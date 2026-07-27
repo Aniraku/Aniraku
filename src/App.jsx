@@ -1,0 +1,83 @@
+import React, { Suspense, lazy, Component } from "react"
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { AuthProvider } from "./hooks/useAuth"
+import Error from "./pages/Error"
+import HomeSkeleton from "./components/Loader/HomeSkeleton"
+import Skeleton from "./components/Loader/Skeleton"
+
+class ErrorBoundary extends Component {
+  state = { hasError: false, error: null }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  reset = () => {
+    this.setState({ hasError: false, error: null })
+    window.location.href = "/"
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "sans-serif", background: "#000", color: "#e2e8f0" }}>
+          <h2 style={{ marginBottom: "0.5rem" }}>Something went wrong</h2>
+          <p style={{ marginBottom: "1rem", color: "#8c8c8c" }}>{this.state.error?.message || "An unexpected error occurred."}</p>
+          <button
+            onClick={this.reset}
+            style={{ padding: "0.5rem 1.5rem", background: "var(--accent)", color: "#000", border: "none", borderRadius: "9999px", cursor: "pointer", fontSize: "1rem", fontWeight: 600 }}
+          >
+            Back to Home
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+const Home = lazy(() => import("./pages/Home"))
+const Main = lazy(() => import("./pages/Main"))
+const Watch = lazy(() => import("./pages/Watch"))
+const Dmca = lazy(() => import("./pages/Dmca"))
+const Privacy = lazy(() => import("./pages/Privacy"))
+const License = lazy(() => import("./pages/License"))
+const Terms = lazy(() => import("./pages/Terms"))
+
+const AnimeDetail = lazy(() => import("./pages/AnimeDetail"))
+const Auth = lazy(() => import("./pages/Auth"))
+const Profile = lazy(() => import("./pages/Profile"))
+const Catalog = lazy(() => import("./pages/Catalog"))
+const Schedule = lazy(() => import("./pages/Schedule"))
+const Admin = lazy(() => import("./pages/Admin"))
+
+const App = () => {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Suspense fallback={<Skeleton />}><Main /></Suspense>} />
+            <Route path="/home" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
+            <Route path="/catalog" element={<Suspense fallback={<Skeleton />}><Catalog /></Suspense>} />
+            <Route path="/schedule" element={<Suspense fallback={<Skeleton />}><Schedule /></Suspense>} />
+            <Route path="/watch/:animeName" element={<Suspense fallback={<Skeleton />}><Watch /></Suspense>} />
+            <Route path="/anime/:id" element={<Suspense fallback={<Skeleton />}><AnimeDetail /></Suspense>} />
+            <Route path="/dmca" element={<Suspense fallback={<Skeleton />}><Dmca /></Suspense>} />
+            <Route path="/privacy" element={<Suspense fallback={<Skeleton />}><Privacy /></Suspense>} />
+            <Route path="/license" element={<Suspense fallback={<Skeleton />}><License /></Suspense>} />
+            <Route path="/terms" element={<Suspense fallback={<Skeleton />}><Terms /></Suspense>} />
+
+            <Route path="/login" element={<Suspense fallback={<Skeleton />}><Auth mode="login" /></Suspense>} />
+            <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
+            <Route path="/profile" element={<Suspense fallback={<Skeleton />}><Profile /></Suspense>} />
+            <Route path="/admin" element={<Suspense fallback={<Skeleton />}><Admin /></Suspense>} />
+            <Route path="/*" element={<Error />} />
+          </Routes>
+        </ErrorBoundary>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}
+
+export default App

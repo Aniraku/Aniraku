@@ -1,0 +1,60 @@
+import React from "react"
+import { FaAngleLeft, FaRandom } from "react-icons/fa"
+import { Link, useNavigate } from "react-router-dom"
+import { S } from "./sidebar.style"
+
+const SideBar = ({ open, setOpen }) => {
+  const navigate = useNavigate()
+  const clickHandler = (e) => {
+    setOpen(false)
+    const genre = e.currentTarget.textContent.trim().toLowerCase()
+    if (genre) navigate(`/genre/${genre}`)
+  }
+  return (
+    <S.SideMenu open={open}>
+      <S.CloseButton onClick={() => setOpen(false)}>
+        <FaAngleLeft /> Close menu
+      </S.CloseButton>
+      <S.SettingsIcon>
+        <S.SettingsItem onClick={() => { setOpen(false); navigate('/top-airing') }} style={{ cursor: 'pointer' }}>
+          <FaRandom size={20} color="var(--accent)" />
+          <p>Random</p>
+        </S.SettingsItem>
+      </S.SettingsIcon>
+      <S.NavList>
+        <S.Item>
+          <Link to="/home" onClick={() => setOpen(false)}>Home</Link>
+        </S.Item>
+        <S.Item>
+          <Link to="/top-airing" onClick={() => setOpen(false)}>Top Airing</Link>
+        </S.Item>
+        <S.Item>
+          <Link to="/most-popular" onClick={() => setOpen(false)}>Most Popular</Link>
+        </S.Item>
+        <S.Item>
+          <Link to="/movies" onClick={() => setOpen(false)}>Movies</Link>
+        </S.Item>
+        <S.Item>
+          <Link to="/tv-series" onClick={() => setOpen(false)}>TV Series</Link>
+        </S.Item>
+        <S.Item>
+          <p style={{ marginBottom: "1em" }}>Genre</p>
+          <S.GenreList>
+            <S.GenreItem onClick={clickHandler}>Action</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Adventure</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Comedy</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Drama</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Fantasy</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Horror</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Romance</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Sci-Fi</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Slice of Life</S.GenreItem>
+            <S.GenreItem onClick={clickHandler}>Supernatural</S.GenreItem>
+          </S.GenreList>
+        </S.Item>
+      </S.NavList>
+    </S.SideMenu>
+  )
+}
+
+export default SideBar
