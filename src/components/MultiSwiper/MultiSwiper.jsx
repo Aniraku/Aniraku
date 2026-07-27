@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pagination } from 'swiper/modules'
+import { Pagination } from 'swiper'
 import { S } from './swiper.style'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { useTrendingAnime } from '../../hooks/useAnime'

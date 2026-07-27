@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Artplayer from 'artplayer'
 import Hls from 'hls.js'
-import { FaStepForward, FaStepBackward, FaSearch, FaDownload, FaExclamationTriangle } from 'react-icons/fa'
+import { FaStepForward, FaStepBackward, FaSearch, FaExclamationTriangle } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
@@ -286,7 +286,6 @@ export default function Watch() {
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
   const [resumeCountdown, setResumeCountdown] = useState(0)
-  const [downloadUrl, setDownloadUrl] = useState('')
 
   const epNumber = parseInt(animeName?.split('-episode-')?.[1] || '1', 10)
   const animeId = animeName?.split('-episode-')?.[0] || animeName?.split('-')?.[0] || '1'
@@ -593,7 +592,6 @@ export default function Watch() {
     setError('')
     setEmbedUrl('')
     setResumePos(null)
-    setDownloadUrl('')
 
     const chain = getFallbackChain(sourceId)
 
@@ -644,7 +642,6 @@ export default function Watch() {
         const defaultUrl = qualityList[0]?.url || ''
 
         const subs = firstSource.subtitles || []
-        setDownloadUrl(data.download || '')
         buildPlayer(defaultUrl, qualityList, subs, data.headers)
         setStreamLoading(false)
         loadingRef.current = false
@@ -673,41 +670,6 @@ export default function Watch() {
     setActiveSource(sourceId)
     setError('')
   }, [activeSource, SOURCES, showToast])
-
-  const handleDownload = useCallback(() => {
-    if (downloadUrl) {
-      window.open(downloadUrl, '_blank')
-      return
-    }
-
-    const art = artInstance.current
-    if (!art?.video?.src) return
-
-    const title = anime?.title?.english || anime?.title?.romaji || baseName
-    const season = anime?.season ? `S${String(anime.seasonNumber || 1).padStart(2, '0')}` : 'S01'
-    const ep = `E${String(epNumber).padStart(2, '0')}`
-    const fileName = `${title} ${season}${ep}.mp4`
-
-    const src = art.video.src
-    if (src.includes('.m3u8') || src.startsWith('blob:')) {
-      window.open(src, '_blank')
-      return
-    }
-
-    fetch(src).then(r => {
-      if (!r.ok) throw new Error('fetch failed')
-      return r.blob()
-    }).then(blob => {
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    }).catch(() => window.open(src, '_blank'))
-  }, [anime, baseName, epNumber, downloadUrl])
 
   // Mobile gestures
   const touchState = useRef({ lastTap: 0, lastTapX: 0, touchStartX: 0, touchStartY: 0, touchStartTime: 0 })
@@ -948,16 +910,6 @@ export default function Watch() {
                   </button>
                 )
               })}
-              <button onClick={handleDownload} title="Download" style={{
-                padding: '10px 14px', background: 'var(--bg-elevated)', color: 'var(--text-muted)',
-                border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', marginLeft: 'auto', transition: 'all 0.2s',
-              }}
-                onMouseEnter={e => { e.target.style.color = 'var(--accent)'; e.target.style.borderColor = 'rgba(226,232,240,0.3)' }}
-                onMouseLeave={e => { e.target.style.color = 'var(--text-muted)'; e.target.style.borderColor = 'var(--border)' }}
-              >
-                <FaDownload size={14} />
-              </button>
             </div>
           </div>
         ))}

@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { FaChevronLeft, FaChevronRight, FaPlayCircle, FaClock } from "react-icons/fa";
-import SwiperCore from "swiper";
-import { Navigation, Pagination, Autoplay } from "swiper/modules";
+import { Navigation, Pagination, Autoplay } from "swiper";
 import "swiper/swiper-bundle.css";
 import { H } from "./hero.style";
-SwiperCore.use([Navigation, Pagination, Autoplay]);
 import { useTrendingAnime } from "../../hooks/useAnime";
 
 const SkeletonSlide = () => (
