@@ -1,25 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="manifest" href="/manifest.json" />
+
+  <!-- Viewport -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
-  <meta name="description" content="Aniraku — Stream, Discover & Download Anime. AniList catalog, community features, Sub/Dub playback." />
   <meta name="theme-color" content="#000000" />
-  <meta property="og:title" content="Aniraku" />
-  <meta property="og:description" content="Stream, Discover & Download Anime. Metadata from AniList. Stream links from public sources." />
+  <meta name="color-scheme" content="dark" />
+
+  <!-- Primary Meta -->
+  <title>Aniraku — Anime Streaming</title>
+  <meta name="title" content="Aniraku — Anime Streaming" />
+  <meta name="description" content="Aniraku — Stream, Discover & Download anime. Browse the AniList catalog, watch Sub/Dub with community features. Free anime streaming." />
+  <meta name="keywords" content="anime streaming, watch anime free, anime online, sub anime, dub anime, aniraku, anime download, anime community" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://aniraku.vercel.app/" />
+
+  <!-- Google Site Verification -->
+  <meta name="google-site-verification" content="8N8_HVtAz4Ut5opOehOdq1o6Mh4MM-vqgOZB6cQ-pq0" />
+
+  <!-- Open Graph -->
   <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://aniraku.vercel.app/" />
+  <meta property="og:title" content="Aniraku — Anime Streaming" />
+  <meta property="og:description" content="Stream, Discover & Download anime. Browse the AniList catalog with Sub/Dub playback and community features." />
+  <meta property="og:image" content="https://aniraku.vercel.app/favicon.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="Aniraku" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://aniraku.vercel.app/" />
+  <meta name="twitter:title" content="Aniraku — Anime Streaming" />
+  <meta name="twitter:description" content="Stream, Discover & Download anime. Browse the AniList catalog with Sub/Dub playback and community features." />
+  <meta name="twitter:image" content="https://aniraku.vercel.app/favicon.svg" />
+  <meta name="twitter:site" content="@sho_islam0311" />
+  <meta name="twitter:creator" content="@sho_islam0311" />
+
+  <!-- Fonts preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Agbalumo&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <title>Aniraku — Anime Streaming</title>
-</head>
 
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Aniraku",
+      "url": "https://aniraku.vercel.app/",
+      "description": "Stream, Discover & Download anime. AniList catalog, Sub/Dub playback, community features.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://aniraku.vercel.app/catalog?search={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      },
+      "inLanguage": "en-US"
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Aniraku",
+      "url": "https://aniraku.vercel.app/",
+      "logo": "https://aniraku.vercel.app/favicon.svg",
+      "sameAs": [
+        "https://twitter.com/sho_islam0311"
+      ]
+    }
+  </script>
+</head>
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
-
 </html>
