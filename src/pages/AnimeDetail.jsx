@@ -137,13 +137,13 @@ const Content = styled.div`
   }
 `
 
-const Section = styled.div`
+const Section = styled.section`
   margin-bottom: 30px;
 
   @media (max-width: 480px) { margin-bottom: 1.5rem; }
 `
 
-const SectionTitle = styled.h3`
+const SectionTitle = styled.h2`
   font-size: 16px;
   margin-bottom: 10px;
   color: var(--text-secondary);
@@ -209,7 +209,7 @@ const EpNum = styled.span`
   color: var(--text-muted);
 `
 
-const RecsSection = styled.div`
+const RecsSection = styled.section`
   margin-bottom: 30px;
 `
 
@@ -415,6 +415,7 @@ const AnimeDetail = () => {
   return (
     <Page>
       <NavBar />
+      <main>
       <Banner>
         <BannerImg src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} alt="" />
         <BannerOverlay />
@@ -487,7 +488,7 @@ const AnimeDetail = () => {
               <RecsRow ref={recsRef}>
                 {recommendations.map((item, idx) => (
                   <RecsCard to={`/anime/${item.id}`} key={item.id || idx}>
-                    <RecsImg src={item.coverImage?.large || ''} alt="" loading="lazy" />
+                    <RecsImg src={item.coverImage?.large || ''} alt={item.title?.english || item.title?.romaji || 'Recommended anime'} loading="lazy" />
                     <RecsBadge>★ {(item.averageScore || 0)}%</RecsBadge>
                     <RecsOverlay>
                       <RecsTitle>{item.title?.english || item.title?.romaji || 'Unknown'}</RecsTitle>
@@ -516,7 +517,7 @@ const AnimeDetail = () => {
               <RecsRow ref={similarRef}>
                 {similar.map((item, idx) => (
                   <RecsCard to={`/anime/${item.id}`} key={item.id || idx}>
-                    <RecsImg src={item.coverImage?.large || ''} alt="" loading="lazy" />
+                    <RecsImg src={item.coverImage?.large || ''} alt={item.title?.english || item.title?.romaji || 'Similar anime'} loading="lazy" />
                     {item.averageScore && <RecsBadge>★ {item.averageScore}%</RecsBadge>}
                     <RecsOverlay>
                       <RecsTitle>{item.title?.english || item.title?.romaji || 'Unknown'}</RecsTitle>
@@ -535,6 +536,7 @@ const AnimeDetail = () => {
           </RecsSection>
         )}
       </Content>
+      </main>
       <Footer />
     </Page>
   )

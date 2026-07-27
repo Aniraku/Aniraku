@@ -806,6 +806,7 @@ export default function Watch() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: '#fff' }}>
       <NavBar />
+      <main>
 
       {/* Toast notification */}
       {toast && (
@@ -1005,7 +1006,7 @@ export default function Watch() {
 
           {anime?.description && (
             <div style={{ marginTop: 20 }}>
-              <h3 style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 600 }}>Synopsis</h3>
+              <h2 style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 600 }}>Synopsis</h2>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, maxHeight: 120, overflow: 'hidden' }}>
                 {anime.description.replace(/<[^>]*>/g, '')}
               </p>
@@ -1029,9 +1030,9 @@ export default function Watch() {
           width: 340, flexShrink: 0, minWidth: 0,
           display: showEpSidebar ? 'block' : 'none',
         }}>
-          <h3 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>
+          <h2 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>
             Episodes ({episodes.length})
-          </h3>
+          </h2>
 
           {episodes.length > EPISODES_PER_PAGE && (
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, alignItems: 'center' }}>
@@ -1153,6 +1154,7 @@ export default function Watch() {
           .watch-source-btn { padding: 10px 18px !important; }
         }
       `}</style>
+    </main>
     </div>
   )
 }

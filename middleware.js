@@ -1,6 +1,6 @@
 const BACKEND = 'https://aniraku-backend.onrender.com'
 const SITE = 'https://aniraku.vercel.app'
-const FALLBACK_IMAGE = `${SITE}/favicon.svg`
+const FALLBACK_IMAGE = `${SITE}/og-image.svg`
 
 const BOT_RE = /bot|crawler|spider|googlebot|bingbot|yandex|facebookexternalhit|twitterbot|whatsapp|linkedin|slack|telegram|discord|pinterest|slurp|duckduckbot|baiduspider|youtube|embedly|preview|headless|ia_archiver|applebot|curl|wget|validator|facebook|twitter/i
 

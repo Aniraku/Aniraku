@@ -204,6 +204,7 @@ const Home = () => {
   return (
     <>
       <NavBar />
+      <main>
       <Hero />
       <ContinueWatching />
 
@@ -241,6 +242,7 @@ const Home = () => {
         </GenreRow>
       </Section>
 
+      </main>
       <Footer />
       <MobileBottomNav />
       <div className="bottom-nav-spacer" />

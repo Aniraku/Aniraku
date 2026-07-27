@@ -356,6 +356,7 @@ const Catalog = () => {
       <NavBar />
       <Container>
         <Title>Browse Anime</Title>
+        <main>
 
         <form onSubmit={handleSearch} ref={searchRef} style={{ position: 'relative' }}>
           <SearchBar>
@@ -457,7 +458,7 @@ const Catalog = () => {
         {/* Trending section when no search */}
         {showTrending && trending && trending.length > 0 && !isLoading && (
           <TrendingSection>
-            <h3 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>Trending Now</h3>
+            <h2 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>Trending Now</h2>
             <TrendingGrid>
               {trending.slice(0, 6).map((item, idx) => {
                 const id = item.id
@@ -574,6 +575,7 @@ const Catalog = () => {
             )}
           </>
         )}
+      </main>
       </Container>
       <Footer />
       <MobileBottomNav />

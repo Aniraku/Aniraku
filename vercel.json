@@ -4,8 +4,9 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
+    { "source": "/sitemaps/(.*)", "destination": "/sitemaps/$1" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
-    { "source": "/((?!assets/|favicon\\.svg|manifest\\.json|sitemap\\.xml|robots\\.txt).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|favicon\\.svg|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -24,6 +25,13 @@
     },
     {
       "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600, s-maxage=3600" }
+      ]
+    },
+    {
+      "source": "/sitemaps/(.*)",
       "headers": [
         { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
         { "key": "Cache-Control", "value": "public, max-age=3600, s-maxage=3600" }

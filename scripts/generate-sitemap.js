@@ -3,9 +3,46 @@ import path from 'path'
 
 const API = 'https://aniraku-backend.onrender.com/api/v1'
 const SITE = 'https://aniraku.vercel.app'
-const OUTPUT = path.resolve('public/sitemap.xml')
+const OUT_DIR = path.resolve('public')
 const PER_PAGE = 50
 const MAX_RETRIES = 3
+const CHUNK_SIZE = 1000
+
+const STATIC_URLS = [
+  { loc: '/', freq: 'daily', priority: '1.0' },
+  { loc: '/catalog', freq: 'daily', priority: '0.8' },
+  { loc: '/schedule', freq: 'weekly', priority: '0.6' },
+  { loc: '/privacy', freq: 'monthly', priority: '0.3' },
+  { loc: '/terms', freq: 'monthly', priority: '0.3' },
+  { loc: '/dmca', freq: 'monthly', priority: '0.3' },
+  { loc: '/license', freq: 'yearly', priority: '0.2' },
+]
+
+function escapeXml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function urlEntry(loc, lastmod, freq, priority) {
+  return `  <url><loc>${SITE}${escapeXml(loc)}</loc><lastmod>${lastmod}</lastmod><changefreq>${freq}</changefreq><priority>${priority}</priority></url>`
+}
+
+function writeSitemap(filePath, urls) {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.join('\n')}
+</urlset>`
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, xml, 'utf-8')
+  return Buffer.byteLength(xml, 'utf-8')
+}
+
+function writeSitemapIndex(filePath, children) {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${children.join('\n')}
+</sitemapindex>`
+  fs.writeFileSync(filePath, xml, 'utf-8')
+}
 
 async function fetchPage(page) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -41,7 +78,7 @@ async function fetchPage(page) {
 async function fetchAllPages() {
   const first = await fetchPage(1)
   if (!first || !first.media) {
-    console.error('Could not fetch first page. Backend may be waking up. Using static routes only.')
+    console.error('Could not fetch first page. Backend may be waking up.')
     return []
   }
 
@@ -60,47 +97,50 @@ async function fetchAllPages() {
   return media
 }
 
-function escapeXml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
+const today = new Date().toISOString().slice(0, 10)
 
-function buildSitemap(media) {
-  const seen = new Set()
-  const urls = []
-  const today = new Date().toISOString().slice(0, 10)
-
-  urls.push(`  <url><loc>${SITE}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`)
-  urls.push(`  <url><loc>${SITE}/catalog</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>`)
-  urls.push(`  <url><loc>${SITE}/schedule</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>`)
-
-  const staticPages = [
-    { path: '/privacy', freq: 'monthly', priority: '0.3' },
-    { path: '/terms', freq: 'monthly', priority: '0.3' },
-    { path: '/dmca', freq: 'monthly', priority: '0.3' },
-    { path: '/license', freq: 'yearly', priority: '0.2' },
-  ]
-  for (const p of staticPages) {
-    urls.push(`  <url><loc>${SITE}${p.path}</loc><lastmod>${today}</lastmod><changefreq>${p.freq}</changefreq><priority>${p.priority}</priority></url>`)
-  }
-
-  for (const item of media) {
-    if (!item.id || seen.has(item.id)) continue
-    seen.add(item.id)
-    urls.push(`  <url><loc>${SITE}/anime/${item.id}</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`)
-  }
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls.join('\n')}
-</urlset>`
-}
-
+console.log('Generating sitemaps...')
 console.log(`Fetching anime catalog from ${API}/browse ...`)
 const media = await fetchAllPages()
 console.log(`Fetched ${media.length} anime entries`)
 
-const xml = buildSitemap(media)
-fs.mkdirSync(path.dirname(OUTPUT), { recursive: true })
-fs.writeFileSync(OUTPUT, xml, 'utf-8')
-console.log(`Wrote ${OUTPUT} (${xml.length} bytes, ${media.length} anime pages)`)
+// Write static sitemap
+const staticUrls = STATIC_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority))
+const staticSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'static.xml'), staticUrls)
+console.log(`  sitemaps/static.xml — ${staticUrls.length} URLs, ${staticSize} bytes`)
+
+// Write anime chunk sitemaps
+const seen = new Set()
+const uniqueMedia = media.filter(item => {
+  if (!item.id || seen.has(item.id)) return false
+  seen.add(item.id)
+  return true
+})
+
+const chunks = []
+for (let i = 0; i < uniqueMedia.length; i += CHUNK_SIZE) {
+  chunks.push(uniqueMedia.slice(i, i + CHUNK_SIZE))
+}
+
+const childIndexes = [{
+  loc: '/sitemaps/static.xml',
+  lastmod: today
+}]
+
+for (let i = 0; i < chunks.length; i++) {
+  const name = `anime-${i + 1}.xml`
+  const urls = chunks[i].map(item =>
+    urlEntry(`/anime/${item.id}`, today, 'monthly', '0.6')
+  )
+  const size = writeSitemap(path.join(OUT_DIR, 'sitemaps', name), urls)
+  console.log(`  sitemaps/${name} — ${urls.length} URLs, ${size} bytes`)
+  childIndexes.push({ loc: `/sitemaps/${name}`, lastmod: today })
+}
+
+// Write sitemap index
+const indexChildren = childIndexes.map(c =>
+  `  <sitemap><loc>${SITE}${c.loc}</loc><lastmod>${c.lastmod}</lastmod></sitemap>`
+)
+writeSitemapIndex(path.join(OUT_DIR, 'sitemap.xml'), indexChildren)
+console.log(`  sitemap.xml (index) — ${childIndexes.length} children`)
+console.log(`Done. ${uniqueMedia.length} anime across ${chunks.length} chunk(s).`)
