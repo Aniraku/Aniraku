@@ -621,6 +621,8 @@ export default function Watch() {
         return
       }
       showToast(`Provider blocked (${streamRetries.current[retryKey]}/7), trying next...`)
+    } else {
+      streamRetries.current = {}
     }
 
     const chain = getFallbackChain(sourceId)
