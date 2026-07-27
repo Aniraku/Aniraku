@@ -477,7 +477,7 @@ export default function Watch() {
               art.hls.destroy()
             }
             const hls = new Hls({
-              enableWorker: true,
+              enableWorker: false,
               maxBufferLength: 15,
               maxMaxBufferLength: 60,
               startFragPrefetch: true,
@@ -503,7 +503,6 @@ export default function Watch() {
                 hls.startLoad()
                 recoveryAttempts++
               } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                hls.swapAudioCodec()
                 hls.recoverMediaError()
                 recoveryAttempts++
               }
