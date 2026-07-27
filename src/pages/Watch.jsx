@@ -480,35 +480,17 @@ export default function Watch() {
             const hls = new Hls({
               enableWorker: true,
               maxBufferLength: 30,
-              maxMaxBufferLength: 60,
+              maxMaxBufferLength: 120,
               startFragPrefetch: true,
               lowLatencyMode: false,
-              backBufferLength: 0,
+              backBufferLength: 30,
               appendInSequenceGaps: true,
-              maxBufferHole: 10,
+              maxBufferHole: 0.5,
               forceKeyFrameOnDiscontinuity: true,
             })
 
-            if (hls._emitter && hls._emitter._events && hls._emitter._events['hlsBufferCodecs']) {
-              const listeners = hls._emitter._events['hlsBufferCodecs']
-              const bcIdx = listeners.findIndex(l => l.context && l.context.constructor && l.context.constructor.name === 'BufferController')
-              if (bcIdx >= 0) {
-                const origFn = listeners[bcIdx].fn
-                listeners[bcIdx].fn = function(event, data) {
-                  if (data && data.audio) {
-                    const codec = data.audio.levelCodec || data.audio.codec
-                    if (codec && codec !== 'mp4a.40.2') {
-                      data.audio.codec = 'mp4a.40.2'
-                      data.audio.levelCodec = 'mp4a.40.2'
-                    }
-                  }
-                  return origFn.call(this, event, data)
-                }
-              }
-            }
-
             let recoveryAttempts = 0
-            const maxRecoveryAttempts = 3
+            const maxRecoveryAttempts = 5
 
             hls.on(Hls.Events.ERROR, (_event, data) => {
               if (!data.fatal) return
@@ -523,13 +505,7 @@ export default function Watch() {
               }
             })
 
-            hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_e, data) => {
-            })
-
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              if (hls.audioTracks.length > 0) {
-                hls.audioTrack = 0
-              }
               video.play().catch(() => {})
             })
 
