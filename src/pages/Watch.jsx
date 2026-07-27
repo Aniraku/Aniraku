@@ -490,6 +490,7 @@ export default function Watch() {
               manifestLoadingMaxRetry: 10,
               levelLoadingMaxRetry: 10,
               fragLoadingMaxRetry: 10,
+              defaultAudioCodec: 'mp4a.40.2',
             })
 
             let recoveryAttempts = 0
@@ -505,12 +506,6 @@ export default function Watch() {
                 hls.swapAudioCodec()
                 hls.recoverMediaError()
                 recoveryAttempts++
-              }
-            })
-
-            hls.on(Hls.Events.BUFFER_CODECS, (_event, data) => {
-              if (!data.audioCodec) {
-                data.audioCodec = 'mp4a.40.2'
               }
             })
 
