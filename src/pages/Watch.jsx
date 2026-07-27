@@ -423,7 +423,7 @@ export default function Watch() {
     return [SOURCES.sub[0]]
   }, [SOURCES])
 
-  const buildPlayer = useCallback((streamUrl, qualityList, subtitles, headers) => {
+  const buildPlayer = useCallback((streamUrl, qualityList, subtitles, headers, onBlocked) => {
     destroyPlayer()
     const container = artRef.current
     if (!container) return
@@ -500,7 +500,11 @@ export default function Watch() {
               if (!data.fatal) return
               recoveryAttempts++
               if (recoveryAttempts >= maxRecoveryAttempts) {
-                setError('Stream failed after multiple retries. Try a different server.')
+                if (onBlocked) {
+                  onBlocked()
+                } else {
+                  setError('Stream failed after multiple retries. Try a different server.')
+                }
                 return
               }
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -508,7 +512,11 @@ export default function Watch() {
               } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                 hls.recoverMediaError()
               } else {
-                setError('Stream playback error. Try a different server.')
+                if (onBlocked) {
+                  onBlocked()
+                } else {
+                  setError('Stream playback error. Try a different server.')
+                }
               }
             })
 
@@ -593,13 +601,27 @@ export default function Watch() {
     artInstance.current = art
   }, [animeId, anime, epNumber, episodes, baseName, navigate, destroyPlayer])
 
-  const loadStream = useCallback(async (sourceId) => {
-    if (loadingRef.current) return
+  const streamRetries = useRef({})
+
+  const loadStream = useCallback(async (sourceId, forceRefresh = false) => {
+    if (loadingRef.current && !forceRefresh) return
     loadingRef.current = true
     setStreamLoading(true)
     setError('')
     setEmbedUrl('')
     setResumePos(null)
+
+    const retryKey = sourceId
+    if (forceRefresh) {
+      streamRetries.current[retryKey] = (streamRetries.current[retryKey] || 0) + 1
+      if (streamRetries.current[retryKey] > 7) {
+        setError('All providers blocked. Try a different server.')
+        setStreamLoading(false)
+        loadingRef.current = false
+        return
+      }
+      showToast(`Provider blocked (${streamRetries.current[retryKey]}/7), trying next...`)
+    }
 
     const chain = getFallbackChain(sourceId)
 
@@ -617,6 +639,7 @@ export default function Watch() {
             provider: source.provider,
             lang: source.lang,
             quality: 'auto',
+            refresh: forceRefresh,
           }),
         })
         const data = await res.json()
@@ -650,7 +673,10 @@ export default function Watch() {
         const defaultUrl = qualityList[0]?.url || ''
 
         const subs = firstSource.subtitles || []
-        buildPlayer(defaultUrl, qualityList, subs, data.headers)
+        const onBlocked = () => {
+          loadStream(sourceId, true)
+        }
+        buildPlayer(defaultUrl, qualityList, subs, data.headers, onBlocked)
         setStreamLoading(false)
         loadingRef.current = false
         return
