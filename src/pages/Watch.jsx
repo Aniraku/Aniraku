@@ -478,11 +478,11 @@ export default function Watch() {
             }
             const hls = new Hls({
               enableWorker: true,
-              maxBufferLength: 30,
-              maxMaxBufferLength: 120,
+              maxBufferLength: 15,
+              maxMaxBufferLength: 60,
               startFragPrefetch: true,
               lowLatencyMode: false,
-              backBufferLength: 30,
+              backBufferLength: 5,
               appendInSequenceGaps: true,
               maxBufferHole: 1.0,
               forceKeyFrameOnDiscontinuity: true,
@@ -505,6 +505,12 @@ export default function Watch() {
                 hls.swapAudioCodec()
                 hls.recoverMediaError()
                 recoveryAttempts++
+              }
+            })
+
+            hls.on(Hls.Events.BUFFER_CODECS, (_event, data) => {
+              if (!data.audioCodec) {
+                data.audioCodec = 'mp4a.40.2'
               }
             })
 
