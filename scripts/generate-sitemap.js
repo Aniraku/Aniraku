@@ -69,14 +69,11 @@ function buildSitemap(media) {
   const urls = []
   const today = new Date().toISOString().slice(0, 10)
 
-  urls.push(`  <url><loc>${SITE}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>`)
-  urls.push(`  <url><loc>${SITE}/home</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`)
+  urls.push(`  <url><loc>${SITE}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`)
   urls.push(`  <url><loc>${SITE}/catalog</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>`)
   urls.push(`  <url><loc>${SITE}/schedule</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>`)
 
   const staticPages = [
-    { path: '/login', freq: 'monthly', priority: '0.4' },
-    { path: '/signup', freq: 'monthly', priority: '0.4' },
     { path: '/privacy', freq: 'monthly', priority: '0.3' },
     { path: '/terms', freq: 'monthly', priority: '0.3' },
     { path: '/dmca', freq: 'monthly', priority: '0.3' },
