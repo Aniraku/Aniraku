@@ -2,9 +2,6 @@
   "buildCommand": "npm run generate-sitemap && npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "functions": {
-    "middleware.js": { "runtime": "edge" }
-  },
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
