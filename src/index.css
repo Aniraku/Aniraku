@@ -287,7 +287,14 @@ img { display: block; max-width: 100%; }
 
 /* Android / Mobile fixes */
 @supports (padding: env(safe-area-inset-bottom)) {
-  body { padding-bottom: env(safe-area-inset-bottom); }
+  body { padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  .bottom-nav-spacer { height: calc(70px + env(safe-area-inset-bottom)); }
+}
+
+/* Extra small screens (< 360px) */
+@media (max-width: 360px) {
+  :root { --header-h: 56px; }
+  .art-subtitle-wrap span { font-size: 16px !important; }
 }
 
 input, textarea, select {

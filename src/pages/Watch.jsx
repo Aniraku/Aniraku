@@ -286,6 +286,7 @@ export default function Watch() {
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
   const [resumeCountdown, setResumeCountdown] = useState(0)
+  const [showEpSidebar, setShowEpSidebar] = useState(true)
 
   const epNumber = parseInt(animeName?.split('-episode-')?.[1] || '1', 10)
   const animeId = animeName?.split('-episode-')?.[0] || animeName?.split('-')?.[0] || '1'
@@ -1012,8 +1013,22 @@ export default function Watch() {
           )}
         </div>
 
+        {/* Episode sidebar toggle for mobile */}
+        <button onClick={() => setShowEpSidebar(p => !p)} className="watch-ep-toggle" style={{
+          display: 'none', width: '100%', padding: '10px 14px', margin: '0 0 12px',
+          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+          borderRadius: 10, color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
+          cursor: 'pointer', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span>Episodes ({episodes.length})</span>
+          <span style={{ transform: showEpSidebar ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+        </button>
+
         {/* Episode sidebar */}
-        <div className="watch-episode-sidebar" style={{ width: 340, flexShrink: 0, minWidth: 0 }}>
+        <div className="watch-episode-sidebar" style={{
+          width: 340, flexShrink: 0, minWidth: 0,
+          display: showEpSidebar ? 'block' : 'none',
+        }}>
           <h3 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>
             Episodes ({episodes.length})
           </h3>
@@ -1113,6 +1128,7 @@ export default function Watch() {
         @media (max-width: 768px) {
           .watch-player-wrapper { max-width: 100% !important; }
           .watch-episode-sidebar { width: 100% !important; flex-shrink: 1 !important; max-height: none !important; }
+          .watch-ep-toggle { display: flex !important; }
           .art-bottom { padding: 0 8px 4px !important; }
           .art-control-progress .art-control-progress-inner { height: 20px !important; top: -8px !important; }
           .art-setting-panel { border-radius: 8px !important; max-height: 60vh !important; overflow-y: auto !important; }
@@ -1125,8 +1141,16 @@ export default function Watch() {
           .watch-episode-sidebar { max-height: 600px !important; overflow-y: auto !important; }
         }
 
+        /* Touch-friendly nav buttons on watch page */
+        @media (max-width: 768px) {
+          a[style*="var(--bg-card)"] { min-height: 44px; padding: 10px 16px !important; }
+        }
+
         @media (max-width: 640px) {
-          .watch-source-btn { flex: 1 1 auto !important; min-width: 0 !important; }
+          .watch-source-btn { flex: 1 1 auto !important; min-width: 0 !important; padding: 14px 14px !important; font-size: 14px !important; min-height: 48px !important; }
+        }
+        @media (min-width: 641px) and (max-width: 1024px) {
+          .watch-source-btn { padding: 10px 18px !important; }
         }
       `}</style>
     </div>
@@ -1135,7 +1159,7 @@ export default function Watch() {
 
 const navBtnStyle = {
   background: 'var(--bg-card)',
-  padding: '8px 16px',
+  padding: '10px 18px',
   borderRadius: 8,
   color: 'var(--text-secondary)',
   textDecoration: 'none',
@@ -1144,6 +1168,7 @@ const navBtnStyle = {
   alignItems: 'center',
   gap: 6,
   fontWeight: 500,
+  minHeight: 44,
   border: '1px solid var(--border)',
   transition: 'all 0.15s',
 }

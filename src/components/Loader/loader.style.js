@@ -35,7 +35,7 @@ L.Hero = styled.div`
   @media screen and (max-width: 1299px) {
     height: 500px;
   }
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     height: 350px;
   }
 `;

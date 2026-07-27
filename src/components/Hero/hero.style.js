@@ -18,7 +18,7 @@ H.Swiper = styled(Swiper)`
   @media screen and (max-width: 1299px) {
     height: 500px;
   }
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     height: 420px;
   }
 `;
@@ -89,7 +89,7 @@ H.ImgContainer = styled.div`
       var(--bg) 100%
     );
   }
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     &::after {
       background: var(--bg);
       background: -moz-linear-gradient(
@@ -116,7 +116,7 @@ H.Img = styled.img`
   height: 100%;
   position: absolute;
   object-fit: cover;
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     opacity: 0.5;
   }
 `;
@@ -137,7 +137,7 @@ H.Content = styled.div`
   @media screen and (max-width: 1200px) {
     width: 50%;
   }
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     width: 100%;
     padding: 0 16px 24px;
     left: 0;
@@ -169,7 +169,7 @@ H.Title = styled.h1`
     line-height: 1.1em;
     -webkit-line-clamp: 2;
   }
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     font-size: 22px;
     line-height: 1.15em;
     -webkit-line-clamp: 2;
@@ -187,7 +187,7 @@ H.Icons = styled.div`
   font-size: 14px;
   align-items: center;
 
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     display: none;
   }
 `;
@@ -221,7 +221,7 @@ H.Description = styled.div`
     line-height: 1.1em;
     -webkit-line-clamp: 2;
   }
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     display: none;
   }
 `;

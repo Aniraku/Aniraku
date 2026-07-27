@@ -12,7 +12,7 @@ S.SwiperContainer = styled.div`
   overflow: hidden;
   z-index: 1;
 
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     padding-right: 0;
   }
 `
@@ -154,7 +154,7 @@ S.NavBtn = styled.div`
   bottom: 0;
   width: 40px;
 
-  @media screen and (max-width: 759px) {
+  @media screen and (max-width: 768px) {
     display: none;
   }
 `

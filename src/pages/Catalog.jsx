@@ -119,6 +119,10 @@ const Grid = styled.div`
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
   }
+  @media (max-width: 360px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
 `
 const ListView = styled.div`
   display: flex;
@@ -219,6 +223,10 @@ const TrendingGrid = styled.div`
   @media (max-width: 480px) {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
+  }
+  @media (max-width: 360px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
   }
 `
 

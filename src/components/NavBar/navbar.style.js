@@ -220,7 +220,7 @@ N.NavItem = styled.button`
   }
 
   @media (max-width: 768px) {
-    padding: 6px;
+    padding: 10px 12px;
     span { display: none; }
   }
 

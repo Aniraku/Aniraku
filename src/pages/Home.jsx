@@ -61,6 +61,10 @@ const Grid = styled.div`
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
   }
+  @media (max-width: 360px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
 `
 
 const ScheduleGrid = styled.div`
@@ -73,6 +77,10 @@ const ScheduleGrid = styled.div`
   @media (max-width: 480px) {
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
+  }
+  @media (max-width: 360px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
   }
 `
 

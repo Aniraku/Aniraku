@@ -75,6 +75,11 @@ F.SocialLink = styled.a`
     border-color: var(--accent);
     background: var(--accent-glow);
   }
+
+  @media (max-width: 768px) {
+    width: 44px;
+    height: 44px;
+  }
 `
 
 F.ColLinks = styled.div`

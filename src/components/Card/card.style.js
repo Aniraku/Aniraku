@@ -83,6 +83,9 @@ C.BookmarkBtn = styled.button`
   @media (max-width: 768px) {
     opacity: 1;
     transform: translateY(0);
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
   }
 
   &:hover {

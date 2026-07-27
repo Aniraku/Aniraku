@@ -34,7 +34,9 @@ const Item = styled.button`
   border: none;
   color: ${({ active }) => (active ? '#fff' : 'var(--text-muted)')};
   cursor: pointer;
-  padding: 8px 14px;
+  padding: 10px 16px;
+  min-height: 48px;
+  min-width: 48px;
   border-radius: 9999px;
   font-size: 10px;
   transition: all 0.2s;
