@@ -498,13 +498,17 @@ export default function Watch() {
 
             hls.on(Hls.Events.ERROR, (_event, data) => {
               if (!data.fatal) return
-              if (recoveryAttempts >= maxRecoveryAttempts) return
+              recoveryAttempts++
+              if (recoveryAttempts >= maxRecoveryAttempts) {
+                setError('Stream failed after multiple retries. Try a different server.')
+                return
+              }
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
                 hls.startLoad()
-                recoveryAttempts++
               } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
                 hls.recoverMediaError()
-                recoveryAttempts++
+              } else {
+                setError('Stream playback error. Try a different server.')
               }
             })
 
