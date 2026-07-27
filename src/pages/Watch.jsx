@@ -484,8 +484,12 @@ export default function Watch() {
               lowLatencyMode: false,
               backBufferLength: 30,
               appendInSequenceGaps: true,
-              maxBufferHole: 0.5,
+              maxBufferHole: 1.0,
               forceKeyFrameOnDiscontinuity: true,
+              maxRecoveryAttempts: 10,
+              manifestLoadingMaxRetry: 10,
+              levelLoadingMaxRetry: 10,
+              fragLoadingMaxRetry: 10,
             })
 
             let recoveryAttempts = 0
