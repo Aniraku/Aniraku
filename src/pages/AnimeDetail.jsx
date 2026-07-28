@@ -352,7 +352,8 @@ const AnimeDetail = () => {
       anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
       anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => {
         const edges = r.data.Media?.relations?.edges || []
-        return edges.filter(e => e.node?.id && (e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY')).map(e => e.node)
+        return edges.filter(e => e.node?.id && (e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY'))
+          .map(e => ({ ...e.node, relationType: e.relationType }))
       }).catch(() => []),
     ]).then(([data, simData, relData]) => {
       setAnime(data)
@@ -521,7 +522,7 @@ const AnimeDetail = () => {
 
             {activeTab === 'relations' && hasRelations && (
               <RelationsGrid>
-                {relations.map((r, i) => <RelationCard key={r?.id || i} r={{ node: r, relationType: '' }} />)}
+                {relations.map((r, i) => <RelationCard key={r?.id || i} r={{ node: r, relationType: r.relationType || '' }} />)}
               </RelationsGrid>
             )}
           </Section>
