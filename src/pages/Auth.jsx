@@ -31,6 +31,10 @@ const Card = styled.div`
   border-radius: 16px;
   padding: 40px 32px;
   border: 1px solid var(--border);
+  @media (max-width: 480px) {
+    padding: 28px 20px;
+    border-radius: 12px;
+  }
 `
 
 const Title = styled.h1`

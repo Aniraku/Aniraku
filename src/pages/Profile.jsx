@@ -175,7 +175,7 @@ const Profile = () => {
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div className="profile-header" style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
             <img src={avatarSrc} alt="" style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent)', flexShrink: 0 }} />
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <h1 style={{ fontSize: 24, fontWeight: 700 }}>{displayName || username || 'User'}</h1>
                 {user.email_confirmed_at && (

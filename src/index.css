@@ -482,6 +482,35 @@ video {
   .player-wrapper { border-radius: 0 !important; }
 }
 
+/* --- Watch page mobile --- */
+@media (max-width: 768px) {
+  .watch-ep-toggle { display: flex !important; }
+  .watch-episode-sidebar {
+    width: 100% !important;
+    max-height: none !important;
+  }
+  .watch-info-section {
+    flex-direction: column !important;
+    gap: 16px !important;
+    padding: 16px 12px !important;
+  }
+  .watch-info-section h1 {
+    font-size: 18px !important;
+    white-space: normal !important;
+  }
+  .watch-source-btn {
+    padding: 8px 14px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* --- Catalog page mobile --- */
+@media (max-width: 480px) {
+  .catalog-filters {
+    gap: 6px !important;
+  }
+}
+
 /* --- Input focus ring accessibility --- */
 input:focus, textarea:focus, select:focus, button:focus-visible {
   outline: 2px solid var(--accent);
@@ -492,4 +521,58 @@ input:focus, textarea:focus, select:focus, button:focus-visible {
 @media (max-width: 768px) {
   h1 { font-size: 1.5rem !important; }
   h2 { font-size: 1.25rem !important; }
+}
+
+/* --- Profile page mobile --- */
+@media (max-width: 768px) {
+  .profile-page {
+    padding: 20px 12px !important;
+  }
+  .profile-header img {
+    width: 64px !important;
+    height: 64px !important;
+  }
+  .profile-header h1 {
+    font-size: 20px !important;
+  }
+  .profile-tabs {
+    gap: 0 !important;
+  }
+  .profile-tabs button {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+  .profile-card {
+    padding: 16px !important;
+  }
+  .profile-bookmark-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .profile-avatar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .profile-actions {
+    flex-direction: column !important;
+  }
+}
+
+/* --- Touch-friendly tap targets --- */
+@media (max-width: 768px) {
+  button, a, [role="button"] {
+    min-height: 44px;
+  }
+}
+
+/* --- Safe area insets for iOS --- */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+}
+
+/* --- Smooth scrolling --- */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
 }
