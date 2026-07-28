@@ -286,7 +286,8 @@ const RELATION_LABELS = {
 }
 
 const RelationCard = ({ r }) => {
-  const item = r.node
+  const item = r?.node
+  if (!item?.id) return null
   const t = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
   const label = RELATION_LABELS[r.relationType] || r.relationType?.replace('_', ' ') || ''
   return (
@@ -351,7 +352,7 @@ const AnimeDetail = () => {
       anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
       anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => {
         const edges = r.data.Media?.relations?.edges || []
-        return edges.filter(e => e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY').map(e => e.node)
+        return edges.filter(e => e.node?.id && (e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY')).map(e => e.node)
       }).catch(() => []),
     ]).then(([data, simData, relData]) => {
       setAnime(data)
@@ -520,7 +521,7 @@ const AnimeDetail = () => {
 
             {activeTab === 'relations' && hasRelations && (
               <RelationsGrid>
-                {relations.map(r => <RelationCard key={r.node.id} r={r} />)}
+                {relations.map((r, i) => <RelationCard key={r?.node?.id || i} r={r} />)}
               </RelationsGrid>
             )}
           </Section>
