@@ -286,10 +286,10 @@ const RELATION_LABELS = {
 }
 
 const RelationCard = ({ r }) => {
-  const item = r?.node
+  const item = r?.node || r
   if (!item?.id) return null
   const t = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
-  const label = RELATION_LABELS[r.relationType] || r.relationType?.replace('_', ' ') || ''
+  const label = RELATION_LABELS[r?.relationType] || r?.relationType?.replace('_', ' ') || ''
   return (
     <Link to={`/anime/${item.id}`} style={{ textDecoration: 'none' }}>
       <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', background: 'var(--bg-card)', aspectRatio: '16/10' }}>
@@ -521,7 +521,7 @@ const AnimeDetail = () => {
 
             {activeTab === 'relations' && hasRelations && (
               <RelationsGrid>
-                {relations.map((r, i) => <RelationCard key={r?.node?.id || i} r={r} />)}
+                {relations.map((r, i) => <RelationCard key={r?.id || i} r={{ node: r, relationType: '' }} />)}
               </RelationsGrid>
             )}
           </Section>
