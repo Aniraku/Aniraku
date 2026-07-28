@@ -10,6 +10,9 @@
   <meta name="theme-color" content="#000000" />
   <meta name="color-scheme" content="dark" />
 
+  <!-- CSP: allow AniList GraphQL + Miruro CDN -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://graphql.anilist.co https://aniraku-backend.onrender.com https://*.onrender.com https://*.vercel.app wss://*.onrender.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:;" />
+
   <!-- Primary Meta -->
   <title>Aniraku — Anime Streaming</title>
   <meta name="title" content="Aniraku — Anime Streaming" />
