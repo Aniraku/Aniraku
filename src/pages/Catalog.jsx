@@ -3,13 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { API_BASE } from '../config'
-import Card from '../components/Card/Card'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
 import useDebounce from '../hooks/useDebounce'
 import useMediaQuery from '../hooks/useMediaQuery'
-import { FaTimes, FaSearch, FaList, FaThLarge, FaArrowUp } from 'react-icons/fa'
+import { FaTimes, FaSearch, FaList, FaThLarge, FaArrowUp, FaStar } from 'react-icons/fa'
 import styled from 'styled-components'
 
 const GENRES = ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mystery', 'Romance', 'Sci-Fi', 'Slice of Life', 'Sports', 'Supernatural', 'Thriller', 'NSFW']
@@ -54,12 +53,11 @@ const SearchBar = styled.div`
   align-items: center;
   gap: 8px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  border: 1px solid ${p => p.$focused ? 'var(--accent)' : 'var(--border)'};
   border-radius: var(--radius-full);
   padding: 8px 14px;
   margin-bottom: 1rem;
   transition: border-color 0.2s;
-  &:focus-within { border-color: var(--accent); }
 `
 const SearchInput = styled.input`
   flex: 1;
@@ -78,7 +76,7 @@ const SuggestionDropdown = styled.div`
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   margin-top: 4px;
-  max-height: 360px;
+  max-height: 420px;
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
 `
@@ -94,8 +92,8 @@ const SuggestionItem = styled.div`
   &:last-child { border-bottom: none; }
 `
 const SuggestionImg = styled.img`
-  width: 32px;
-  height: 45px;
+  width: 36px;
+  height: 50px;
   object-fit: cover;
   border-radius: 4px;
   flex-shrink: 0;
@@ -116,6 +114,17 @@ const SuggestionTitle = styled.p`
 const SuggestionMeta = styled.p`
   font-size: 11px;
   color: var(--text-muted);
+  margin-top: 2px;
+`
+const SuggestionGenre = styled.span`
+  display: inline-block;
+  background: rgba(99,102,241,0.12);
+  color: #818cf8;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 4px;
+  margin-top: 4px;
 `
 const FiltersRow = styled.div`
   display: flex;
@@ -224,8 +233,6 @@ const ResultMeta = styled.div`
     margin-bottom: 0.75rem;
   }
 `
-const ResultCount = styled.span``
-
 const ViewToggle = styled.button`
   background: none;
   border: 1px solid var(--border);
@@ -240,9 +247,7 @@ const ViewToggle = styled.button`
   transition: all 0.15s;
   flex-shrink: 0;
   &:hover { border-color: var(--accent); color: var(--accent); }
-  @media (max-width: 600px) {
-    display: none;
-  }
+  @media (max-width: 600px) { display: none; }
 `
 const Grid = styled.div`
   display: grid;
@@ -335,8 +340,6 @@ const EmptyBtn = styled.button`
   transition: opacity 0.2s;
   &:hover { opacity: 0.9; }
 `
-
-// Pagination
 const PaginationWrap = styled.div`
   display: flex;
   align-items: center;
@@ -386,8 +389,6 @@ const PageInfo = styled.div`
   text-align: center;
   margin-bottom: 0.5rem;
 `
-
-// Back to top
 const BackToTop = styled.button`
   position: fixed;
   bottom: 80px;
@@ -416,8 +417,6 @@ const BackToTop = styled.button`
     height: 40px;
   }
 `
-
-// Trending
 const TrendingSection = styled.div`
   margin-bottom: 2rem;
 `
@@ -459,47 +458,44 @@ function useTrending() {
   })
 }
 
-function useSearchSuggestions(query) {
-  return useQuery(['search-suggestions', query], async () => {
+function useSearchSuggestions(query, currentFilters) {
+  return useQuery(['search-suggestions', query, currentFilters.genre, currentFilters.format, currentFilters.status], async () => {
     if (!query || query.length < 2) return []
-    const { data } = await axios.get(`${API_BASE}/api/v1/search?q=${encodeURIComponent(query)}`)
+    const params = new URLSearchParams()
+    params.set('q', query)
+    if (currentFilters.genre) params.append('genre', currentFilters.genre)
+    if (currentFilters.format) params.append('format', currentFilters.format)
+    if (currentFilters.status) params.append('status', currentFilters.status)
+    const { data } = await axios.get(`${API_BASE}/api/v1/search?${params.toString()}`)
     return data.results || []
-  }, { enabled: !!query && query.length >= 2 })
+  }, { enabled: !!query && query.length >= 2, staleTime: 60000 })
 }
 
 function Pagination({ currentPage, lastPage, onPageChange }) {
   if (lastPage <= 1) return null
-
   const pages = []
   const range = 2
-
   pages.push(1)
   const start = Math.max(2, currentPage - range)
   const end = Math.min(lastPage - 1, currentPage + range)
-
   if (start > 2) pages.push('...')
   for (let i = start; i <= end; i++) pages.push(i)
   if (end < lastPage - 1) pages.push('...')
   if (lastPage > 1) pages.push(lastPage)
-
   return (
     <PaginationWrap>
-      <PageBtn disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>
-        ‹ Prev
-      </PageBtn>
+      <PageBtn disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>‹ Prev</PageBtn>
       {pages.map((p, i) =>
         p === '...' ? <PageEllipsis key={`e${i}`}>…</PageEllipsis> : (
-          <PageBtn key={p} $active={p === currentPage} onClick={() => onPageChange(p)}>
-            {p}
-          </PageBtn>
+          <PageBtn key={p} $active={p === currentPage} onClick={() => onPageChange(p)}>{p}</PageBtn>
         )
       )}
-      <PageBtn disabled={currentPage >= lastPage} onClick={() => onPageChange(currentPage + 1)}>
-        Next ›
-      </PageBtn>
+      <PageBtn disabled={currentPage >= lastPage} onClick={() => onPageChange(currentPage + 1)}>Next ›</PageBtn>
     </PaginationWrap>
   )
 }
+
+function formatLabel(v) { return v.replace(/_/g, ' ') }
 
 const Catalog = () => {
   const navigate = useNavigate()
@@ -507,8 +503,8 @@ const Catalog = () => {
   const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
   const [viewMode, setViewMode] = useState('grid')
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
   const searchRef = useRef(null)
-  const containerRef = useRef(null)
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const perPage = isDesktop ? RESULTS_PER_PAGE.desktop : RESULTS_PER_PAGE.mobile
   const debouncedSearch = useDebounce(searchInput, 300)
@@ -522,14 +518,19 @@ const Catalog = () => {
   useEffect(() => {
     const handler = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setSearchInput(prev => {
-          if (prev.length >= 2 && !e.target.closest('.search-form')) return prev
-          return prev
-        })
+        setSearchFocused(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') setSearchFocused(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [])
 
   const filters = useMemo(() => ({
@@ -548,12 +549,14 @@ const Catalog = () => {
   const { data, isLoading, isFetching } = useCatalogQuery(filters, currentPage, perPage)
   const { data: trending } = useTrending()
   const { data: suggestions } = useSearchSuggestions(
-    hasActiveFilters ? '' : (searchInput && searchInput.length >= 2 ? searchInput : '')
+    searchFocused && searchInput.length >= 2 ? searchInput : '',
+    filters
   )
 
   const media = data?.media || []
   const total = data?.pageInfo?.total || 0
   const lastPage = data?.pageInfo?.lastPage || 1
+  const showSuggestions = searchFocused && searchInput.length >= 2 && suggestions && suggestions.length > 0
 
   const updateFilter = useCallback((key, value) => {
     setSearchParams(prev => {
@@ -583,45 +586,74 @@ const Catalog = () => {
     navigate(`/anime/${suggestion.id}`)
   }, [navigate])
 
-  const showTrending = !hasActiveFilters && !debouncedSearch && !searchInput
+  const showTrending = !hasActiveFilters && !isLoading
+
+  const searchPlaceholder = filters.genre
+    ? `Search in ${filters.genre}...`
+    : filters.format
+      ? `Search in ${formatLabel(filters.format)}...`
+      : 'Search anime by title...'
 
   return (
     <Page>
       <NavBar />
-      <Container ref={containerRef}>
+      <Container>
         <Title>Browse Anime</Title>
         <main>
-
-        <div style={{ position: 'relative' }} className="search-form" ref={searchRef}>
-          <SearchBar>
-            <FaSearch size={14} style={{ color: 'var(--text-muted)' }} />
+        <div style={{ position: 'relative' }} ref={searchRef}>
+          <SearchBar $focused={searchFocused}>
+            <FaSearch size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <SearchInput
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              placeholder="Search anime..."
+              onFocus={() => setSearchFocused(true)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  setSearchFocused(false)
+                  updateFilter('search', searchInput)
+                }
+              }}
+              placeholder={searchPlaceholder}
             />
             {searchInput && (
-              <button onClick={() => { setSearchInput(''); setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete('search'); n.set('page', '1'); return n }) }}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
+              <button onClick={() => {
+                setSearchInput('')
+                setSearchParams(prev => {
+                  const n = new URLSearchParams(prev)
+                  n.delete('search')
+                  n.set('page', '1')
+                  return n
+                })
+              }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4, flexShrink: 0 }}>
                 <FaTimes size={12} />
               </button>
             )}
           </SearchBar>
 
-          {searchInput.length >= 2 && suggestions && suggestions.length > 0 && !hasActiveFilters && (
+          {showSuggestions && (
             <SuggestionDropdown>
               {suggestions.slice(0, 8).map((item) => {
                 const id = item.id
                 const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
-                const poster = item.coverImage?.large || item.images?.jpg?.image_url || ''
+                const poster = item.coverImage?.large || ''
                 return (
                   <SuggestionItem key={id} onClick={() => handleSuggestionClick(item)}>
-                    {poster ? <SuggestionImg src={poster} alt="" /> : <div style={{ width: 32, height: 45, background: '#222', borderRadius: 4, flexShrink: 0 }} />}
+                    {poster ? <SuggestionImg src={poster} alt="" /> : <div style={{ width: 36, height: 50, background: '#222', borderRadius: 4, flexShrink: 0 }} />}
                     <SuggestionInfo>
                       <SuggestionTitle>{title}</SuggestionTitle>
                       <SuggestionMeta>
-                        {item.format || item.type || 'Anime'} {item.averageScore ? `· ${item.averageScore}%` : ''}
+                        {item.format ? formatLabel(item.format) : 'Anime'}
+                        {item.averageScore ? ` · ${item.averageScore}%` : ''}
+                        {item.episodes ? ` · ${item.episodes} ep` : ''}
                       </SuggestionMeta>
+                      {item.genres && item.genres.length > 0 && (
+                        <div style={{ marginTop: 2 }}>
+                          {item.genres.slice(0, 3).map(g => (
+                            <SuggestionGenre key={g}>{g}</SuggestionGenre>
+                          ))}
+                        </div>
+                      )}
                     </SuggestionInfo>
                   </SuggestionItem>
                 )
@@ -636,11 +668,11 @@ const Catalog = () => {
           </Select>
           <Select value={filters.format} onChange={(e) => updateFilter('format', e.target.value)}>
             <option value="">Format</option>
-            {FORMATS.map(f => <option key={f} value={f}>{f.replace('_', ' ')}</option>)}
+            {FORMATS.map(f => <option key={f} value={f}>{formatLabel(f)}</option>)}
           </Select>
           <Select value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
             <option value="">Status</option>
-            {STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            {STATUSES.map(s => <option key={s} value={s}>{formatLabel(s)}</option>)}
           </Select>
           <Select value={filters.season} onChange={(e) => updateFilter('season', e.target.value)}>
             <option value="">Season</option>
@@ -669,14 +701,14 @@ const Catalog = () => {
           )}
         </GenreChipsRow>
 
-        {showTrending && trending && trending.length > 0 && !isLoading && (
+        {showTrending && trending && trending.length > 0 && (
           <TrendingSection>
             <h2 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>Trending Now</h2>
             <TrendingGrid>
               {trending.map((item) => {
                 const id = item.id
                 const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
-                const poster = item.coverImage?.large || item.images?.jpg?.image_url || ''
+                const poster = item.coverImage?.large || ''
                 const score = item.averageScore || item.score
                 return (
                   <Link key={id} to={`/anime/${id}`} style={{ textDecoration: 'none' }}>
@@ -700,7 +732,7 @@ const Catalog = () => {
           </TrendingSection>
         )}
 
-        {!showTrending && (hasActiveFilters || debouncedSearch) && total > 0 && (
+        {hasActiveFilters && total > 0 && !isLoading && (
           <ResultMeta>
             <ResultCount>{total} result{total !== 1 ? 's' : ''}</ResultCount>
           </ResultMeta>
@@ -761,9 +793,9 @@ const Catalog = () => {
           <>
             <ListView>
               {media.map((item) => {
-                const id = item.id || item.mal_id
+                const id = item.id
                 const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || item.title || 'Unknown'
-                const poster = item.coverImage?.large || item.images?.jpg?.image_url || ''
+                const poster = item.coverImage?.large || ''
                 const score = item.averageScore || item.score
                 return (
                   <ListItem key={id} to={`/anime/${id}`}>
@@ -771,7 +803,7 @@ const Catalog = () => {
                     <ListInfo>
                       <p style={{ fontWeight: 600, fontSize: 14 }}>{title}</p>
                       <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                        {[item.format, item.status, score ? `${score}%` : ''].filter(Boolean).join(' · ')}
+                        {[item.format ? formatLabel(item.format) : '', item.status ? formatLabel(item.status) : '', score ? `${score}%` : ''].filter(Boolean).join(' · ')}
                       </p>
                       {item.genres && (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>

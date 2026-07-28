@@ -1025,7 +1025,7 @@ export default function Watch() {
         maxWidth: 1200, margin: '0 auto', padding: '20px 16px',
         display: 'flex', gap: 24, flexWrap: 'wrap',
       }}>
-        <div style={{ flex: 1, minWidth: 0, minWidth: 280 }}>
+        <div style={{ flex: 1, minWidth: 280 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {anime?.title?.english || anime?.title?.romaji || 'Loading...'}
           </h1>
