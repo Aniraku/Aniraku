@@ -513,35 +513,33 @@ const AnimeDetail = () => {
             <Section>
               <SectionTitle>Relations</SectionTitle>
               {ordered.map(relType => (
-                <div key={relType} style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+                <div key={relType} style={{ marginBottom: 20 }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
                     {RELATION_LABELS[relType] || relType}
                   </p>
-                  <div className="scroll-row" style={{ gap: 10 }}>
+                  <div className="scroll-row" style={{ gap: 12 }}>
                     {grouped[relType].map(item => {
                       const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
-                      const epText = item.episodes ? `${item.episodes} ep` : ''
-                      const score = item.averageScore
                       return (
-                        <Link key={item.id} to={`/anime/${item.id}`} style={{ textDecoration: 'none', flex: '0 0 140px' }}>
-                          <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--bg-card)' }}>
+                        <Link key={item.id} to={`/anime/${item.id}`} style={{ textDecoration: 'none', flex: '0 0 120px' }}>
+                          <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', background: 'var(--bg-card)' }}>
                             <img src={item.coverImage?.large || ''} alt={title} style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                            {score && (
-                              <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.75)', color: '#e2e8f0', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>
-                                {score}%
+                            {item.averageScore && (
+                              <span style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.8)', color: '#e2e8f0', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>
+                                {item.averageScore}%
                               </span>
                             )}
                             {item.format && (
-                              <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(99,102,241,0.85)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                              <span style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(99,102,241,0.9)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3, textTransform: 'uppercase' }}>
                                 {item.format.replace('_', ' ')}
                               </span>
                             )}
                           </div>
-                          <p style={{ fontSize: 12, marginTop: 6, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <p style={{ fontSize: 11, marginTop: 4, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
                             {title}
                           </p>
-                          <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {[item.status, epText].filter(Boolean).join(' · ')}
+                          <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            {[item.status, item.episodes ? `${item.episodes} ep` : ''].filter(Boolean).join(' · ')}
                           </p>
                         </Link>
                       )
