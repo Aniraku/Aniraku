@@ -1,76 +1,79 @@
-import axios from 'axios'
 import { useQuery } from '@tanstack/react-query'
-import { API_BASE } from '../config'
+import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 
-const API = API_BASE
-
-export function useLatestEpisode() {
-  return useQuery(['episodes'], async () => {
-    const { data } = await axios.get(`${API}/api/v1/trending?perPage=20`)
-    return Array.isArray(data) ? data : []
-  })
+async function browse(variables) {
+  const { data } = await anilistQuery(BROWSE_QUERY, variables)
+  return data.Page.media || []
 }
 
-export function useSeries() {
-  return useQuery(['series'], async () => {
-    const { data } = await axios.get(`${API}/api/v1/browse?format=TV&sort=SCORE_DESC&perPage=20`)
-    return data.media || []
-  })
+export function useTrendingAnime() {
+  return useQuery(['trending'], async () => {
+    return browse({ page: 1, perPage: 10, sort: ['TRENDING'] })
+  }, { staleTime: 300000 })
 }
 
 export function usePopular() {
   return useQuery(['popular'], async () => {
-    const { data } = await axios.get(`${API}/api/v1/browse?sort=POPULARITY_DESC&perPage=20`)
-    return data.media || []
-  })
+    return browse({ page: 1, perPage: 20, sort: ['POPULARITY_DESC'] })
+  }, { staleTime: 300000 })
 }
 
 export function useAiring() {
   return useQuery(['airing'], async () => {
-    const { data } = await axios.get(`${API}/api/v1/browse?status=RELEASING&sort=POPULARITY_DESC&perPage=20`)
-    return data.media || []
-  })
+    return browse({ page: 1, perPage: 20, status: 'RELEASING', sort: ['POPULARITY_DESC'] })
+  }, { staleTime: 300000 })
 }
 
 export function useMovies() {
   return useQuery(['movies'], async () => {
-    const { data } = await axios.get(`${API}/api/v1/browse?format=MOVIE&sort=SCORE_DESC&perPage=20`)
-    return data.media || []
-  })
+    return browse({ page: 1, perPage: 20, format: 'MOVIE', sort: ['SCORE_DESC'] })
+  }, { staleTime: 300000 })
+}
+
+export function useSeries() {
+  return useQuery(['series'], async () => {
+    return browse({ page: 1, perPage: 20, format: 'TV', sort: ['SCORE_DESC'] })
+  }, { staleTime: 300000 })
 }
 
 export function useGenre({ genre }) {
   return useQuery(['genres', genre], async () => {
-    const { data } = await axios.get(`${API}/api/v1/browse?genre=${genre}&perPage=20`)
-    return data.media || []
-  })
+    return browse({ page: 1, perPage: 20, genre })
+  }, { staleTime: 300000 })
+}
+
+export function useLatestEpisode() {
+  return useQuery(['latest'], async () => {
+    return browse({ page: 1, perPage: 20, sort: ['TRENDING'] })
+  }, { staleTime: 300000 })
 }
 
 export const useSearchAnime = (filter) => {
   return useQuery(['searchAnime', filter], async () => {
     if (!filter || filter.length < 2) return []
-    const { data } = await axios.get(`${API}/api/v1/search?q=${encodeURIComponent(filter)}`)
-    return data.results || []
-  }, { enabled: !!filter && filter.length > 1 })
-}
-
-export function useTrendingAnime() {
-  return useQuery(['trending'], async () => {
-    const { data } = await axios.get(`${API}/api/v1/trending?perPage=10`)
-    return Array.isArray(data) ? data : []
-  })
+    return browse({ page: 1, perPage: 10, search: filter })
+  }, { enabled: !!filter && filter.length > 1, staleTime: 60000 })
 }
 
 export function useAnimeDetails(id) {
+  const { ANIME_DETAIL_QUERY } = require('../lib/anilist')
   return useQuery(['anime', id], async () => {
-    const { data } = await axios.get(`${API}/api/v1/anime/${id}`)
-    return data
-  }, { enabled: !!id })
+    const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
+    return data.Media
+  }, { enabled: !!id, staleTime: 300000 })
 }
 
 export function useAnimeEpisodes(id) {
+  const { ANIME_DETAIL_QUERY } = require('../lib/anilist')
   return useQuery(['episodes', id], async () => {
-    const { data } = await axios.get(`${API}/api/v1/anime/${id}/episodes`)
-    return data.episodes || []
-  }, { enabled: !!id })
+    const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
+    const media = data.Media
+    if (!media) return []
+    const count = media.episodes || 12
+    return Array.from({ length: count }, (_, i) => ({
+      number: i + 1,
+      title: `Episode ${i + 1}`,
+      thumbnail: media.coverImage?.medium || '',
+    }))
+  }, { enabled: !!id, staleTime: 300000 })
 }

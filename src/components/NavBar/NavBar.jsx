@@ -6,8 +6,7 @@ import Logo from '../Logo'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { avatarUrl, defaultAvatar } from '../../lib/avatars'
-import axios from 'axios'
-import { API_BASE } from '../../config'
+import { anilistQuery, BROWSE_QUERY } from '../../lib/anilist'
 import { supabase } from '../../lib/supabase'
 
 const NavBar = () => {
@@ -47,8 +46,8 @@ const NavBar = () => {
     setSuggestLoading(true)
     suggestTimer.current = setTimeout(async () => {
       try {
-        const { data } = await axios.get(`${API_BASE}/api/v1/search?q=${encodeURIComponent(searchValue)}`)
-        const results = data.results || []
+        const { data } = await anilistQuery(BROWSE_QUERY, { page: 1, perPage: 8, search: searchValue, sort: ['POPULARITY_DESC'] })
+        const results = data.Page.media || []
         setSuggestions(results.slice(0, 8))
         setShowSuggestions(results.length > 0)
       } catch {} finally {
@@ -73,8 +72,8 @@ const NavBar = () => {
   const fetchRandomAnime = useCallback(async () => {
     try {
       const page = Math.floor(Math.random() * 10) + 1
-      const { data } = await axios.get(`${API_BASE}/api/v1/browse?page=${page}&perPage=20&sort=POPULARITY_DESC`)
-      const items = data?.media || []
+      const { data } = await anilistQuery(BROWSE_QUERY, { page, perPage: 20, sort: ['POPULARITY_DESC'] })
+      const items = data?.Page?.media || []
       if (items.length > 0) {
         const random = items[Math.floor(Math.random() * items.length)]
         navigate(`/anime/${random.id}`)

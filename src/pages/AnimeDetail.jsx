@@ -4,7 +4,7 @@ import { FaPlay, FaStar, FaBookmark, FaRegBookmark } from 'react-icons/fa'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import useLocalStorage from '../hooks/useLocalStorage'
-import { API_BASE } from '../config'
+import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
 import styled from 'styled-components'
 
 const Page = styled.div`
@@ -347,16 +347,23 @@ const AnimeDetail = () => {
     setLoading(true)
     setActiveTab('episodes')
     Promise.all([
-      fetch(`${API_BASE}/api/v1/anime/${id}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_BASE}/api/v1/anime/${id}/episodes`).then(r => r.ok ? r.json() : { episodes: [] }).catch(() => ({ episodes: [] })),
-      fetch(`${API_BASE}/api/v1/anime/${id}/similar`).then(r => r.ok ? r.json() : { media: [] }).catch(() => ({ media: [] })),
-      fetch(`${API_BASE}/api/v1/anime/${id}/relations`).then(r => r.ok ? r.json() : { relations: [] }).catch(() => ({ relations: [] })),
-    ]).then(([data, epData, simData, relData]) => {
+      anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => r.data.Media).catch(() => null),
+      anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
+      anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => {
+        const edges = r.data.Media?.relations?.edges || []
+        return edges.filter(e => e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY').map(e => e.node)
+      }).catch(() => []),
+    ]).then(([data, simData, relData]) => {
       setAnime(data)
-      setEpisodes(epData.episodes || [])
-      const allSimilar = simData.media || []
-      setSimilar(allSimilar.slice(0, 12))
-      setRelations(relData.relations || [])
+      if (data?.episodes) {
+        setEpisodes(Array.from({ length: data.episodes }, (_, i) => ({
+          number: i + 1,
+          title: `Episode ${i + 1}`,
+          thumbnail: data.coverImage?.medium || '',
+        })))
+      }
+      setSimilar(simData || [])
+      setRelations(relData || [])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id])
