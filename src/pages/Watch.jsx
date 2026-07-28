@@ -436,6 +436,9 @@ export default function Watch() {
       const idx = SOURCES[lang].findIndex(s => s.id === sourceId)
       if (idx !== -1) return SOURCES[lang].slice(idx)
     }
+    if (sourceId.includes('-dub')) {
+      return [{ id: 'miruro-dub', provider: 'miruro', lang: 'dub' }]
+    }
     if (SOURCES.sub.length > 0) return [SOURCES.sub[0]]
     return [{ id: 'miruro-sub', provider: 'miruro', lang: 'sub' }]
   }, [SOURCES])

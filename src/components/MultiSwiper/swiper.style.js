@@ -57,27 +57,18 @@ S.Number = styled.div`
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 0;
   overflow: hidden;
   width: 40px;
+  height: 50px;
   text-align: center;
   font-weight: 600;
   cursor: default;
-  background: #4a4b51;
-  background: -moz-linear-gradient(180deg, #4a4b51 0, rgba(74, 75, 81, 0) 99%);
-  background: -webkit-linear-gradient(
-    180deg,
-    #4a4b51 0,
-    rgba(74, 75, 81, 0) 99%
-  );
-  background: linear-gradient(180deg, #4a4b51 0, rgba(74, 75, 81, 0) 99%);
+  background: rgba(42, 44, 49, 0.85);
+  border-radius: 0 0 6px 0;
+  z-index: 2;
 
   @media screen and (max-width: 575px) {
-    bottom: auto;
-    top: 0;
-    right: auto;
     width: 40px;
-    left: 0;
     height: 30px;
     background: #fff;
     z-index: 9;
