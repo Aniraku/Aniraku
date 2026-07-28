@@ -1,13 +1,15 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { FaPlay, FaFire, FaStar } from 'react-icons/fa'
+import { FaPlay, FaFire, FaStar, FaTv, FaFilm } from 'react-icons/fa'
 import NavBar from '../components/NavBar/NavBar'
 import Hero from '../components/Hero/Hero'
 import ContinueWatching from '../components/ContinueWatching'
 import Trending from '../components/Trending/Trending'
+import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
+import { useAiring, useMovies, useSeries } from '../hooks/useAnime'
 
 const Section = styled.section`
   max-width: 1400px;
@@ -48,6 +50,21 @@ const SectionTitle = styled.h2`
   @media (max-width: 480px) {
     font-size: 1.1rem;
     margin-bottom: 0.75rem;
+  }
+`
+
+const ScrollRow = styled.div`
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  &::-webkit-scrollbar { display: none; }
+  > div { scroll-snap-align: start; flex: 0 0 auto; width: 150px; }
+  @media (max-width: 480px) {
+    gap: 10px;
+    > div { width: 130px; }
   }
 `
 
@@ -120,11 +137,17 @@ const QuickLink = styled(Link)`
   }
 `
 
+const skeletonRow = Array.from({ length: 6 }, (_, i) => i)
+
 const Home = () => {
   const genres = [
     'Action', 'Romance', 'Comedy', 'Sci-Fi', 'Horror',
     'Slice of Life', 'Sports', 'Supernatural', 'Mystery', 'Drama',
   ]
+
+  const { data: airing = [], isFetched: airingDone } = useAiring()
+  const { data: movies = [], isFetched: moviesDone } = useMovies()
+  const { data: topTV = [], isFetched: tvDone } = useSeries()
 
   return (
     <>
@@ -140,6 +163,60 @@ const Home = () => {
       </QuickLinks>
 
       <Trending />
+
+      {/* Airing Now */}
+      <Section>
+        <SectionTitle>
+          <FaTv size={16} /> Airing Now
+          <Link to="/catalog?status=RELEASING">View All</Link>
+        </SectionTitle>
+        <ScrollRow>
+          {airingDone ? airing.slice(0, 15).map(item => (
+            <Card key={item.id} data={item} />
+          )) : skeletonRow.map(i => (
+            <div key={`sk-air-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+              <div style={{ width: '100%', aspectRatio: '3/4', background: '#1a1a2e', borderRadius: 8 }} />
+              <div style={{ height: 12, background: '#1a1a2e', borderRadius: 4, marginTop: 8, width: '70%' }} />
+            </div>
+          ))}
+        </ScrollRow>
+      </Section>
+
+      {/* Top Movies */}
+      <Section>
+        <SectionTitle>
+          <FaFilm size={16} /> Top Movies
+          <Link to="/catalog?format=MOVIE&sort=SCORE_DESC">View All</Link>
+        </SectionTitle>
+        <ScrollRow>
+          {moviesDone ? movies.slice(0, 15).map(item => (
+            <Card key={item.id} data={item} />
+          )) : skeletonRow.map(i => (
+            <div key={`sk-mov-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+              <div style={{ width: '100%', aspectRatio: '3/4', background: '#1a1a2e', borderRadius: 8 }} />
+              <div style={{ height: 12, background: '#1a1a2e', borderRadius: 4, marginTop: 8, width: '70%' }} />
+            </div>
+          ))}
+        </ScrollRow>
+      </Section>
+
+      {/* Top Rated TV */}
+      <Section>
+        <SectionTitle>
+          <FaStar size={16} /> Top Rated TV
+          <Link to="/catalog?format=TV&sort=SCORE_DESC">View All</Link>
+        </SectionTitle>
+        <ScrollRow>
+          {tvDone ? topTV.slice(0, 15).map(item => (
+            <Card key={item.id} data={item} />
+          )) : skeletonRow.map(i => (
+            <div key={`sk-tv-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+              <div style={{ width: '100%', aspectRatio: '3/4', background: '#1a1a2e', borderRadius: 8 }} />
+              <div style={{ height: 12, background: '#1a1a2e', borderRadius: 4, marginTop: 8, width: '70%' }} />
+            </div>
+          ))}
+        </ScrollRow>
+      </Section>
 
       <Section>
         <SectionTitle>Browse by Genre</SectionTitle>
