@@ -817,6 +817,35 @@ export default function Watch() {
     )
   }
 
+  if (anime?.isAdult) {
+    try {
+      const nsfwConfirmed = JSON.parse(localStorage.getItem('aurelia-nsfw-confirmed') || '{}')[String(animeId)]
+      if (!nsfwConfirmed) {
+        return (
+          <>
+            <NavBar />
+            <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+              <div style={{
+                textAlign: 'center', padding: 40, maxWidth: 400,
+                background: 'var(--bg-elevated)', borderRadius: 16, border: '1px solid var(--border)',
+              }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
+                <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Age-Restricted Content</p>
+                <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
+                  This anime contains adult content. Confirm your age on the details page first.
+                </p>
+                <Link to={`/anime/${animeId}`} style={{
+                  background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10,
+                  padding: '10px 24px', fontSize: 14, fontWeight: 600, textDecoration: 'none',
+                }}>Go to Details</Link>
+              </div>
+            </div>
+          </>
+        )
+      }
+    } catch {}
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: '#fff' }}>
       <NavBar />

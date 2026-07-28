@@ -352,6 +352,9 @@ const AnimeDetail = () => {
   const [bookmarks, setBookmarks] = useLocalStorage('aurelia-bookmarks', [])
   const [similar, setSimilar] = useState([])
   const [recommendations, setRecommendations] = useState([])
+  const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aurelia-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
+  })
   const recsRef = useRef(null)
   const similarRef = useRef(null)
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
@@ -376,6 +379,15 @@ const AnimeDetail = () => {
     if (ref.current) {
       ref.current.scrollBy({ left: dir * 400, behavior: 'smooth' })
     }
+  }
+
+  const confirmNsfw = () => {
+    setNsfwConfirmed(true)
+    try {
+      const raw = JSON.parse(localStorage.getItem('aurelia-nsfw-confirmed') || '{}')
+      raw[String(id)] = true
+      localStorage.setItem('aurelia-nsfw-confirmed', JSON.stringify(raw))
+    } catch {}
   }
 
   const toggleBookmark = () => {
@@ -404,6 +416,36 @@ const AnimeDetail = () => {
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 18, marginBottom: 12, color: 'var(--text-muted)' }}>Anime not found</p>
           <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
+        </div>
+      </Center>
+    </>
+  )
+
+  if (anime.isAdult && !nsfwConfirmed) return (
+    <>
+      <NavBar />
+      <Center>
+        <div style={{
+          textAlign: 'center', padding: 40, maxWidth: 400,
+          background: 'var(--bg-elevated)', borderRadius: 16, border: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
+          <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>
+            Age-Restricted Content
+          </p>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
+            This anime contains adult content. You must be at least 18 years old to view it.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button onClick={confirmNsfw} style={{
+              background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10,
+              padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}>I am 18+ — Continue</button>
+            <Link to="/home" style={{
+              background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '10px 24px', fontSize: 14, textDecoration: 'none',
+            }}>Go Back</Link>
+          </div>
         </div>
       </Center>
     </>
