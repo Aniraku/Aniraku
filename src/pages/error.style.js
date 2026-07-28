@@ -24,6 +24,13 @@ E.ErrorText = styled.p`
   line-height: 1.2em;
   margin-bottom: 10px;
   color: #fff;
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+  }
+  @media (max-width: 480px) {
+    font-size: 20px;
+  }
 `
 
 E.Text = styled.p`

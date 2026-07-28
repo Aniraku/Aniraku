@@ -18,6 +18,10 @@ M.VideoSection = styled.section`
   align-items: center;
   justify-content: center;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    height: 85vh;
+  }
 `
 
 M.VideoMask = styled.div`
@@ -57,6 +61,10 @@ M.VideoContent = styled.div`
   z-index: 3;
   text-align: center;
   padding: 2rem;
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 `
 
 M.VideoTitle = styled.h1`
@@ -81,6 +89,11 @@ M.CTA = styled.div`
   gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: center;
+  }
 `
 
 M.CTAPrimary = styled(Link)`
@@ -95,6 +108,14 @@ M.CTAPrimary = styled(Link)`
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 24px rgba(226, 232, 240, 0.3);
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    max-width: 280px;
+    text-align: center;
+    padding: 12px 24px;
+    font-size: 14px;
   }
 `
 
@@ -112,6 +133,14 @@ M.CTAGhost = styled(Link)`
     border-color: var(--accent);
     color: var(--accent);
   }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    max-width: 280px;
+    text-align: center;
+    padding: 12px 24px;
+    font-size: 14px;
+  }
 `
 
 // 3D Card Carousel
@@ -120,6 +149,10 @@ M.CarouselSection = styled.section`
   padding: 4rem 2rem;
   max-width: 1400px;
   margin: 0 auto;
+
+  @media (max-width: 768px) {
+    padding: 2rem 1rem;
+  }
 `
 
 M.CarouselInner = styled.div`
@@ -232,6 +265,10 @@ M.Section = styled.section`
   padding: 5rem 2rem;
   max-width: 1200px;
   margin: 0 auto;
+
+  @media (max-width: 768px) {
+    padding: 2.5rem 1rem;
+  }
 `
 
 M.SectionInner = styled.div`
@@ -276,6 +313,10 @@ M.FeatureCard = styled.div`
   &:hover {
     border-color: var(--accent);
     transform: translateY(-4px);
+  }
+
+  @media (max-width: 768px) {
+    padding: 1.25rem;
   }
 `
 
@@ -323,6 +364,10 @@ M.TestimonialCard = styled.div`
   background: #0a0a0a;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 `
 
 M.TestimonialHeader = styled.div`
@@ -367,6 +412,10 @@ M.Footer = styled.footer`
   padding: 4rem 2rem 2rem;
   border-top: 1px solid var(--border);
   text-align: center;
+
+  @media (max-width: 768px) {
+    padding: 2rem 1rem 1rem;
+  }
 `
 
 M.FooterText = styled.p`

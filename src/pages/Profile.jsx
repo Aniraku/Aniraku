@@ -171,9 +171,9 @@ const Profile = () => {
   return (
     <>
       <NavBar />
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)', padding: '40px 20px' }}>
+      <div className="profile-page" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)', padding: '40px 20px' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
+          <div className="profile-header" style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
             <img src={avatarSrc} alt="" style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent)', flexShrink: 0 }} />
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -187,7 +187,7 @@ const Profile = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24, overflowX: 'auto' }}>
+          <div className="profile-tabs" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24, overflowX: 'auto' }}>
             {['profile', 'avatars', 'bookmarks', 'history', 'badges', 'import'].map(tab => (
               <button
                 key={tab}
@@ -217,7 +217,7 @@ const Profile = () => {
           )}
 
           {activeTab === 'profile' && (
-            <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
+            <div className="profile-card" style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
               <h3 style={{ fontSize: 16, marginBottom: 16 }}>Edit Profile</h3>
               <label style={labelStyle}>Username</label>
               <input type="text" value={username} onChange={e => setUsername(e.target.value)} style={inputStyle} maxLength={20} />
@@ -225,7 +225,7 @@ const Profile = () => {
               <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} style={inputStyle} />
               <label style={labelStyle}>Bio</label>
               <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <div className="profile-actions" style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button onClick={handleSave} disabled={saving} style={primaryBtn}>{saving ? 'Saving…' : 'Save Changes'}</button>
                 <button onClick={handleSignOut} style={ghostBtn}>Sign Out</button>
               </div>
@@ -233,10 +233,10 @@ const Profile = () => {
           )}
 
           {activeTab === 'avatars' && (
-            <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
+            <div className="profile-card" style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
               <h3 style={{ fontSize: 16, marginBottom: 8 }}>Choose an avatar</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>Community presets from the Aniraku avatar library.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 12 }}>
+              <div className="profile-avatar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 12 }}>
                 {AVATAR_LIST.map(av => {
                   const selected = profile?.avatar_url === av.url || profile?.avatar_url?.endsWith(av.name)
                   return (
@@ -271,7 +271,7 @@ const Profile = () => {
                   <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14, marginTop: 8, display: 'inline-block' }}>Browse Anime</Link>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
+                <div className="profile-bookmark-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
                   {bookmarks.map(b => (
                     <div key={b.id} style={{ background: 'var(--bg-card)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
                       <Link to={`/anime/${b.id}`}>
@@ -301,7 +301,7 @@ const Profile = () => {
                     <button onClick={clearHistory} style={ghostBtn}>Clear History</button>
                   </div>
                   {history.map((h, i) => (
-                    <Link key={i} to={`/watch/${h.animeId}-episode-${h.episode}`} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 8, textDecoration: 'none', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                    <Link key={i} to={`/watch/${h.animeId}-episode-${h.episode}`} className="profile-history-item" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 8, textDecoration: 'none', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                       {h.image && <img src={h.image} alt="" style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 4 }} />}
                       <span style={{ color: 'var(--text-muted)', fontSize: 13, minWidth: 50 }}>Ep {h.episode}</span>
                       <span style={{ fontSize: 14, flex: 1 }}>{h.title || `Anime ${h.animeId}`}</span>
@@ -314,9 +314,9 @@ const Profile = () => {
           )}
 
           {activeTab === 'badges' && (
-            <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
+            <div className="profile-card" style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
               <h3 style={{ fontSize: 16, marginBottom: 16 }}>Achievements</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+              <div className="profile-badge-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
                 {[
                   { icon: '🎬', name: 'First Watch', desc: 'Watch your first episode', unlocked: history.length >= 1 },
                   { icon: '🔥', name: '5 Episodes', desc: 'Watch 5 episodes', unlocked: history.length >= 5 },
@@ -341,7 +341,7 @@ const Profile = () => {
           )}
 
           {activeTab === 'import' && (
-            <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
+            <div className="profile-card" style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
               <h3 style={{ fontSize: 16, marginBottom: 8 }}>Import from AniList</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                 Import your AniList username to sync favorites and list data into Aniraku.
@@ -357,7 +357,30 @@ const Profile = () => {
         </div>
       </div>
       <Footer />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) {
+          .profile-header { flex-direction: column; text-align: center; gap: 12px !important; }
+          .profile-header img { width: 64px !important; height: 64px !important; }
+          .profile-header h1 { font-size: 20px !important; }
+          .profile-tabs { gap: 0 !important; }
+          .profile-tabs button { padding: 10px 12px !important; font-size: 13px !important; }
+          .profile-card { padding: 16px !important; }
+          .profile-avatar-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)) !important; gap: 8px !important; }
+          .profile-bookmark-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 10px !important; }
+          .profile-badge-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+          .profile-badge-grid > div { padding: 12px !important; }
+          .profile-badge-grid > div > div:first-child { font-size: 22px !important; }
+          .profile-history-item { padding: 8px 10px !important; gap: 10px !important; }
+          .profile-history-item img { width: 32px !important; height: 44px !important; }
+          .profile-actions { flex-direction: column; }
+          .profile-actions button { width: 100%; }
+        }
+        @media (max-width: 480px) {
+          .profile-page { padding: 20px 12px !important; }
+          .profile-avatar-grid { grid-template-columns: repeat(4, 1fr) !important; }
+        }
+      `}</style>
     </>
   )
 }

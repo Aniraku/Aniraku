@@ -359,3 +359,137 @@ a, button, [role="button"] {
 video {
   object-fit: contain;
 }
+
+/* ============================================
+   RESPONSIVE UTILITY LAYER
+   Android / iOS / Tablet / Desktop
+   ============================================ */
+
+/* --- Typography Scale --- */
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+}
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+}
+@media (max-width: 360px) {
+  html { font-size: 13px; }
+}
+
+/* --- Touch targets: minimum 48x48px on touch devices --- */
+@media (hover: none) and (pointer: coarse) {
+  a, button, [role="button"], input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* --- Safe area for notch devices (iPhone X+) --- */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* --- Scrollbar hidden globally on mobile --- */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  * { scrollbar-width: none; }
+}
+
+/* --- Responsive container utility --- */
+.container-responsive {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+@media (max-width: 768px) {
+  .container-responsive { padding: 0 12px; }
+}
+@media (max-width: 480px) {
+  .container-responsive { padding: 0 10px; }
+}
+
+/* --- Responsive grid utility --- */
+.grid-auto-fill {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 768px) {
+  .grid-auto-fill { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+}
+@media (max-width: 480px) {
+  .grid-auto-fill { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+}
+@media (max-width: 360px) {
+  .grid-auto-fill { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+}
+
+/* --- Hide on mobile / desktop --- */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 769px) {
+  .hide-desktop { display: none !important; }
+}
+
+/* --- Flex row that scrolls on mobile --- */
+.scroll-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll-row::-webkit-scrollbar { display: none; }
+.scroll-row > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+/* --- Page section spacing --- */
+.page-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  margin-bottom: 2rem;
+}
+@media (max-width: 768px) {
+  .page-section { padding: 0 12px; margin-bottom: 1.5rem; }
+}
+@media (max-width: 480px) {
+  .page-section { padding: 0 10px; margin-bottom: 1.25rem; }
+}
+
+/* --- Card image aspect ratio --- */
+@media (max-width: 768px) {
+  .card-poster img { aspect-ratio: 2/3; object-fit: cover; }
+}
+
+/* --- Horizontal scroll sections (Home page) --- */
+@media (max-width: 768px) {
+  .home-scroll-row > div { width: 130px !important; }
+}
+@media (max-width: 480px) {
+  .home-scroll-row > div { width: 120px !important; }
+}
+
+/* --- Player wrapper mobile --- */
+@media (max-width: 768px) {
+  .player-wrapper { border-radius: 0 !important; }
+}
+
+/* --- Input focus ring accessibility --- */
+input:focus, textarea:focus, select:focus, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Prevent text overflow on mobile --- */
+@media (max-width: 768px) {
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+}
