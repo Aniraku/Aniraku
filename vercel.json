@@ -46,6 +46,7 @@
     }
   ],
   "env": {
+    "VITE_API_URL": "https://aniraku-backend.onrender.com",
     "VITE_PROXY_URL": ""
   }
 }
