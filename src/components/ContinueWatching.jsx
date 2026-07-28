@@ -120,7 +120,7 @@ const ContinueWatching = () => {
   const items = useMemo(() => {
     const local = []
     try {
-      local.push(...JSON.parse(localStorage.getItem('aurelia-watch-history') || '[]'))
+      local.push(...JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]'))
     } catch {}
 
     const seen = new Set()

@@ -25,20 +25,6 @@ S.Swiper = styled(Swiper)`
 S.SwiperSlide = styled(SwiperSlide)`
   text-align: center;
   font-size: 18px;
-
-  /* Center slide text vertically */
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: -webkit-flex;
-  display: flex;
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  -webkit-justify-content: center;
-  justify-content: center;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  -webkit-align-items: center;
-  align-items: center;
 `
 
 S.Item = styled.div`
@@ -113,8 +99,7 @@ S.ItemName = styled.div`
 `
 
 S.LinkImg = styled(Link)`
-  display: inline-block;
-  background: #2a2c31;
+  display: block;
   position: absolute;
   width: auto;
   left: 40px;
@@ -124,11 +109,14 @@ S.LinkImg = styled(Link)`
   padding-bottom: 0;
   height: auto;
   margin-bottom: 0;
+  border-radius: 0 6px 6px 0;
+  overflow: hidden;
 
   @media screen and (max-width: 575px) {
     left: 0;
     top: 0;
     bottom: 0;
+    border-radius: 6px;
   }
 `
 

@@ -31,8 +31,8 @@ const Profile = () => {
       setDisplayName(profile.display_name || '')
       setBio(profile.bio || '')
     }
-    const bm = JSON.parse(localStorage.getItem('aurelia-bookmarks') || '[]')
-    const hx = JSON.parse(localStorage.getItem('aurelia-watch-history') || '[]')
+    const bm = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]')
+    const hx = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
     setBookmarks(bm)
     setHistory(hx)
 
@@ -108,7 +108,7 @@ const Profile = () => {
   const removeBookmark = async (id) => {
     const updated = bookmarks.filter(b => b.id !== id)
     setBookmarks(updated)
-    localStorage.setItem('aurelia-bookmarks', JSON.stringify(updated))
+    localStorage.setItem('aniraku-bookmarks', JSON.stringify(updated))
     if (user) {
       await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('anime_id', id)
     }
@@ -116,7 +116,7 @@ const Profile = () => {
 
   const clearHistory = () => {
     setHistory([])
-    localStorage.removeItem('aurelia-watch-history')
+    localStorage.removeItem('aniraku-watch-history')
   }
 
   const importAniList = async () => {

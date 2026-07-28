@@ -145,7 +145,7 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
       if (key === 'KeyC') {
         e.preventDefault()
         if (art) {
-          const subtitles = art._aureliaSubtitles || []
+          const subtitles = art._anirakuSubtitles || []
           if (subtitles.length > 0) {
             const currentSub = art.subtitle?.url
             const currentIdx = subtitles.findIndex(s => s.url === currentSub)
@@ -383,7 +383,7 @@ export default function Watch() {
   useEffect(() => {
     if (!animeId || !epNumber) return
     try {
-      const raw = JSON.parse(localStorage.getItem('aurelia-watch-history') || '[]')
+      const raw = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
       const entry = raw.find(h => String(h.animeId) === String(animeId) && h.episode === epNumber)
       if (entry && entry.time > 30) {
         setResumePos(entry.time)
@@ -430,18 +430,6 @@ export default function Watch() {
   }, [])
 
   useEffect(() => () => destroyPlayer(), [destroyPlayer])
-
-  const getFallbackChain = useCallback((sourceId) => {
-    for (const lang of ['sub', 'dub']) {
-      const idx = SOURCES[lang].findIndex(s => s.id === sourceId)
-      if (idx !== -1) return SOURCES[lang].slice(idx)
-    }
-    if (sourceId.includes('-dub')) {
-      return [{ id: 'miruro-dub', provider: 'miruro', lang: 'dub' }]
-    }
-    if (SOURCES.sub.length > 0) return [SOURCES.sub[0]]
-    return [{ id: 'miruro-sub', provider: 'miruro', lang: 'sub' }]
-  }, [SOURCES])
 
   const buildPlayer = useCallback((streamUrl, qualityList, subtitles, headers, onBlocked) => {
     destroyPlayer()
@@ -574,7 +562,7 @@ export default function Watch() {
     const art = new Artplayer(playerConfig)
 
     if (subtitles && subtitles.length > 1) {
-      art._aureliaSubtitles = subtitles
+      art._anirakuSubtitles = subtitles
     }
 
     // Auto next episode
@@ -598,10 +586,10 @@ export default function Watch() {
           timestamp: now,
           image: anime?.coverImage?.large || '',
         }
-        const raw = JSON.parse(localStorage.getItem('aurelia-watch-history') || '[]')
+        const raw = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
         const filtered = raw.filter(h => !(String(h.animeId) === String(animeId) && h.episode === epNumber))
         filtered.unshift(entry)
-        localStorage.setItem('aurelia-watch-history', JSON.stringify(filtered.slice(0, 100)))
+        localStorage.setItem('aniraku-watch-history', JSON.stringify(filtered.slice(0, 100)))
       } catch {}
 
       if (user) {
@@ -645,86 +633,107 @@ export default function Watch() {
       streamRetries.current = {}
     }
 
-    const chain = getFallbackChain(sourceId)
+    // Find the source to play
+    const source = [...SOURCES.sub, ...SOURCES.dub].find(s => s.id === sourceId) || SOURCES.sub[0] || { provider: 'miruro', lang: 'sub' }
 
-    for (let i = 0; i < chain.length; i++) {
-      const source = chain[i]
-      if (i > 0) showToast('Loading stream...')
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          animeId: parseInt(animeId, 10),
+          episode: epNumber,
+          provider: source.provider,
+          lang: source.lang,
+          quality: 'auto',
+          refresh: forceRefresh,
+        }),
+      })
+      const data = await res.json()
 
-      try {
-        const res = await fetch(`${API_BASE}/api/v1/stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            animeId: parseInt(animeId, 10),
-            episode: epNumber,
-            provider: source.provider,
-            lang: source.lang,
-            quality: 'auto',
-            refresh: forceRefresh,
-          }),
-        })
-        const data = await res.json()
-
-        if (data.servers) {
-          setServers({
-            sub: data.servers.filter(s => s.lang === 'sub'),
-            dub: data.servers.filter(s => s.lang === 'dub'),
-          })
-        }
-
-        if (data.error || !data.sources?.[0]?.url) {
-          if (i < chain.length - 1) continue
-          setError(data.error || 'No video source found')
-          setStreamLoading(false)
-          loadingRef.current = false
-          return
-        }
-
-        const firstSource = data.sources[0]
-
-        if (firstSource.type === 'embed') {
-          destroyPlayer()
-          setEmbedUrl(firstSource.url)
-          setStreamLoading(false)
-          loadingRef.current = false
-          return
-        }
-
-        const headersParam = data.headers ? `&headers=${encodeURIComponent(JSON.stringify(data.headers))}` : ''
-        
-        const qualityList = data.sources.map((src, idx) => ({
-          default: idx === 0,
-          html: src.quality || 'Auto',
-          url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(src.url)}${headersParam}`,
-        }))
-
-        const defaultUrl = qualityList[0]?.url || ''
-
-        const subs = firstSource.subtitles || []
-        const onBlocked = () => {
-          loadStream(sourceId, true)
-        }
-        buildPlayer(defaultUrl, qualityList, subs, data.headers, onBlocked)
-        setStreamLoading(false)
-        loadingRef.current = false
-        return
-      } catch (err) {
-        if (i < chain.length - 1) continue
-        setError('Failed to load stream')
+      if (data.error || !data.sources?.[0]?.url) {
+        setError(data.error || 'No video source found')
         setStreamLoading(false)
         loadingRef.current = false
         return
       }
-    }
-    setStreamLoading(false)
-    loadingRef.current = false
-  }, [animeId, epNumber, getFallbackChain, showToast, buildPlayer, destroyPlayer])
 
-  // Load stream on episode/source change
+      const firstSource = data.sources[0]
+
+      if (firstSource.type === 'embed') {
+        destroyPlayer()
+        setEmbedUrl(firstSource.url)
+        setStreamLoading(false)
+        loadingRef.current = false
+        return
+      }
+
+      const headersParam = data.headers ? `&headers=${encodeURIComponent(JSON.stringify(data.headers))}` : ''
+      
+      const qualityList = data.sources.map((src, idx) => ({
+        default: idx === 0,
+        html: src.quality || 'Auto',
+        url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(src.url)}${headersParam}`,
+      }))
+
+      const defaultUrl = qualityList[0]?.url || ''
+
+      const subs = firstSource.subtitles || []
+      const onBlocked = () => {
+        loadStream(sourceId, true)
+      }
+      buildPlayer(defaultUrl, qualityList, subs, data.headers, onBlocked)
+      setStreamLoading(false)
+      loadingRef.current = false
+      return
+    } catch (err) {
+      setError('Failed to load stream')
+      setStreamLoading(false)
+      loadingRef.current = false
+      return
+    }
+  }, [animeId, epNumber, SOURCES, showToast, buildPlayer, destroyPlayer])
+
+  // Fetch servers when episode changes
   useEffect(() => {
-    loadStream(activeSource)
-  }, [activeSource, epNumber, loadStream])
+    if (!animeId || !epNumber) return
+    let cancelled = false
+    const fetchServers = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=sub`)
+        if (!res.ok) return
+        const subServers = await res.json()
+        if (cancelled) return
+        // Also fetch dub servers
+        try {
+          const dubRes = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=dub`)
+          const dubServers = dubRes.ok ? await dubRes.json() : []
+          if (!cancelled) {
+            setServers({
+              sub: Array.isArray(subServers) ? subServers : [],
+              dub: Array.isArray(dubServers) ? dubServers : [],
+            })
+          }
+        } catch {
+          if (!cancelled) {
+            setServers({
+              sub: Array.isArray(subServers) ? subServers : [],
+              dub: [],
+            })
+          }
+        }
+      } catch {}
+    }
+    fetchServers()
+    return () => { cancelled = true }
+  }, [animeId, epNumber])
+
+  // Load stream on active source / episode change
+  const loadStreamRef = useRef(loadStream)
+  loadStreamRef.current = loadStream
+  useEffect(() => {
+    loadStreamRef.current(activeSource)
+  }, [activeSource, epNumber])
 
   const handleSourceSwitch = useCallback((sourceId) => {
     if (sourceId === activeSource) return
@@ -827,7 +836,7 @@ export default function Watch() {
 
   if (anime?.isAdult) {
     try {
-      const nsfwConfirmed = JSON.parse(localStorage.getItem('aurelia-nsfw-confirmed') || '{}')[String(animeId)]
+      const nsfwConfirmed = JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(animeId)]
       if (!nsfwConfirmed) {
         return (
           <>
@@ -861,7 +870,7 @@ export default function Watch() {
 
       {/* Toast notification */}
       {toast && (
-        <div className="aurelia-toast" style={{
+        <div className="aniraku-toast" style={{
           position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(0,0,0,0.88)', color: '#e2e8f0', padding: '8px 20px',
           borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,

@@ -349,11 +349,11 @@ const AnimeDetail = () => {
   const [anime, setAnime] = useState(null)
   const [episodes, setEpisodes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [bookmarks, setBookmarks] = useLocalStorage('aurelia-bookmarks', [])
+  const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [similar, setSimilar] = useState([])
   const [recommendations, setRecommendations] = useState([])
   const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('aurelia-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
+    try { return JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
   })
   const recsRef = useRef(null)
   const similarRef = useRef(null)
@@ -384,9 +384,9 @@ const AnimeDetail = () => {
   const confirmNsfw = () => {
     setNsfwConfirmed(true)
     try {
-      const raw = JSON.parse(localStorage.getItem('aurelia-nsfw-confirmed') || '{}')
+      const raw = JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')
       raw[String(id)] = true
-      localStorage.setItem('aurelia-nsfw-confirmed', JSON.stringify(raw))
+      localStorage.setItem('aniraku-nsfw-confirmed', JSON.stringify(raw))
     } catch {}
   }
 

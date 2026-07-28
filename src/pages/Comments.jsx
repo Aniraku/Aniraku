@@ -188,11 +188,11 @@ function formatTime(iso) {
 
 const Comments = () => {
   const { user, profile } = useAuth()
-  const [localComments, setLocalComments] = useLocalStorage('aurelia-comments-v4', initialComments)
+  const [localComments, setLocalComments] = useLocalStorage('aniraku-comments-v4', initialComments)
   const [remoteComments, setRemoteComments] = useState([])
   const [likedIds, setLikedIds] = useState(new Set())
   const [newComment, setNewComment] = useState('')
-  const [username, setUsername] = useLocalStorage('aurelia-username', '')
+  const [username, setUsername] = useLocalStorage('aniraku-username', '')
   const [sortBy, setSortBy] = useState('newest')
   const [replyTo, setReplyTo] = useState(null)
   const [replyText, setReplyText] = useState('')

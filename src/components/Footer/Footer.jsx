@@ -21,7 +21,7 @@ const Footer = () => {
           </F.Disclaimer>
           <F.Socials>
             <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer"><FaGithub size={18} /></F.SocialLink>
-            <F.SocialLink href="https://discord.gg/aurelia" target="_blank" rel="noreferrer"><FaDiscord size={18} /></F.SocialLink>
+            <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer"><FaDiscord size={18} /></F.SocialLink>
           </F.Socials>
         </F.Col>
 

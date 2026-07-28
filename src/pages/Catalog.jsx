@@ -273,7 +273,7 @@ const Catalog = () => {
 
   useEffect(() => {
     try {
-      const raw = JSON.parse(localStorage.getItem('aurelia-watch-history') || '[]')
+      const raw = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
       setWatchHistory(raw)
     } catch {}
   }, [])
