@@ -155,11 +155,16 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
               showToast('Subtitles Off')
             } else {
               const sub = subtitles[nextIdx]
-              art.subtitle = {
-                url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(sub.url)}`,
-                type: 'srt',
+              if (!sub.url) {
+                art.subtitle = null
+                showToast('Subtitles Off')
+              } else {
+                art.subtitle = {
+                  url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(sub.url)}`,
+                  type: 'srt',
+                }
+                showToast(`Subtitles: ${sub.label || 'Track ' + nextIdx}`)
               }
-              showToast(`Subtitles: ${sub.label || 'Track ' + nextIdx}`)
             }
           } else {
             showToast('No subtitles available')
@@ -547,7 +552,7 @@ export default function Watch() {
       },
     }
 
-    if (subtitles && subtitles.length > 0) {
+    if (subtitles && subtitles.length > 0 && subtitles[0].url) {
       playerConfig.subtitle = {
         url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(subtitles[0].url)}${headersParam}`,
         type: 'srt',

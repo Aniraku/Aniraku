@@ -6,8 +6,6 @@ T.Container = styled.div`
   margin-bottom: 0;
   padding: 0 0 40px 15px;
   background: var(--bg);
-  background: -webkit-linear-gradient(0deg, var(--bg) 0, transparent 99%);
-  background: linear-gradient(0deg, var(--bg) 0, transparent 99%);
 
   @media screen and (max-width: 575px) {
     padding: 0 0 40px 0;
