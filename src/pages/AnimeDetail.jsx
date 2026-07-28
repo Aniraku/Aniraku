@@ -495,12 +495,12 @@ const AnimeDetail = () => {
         )}
 
         {relations.length > 0 && (() => {
-          const RELATION_ORDER = ['PREQUEL', 'SEQUEL', 'SIDE_STORY', 'SPIN_OFF', 'SUMMARY', 'ALTERNATIVE', 'ADAPTATION', 'CHARACTER', 'OTHER', 'PARENT', 'COMPANION', 'INCLUDES', 'GIFIED_FROM']
+          const RELATION_ORDER = ['PREQUEL', 'SEQUEL', 'SIDE_STORY', 'SPIN_OFF', 'SUMMARY', 'ALTERNATIVE', 'ADAPTATION', 'CHARACTER', 'OTHER', 'PARENT', 'COMPANION', 'INCLUDES', 'GIFTED_FROM']
           const RELATION_LABELS = {
             PREQUEL: 'Prequel', SEQUEL: 'Sequel', SIDE_STORY: 'Side Story',
             SPIN_OFF: 'Spin Off', SUMMARY: 'Summary', ALTERNATIVE: 'Alternative',
             ADAPTATION: 'Adaptation', CHARACTER: 'Character', OTHER: 'Other',
-            PARENT: 'Parent', COMPANION: 'Companion', INCLUDES: 'Includes', GIFIED_FROM: 'Based On',
+            PARENT: 'Parent', COMPANION: 'Companion', INCLUDES: 'Includes', GIFTED_FROM: 'Based On',
           }
           const grouped = {}
           relations.forEach(r => {
