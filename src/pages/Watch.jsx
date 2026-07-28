@@ -281,7 +281,7 @@ export default function Watch() {
   const [activeSource, setActiveSource] = useState('miruro-sub')
   const [epSearch, setEpSearch] = useState('')
   const [toast, setToast] = useState('')
-  const [hasDub, setHasDub] = useState(false)
+  const [servers, setServers] = useState({ sub: [], dub: [] })
   const [embedUrl, setEmbedUrl] = useState('')
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
@@ -299,14 +299,26 @@ export default function Watch() {
   }, [])
 
   const SOURCES = useMemo(() => ({
-    sub: [
-      { id: 'miruro-sub', label: 'Miruro', provider: 'miruro', lang: 'sub' },
-      { id: 'senshi-sub', label: 'Senshi', provider: 'senshi', lang: 'sub' },
-    ],
-    dub: hasDub ? [
-      { id: 'miruro-dub', label: 'Miruro', provider: 'miruro', lang: 'dub' },
-    ] : [],
-  }), [hasDub])
+    sub: servers.sub.map(s => ({
+      id: `${s.provider}-${s.lang}`,
+      label: s.name,
+      provider: s.provider,
+      lang: s.lang,
+    })),
+    dub: servers.dub.map(s => ({
+      id: `${s.provider}-${s.lang}`,
+      label: s.name,
+      provider: s.provider,
+      lang: s.lang,
+    })),
+  }), [servers])
+
+  const currentSource = useMemo(() => {
+    const all = [...SOURCES.sub, ...SOURCES.dub]
+    return all.find(s => s.id === activeSource) || all[0] || null
+  }, [SOURCES, activeSource])
+
+  const hasDub = servers.dub.length > 0
 
   const filteredEps = useMemo(() => {
     if (!epSearch) return episodes
@@ -349,17 +361,15 @@ export default function Watch() {
     containerRef: playerContainerRef,
   })
 
-  // Fetch anime + episodes + hasDub
+  // Fetch anime + episodes
   useEffect(() => {
     setLoading(true)
     Promise.all([
       fetch(`${API_BASE}/api/v1/anime/${animeId}`).then(r => r.ok ? r.json() : null).catch(() => null),
       fetch(`${API_BASE}/api/v1/anime/${animeId}/episodes`).then(r => r.ok ? r.json() : { episodes: [] }).catch(() => ({ episodes: [] })),
-      fetch(`${API_BASE}/api/v1/miruro/has-dub/${animeId}`).then(r => r.ok ? r.json() : { hasDub: false }).catch(() => ({ hasDub: false })),
-    ]).then(([animeData, epData, dubData]) => {
+    ]).then(([animeData, epData]) => {
       setAnime(animeData)
       setEpisodes(epData.episodes || [])
-      setHasDub(dubData.hasDub || false)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [animeId])
@@ -421,7 +431,8 @@ export default function Watch() {
       const idx = SOURCES[lang].findIndex(s => s.id === sourceId)
       if (idx !== -1) return SOURCES[lang].slice(idx)
     }
-    return [SOURCES.sub[0]]
+    if (SOURCES.sub.length > 0) return [SOURCES.sub[0]]
+    return [{ id: 'miruro-sub', provider: 'miruro', lang: 'sub' }]
   }, [SOURCES])
 
   const buildPlayer = useCallback((streamUrl, qualityList, subtitles, headers, onBlocked) => {
@@ -647,6 +658,13 @@ export default function Watch() {
         })
         const data = await res.json()
 
+        if (data.servers) {
+          setServers({
+            sub: data.servers.filter(s => s.lang === 'sub'),
+            dub: data.servers.filter(s => s.lang === 'dub'),
+          })
+        }
+
         if (data.error || !data.sources?.[0]?.url) {
           if (i < chain.length - 1) continue
           setError(data.error || 'No video source found')
@@ -787,10 +805,6 @@ export default function Watch() {
     }
   }, [showToast])
 
-  const currentSource = SOURCES.sub.find(s => s.id === activeSource)
-    || SOURCES.dub.find(s => s.id === activeSource)
-    || SOURCES.sub[0]
-
   if (loading) {
     return (
       <>
@@ -862,7 +876,11 @@ export default function Watch() {
             alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)',
             padding: 24, textAlign: 'center', zIndex: 50,
           }}>
-            <FaExclamationTriangle size={32} color="#f59e0b" style={{ marginBottom: 12 }} />
+            {error.includes('No video source') ? (
+              <img src="/no-source.svg" alt="No source found" style={{ width: 160, height: 160, marginBottom: 16, opacity: 0.9 }} />
+            ) : (
+              <FaExclamationTriangle size={32} color="#f59e0b" style={{ marginBottom: 12 }} />
+            )}
             <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{error}</p>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20, maxWidth: 360 }}>
               Aniraku does not host video. Try another server or check your connection.
