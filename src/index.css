@@ -1,18 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800;900&family=Agbalumo&display=swap');
 
 :root {
-  --bg: #000;
-  --bg-secondary: #0a0a0a;
-  --bg-card: #111;
-  --bg-elevated: #161616;
-  --border: #2a2a2a;
-  --border-hover: #444;
-  --text-primary: #e2e8f0;
-  --text-secondary: #8c8c8c;
-  --text-muted: #555;
-  --accent: #e2e8f0;
-  --accent-dim: #cbd5e1;
-  --accent-glow: rgba(226, 232, 240, 0.15);
+  --bg: #0a0a0f;
+  --bg-secondary: #0f0f1a;
+  --bg-card: #12121e;
+  --bg-elevated: #1a1a2e;
+  --border: rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.15);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255,255,255,0.7);
+  --text-muted: rgba(255,255,255,0.4);
+  --accent: #6366f1;
+  --accent-dim: #818cf8;
+  --accent-glow: rgba(99,102,241,0.25);
   --danger: #e50914;
   --radius-sm: 6px;
   --radius-md: 10px;
