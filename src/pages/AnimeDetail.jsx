@@ -336,7 +336,6 @@ const AnimeDetail = () => {
   const [loading, setLoading] = useState(true)
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [similar, setSimilar] = useState([])
-  const [recommendations, setRecommendations] = useState([])
   const [relations, setRelations] = useState([])
   const [activeTab, setActiveTab] = useState('episodes')
   const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
@@ -356,7 +355,6 @@ const AnimeDetail = () => {
       setAnime(data)
       setEpisodes(epData.episodes || [])
       const allSimilar = simData.media || []
-      setRecommendations(allSimilar.slice(0, 12))
       setSimilar(allSimilar.slice(0, 12))
       setRelations(relData.relations || [])
       setLoading(false)
@@ -518,15 +516,6 @@ const AnimeDetail = () => {
                 {relations.map(r => <RelationCard key={r.node.id} r={r} />)}
               </RelationsGrid>
             )}
-          </Section>
-        )}
-
-        {recommendations.length > 0 && (
-          <Section>
-            <SectionTitle>Recommended For You</SectionTitle>
-            <RecGrid>
-              {recommendations.map((item, idx) => <RecCard key={item.id || idx} item={item} />)}
-            </RecGrid>
           </Section>
         )}
 

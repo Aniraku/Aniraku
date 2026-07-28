@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { API_BASE } from '../config'
 import Card from '../components/Card/Card'
@@ -263,6 +263,7 @@ function useSearchSuggestions(query) {
 }
 
 const Catalog = () => {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
@@ -330,9 +331,8 @@ const Catalog = () => {
   // Manual pagination via Load More button only — no auto-scroll
 
   const handleSuggestionClick = useCallback((suggestion) => {
-    setSearchInput(suggestion.title?.english || suggestion.title?.romaji || '')
-    updateFilter('search', suggestion.title?.english || suggestion.title?.romaji || '')
-  }, [updateFilter])
+    navigate(`/anime/${suggestion.id}`)
+  }, [navigate])
 
   const showTrending = !hasActiveFilters && !searchInput
 
