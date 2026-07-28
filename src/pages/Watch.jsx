@@ -283,7 +283,7 @@ export default function Watch() {
   const [loading, setLoading] = useState(true)
   const [streamLoading, setStreamLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeSource, setActiveSource] = useState('miruro-sub')
+  const [activeSource, setActiveSource] = useState('')
   const [epSearch, setEpSearch] = useState('')
   const [toast, setToast] = useState('')
   const [servers, setServers] = useState({ sub: [], dub: [] })
@@ -303,20 +303,26 @@ export default function Watch() {
     toastTimer = setTimeout(() => setToast(''), 2500)
   }, [])
 
-  const SOURCES = useMemo(() => ({
-    sub: servers.sub.map(s => ({
-      id: `${s.provider}-${s.lang}`,
-      label: s.name,
-      provider: s.provider,
-      lang: s.lang,
-    })),
-    dub: servers.dub.map(s => ({
-      id: `${s.provider}-${s.lang}`,
-      label: s.name,
-      provider: s.provider,
-      lang: s.lang,
-    })),
-  }), [servers])
+  const SOURCES = useMemo(() => {
+    const dedupe = (arr) => {
+      const seen = new Set()
+      return arr.filter(s => {
+        const key = `${s.name}:${s.lang}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      }).map(s => ({
+        id: `${s.name}-${s.lang}`,
+        label: s.name,
+        provider: s.provider,
+        lang: s.lang,
+      }))
+    }
+    return {
+      sub: dedupe(servers.sub),
+      dub: dedupe(servers.dub),
+    }
+  }, [servers])
 
   const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
@@ -324,6 +330,15 @@ export default function Watch() {
   }, [SOURCES, activeSource])
 
   const hasDub = servers.dub.length > 0
+
+  // Auto-select first working SUB source when servers load
+  useEffect(() => {
+    if (SOURCES.sub.length > 0 && !SOURCES.sub.find(s => s.id === activeSource)) {
+      setActiveSource(SOURCES.sub[0].id)
+    } else if (SOURCES.sub.length === 0 && SOURCES.dub.length > 0 && !SOURCES.dub.find(s => s.id === activeSource)) {
+      setActiveSource(SOURCES.dub[0].id)
+    }
+  }, [SOURCES])
 
   const filteredEps = useMemo(() => {
     if (!epSearch) return episodes
@@ -994,9 +1009,9 @@ export default function Watch() {
                     className="watch-source-btn"
                     style={{
                       padding: '10px 20px',
-                      background: isActive ? 'rgba(226,232,240,0.1)' : 'var(--bg-elevated)',
-                      color: isActive ? '#e2e8f0' : 'var(--text-secondary)',
-                      border: `1px solid ${isActive ? 'rgba(226,232,240,0.2)' : 'var(--border)'}`,
+                      background: isActive ? 'rgba(99,102,241,0.15)' : 'var(--bg-elevated)',
+                      color: isActive ? '#a5b4fc' : 'var(--text-secondary)',
+                      border: `1px solid ${isActive ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
                       borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer',
                       position: 'relative', transition: 'all 0.2s ease',
                       display: 'flex', alignItems: 'center', gap: 8,
@@ -1006,7 +1021,7 @@ export default function Watch() {
                     {isActive && (
                       <div style={{
                         position: 'absolute', bottom: -1, left: '15%', right: '15%',
-                        height: 2, background: '#e2e8f0', borderRadius: 1,
+                        height: 2, background: '#6366f1', borderRadius: 1,
                       }} />
                     )}
                   </button>
