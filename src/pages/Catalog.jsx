@@ -270,7 +270,6 @@ const Catalog = () => {
   const [showHistory, setShowHistory] = useState(false)
   const [watchHistory, setWatchHistory] = useState([])
   const searchRef = useRef(null)
-  const sentinelRef = useRef(null)
 
   useEffect(() => {
     try {
@@ -328,21 +327,7 @@ const Catalog = () => {
     setPage(1)
   }, [setSearchParams])
 
-  // Infinite scroll via IntersectionObserver
-  useEffect(() => {
-    const el = sentinelRef.current
-    if (!el || !hasNext) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !isFetching) {
-          setPage(p => p + 1)
-        }
-      },
-      { threshold: 0.1 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [hasNext])
+  // Manual pagination via Load More button only — no auto-scroll
 
   const handleSuggestionClick = useCallback((suggestion) => {
     setSearchInput(suggestion.title?.english || suggestion.title?.romaji || '')
@@ -506,7 +491,6 @@ const Catalog = () => {
                 </CardWithTooltip>
               ))}
             </Grid>
-            {hasNext && <div ref={sentinelRef} style={{ height: 1 }} />}
             {isFetching && (
               <div style={{ textAlign: 'center', padding: '1rem' }}>
                 <div style={{ width: 24, height: 24, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
@@ -515,7 +499,6 @@ const Catalog = () => {
             {!hasNext && filteredMedia.length > 0 && (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '1rem' }}>All results loaded</p>
             )}
-            {/* Fallback load more button */}
             {hasNext && !isFetching && (
               <LoadMore onClick={() => setPage(p => p + 1)}>
                 Load More
@@ -559,7 +542,6 @@ const Catalog = () => {
                 )
               })}
             </ListView>
-            <div ref={sentinelRef} style={{ height: 1 }} />
             {isFetching && (
               <div style={{ textAlign: 'center', padding: '1rem' }}>
                 <div style={{ width: 24, height: 24, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />

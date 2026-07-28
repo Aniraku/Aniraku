@@ -1,15 +1,13 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { FaPlay, FaFire, FaCalendarAlt, FaStar } from 'react-icons/fa'
+import { FaPlay, FaFire, FaStar } from 'react-icons/fa'
 import NavBar from '../components/NavBar/NavBar'
 import Hero from '../components/Hero/Hero'
 import ContinueWatching from '../components/ContinueWatching'
 import Trending from '../components/Trending/Trending'
-import Featured from '../components/Featured/Featured'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
-import { useLatestEpisode, useAiring, useGenre } from '../hooks/useAnime'
 
 const Section = styled.section`
   max-width: 1400px;
@@ -51,72 +49,6 @@ const SectionTitle = styled.h2`
     font-size: 1.1rem;
     margin-bottom: 0.75rem;
   }
-`
-
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-  }
-  @media (max-width: 360px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-`
-
-const ScheduleGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-  @media (max-width: 360px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-  }
-`
-
-const DayCard = styled(Link)`
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  text-decoration: none;
-  color: var(--text-primary);
-  text-align: center;
-  transition: all 0.2s;
-  -webkit-tap-highlight-color: transparent;
-  &:hover {
-    border-color: var(--accent);
-    transform: translateY(-2px);
-  }
-  @media (hover: none) and (pointer: coarse) {
-    &:active { opacity: 0.7; transform: scale(0.96); }
-  }
-  @media (max-width: 480px) {
-    padding: 10px 8px;
-    border-radius: 8px;
-  }
-`
-
-const DayLabel = styled.div`
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-`
-
-const DayCount = styled.div`
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--accent);
 `
 
 const GenreChip = styled(Link)`
@@ -189,16 +121,9 @@ const QuickLink = styled(Link)`
 `
 
 const Home = () => {
-  const { data: latest = [] } = useLatestEpisode()
-  const { data: airing = [] } = useAiring()
-
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const today = new Date().getDay()
-
   const genres = [
     'Action', 'Romance', 'Comedy', 'Sci-Fi', 'Horror',
     'Slice of Life', 'Sports', 'Supernatural', 'Mystery', 'Drama',
-    'NSFW'
   ]
 
   return (
@@ -211,27 +136,10 @@ const Home = () => {
       <QuickLinks>
         <QuickLink to="/catalog?sort=POPULARITY_DESC"><FaFire /> Most Popular</QuickLink>
         <QuickLink to="/catalog?status=RELEASING"><FaPlay /> Airing Now</QuickLink>
-        <QuickLink to="/schedule"><FaCalendarAlt /> Schedule</QuickLink>
         <QuickLink to="/catalog?sort=SCORE_DESC"><FaStar /> Top Rated</QuickLink>
       </QuickLinks>
 
-      <Section>
-        <SectionTitle>
-          Upcoming
-          <Link to="/schedule">View All</Link>
-        </SectionTitle>
-        <ScheduleGrid>
-          {days.map((day, i) => (
-            <DayCard key={day} to={`/schedule?day=${day.toLowerCase()}`}>
-              <DayLabel>{day}</DayLabel>
-              <DayCount>{i === today ? 'Today' : (7 + i - today) % 7 || 7}</DayCount>
-            </DayCard>
-          ))}
-        </ScheduleGrid>
-      </Section>
-
       <Trending />
-      <Featured />
 
       <Section>
         <SectionTitle>Browse by Genre</SectionTitle>

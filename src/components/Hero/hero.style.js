@@ -8,18 +8,15 @@ H.Swiper = styled(Swiper)`
   position: relative;
   display: flex;
   width: 100%;
-  height: 600px;
+  height: 420px;
   overflow: hidden;
   z-index: 1;
 
-  @media screen and ((max-width: 1400px)) {
-    height: 570px;
+  @media screen and (min-width: 769px) {
+    height: 480px;
   }
-  @media screen and (max-width: 1299px) {
-    height: 500px;
-  }
-  @media screen and (max-width: 768px) {
-    height: 420px;
+  @media screen and (min-width: 1200px) {
+    height: 520px;
   }
 `;
 
