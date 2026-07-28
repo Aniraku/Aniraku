@@ -352,6 +352,7 @@ const AnimeDetail = () => {
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [similar, setSimilar] = useState([])
   const [recommendations, setRecommendations] = useState([])
+  const [relations, setRelations] = useState([])
   const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
   })
@@ -365,12 +366,14 @@ const AnimeDetail = () => {
       fetch(`${API_BASE}/api/v1/anime/${id}`).then(r => r.ok ? r.json() : null).catch(() => null),
       fetch(`${API_BASE}/api/v1/anime/${id}/episodes`).then(r => r.ok ? r.json() : { episodes: [] }).catch(() => ({ episodes: [] })),
       fetch(`${API_BASE}/api/v1/anime/${id}/similar`).then(r => r.ok ? r.json() : { media: [] }).catch(() => ({ media: [] })),
-    ]).then(([data, epData, simData]) => {
+      fetch(`${API_BASE}/api/v1/anime/${id}/relations`).then(r => r.ok ? r.json() : { relations: [] }).catch(() => ({ relations: [] })),
+    ]).then(([data, epData, simData, relData]) => {
       setAnime(data)
       setEpisodes(epData.episodes || [])
       const allSimilar = simData.media || []
       setRecommendations(allSimilar.slice(0, 12))
       setSimilar(allSimilar.slice(0, 12))
+      setRelations(relData.relations || [])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id])
@@ -490,6 +493,65 @@ const AnimeDetail = () => {
             <Desc>{desc}{(anime.description || '').length > 500 ? '...' : ''}</Desc>
           </Section>
         )}
+
+        {relations.length > 0 && (() => {
+          const RELATION_ORDER = ['PREQUEL', 'SEQUEL', 'SIDE_STORY', 'SPIN_OFF', 'SUMMARY', 'ALTERNATIVE', 'ADAPTATION', 'CHARACTER', 'OTHER', 'PARENT', 'COMPANION', 'INCLUDES', 'GIFIED_FROM']
+          const RELATION_LABELS = {
+            PREQUEL: 'Prequel', SEQUEL: 'Sequel', SIDE_STORY: 'Side Story',
+            SPIN_OFF: 'Spin Off', SUMMARY: 'Summary', ALTERNATIVE: 'Alternative',
+            ADAPTATION: 'Adaptation', CHARACTER: 'Character', OTHER: 'Other',
+            PARENT: 'Parent', COMPANION: 'Companion', INCLUDES: 'Includes', GIFIED_FROM: 'Based On',
+          }
+          const grouped = {}
+          relations.forEach(r => {
+            if (!grouped[r.relationType]) grouped[r.relationType] = []
+            grouped[r.relationType].push(r.node)
+          })
+          const ordered = RELATION_ORDER.filter(t => grouped[t]?.length > 0)
+          if (ordered.length === 0) return null
+          return (
+            <Section>
+              <SectionTitle>Relations</SectionTitle>
+              {ordered.map(relType => (
+                <div key={relType} style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {RELATION_LABELS[relType] || relType}
+                  </p>
+                  <div className="scroll-row" style={{ gap: 10 }}>
+                    {grouped[relType].map(item => {
+                      const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
+                      const epText = item.episodes ? `${item.episodes} ep` : ''
+                      const score = item.averageScore
+                      return (
+                        <Link key={item.id} to={`/anime/${item.id}`} style={{ textDecoration: 'none', flex: '0 0 140px' }}>
+                          <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--bg-card)' }}>
+                            <img src={item.coverImage?.large || ''} alt={title} style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                            {score && (
+                              <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.75)', color: '#e2e8f0', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>
+                                {score}%
+                              </span>
+                            )}
+                            {item.format && (
+                              <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(99,102,241,0.85)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                                {item.format.replace('_', ' ')}
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ fontSize: 12, marginTop: 6, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {title}
+                          </p>
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            {[item.status, epText].filter(Boolean).join(' · ')}
+                          </p>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </Section>
+          )
+        })()}
 
         {anime.genres?.length > 0 && (
           <Section>

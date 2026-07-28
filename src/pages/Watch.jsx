@@ -724,17 +724,20 @@ export default function Watch() {
           const dubRes = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=dub`)
           const dubServers = dubRes.ok ? await dubRes.json() : []
           if (!cancelled) {
-            setServers({
-              sub: Array.isArray(subServers) ? subServers : [],
-              dub: Array.isArray(dubServers) ? dubServers : [],
-            })
+            const subs = Array.isArray(subServers) ? subServers : []
+            const dubs = Array.isArray(dubServers) ? dubServers : []
+            setServers({ sub: subs, dub: dubs })
+            if (subs.length === 0 && dubs.length === 0) {
+              setError('No video source found')
+            }
           }
         } catch {
           if (!cancelled) {
-            setServers({
-              sub: Array.isArray(subServers) ? subServers : [],
-              dub: [],
-            })
+            const subs = Array.isArray(subServers) ? subServers : []
+            setServers({ sub: subs, dub: [] })
+            if (subs.length === 0) {
+              setError('No video source found')
+            }
           }
         }
       } catch {}
@@ -938,24 +941,46 @@ export default function Watch() {
             padding: 24, textAlign: 'center', zIndex: 50,
           }}>
             {error.includes('No video source') ? (
-              <img src="/no-source.svg" alt="No source found" style={{ width: 160, height: 160, marginBottom: 16, opacity: 0.9 }} />
+              <>
+                <img src="/no-source.svg" alt="No source found" style={{ width: 160, height: 160, marginBottom: 16, opacity: 0.9 }} />
+                <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: '#e2e8f0' }}>No Streaming Sources</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20, maxWidth: 360, lineHeight: 1.6 }}>
+                  Aniraku couldn't find a working stream for this episode. Try another server below, or watch on an external source.
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <button onClick={() => { loadingRef.current = false; loadStream(activeSource, true) }} style={{
+                    background: 'rgba(226,232,240,0.15)', color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)',
+                    borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Retry Server</button>
+                  <a href={`https://hianime.to/search?keyword=${encodeURIComponent(anime?.title?.english || anime?.title?.romaji || '')}`} target="_blank" rel="noopener noreferrer" style={{
+                    background: 'var(--accent)', color: '#000', border: 'none',
+                    borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 700, textDecoration: 'none',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" fill="currentColor"/></svg>
+                    Watch on HiAnime
+                  </a>
+                </div>
+              </>
             ) : (
-              <FaExclamationTriangle size={32} color="#f59e0b" style={{ marginBottom: 12 }} />
+              <>
+                <FaExclamationTriangle size={32} color="#f59e0b" style={{ marginBottom: 12 }} />
+                <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{error}</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20, maxWidth: 360 }}>
+                  Aniraku does not host video. Try another server or check your connection.
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { loadingRef.current = false; loadStream(activeSource) }} style={{
+                    background: 'rgba(226,232,240,0.15)', color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)',
+                    borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Retry</button>
+                  <Link to={`/anime/${animeId}`} style={{
+                    background: 'transparent', color: 'var(--accent)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                  }}>Anime Details</Link>
+                </div>
+              </>
             )}
-            <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{error}</p>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 20, maxWidth: 360 }}>
-              Aniraku does not host video. Try another server or check your connection.
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { loadingRef.current = false; loadStream(activeSource) }} style={{
-                background: 'rgba(226,232,240,0.15)', color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)',
-                borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}>Retry</button>
-              <Link to={`/anime/${animeId}`} style={{
-                background: 'transparent', color: 'var(--accent)', border: '1px solid var(--border)',
-                borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600, textDecoration: 'none',
-              }}>Anime Details</Link>
-            </div>
           </div>
         )}
 
