@@ -174,9 +174,9 @@ const Home = () => {
           {airingDone ? airing.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-            <div key={`sk-air-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
-              <div style={{ width: '100%', aspectRatio: '3/4', background: '#1a1a2e', borderRadius: 8 }} />
-              <div style={{ height: 12, background: '#1a1a2e', borderRadius: 4, marginTop: 8, width: '70%' }} />
+              <div key={`sk-air-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+              <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
+              <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
             </div>
           ))}
         </ScrollRow>
@@ -193,8 +193,8 @@ const Home = () => {
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-mov-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
-              <div style={{ width: '100%', aspectRatio: '3/4', background: '#1a1a2e', borderRadius: 8 }} />
-              <div style={{ height: 12, background: '#1a1a2e', borderRadius: 4, marginTop: 8, width: '70%' }} />
+              <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
+              <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
             </div>
           ))}
         </ScrollRow>
@@ -211,8 +211,8 @@ const Home = () => {
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-tv-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
-              <div style={{ width: '100%', aspectRatio: '3/4', background: '#1a1a2e', borderRadius: 8 }} />
-              <div style={{ height: 12, background: '#1a1a2e', borderRadius: 4, marginTop: 8, width: '70%' }} />
+              <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
+              <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
             </div>
           ))}
         </ScrollRow>

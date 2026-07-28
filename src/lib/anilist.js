@@ -1,18 +1,31 @@
 const ANILIST_URL = 'https://graphql.anilist.co'
 
-// ponytail: CORS proxy list — rotates on failure
-const PROXIES = [
-  url => url, // try direct first
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-]
-
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
 
-  for (const proxy of PROXIES) {
+  // ponytail: try direct first (works with extensions/CORS)
+  try {
+    const res = await fetch(ANILIST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body,
+    })
+    if (res.ok) {
+      const json = await res.json()
+      if (json.data) return json
+    }
+  } catch {}
+
+  // ponytail: corsproxy.io — raw URL, no encoding
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(ANILIST_URL)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(ANILIST_URL)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ANILIST_URL)}`,
+  ]
+
+  for (const proxy of proxies) {
     try {
-      const res = await fetch(proxy(ANILIST_URL), {
+      const res = await fetch(proxy, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body,
@@ -23,7 +36,8 @@ export async function anilistQuery(query, variables = {}) {
       }
     } catch {}
   }
-  throw new Error('AniList: all proxies failed')
+
+  throw new Error('AniList: all methods failed')
 }
 
 // --- Queries ---
