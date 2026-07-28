@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaChevronRight, FaChevronLeft } from 'react-icons/fa'
+import { FaPlay, FaStar, FaBookmark, FaRegBookmark } from 'react-icons/fa'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import Card from '../components/Card/Card'
@@ -209,123 +209,6 @@ const EpNum = styled.span`
   color: var(--text-muted);
 `
 
-const RecsSection = styled.section`
-  margin-bottom: 30px;
-`
-
-const RecsScroll = styled.div`
-  position: relative;
-`
-
-const RecsRow = styled.div`
-  display: flex;
-  gap: 16px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-  padding: 4px 0 20px;
-  &::-webkit-scrollbar { display: none; }
-`
-
-const RecsCard = styled(Link)`
-  flex: 0 0 200px;
-  text-decoration: none;
-  color: inherit;
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--bg-card);
-  transition: transform 0.3s, box-shadow 0.3s;
-  &:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
-  }
-  @media (max-width: 600px) { flex: 0 0 140px; }
-`
-
-const RecsImg = styled.img`
-  width: 100%;
-  aspect-ratio: 2/3;
-  object-fit: cover;
-  display: block;
-  transition: filter 0.3s;
-  ${RecsCard}:hover & { filter: brightness(1.1) saturate(1.15); }
-`
-
-const RecsOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(transparent 40%, rgba(0,0,0,0.85) 100%);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 12px;
-`
-
-const RecsTitle = styled.div`
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-`
-
-const RecsMeta = styled.div`
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: 11px;
-  color: rgba(255,255,255,0.7);
-`
-
-const RecsScore = styled.span`
-  color: #ffc107;
-  font-weight: 600;
-`
-
-const ScrollBtn = styled.button`
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 5;
-  transition: background 0.2s;
-  &:hover { background: var(--accent); color: var(--bg); }
-  @media (max-width: 600px) { display: none; }
-`
-
-const glowPulse = keyframes`
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-`
-
-const RecsBadge = styled.div`
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: var(--accent);
-  color: #000;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 20px;
-  z-index: 3;
-  animation: ${glowPulse} 2s ease-in-out infinite;
-`
-
 const Spinner = styled.div`
   width: 48px;
   height: 48px;
@@ -356,8 +239,6 @@ const AnimeDetail = () => {
   const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
   })
-  const recsRef = useRef(null)
-  const similarRef = useRef(null)
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
   useEffect(() => {
@@ -377,12 +258,6 @@ const AnimeDetail = () => {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [id])
-
-  const scrollRow = (ref, dir) => {
-    if (ref.current) {
-      ref.current.scrollBy({ left: dir * 400, behavior: 'smooth' })
-    }
-  }
 
   const confirmNsfw = () => {
     setNsfwConfirmed(true)
@@ -495,58 +370,59 @@ const AnimeDetail = () => {
         )}
 
         {relations.length > 0 && (() => {
-          const RELATION_ORDER = ['PREQUEL', 'SEQUEL', 'SIDE_STORY', 'SPIN_OFF', 'SUMMARY', 'ALTERNATIVE', 'ADAPTATION', 'CHARACTER', 'OTHER', 'PARENT', 'COMPANION', 'INCLUDES', 'GIFTED_FROM']
           const RELATION_LABELS = {
             PREQUEL: 'Prequel', SEQUEL: 'Sequel', SIDE_STORY: 'Side Story',
             SPIN_OFF: 'Spin Off', SUMMARY: 'Summary', ALTERNATIVE: 'Alternative',
             ADAPTATION: 'Adaptation', CHARACTER: 'Character', OTHER: 'Other',
             PARENT: 'Parent', COMPANION: 'Companion', INCLUDES: 'Includes', GIFTED_FROM: 'Based On',
           }
-          const grouped = {}
-          relations.forEach(r => {
-            if (!grouped[r.relationType]) grouped[r.relationType] = []
-            grouped[r.relationType].push(r.node)
-          })
-          const ordered = RELATION_ORDER.filter(t => grouped[t]?.length > 0)
-          if (ordered.length === 0) return null
+          if (relations.length === 0) return null
           return (
             <Section>
               <SectionTitle>Relations</SectionTitle>
-              {ordered.map(relType => (
-                <div key={relType} style={{ marginBottom: 20 }}>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
-                    {RELATION_LABELS[relType] || relType}
-                  </p>
-                  <div className="scroll-row" style={{ gap: 12 }}>
-                    {grouped[relType].map(item => {
-                      const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
-                      return (
-                        <Link key={item.id} to={`/anime/${item.id}`} style={{ textDecoration: 'none', flex: '0 0 120px' }}>
-                          <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', background: 'var(--bg-card)' }}>
-                            <img src={item.coverImage?.large || ''} alt={title} style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                            {item.averageScore && (
-                              <span style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,0.8)', color: '#e2e8f0', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>
-                                {item.averageScore}%
-                              </span>
-                            )}
-                            {item.format && (
-                              <span style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(99,102,241,0.9)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 3, textTransform: 'uppercase' }}>
-                                {item.format.replace('_', ' ')}
-                              </span>
-                            )}
-                          </div>
-                          <p style={{ fontSize: 11, marginTop: 4, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-                            {title}
-                          </p>
-                          <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                            {[item.status, item.episodes ? `${item.episodes} ep` : ''].filter(Boolean).join(' · ')}
-                          </p>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                gap: 12,
+              }}>
+                {relations.map(r => {
+                  const item = r.node
+                  const title = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
+                  const relLabel = RELATION_LABELS[r.relationType] || r.relationType?.replace('_', ' ') || ''
+                  return (
+                    <Link key={item.id} to={`/anime/${item.id}`} style={{ textDecoration: 'none' }}>
+                      <div style={{
+                        position: 'relative', borderRadius: 6, overflow: 'hidden',
+                        background: 'var(--bg-card)', aspectRatio: '16/10',
+                      }}>
+                        <img src={item.coverImage?.large || ''} alt={title} style={{
+                          width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                        }} loading="lazy" />
+                        <div style={{
+                          position: 'absolute', inset: 0,
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%)',
+                        }} />
+                        <span style={{
+                          position: 'absolute', top: 6, left: 6,
+                          background: 'rgba(99,102,241,0.9)', color: '#fff',
+                          fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 3,
+                          textTransform: 'uppercase', letterSpacing: 0.3,
+                        }}>
+                          {relLabel}
+                        </span>
+                        <p style={{
+                          position: 'absolute', bottom: 0, left: 0, right: 0,
+                          padding: '20px 8px 8px', fontSize: 12, fontWeight: 600,
+                          color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap', lineHeight: 1.3,
+                        }}>
+                          {title}
+                        </p>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
             </Section>
           )
         })()}
@@ -581,61 +457,109 @@ const AnimeDetail = () => {
         )}
 
         {recommendations.length > 0 && (
-          <RecsSection>
-            <SectionTitle style={{ marginBottom: '14px' }}>Recommended For You</SectionTitle>
-            <RecsScroll>
-              <ScrollBtn style={{ left: '-8px' }} onClick={() => scrollRow(recsRef, -1)}>
-                <FaChevronLeft size={14} />
-              </ScrollBtn>
-              <RecsRow ref={recsRef}>
-                {recommendations.map((item, idx) => (
-                  <RecsCard to={`/anime/${item.id}`} key={item.id || idx}>
-                    <RecsImg src={item.coverImage?.large || ''} alt={item.title?.english || item.title?.romaji || 'Recommended anime'} loading="lazy" />
-                    <RecsBadge>★ {(item.averageScore || 0)}%</RecsBadge>
-                    <RecsOverlay>
-                      <RecsTitle>{item.title?.english || item.title?.romaji || 'Unknown'}</RecsTitle>
-                      <RecsMeta>
-                        <span>{item.format || ''}</span>
-                        <span>{item.episodes ? `${item.episodes} ep` : ''}</span>
-                      </RecsMeta>
-                    </RecsOverlay>
-                  </RecsCard>
-                ))}
-              </RecsRow>
-              <ScrollBtn style={{ right: '-8px' }} onClick={() => scrollRow(recsRef, 1)}>
-                <FaChevronRight size={14} />
-              </ScrollBtn>
-            </RecsScroll>
-          </RecsSection>
+          <Section>
+            <SectionTitle>Recommended For You</SectionTitle>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 12,
+            }}>
+              {recommendations.map((item, idx) => (
+                <Link to={`/anime/${item.id}`} key={item.id || idx} style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    position: 'relative', borderRadius: 6, overflow: 'hidden',
+                    background: 'var(--bg-card)', aspectRatio: '16/10',
+                  }}>
+                    <img src={item.coverImage?.large || ''} alt={item.title?.english || item.title?.romaji || 'Recommended'} style={{
+                      width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                      transition: 'filter 0.3s',
+                    }} loading="lazy" onMouseOver={e => e.currentTarget.style.filter = 'brightness(1.15)'} onMouseOut={e => e.currentTarget.style.filter = ''} />
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%)',
+                    }} />
+                    {item.averageScore > 0 && (
+                      <span style={{
+                        position: 'absolute', top: 6, right: 6,
+                        background: 'rgba(0,0,0,0.8)', color: '#ffc107',
+                        fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
+                      }}>
+                        ★ {item.averageScore}%
+                      </span>
+                    )}
+                    <p style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0,
+                      padding: '20px 8px 8px', fontSize: 12, fontWeight: 600,
+                      color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap', lineHeight: 1.3,
+                    }}>
+                      {item.title?.english || item.title?.romaji || 'Unknown'}
+                    </p>
+                    <div style={{
+                      position: 'absolute', bottom: 28, left: 8,
+                      display: 'flex', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)',
+                    }}>
+                      {item.format && <span>{item.format.replace('_', ' ')}</span>}
+                      {item.episodes && <span>{item.episodes} ep</span>}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Section>
         )}
 
         {similar.length > 0 && (
-          <RecsSection>
-            <SectionTitle style={{ marginBottom: '14px' }}>Similar Anime</SectionTitle>
-            <RecsScroll>
-              <ScrollBtn style={{ left: '-8px' }} onClick={() => scrollRow(similarRef, -1)}>
-                <FaChevronLeft size={14} />
-              </ScrollBtn>
-              <RecsRow ref={similarRef}>
-                {similar.map((item, idx) => (
-                  <RecsCard to={`/anime/${item.id}`} key={item.id || idx}>
-                    <RecsImg src={item.coverImage?.large || ''} alt={item.title?.english || item.title?.romaji || 'Similar anime'} loading="lazy" />
-                    {item.averageScore && <RecsBadge>★ {item.averageScore}%</RecsBadge>}
-                    <RecsOverlay>
-                      <RecsTitle>{item.title?.english || item.title?.romaji || 'Unknown'}</RecsTitle>
-                      <RecsMeta>
-                        <span>{item.format || ''}</span>
-                        <span>{item.episodes ? `${item.episodes} ep` : ''}</span>
-                      </RecsMeta>
-                    </RecsOverlay>
-                  </RecsCard>
-                ))}
-              </RecsRow>
-              <ScrollBtn style={{ right: '-8px' }} onClick={() => scrollRow(similarRef, 1)}>
-                <FaChevronRight size={14} />
-              </ScrollBtn>
-            </RecsScroll>
-          </RecsSection>
+          <Section>
+            <SectionTitle>Similar Anime</SectionTitle>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 12,
+            }}>
+              {similar.map((item, idx) => (
+                <Link to={`/anime/${item.id}`} key={item.id || idx} style={{ textDecoration: 'none' }}>
+                  <div style={{
+                    position: 'relative', borderRadius: 6, overflow: 'hidden',
+                    background: 'var(--bg-card)', aspectRatio: '16/10',
+                  }}>
+                    <img src={item.coverImage?.large || ''} alt={item.title?.english || item.title?.romaji || 'Similar'} style={{
+                      width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                      transition: 'filter 0.3s',
+                    }} loading="lazy" onMouseOver={e => e.currentTarget.style.filter = 'brightness(1.15)'} onMouseOut={e => e.currentTarget.style.filter = ''} />
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%)',
+                    }} />
+                    {item.averageScore > 0 && (
+                      <span style={{
+                        position: 'absolute', top: 6, right: 6,
+                        background: 'rgba(0,0,0,0.8)', color: '#ffc107',
+                        fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
+                      }}>
+                        ★ {item.averageScore}%
+                      </span>
+                    )}
+                    <p style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0,
+                      padding: '20px 8px 8px', fontSize: 12, fontWeight: 600,
+                      color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap', lineHeight: 1.3,
+                    }}>
+                      {item.title?.english || item.title?.romaji || 'Unknown'}
+                    </p>
+                    <div style={{
+                      position: 'absolute', bottom: 28, left: 8,
+                      display: 'flex', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)',
+                    }}>
+                      {item.format && <span>{item.format.replace('_', ' ')}</span>}
+                      {item.episodes && <span>{item.episodes} ep</span>}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Section>
         )}
       </Content>
       </main>
