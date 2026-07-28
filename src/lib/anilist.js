@@ -3,7 +3,7 @@ const ANILIST_URL = 'https://graphql.anilist.co'
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
 
-  // ponytail: try direct first (works with extensions/CORS)
+  // ponytail: try direct first (AniList has permissive CORS for GraphQL)
   try {
     const res = await fetch(ANILIST_URL, {
       method: 'POST',
@@ -16,16 +16,11 @@ export async function anilistQuery(query, variables = {}) {
     }
   } catch {}
 
-  // ponytail: corsproxy.io — raw URL, no encoding
-  const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(ANILIST_URL)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(ANILIST_URL)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ANILIST_URL)}`,
-  ]
-
-  for (const proxy of proxies) {
+  // ponytail: backend proxy — reliable, no CORS issues
+  const apiBase = import.meta.env.VITE_API_URL || ''
+  if (apiBase) {
     try {
-      const res = await fetch(proxy, {
+      const res = await fetch(`${apiBase}/api/v1/anilist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body,

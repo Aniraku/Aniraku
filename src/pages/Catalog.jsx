@@ -17,6 +17,7 @@ const SORTS = [
 ]
 const FORMATS = ['TV', 'MOVIE', 'OVA', 'ONA', 'SPECIAL']
 const STATUSES = ['RELEASING', 'FINISHED', 'NOT_YET_RELEASED']
+const YEARS = Array.from({ length: 15 }, (_, i) => 2026 - i)
 
 function useBrowse(f, p) {
   return useQuery(['cat', f, p], async () => {
@@ -127,6 +128,10 @@ export default function Catalog() {
           <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px', flexShrink: 0, alignSelf: 'center' }} />
           {STATUSES.map(v => (
             <button key={v} onClick={() => set('status', f.status === v ? '' : v)} style={{ padding: '6px 14px', borderRadius: 999, border: '1px solid', borderColor: f.status === v ? 'var(--accent)' : 'var(--border)', background: f.status === v ? 'var(--accent)' : 'transparent', color: f.status === v ? '#000' : 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s' }}>{fmt(v)}</button>
+          ))}
+          <div style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 4px', flexShrink: 0, alignSelf: 'center' }} />
+          {YEARS.map(y => (
+            <button key={y} onClick={() => set('year', f.year === String(y) ? '' : String(y))} style={{ padding: '6px 14px', borderRadius: 999, border: '1px solid', borderColor: f.year === String(y) ? 'var(--accent)' : 'var(--border)', background: f.year === String(y) ? 'var(--accent)' : 'transparent', color: f.year === String(y) ? '#000' : 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s' }}>{y}</button>
           ))}
         </div>
 
