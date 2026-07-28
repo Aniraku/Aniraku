@@ -70,7 +70,7 @@ export const ANIME_DETAIL_QUERY = `
       coverImage { extraLarge large medium color }
       bannerImage format status episodes duration genres averageScore popularity description season seasonYear
       nextAiringEpisode { episode airingAt }
-      relations { edges { relationType node { id title { romaji english } format type } } }
+      relations { edges { relationType node { id title { romaji english } coverImage { large medium } format type } } }
     }
   }
 `
