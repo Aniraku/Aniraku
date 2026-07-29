@@ -1,68 +1,62 @@
 # Privacy Policy
 
-**Last updated: July 2026**
+Last updated July 2026.
 
-Aniraku ("we", "our") operates the Aniraku anime streaming platform at [aniraku.vercel.app](https://aniraku.vercel.app). This Privacy Policy describes how we collect, use, and protect your information.
+We run Aniraku at [aniraku.vercel.app](https://aniraku.vercel.app). Here's what happens with your data.
 
-## Information We Collect
+## What we collect
 
-### Account Information
-- Email address (via Supabase authentication)
-- Username
-- Profile preferences and avatar
+If you make an account:
 
-### Usage Data
-- Watch history and playback progress
-- Search queries
-- Bookmarks
-- Browser type and IP address (for rate limiting and abuse protection)
+- Your email (handled by Supabase — we never see the password)
+- A username
+- Whatever avatar you set
 
-### What We Don't Collect
-- We do **not** log which specific anime you watch
-- We do **not** use third-party analytics or tracking cookies
-- We do **not** sell or share your data with advertisers
+As you use the site:
 
-## How We Use Information
+- Watch history and progress (what episode, how far in)
+- Bookmarks you save
+- Search terms you type
 
-- Provide and improve the streaming service
-- Save your watch progress across devices (local + cloud sync)
-- Authenticate your account and protect against abuse
-- Sync bookmarks and preferences to your profile
+## What we don't
 
-## Data Storage
+- We don't track *which* anime you watch. We know you watched episode 5 of *something*, but we don't keep a "this person watched Naruto" kind of log.
+- No analytics. No tracking cookies. No ads.
+- Your data isn't sold to anyone, shared with advertisers, or used to build profiles.
 
-- **Account data** — stored in Supabase (hosted on AWS, encrypted at rest)
-- **Watch progress** — stored both locally in your browser (localStorage) and in our database when signed in
-- **Bookmarks** — stored locally in your browser
-- **No tracking cookies** — we use no cookies for analytics or tracking purposes
+## Where stuff lives
 
-## Third-Party Services
+- Account info is in Supabase. It sits on AWS, encrypted at rest.
+- Watch progress lives in two places — your browser's localStorage, and in Supabase if you're signed in. The local copy means your progress works even offline or when the backend is down.
+- Bookmarks are local-only for now, saved in your browser.
 
-- **[AniList](https://anilist.co/)** — Anime metadata (titles, covers, descriptions, ratings). Queried via their public GraphQL API. We do not send any user data to AniList.
-- **[Supabase](https://supabase.com/)** — Authentication, database, and row-level security. Your credentials are managed entirely by Supabase Auth.
-- **Streaming Backend** — A separate Go service that resolves streaming sources. We proxy requests through this backend; your IP is not directly exposed to upstream providers.
+## Third parties
 
-## Data Retention
+- **AniList** — we grab anime metadata (titles, artwork, descriptions) from their public GraphQL API. We don't send them anything about you.
+- **Supabase** — handles auth and stores user data. Your password never touches our servers.
+- **Streaming backend** — a separate service resolves where video files actually come from. Your requests go through it as a proxy; the upstream sources don't see your IP.
 
-- **Account data** — retained until you delete your account
-- **Watch history** — retained until you delete it from your profile
-- **Local data (localStorage)** — cleared when you clear your browser data
+## How long we keep things
 
-## Your Rights
+- Account data? Until you delete your account.
+- Watch history? Until you clear it.
+- Local browser data? Until you clear your site data in browser settings.
 
-- Request access to your stored data
-- Request deletion of your account and associated data
+## If you're under 13
+
+This site isn't meant for kids under 13. We don't knowingly collect data from anyone that young. If you think we accidentally have, open a GitHub issue and we'll take care of it.
+
+## Your rights
+
+- Ask us what data we have on you
+- Ask us to delete it
 - Export your watch history
-- Delete local data by clearing your browser's site data
+- Delete local data anytime by clearing your browser's site data
 
-## Children's Privacy
+## Changes
 
-Aniraku is not intended for children under 13. We do not knowingly collect data from children under 13. If you believe we have inadvertently collected such data, please open an issue on GitHub and we will promptly remove it.
+If we update this policy, we'll note it here. Using the site after changes means you're okay with them.
 
-## Changes to This Policy
+## Questions?
 
-We may update this policy from time to time. Continued use of the platform after changes constitutes acceptance of the updated policy.
-
-## Contact
-
-For privacy concerns or data requests, please [open an issue on GitHub](https://github.com/Aniraku/Aniraku/issues) or reach out via our [Discord](https://discord.gg/aniraku).
+Open an issue on [GitHub](https://github.com/Aniraku/Aniraku/issues) or find us on [Discord](https://discord.gg/aniraku).

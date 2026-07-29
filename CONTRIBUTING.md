@@ -1,127 +1,73 @@
-# Contributing to Aniraku
+# Contributing
 
-Thanks for your interest in contributing! This guide covers the frontend codebase. The backend is a separate Go service — see the backend repo for its contribution guide.
+Hey, thanks for wanting to help out. This is the frontend repo — a React app that talks to an AniList for metadata and a small Go backend for streaming. Here's how to get started.
 
-## Development Setup
+## Getting set up
 
-### Prerequisites
+1. Fork and clone the thing
+2. `npm install`
+3. `npm run dev` — that's it, you should see the site at `http://localhost:3000`
 
-- **Node.js** 18+
-- **npm** (or pnpm / yarn)
+If you want auth, bookmarks, and watch history to work locally, make a `.env` file:
 
-### Setup
-
-1. **Fork** and **clone** the repo
-
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Aniraku.git
-   cd Aniraku
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **(Optional) Configure environment variables**
-
-   Create a `.env` file:
-
-   ```env
-   VITE_API_URL=http://127.0.0.1:43211      # Local backend (or omit for production)
-   VITE_SUPABASE_URL=https://your-project.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-anon-key
-   ```
-
-   The app works without these — it falls back to the production backend and read-only mode.
-
-4. **Start the dev server**
-
-   ```bash
-   npm run dev
-   ```
-
-   Opens at `http://localhost:3000`.
-
-## Project Structure
-
-```
-aniraku/
-├── index.html              # HTML shell (CSP, OG, JSON-LD, PWA)
-├── vercel.json             # Vercel routes, headers, env
-├── vite.config.js          # Vite build config
-├── middleware.js            # Vercel edge middleware (bot SEO)
-├── public/                 # Static assets
-├── scripts/                # Sitemap generator
-└── src/
-    ├── main.jsx            # Entrypoint (React root + QueryClient)
-    ├── App.jsx             # Router, routes, error boundary, lazy loading
-    ├── config.js           # API_BASE / PROXY_BASE
-    ├── index.css           # CSS variables, global resets, utilities
-    ├── components/         # Reusable UI components
-    ├── hooks/              # Custom React hooks
-    ├── lib/                # AniList client, Supabase, SEO, avatars
-    └── pages/              # Route-level page components
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-### Key Files
+Don't have Supabase set up? No worries — browsing, searching, and watching all work without it. The app falls back to read-only mode gracefully.
 
-| File                     | Purpose                                                   |
-| ------------------------ | --------------------------------------------------------- |
-| `src/App.jsx`            | All routes defined here with `React.lazy` code-splitting  |
-| `src/lib/anilist.js`     | AniList GraphQL client + queries (browse, detail, trend)  |
-| `src/lib/seo.js`         | Dynamic `document.title`, meta tags, JSON-LD per route    |
-| `src/lib/supabase.js`    | Supabase client (auth, watch history, notifications)      |
-| `src/config.js`          | Backend API URL — change `VITE_API_URL` for local testing |
-| `src/hooks/useAnime.js`  | React Query hooks wrapping AniList queries                |
-| `src/hooks/useAuth.jsx`  | Auth context (login, signup, profile, session)            |
-| `src/pages/Watch.jsx`    | Artplayer + hls.js video player, episode browser          |
+If you're also running the backend locally, point to it:
 
-### Styling
+```env
+VITE_API_URL=http://127.0.0.1:43211
+```
 
-- **styled-components** for component-level styles
-- CSS custom properties in `src/index.css` (`--bg`, `--accent`, `--border`, etc.)
-- Always-on dark theme
-- Mobile-first responsive breakpoints (480px, 768px, 1024px)
-- Touch-friendly: 44px minimum tap targets, `-webkit-tap-highlight-color: transparent`
+Otherwise it'll use the production backend automatically.
 
-## Guidelines
+## How the code is organized
 
-- **Keep it simple.** No over-engineering.
-- **Follow the existing patterns** — styled-components for styles, React Query for data, hooks for logic.
-- **Test on mobile.** Use Chrome DevTools device toolbar at 375px width.
-- **Test with multiple anime** — popular ongoing (e.g., One Piece), finished (e.g., Frieren), and older titles.
-- **Maintain accessibility** — semantic HTML, aria labels, keyboard navigation.
-- **Don't break the SEO helper.** If you add a new page, add a `set*SEO()` function in `src/lib/seo.js`.
-- **One PR per feature or fix.**
+A few files worth knowing about before you dive in:
 
-## Adding a New Page
+- **`src/App.jsx`** — every route is here. Pages are lazy-loaded with `React.lazy` so they code-split.
+- **`src/lib/anilist.js`** — the GraphQL queries and a fetch wrapper that tries AniList directly first, then falls back to the backend proxy if CORS gets in the way.
+- **`src/lib/seo.js`** — handles `document.title`, meta tags, Open Graph, and JSON-LD for every page. If you add a new public route, add a `set*SEO()` function here.
+- **`src/hooks/useAnime.js`** — React Query hooks wrapping the AniList queries. Cached aggressively so we don't spam their API.
+- **`src/hooks/useAuth.jsx`** — React context for the Supabase auth state.
+- **`src/pages/Watch.jsx`** — the big one. Artplayer setup, HLS streaming, episode sidebar, keyboard shortcuts, touch gestures, resume positions, the works. It's ~1300 lines, take your time with it.
+- **`src/index.css`** — CSS custom properties for the entire dark theme. `--bg`, `--accent`, `--border`, `--text-primary`, etc.
 
-1. Create your page component in `src/pages/`
-2. Add a lazy import and route in `src/App.jsx`
-3. Add SEO metadata if public-facing (use `src/lib/seo.js`)
-4. If it's a new top-level navigation item, add it to `NavBar.jsx` and `SideBar.jsx`
+Styles are done with styled-components. Keep component styles in their own `*.style.js` files if you're adding a new component.
 
-## Pull Requests
+## Things to keep in mind
 
-- PRs should target the `main` branch.
-- Write clear, descriptive PR titles and descriptions.
-- Reference any related issues (e.g., `Closes #42`).
-- Ensure the dev server starts and builds without errors.
-- Screenshots are appreciated for UI changes.
+- The site is mobile-first. Test at 375px width. Minimum tap targets are 44px.
+- Dark theme only. Don't add light mode.
+- Don't break the SEO helper. New public page = new `set*SEO()` call.
+- One PR per thing. Small changes are easier to review.
+- Test with a few different anime — something popular and currently airing, something old, something obscure. The backend handles them differently.
 
-## Reporting Issues
+## Adding a new page
 
-Use [GitHub Issues](https://github.com/Aniraku/Aniraku/issues). Include:
+1. Make your component in `src/pages/`
+2. Lazy-import it in `src/App.jsx` and add a route
+3. If it's public-facing, add SEO in `src/lib/seo.js`
+4. If it belongs in the nav, add it to `NavBar.jsx` and `SideBar.jsx`
 
-- Steps to reproduce
-- Expected vs actual behavior
-- Browser and OS
-- Screenshots if applicable
+## Pull requests
 
-For streaming/playback issues, include the anime title and episode number.
+A quick checklist before you open one:
+
+- `npm run dev` starts without errors
+- `npm run build` completes clean
+- Works on mobile (375px) and desktop
+- No console errors
+- If it's a UI change, throw in a screenshot
+
+## Reporting bugs
+
+Use the [bug report template](https://github.com/Aniraku/Aniraku/issues/new?template=bug_report.yml). Include what browser and device you're on, and if it's a playback issue, which anime and episode.
 
 ## License
 
-By contributing, you agree your code is licensed under [MIT](LICENSE).
+By contributing you agree your stuff is under MIT, same as the rest of the project.
