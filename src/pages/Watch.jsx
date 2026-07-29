@@ -400,7 +400,7 @@ export default function Watch() {
     if (anime) {
       setWatchSEO(anime, epNumber)
     }
-  }, [anime, epNumber])
+  }, [anime?.id, epNumber])
 
   // Check for resume position on mount
   useEffect(() => {
@@ -630,7 +630,7 @@ export default function Watch() {
     })
 
     artInstance.current = art
-  }, [animeId, anime, epNumber, episodes, baseName, navigate, destroyPlayer])
+  }, [animeId, anime?.id, epNumber, episodes, baseName, navigate, destroyPlayer])
 
   const streamRetries = useRef({})
 

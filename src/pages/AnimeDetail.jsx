@@ -475,7 +475,7 @@ const AnimeDetail = () => {
     if (anime) {
       setAnimeDetailSEO(anime)
     }
-  }, [anime])
+  }, [anime?.id])
 
   return (
     <Page>

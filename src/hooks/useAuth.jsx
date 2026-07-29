@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { defaultAvatar } from '../lib/avatars'
 
@@ -119,8 +119,9 @@ export const AuthProvider = ({ children }) => {
     setProfile(prev => ({ ...prev, ...fields }))
   }
 
+  const ctx = useMemo(() => ({ user, profile, loading, signUp, signIn, signOut, updateProfile, isSupabaseConfigured }), [user, profile, loading, isSupabaseConfigured])
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, updateProfile, isSupabaseConfigured }}>
+    <AuthContext.Provider value={ctx}>
       {children}
     </AuthContext.Provider>
   )
