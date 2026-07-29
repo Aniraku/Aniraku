@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { FaBars, FaBell } from 'react-icons/fa'
+import { FaBars, FaBell, FaSearch, FaRandom } from 'react-icons/fa'
 import { N } from './navbar.style'
 import SideBar from './SideBar'
 import Logo from '../Logo'
@@ -13,7 +13,9 @@ const NavBar = () => {
   const [isScrolled, setIsScrolled] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
+  const [searchQ, setSearchQ] = useState('')
   const notifRef = useRef(null)
+  const searchRef = useRef(null)
   const { user, profile } = useAuth()
   const navigate = useNavigate()
 
@@ -64,7 +66,22 @@ const NavBar = () => {
     }
   }, [])
 
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchRef.current?.focus() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   const unreadCount = notifications.filter(n => !n.read).length
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    const q = searchQ.trim()
+    if (q) navigate(`/catalog?search=${encodeURIComponent(q)}`)
+    setSearchQ('')
+  }
 
   return (
     <N.Nav isScrolled={isScrolled} isHome={isHome}>
@@ -77,7 +94,17 @@ const NavBar = () => {
         <Logo to="/home" height={36} showText />
       </N.Left>
 
+      <N.SearchForm onSubmit={handleSearch}>
+        <FaSearch size={14} />
+        <N.SearchInput ref={searchRef} value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search anime..." />
+      </N.SearchForm>
+
       <N.Right>
+        <N.DesktopNavItem onClick={() => navigate('/random')} title="Random Anime">
+          <FaRandom size={16} />
+          <span>Random</span>
+        </N.DesktopNavItem>
+
         {user && (
           <div ref={notifRef} style={{ position: 'relative' }}>
             <N.NavItem onClick={() => setShowNotifs(!showNotifs)} title="Notifications" style={{ position: 'relative' }}>

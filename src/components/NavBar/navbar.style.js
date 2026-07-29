@@ -58,6 +58,38 @@ N.MenuBtn = styled.button`
   }
 `
 
+N.SearchForm = styled.form`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 320px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  transition: border-color 0.15s;
+
+  &:focus-within { border-color: var(--accent); }
+
+  @media (max-width: 768px) { display: none; }
+`
+
+N.SearchInput = styled.input`
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 14px;
+
+  &::placeholder { color: var(--text-muted); }
+`
+
 N.Right = styled.div`
   display: flex;
   align-items: center;
@@ -67,6 +99,27 @@ N.Right = styled.div`
   @media (max-width: 768px) {
     gap: 0;
   }
+`
+
+N.DesktopNavItem = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+  white-space: nowrap;
+
+  &:hover { color: var(--accent); }
+
+  @media (max-width: 768px) { display: none; }
+
+  span { font-size: 12px; }
 `
 
 N.NavItem = styled.button`

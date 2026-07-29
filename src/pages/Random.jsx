@@ -4,6 +4,7 @@ import { FaRandom, FaPlay, FaRedo } from 'react-icons/fa'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
+import MobileBottomNav from '../components/MobileBottomNav'
 import styled from 'styled-components'
 
 const Page = styled.div`min-height:100vh;background:var(--bg);`
@@ -105,6 +106,8 @@ export default function Random() {
         )}
       </Container>
       <Footer />
+      <MobileBottomNav />
+      <div className="bottom-nav-spacer" />
     </Page>
   )
 }

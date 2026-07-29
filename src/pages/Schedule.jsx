@@ -24,8 +24,6 @@ const Empty = styled.div`text-align:center;padding:4rem 1rem;color:var(--text-mu
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 }
-
 const Schedule = () => {
   const [activeDay, setActiveDay] = React.useState(() => {
     const today = new Date().getDay()
@@ -57,8 +55,15 @@ const Schedule = () => {
     return scheduled
   }, { staleTime: 30 * 60 * 1000 })
 
+  const [searchQuery, setSearchQuery] = React.useState('')
+
   const items = Array.isArray(data) ? data : []
-  const dayItems = items.filter(item => item.day === activeDay)
+  const dayItems = items.filter(item => {
+    if (item.day !== activeDay) return false
+    if (!searchQuery.trim()) return true
+    const title = (item.title?.english || item.title?.romaji || '').toLowerCase()
+    return title.includes(searchQuery.toLowerCase().trim())
+  })
 
   const formatTime = (ts) => {
     if (!ts) return ''
@@ -72,6 +77,7 @@ const Schedule = () => {
       <Container>
         <Title>Airing Schedule</Title>
         <Subtitle>See when your favorite anime air next</Subtitle>
+        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search schedule..." style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', fontSize: 14, marginBottom: 12, outline: 'none' }} />
         <DaysRow>
           {DAYS.map(day => (
             <DayTab key={day} active={activeDay === day ? 1 : 0} onClick={() => setActiveDay(day)}>
