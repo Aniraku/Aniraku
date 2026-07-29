@@ -20,15 +20,17 @@ Allow: /terms
 Allow: /dmca
 Allow: /license
 
+# Allow sitemap files (required for Google to follow sitemap index)
+Allow: /sitemaps/
+
 # Block private/auth routes only
 Disallow: /login
 Disallow: /signup
 Disallow: /profile
 Disallow: /admin
 Disallow: /api/
-Disallow: /sitemaps/
 
-# Block query-param combos that create infinite crawl space
+# Block deep pagination that creates infinite crawl space
 Disallow: /*?page=2
 Disallow: /*?page=3
 Disallow: /*?page=4
