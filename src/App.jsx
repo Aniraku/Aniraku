@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, Component, useEffect } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
+import { Analytics } from "@vercel/analytics/react"
 import { AuthProvider } from "./hooks/useAuth"
 import Error from "./pages/Error"
 import HomeSkeleton from "./components/Loader/HomeSkeleton"
@@ -100,6 +101,7 @@ const App = () => {
             <Route path="/random" element={<Suspense fallback={<Skeleton />}><Random /></Suspense>} />
             <Route path="/*" element={<Error />} />
           </Routes>
+          <Analytics />
         </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
