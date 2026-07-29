@@ -5,6 +5,7 @@ import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
+import { API_BASE } from '../config'
 import styled from 'styled-components'
 
 const Page = styled.div`
@@ -221,7 +222,7 @@ const EpisodeRow = styled(Link)`
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   text-decoration: none;
   color: var(--text-muted);
@@ -229,15 +230,25 @@ const EpisodeRow = styled(Link)`
   transition: background 0.15s;
   &:hover { background: rgba(255,255,255,0.03); }
   &:last-child { border-bottom: none; }
-  @media (max-width: 480px) { padding: 8px 12px; gap: 10px; font-size: 12px; }
+  @media (max-width: 480px) { padding: 6px 12px; gap: 10px; font-size: 12px; }
+`
+
+const EpThumb = styled.img`
+  width: 60px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--bg-card);
 `
 
 const EpNum = styled.span`
-  width: 28px;
+  width: 24px;
   text-align: right;
   font-weight: 600;
   font-size: 12px;
   color: var(--text-muted);
+  flex-shrink: 0;
 `
 
 const RelationsGrid = styled.div`
@@ -349,15 +360,19 @@ const AnimeDetail = () => {
     setActiveTab('episodes')
     Promise.all([
       anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => r.data.Media).catch(() => null),
-      anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
+      fetch(`${API_BASE}/api/v1/anime/${id}/episodes`).then(r => r.ok ? r.json() : { episodes: [] }).catch(() => ({ episodes: [] })),
       anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => {
         const edges = r.data.Media?.relations?.edges || []
         return edges.filter(e => e.node?.id && (e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY'))
           .map(e => ({ ...e.node, relationType: e.relationType }))
       }).catch(() => []),
-    ]).then(([data, simData, relData]) => {
+      anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
+    ]).then(([data, epData, relData, simData]) => {
       setAnime(data)
-      if (data?.episodes) {
+      const eps = epData?.episodes
+      if (eps && eps.length > 0) {
+        setEpisodes(eps)
+      } else if (data?.episodes) {
         setEpisodes(Array.from({ length: data.episodes }, (_, i) => ({
           number: i + 1,
           title: `Episode ${i + 1}`,
@@ -511,9 +526,10 @@ const AnimeDetail = () => {
                   const num = ep.number || i + 1
                   return (
                     <EpisodeRow key={num} to={`/watch/${id}-episode-${num}`}>
+                      <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
                       <EpNum>{num}</EpNum>
                       <span style={{ flex: 1 }}>{ep.title || `Episode ${num}`}</span>
-                      <FaPlay size={10} style={{ color: 'var(--text-muted)' }} />
+                      <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                     </EpisodeRow>
                   )
                 })}
