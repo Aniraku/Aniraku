@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>https://aniraku.vercel.app/sitemaps/static.xml</loc><lastmod>2026-07-27</lastmod></sitemap>
-  <sitemap><loc>https://aniraku.vercel.app/sitemaps/anime-1.xml</loc><lastmod>2026-07-27</lastmod></sitemap>
-  <sitemap><loc>https://aniraku.vercel.app/sitemaps/anime-2.xml</loc><lastmod>2026-07-27</lastmod></sitemap>
-  <sitemap><loc>https://aniraku.vercel.app/sitemaps/anime-3.xml</loc><lastmod>2026-07-27</lastmod></sitemap>
-  <sitemap><loc>https://aniraku.vercel.app/sitemaps/anime-4.xml</loc><lastmod>2026-07-27</lastmod></sitemap>
-  <sitemap><loc>https://aniraku.vercel.app/sitemaps/anime-5.xml</loc><lastmod>2026-07-27</lastmod></sitemap>
-</sitemapindex>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://aniraku.vercel.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://aniraku.vercel.app/home</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://aniraku.vercel.app/catalog</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aniraku.vercel.app/schedule</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://aniraku.vercel.app/random</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://aniraku.vercel.app/privacy</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://aniraku.vercel.app/terms</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://aniraku.vercel.app/dmca</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://aniraku.vercel.app/license</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+</urlset>

@@ -3,7 +3,6 @@ const ANILIST_URL = 'https://graphql.anilist.co'
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
 
-  // ponytail: try direct first (AniList has permissive CORS for GraphQL)
   try {
     const res = await fetch(ANILIST_URL, {
       method: 'POST',
@@ -14,7 +13,9 @@ export async function anilistQuery(query, variables = {}) {
       const json = await res.json()
       if (json.data) return json
     }
-  } catch {}
+  } catch (e) {
+    console.warn('AniList direct fetch failed:', e)
+  }
 
   // ponytail: backend proxy — reliable, no CORS issues
   const apiBase = import.meta.env.VITE_API_URL || ''
@@ -29,7 +30,9 @@ export async function anilistQuery(query, variables = {}) {
         const json = await res.json()
         if (json.data) return json
       }
-    } catch {}
+    } catch (e) {
+      console.warn('AniList proxy fetch failed:', e)
+    }
   }
 
   throw new Error('AniList: all methods failed')

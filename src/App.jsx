@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, Component } from "react"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { AuthProvider } from "./hooks/useAuth"
 import Error from "./pages/Error"
 import HomeSkeleton from "./components/Loader/HomeSkeleton"
@@ -37,7 +37,6 @@ class ErrorBoundary extends Component {
 }
 
 const Home = lazy(() => import("./pages/Home"))
-const Main = lazy(() => import("./pages/Main"))
 const Watch = lazy(() => import("./pages/Watch"))
 const Dmca = lazy(() => import("./pages/Dmca"))
 const Privacy = lazy(() => import("./pages/Privacy"))
@@ -50,6 +49,13 @@ const Profile = lazy(() => import("./pages/Profile"))
 const Catalog = lazy(() => import("./pages/Catalog"))
 const Schedule = lazy(() => import("./pages/Schedule"))
 const Admin = lazy(() => import("./pages/Admin"))
+const Random = lazy(() => import("./pages/Random"))
+
+const GenreRedirect = () => {
+  const params = new URLSearchParams(window.location.search)
+  const genre = window.location.pathname.replace('/genre/', '')
+  return <Navigate to={`/catalog?genre=${encodeURIComponent(genre)}`} replace />
+}
 
 const App = () => {
   return (
@@ -57,7 +63,7 @@ const App = () => {
       <AuthProvider>
         <ErrorBoundary>
           <Routes>
-            <Route path="/" element={<Suspense fallback={<Skeleton />}><Main /></Suspense>} />
+            <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/home" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
             <Route path="/catalog" element={<Suspense fallback={<Skeleton />}><Catalog /></Suspense>} />
             <Route path="/schedule" element={<Suspense fallback={<Skeleton />}><Schedule /></Suspense>} />
@@ -72,6 +78,13 @@ const App = () => {
             <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
             <Route path="/profile" element={<Suspense fallback={<Skeleton />}><Profile /></Suspense>} />
             <Route path="/admin" element={<Suspense fallback={<Skeleton />}><Admin /></Suspense>} />
+            {/* Redirect aliases for sidebar nav */}
+            <Route path="/top-airing" element={<Navigate to="/catalog?status=RELEASING" replace />} />
+            <Route path="/most-popular" element={<Navigate to="/catalog?sort=POPULARITY_DESC" replace />} />
+            <Route path="/movies" element={<Navigate to="/catalog?format=MOVIE" replace />} />
+            <Route path="/tv-series" element={<Navigate to="/catalog?format=TV" replace />} />
+            <Route path="/genre/:genre" element={<GenreRedirect />} />
+            <Route path="/random" element={<Suspense fallback={<Skeleton />}><Random /></Suspense>} />
             <Route path="/*" element={<Error />} />
           </Routes>
         </ErrorBoundary>

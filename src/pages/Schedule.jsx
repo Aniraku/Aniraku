@@ -32,17 +32,11 @@ const Schedule = () => {
     return DAYS[today === 0 ? 6 : today - 1]
   })
 
-  const { data, isLoading } = useQuery(['schedule'], async () => {
-    // ponytail: get current week range
-    const now = Math.floor(Date.now() / 1000)
-    const weekStart = now - (new Date().getDay() * 86400)
-    const weekEnd = weekStart + (7 * 86400)
-
-    const variables = { page: 1, perPage: 50, status: 'RELEASING', sort: ['POPULARITY_DESC'] }
+  const { data, isLoading, error } = useQuery(['schedule'], async () => {
+    const variables = { page: 1, perPage: 100, status: 'RELEASING', sort: ['POPULARITY_DESC'] }
     const { data } = await anilistQuery(BROWSE_QUERY, variables)
     const media = data.Page.media || []
 
-    // ponytail: filter to anime with airing schedule this week
     const scheduled = []
     for (const m of media) {
       if (m.nextAiringEpisode?.airingAt) {
@@ -91,6 +85,8 @@ const Schedule = () => {
               <div key={i} style={{ height: 94, borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', animation: 'pulse 1.5s infinite' }} />
             ))}
           </List>
+        ) : error ? (
+          <Empty>Failed to load schedule. Please try again later.</Empty>
         ) : dayItems.length === 0 ? (
           <Empty>No anime scheduled for {activeDay}.</Empty>
         ) : (

@@ -143,7 +143,7 @@ H.Content = styled.div`
 H.Rank = styled.div`
   color: var(--accent);
   font-size: 14px;
-  font-family: "Ubuntu", sans-serif;
+  font-family: var(--font-body);
   font-weight: bolder;
   text-transform: uppercase;
   margin-bottom: 4px;
@@ -155,7 +155,7 @@ H.Rank = styled.div`
   }
 `;
 H.Title = styled.h1`
-  font-family: "Ubuntu", sans-serif;
+  font-family: var(--font-body);
   color: #fff;
   letter-spacing: 2px;
   margin-bottom: 20px;
@@ -209,7 +209,7 @@ H.Description = styled.div`
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-body);
   color: #fff;
   font-size: 16px;
   margin: 2em 0;
@@ -240,7 +240,7 @@ H.WatchLink = styled(Link)`
   color: #111;
   font-size: 18px;
   border-radius: 30px;
-  font-family: "Ubuntu", sans-serif;
+  font-family: var(--font-body);
   @media screen and (max-width: 1200px) {
     font-size: 16px;
   }
@@ -258,7 +258,7 @@ H.DetailLink = styled(Link)`
   gap: 0.3em;
   font-size: 18px;
   border-radius: 30px;
-  font-family: "Ubuntu", sans-serif;
+  font-family: var(--font-body);
   @media screen and (max-width: 1200px) {
     font-size: 16px;
   }

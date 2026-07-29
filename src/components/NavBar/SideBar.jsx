@@ -7,8 +7,8 @@ const SideBar = ({ open, setOpen }) => {
   const navigate = useNavigate()
   const clickHandler = (e) => {
     setOpen(false)
-    const genre = e.currentTarget.textContent.trim().toLowerCase()
-    if (genre) navigate(`/genre/${genre}`)
+    const genre = e.currentTarget.textContent.trim()
+    if (genre) navigate(`/catalog?genre=${encodeURIComponent(genre)}`)
   }
   return (
     <S.SideMenu open={open}>
@@ -16,7 +16,7 @@ const SideBar = ({ open, setOpen }) => {
         <FaAngleLeft /> Close menu
       </S.CloseButton>
       <S.SettingsIcon>
-        <S.SettingsItem onClick={() => { setOpen(false); navigate('/top-airing') }} style={{ cursor: 'pointer' }}>
+        <S.SettingsItem onClick={() => { setOpen(false); navigate('/random') }} style={{ cursor: 'pointer' }}>
           <FaRandom size={20} color="var(--accent)" />
           <p>Random</p>
         </S.SettingsItem>

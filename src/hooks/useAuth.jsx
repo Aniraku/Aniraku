@@ -43,7 +43,8 @@ export const AuthProvider = ({ children }) => {
           .maybeSingle()
         setProfile(created || { id: userId, username, display_name: username, avatar_url: fallbackAvatar })
       }
-    } catch {
+    } catch (err) {
+      console.error('fetchProfile error:', err)
       const username = sanitizeUsername(email?.split('@')[0] || 'user')
       setProfile({ id: userId, username, display_name: username, avatar_url: defaultAvatar(0).url })
     } finally {

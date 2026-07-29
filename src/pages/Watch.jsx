@@ -652,8 +652,11 @@ export default function Watch() {
     const source = [...SOURCES.sub, ...SOURCES.dub].find(s => s.id === sourceId) || SOURCES.sub[0] || { provider: 'miruro', lang: 'sub' }
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
       const res = await fetch(`${API_BASE}/api/v1/stream`, {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           animeId: parseInt(animeId, 10),
@@ -664,6 +667,7 @@ export default function Watch() {
           refresh: forceRefresh,
         }),
       })
+      clearTimeout(timeoutId)
       const data = await res.json()
 
       if (data.error || !data.sources?.[0]?.url) {
@@ -702,7 +706,11 @@ export default function Watch() {
       loadingRef.current = false
       return
     } catch (err) {
-      setError('Failed to load stream')
+      if (err.name === 'AbortError') {
+        setError('Stream timed out. The backend server may be waking up — try again.')
+      } else {
+        setError('Failed to load stream. Check your connection and try again.')
+      }
       setStreamLoading(false)
       loadingRef.current = false
       return
@@ -844,10 +852,21 @@ export default function Watch() {
     return (
       <>
         <NavBar />
-        <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-          <div style={{ width: 48, height: 48, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <div style={{ background: 'var(--bg)' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0' }}>
+            <div style={{ width: '100%', aspectRatio: '16/9', background: 'var(--bg-card)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' }} />
+            </div>
+          </div>
+            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+              <div style={{ height: 28, width: '60%', background: 'linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%)', backgroundSize: '200% 100%', borderRadius: 6, marginBottom: 12, animation: 'shimmer 1.5s infinite' }} />
+              <div style={{ height: 16, width: '40%', background: 'linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%)', backgroundSize: '200% 100%', borderRadius: 6, marginBottom: 20, animation: 'shimmer 1.5s infinite' }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ height: 44, width: 120, background: 'linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%)', backgroundSize: '200% 100%', borderRadius: 8, animation: 'shimmer 1.5s infinite' }} />
+                <div style={{ height: 44, width: 120, background: 'linear-gradient(90deg, var(--bg-card) 25%, var(--bg-elevated) 50%, var(--bg-card) 75%)', backgroundSize: '200% 100%', borderRadius: 8, animation: 'shimmer 1.5s infinite' }} />
+              </div>
+            </div>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </>
     )
   }
@@ -940,10 +959,15 @@ export default function Watch() {
             alignItems: 'center', justifyContent: 'center', background: '#000',
             padding: 24, textAlign: 'center', zIndex: 50,
           }}>
-            <img src="/no-source.svg" alt="" style={{ width: 200, height: 200, marginBottom: 16, opacity: 0.8 }} />
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, fontWeight: 500 }}>
-              Sorry, we don't have streaming for this.
+            <img src="/no-source.svg" alt="" style={{ width: 160, height: 160, marginBottom: 16, opacity: 0.6 }} />
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, fontWeight: 500, maxWidth: 400, lineHeight: 1.5 }}>
+              {error}
             </p>
+            <button onClick={() => loadStream(activeSource, true)} style={{
+              marginTop: 16, padding: '10px 24px', background: 'rgba(226,232,240,0.12)',
+              color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)', borderRadius: 8,
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}>Retry</button>
           </div>
         )}
 
@@ -1020,13 +1044,24 @@ export default function Watch() {
         ))}
       </div>
 
+      {/* Episode sidebar toggle for mobile */}
+      <button onClick={() => setShowEpSidebar(p => !p)} className="watch-ep-toggle" style={{
+        display: 'none', width: '100%', padding: '10px 14px', margin: '12px auto 0',
+        maxWidth: 1200, background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+        borderRadius: 10, color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
+        cursor: 'pointer', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span>Episodes ({episodes.length})</span>
+        <span style={{ transform: showEpSidebar ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+      </button>
+
       {/* Info + Episodes */}
       <div className="watch-info-section" style={{
         maxWidth: 1200, margin: '0 auto', padding: '20px 16px',
         display: 'flex', gap: 24, flexWrap: 'wrap',
       }}>
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3, wordBreak: 'break-word' }}>
             {anime?.title?.english || anime?.title?.romaji || 'Loading...'}
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 6 }}>
@@ -1081,20 +1116,9 @@ export default function Watch() {
           )}
         </div>
 
-        {/* Episode sidebar toggle for mobile */}
-        <button onClick={() => setShowEpSidebar(p => !p)} className="watch-ep-toggle" style={{
-          display: 'none', width: '100%', padding: '10px 14px', margin: '0 0 12px',
-          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-          borderRadius: 10, color: 'var(--text-primary)', fontSize: 13, fontWeight: 600,
-          cursor: 'pointer', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <span>Episodes ({episodes.length})</span>
-          <span style={{ transform: showEpSidebar ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
-        </button>
-
         {/* Episode sidebar */}
         <div className="watch-episode-sidebar" style={{
-          width: 340, flexShrink: 0, minWidth: 0,
+          width: 340, flexShrink: 0, minWidth: 0, maxWidth: '100%',
           display: showEpSidebar ? 'block' : 'none',
         }}>
           <h2 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 600 }}>
@@ -1195,6 +1219,7 @@ export default function Watch() {
 
         @media (max-width: 768px) {
           .watch-player-wrapper { max-width: 100% !important; }
+          .watch-info-section { flex-direction: column !important; gap: 16px !important; padding: 16px !important; }
           .watch-episode-sidebar { width: 100% !important; flex-shrink: 1 !important; max-height: none !important; }
           .watch-ep-toggle { display: flex !important; }
           .art-bottom { padding: 0 8px 4px !important; }
@@ -1215,7 +1240,10 @@ export default function Watch() {
         }
 
         @media (max-width: 640px) {
-          .watch-source-btn { flex: 1 1 auto !important; min-width: 0 !important; padding: 14px 14px !important; font-size: 14px !important; min-height: 48px !important; }
+          .watch-source-btn { flex: 1 1 auto !important; min-width: 0 !important; padding: 14px 10px !important; font-size: 13px !important; min-height: 48px !important; }
+        }
+        @media (max-width: 400px) {
+          .watch-source-btn { font-size: 11px !important; padding: 12px 6px !important; }
         }
         @media (min-width: 641px) and (max-width: 1024px) {
           .watch-source-btn { padding: 10px 18px !important; }

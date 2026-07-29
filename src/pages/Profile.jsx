@@ -49,7 +49,7 @@ const Profile = () => {
             return [...mapped, ...prev.filter(p => !ids.has(p.id))]
           })
         }
-      }).catch(() => {})
+      }).catch(err => console.error('bookmarks fetch error:', err))
 
       supabase.from('watch_history').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50).then(({ data }) => {
         if (data?.length) {
@@ -71,7 +71,7 @@ const Profile = () => {
             return merged.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 50)
           })
         }
-      }).catch(() => {})
+      }).catch(err => console.error('watch history fetch error:', err))
     }
   }, [user?.id])
 
@@ -300,8 +300,8 @@ const Profile = () => {
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
                     <button onClick={clearHistory} style={ghostBtn}>Clear History</button>
                   </div>
-                  {history.map((h, i) => (
-                    <Link key={i} to={`/watch/${h.animeId}-episode-${h.episode}`} className="profile-history-item" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 8, textDecoration: 'none', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                  {history.map(h => (
+                    <Link key={h.animeId + '-' + h.episode} to={`/watch/${h.animeId}-episode-${h.episode}`} className="profile-history-item" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 8, textDecoration: 'none', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
                       {h.image && <img src={h.image} alt="" style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 4 }} />}
                       <span style={{ color: 'var(--text-muted)', fontSize: 13, minWidth: 50 }}>Ep {h.episode}</span>
                       <span style={{ fontSize: 14, flex: 1 }}>{h.title || `Anime ${h.animeId}`}</span>

@@ -3,6 +3,8 @@ Allow: /
 Disallow: /api/
 Disallow: /login
 Disallow: /signup
+Disallow: /admin
+Disallow: /profile
 Disallow: /*?*
 
 Sitemap: https://aniraku.vercel.app/sitemap.xml

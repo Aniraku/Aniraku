@@ -1,6 +1,6 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FaHome, FaSearch, FaCalendarAlt, FaUser } from 'react-icons/fa'
+import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser } from 'react-icons/fa'
 import styled from 'styled-components'
 
 const Bar = styled.nav`
@@ -34,25 +34,22 @@ const Item = styled.button`
   border: none;
   color: ${({ active }) => (active ? '#fff' : 'var(--text-muted)')};
   cursor: pointer;
-  padding: 10px 16px;
+  padding: 10px 14px;
   min-height: 48px;
   min-width: 48px;
   border-radius: 9999px;
   font-size: 10px;
   transition: all 0.2s;
-  position: relative;
 
   ${({ active }) => active && `
     background: rgba(255, 255, 255, 0.15);
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
   `}
 
-  &:hover {
-    color: #fff;
-  }
+  &:hover { color: #fff; }
 
   span {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 500;
   }
 `
@@ -64,8 +61,9 @@ const MobileBottomNav = () => {
 
   const items = [
     { icon: FaHome, label: 'Home', to: '/home' },
-    { icon: FaSearch, label: 'Browse', to: '/catalog' },
+    { icon: FaThLarge, label: 'Catalog', to: '/catalog' },
     { icon: FaCalendarAlt, label: 'Schedule', to: '/schedule' },
+    { icon: FaRandom, label: 'Random', to: '/random' },
     { icon: FaUser, label: 'Profile', to: '/profile' },
   ]
 
@@ -74,7 +72,7 @@ const MobileBottomNav = () => {
       {items.map(({ icon: Icon, label, to }) => (
         <Item
           key={to}
-          active={path === to || (to === '/home' && path === '/') ? 1 : 0}
+          active={path === to ? 1 : 0}
           onClick={() => navigate(to)}
         >
           <Icon size={18} />

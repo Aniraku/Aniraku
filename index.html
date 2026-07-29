@@ -13,22 +13,32 @@
   <!-- CSP: allow AniList GraphQL + Supabase + Google Fonts + Miruro CDN + Backend -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://graphql.anilist.co https://aniraku-backend.onrender.com https://sbjdrjaovcgvttfnpfsz.supabase.co https://*.onrender.com https://*.vercel.app wss://*.onrender.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob: data: https:;" />
 
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/icons/icon-180.svg" />
+
   <!-- Primary Meta -->
-  <title>Aniraku — Anime Streaming</title>
-  <meta name="title" content="Aniraku — Anime Streaming" />
-  <meta name="description" content="Aniraku — Stream, Discover & Download anime. Browse the AniList catalog, watch Sub/Dub with community features. Free anime streaming." />
-  <meta name="keywords" content="anime streaming, watch anime free, anime online, sub anime, dub anime, aniraku, anime download, anime community" />
+  <title>Aniraku — Free Anime Streaming | Watch Sub &amp; Dub Online</title>
+  <meta name="title" content="Aniraku — Free Anime Streaming | Watch Sub & Dub Online" />
+  <meta name="description" content="Aniraku is a free, open-source anime streaming client. Browse thousands of anime from AniList, watch with subtitles or dubbed, track your progress, and discover new series." />
+  <meta name="keywords" content="anime streaming, watch anime free, anime online, sub anime, dub anime, aniraku, anime community, free anime streaming, anime tracker" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://aniraku.vercel.app/" />
+  <meta name="googlebot" content="index, follow" />
+  <meta name="author" content="Aniraku" />
+  <link rel="canonical" href="https://aniraku.vercel.app/" id="canonical-link" />
+  <script>document.addEventListener('DOMContentLoaded',function(){var c=document.getElementById('canonical-link'),o=window.location.origin.includes('localhost')||window.location.origin.includes('127.0.0.1')?'http://localhost:3000':'https://aniraku.vercel.app';if(c){c.href=o+window.location.pathname}})</script>
 
 <!-- Google Site Verification -->
 <meta name="google-site-verification" content="8lE4K_TtF7U4BTxLPGU_QtufIMbQKWbV9l8P0xxTIx8" />
+  <script>var SITE=window.location.origin.includes('localhost')||window.location.origin.includes('127.0.0.1')?'http://localhost:3000':'https://aniraku.vercel.app'</script>
+
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://aniraku.vercel.app/" />
+  <meta property="og:url" content="https://aniraku.vercel.app/" id="og-url" />
   <meta property="og:title" content="Aniraku — Anime Streaming" />
   <meta property="og:description" content="Stream, Discover & Download anime. Browse the AniList catalog with Sub/Dub playback and community features." />
-  <meta property="og:image" content="https://aniraku.vercel.app/og-image.svg" />
+  <meta property="og:image" content="https://aniraku.vercel.app/og-image.svg" id="og-image" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:type" content="image/svg+xml" />
@@ -37,12 +47,13 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:url" content="https://aniraku.vercel.app/" />
+  <meta name="twitter:url" content="https://aniraku.vercel.app/" id="tw-url" />
   <meta name="twitter:title" content="Aniraku — Anime Streaming" />
   <meta name="twitter:description" content="Stream, Discover & Download anime. Browse the AniList catalog with Sub/Dub playback and community features." />
-  <meta name="twitter:image" content="https://aniraku.vercel.app/og-image.svg" />
+  <meta name="twitter:image" content="https://aniraku.vercel.app/og-image.svg" id="tw-image" />
   <meta name="twitter:site" content="@sho_islam0311" />
   <meta name="twitter:creator" content="@sho_islam0311" />
+  <script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[id$="-url"],[id$="-image"]').forEach(function(e){e.content=e.content.replace('https://aniraku.vercel.app',SITE)})})</script>
 
   <!-- Fonts preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />

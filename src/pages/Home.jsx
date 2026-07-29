@@ -174,7 +174,7 @@ const Home = () => {
           {airingDone ? airing.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-              <div key={`sk-air-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+            <div key={`sk-air-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
               <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
               <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
             </div>
@@ -192,7 +192,7 @@ const Home = () => {
           {moviesDone ? movies.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-            <div key={`sk-mov-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+            <div key={`sk-mov-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
               <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
               <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
             </div>
@@ -210,7 +210,7 @@ const Home = () => {
           {tvDone ? topTV.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-            <div key={`sk-tv-${i}`} style={{ width: 150, flex: '0 0 auto' }}>
+            <div key={`sk-tv-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
               <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
               <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
             </div>
@@ -231,6 +231,7 @@ const Home = () => {
       <Footer />
       <MobileBottomNav />
       <div className="bottom-nav-spacer" />
+      <style>{`@media(max-width:480px){.card-skeleton{width:130px!important}}`}</style>
     </>
   )
 }

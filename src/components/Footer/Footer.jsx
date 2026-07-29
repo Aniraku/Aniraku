@@ -26,24 +26,28 @@ const Footer = () => {
         </F.Col>
 
         <F.Col>
-          <F.ColTitle>Browse</F.ColTitle>
-          <F.ColLinks>
-            <F.LinkItem as={Link} to="/home">Home</F.LinkItem>
-            <F.LinkItem as={Link} to="/catalog">Catalog</F.LinkItem>
-            <F.LinkItem as={Link} to="/schedule">Schedule</F.LinkItem>
-            <F.LinkItem as={Link} to="/catalog?sort=POPULARITY_DESC">Most Popular</F.LinkItem>
-            <F.LinkItem as={Link} to="/catalog?status=RELEASING">Top Airing</F.LinkItem>
-          </F.ColLinks>
+          <F.MobileDetails open>
+            <summary><F.ColTitle as="span">Browse</F.ColTitle></summary>
+            <F.ColLinks>
+              <F.LinkItem as={Link} to="/home">Home</F.LinkItem>
+              <F.LinkItem as={Link} to="/catalog">Catalog</F.LinkItem>
+              <F.LinkItem as={Link} to="/schedule">Schedule</F.LinkItem>
+              <F.LinkItem as={Link} to="/catalog?sort=POPULARITY_DESC">Most Popular</F.LinkItem>
+              <F.LinkItem as={Link} to="/catalog?status=RELEASING">Top Airing</F.LinkItem>
+            </F.ColLinks>
+          </F.MobileDetails>
         </F.Col>
 
         <F.Col>
-          <F.ColTitle>Resources</F.ColTitle>
-          <F.ColLinks>
-            <F.LinkItem as={Link} to="/privacy">Privacy</F.LinkItem>
-            <F.LinkItem as={Link} to="/terms">Terms</F.LinkItem>
-            <F.LinkItem as={Link} to="/dmca">DMCA</F.LinkItem>
-            <F.LinkItem as={Link} to="/license">AGPL License</F.LinkItem>
-          </F.ColLinks>
+          <F.MobileDetails open>
+            <summary><F.ColTitle as="span">Resources</F.ColTitle></summary>
+            <F.ColLinks>
+              <F.LinkItem as={Link} to="/privacy">Privacy</F.LinkItem>
+              <F.LinkItem as={Link} to="/terms">Terms</F.LinkItem>
+              <F.LinkItem as={Link} to="/dmca">DMCA</F.LinkItem>
+              <F.LinkItem as={Link} to="/license">AGPL License</F.LinkItem>
+            </F.ColLinks>
+          </F.MobileDetails>
         </F.Col>
 
         <F.Col>

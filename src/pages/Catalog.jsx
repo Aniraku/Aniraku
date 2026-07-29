@@ -131,6 +131,7 @@ export default function Catalog() {
     ss(p => { const n = new URLSearchParams(p); v ? n.set(k, v) : n.delete(k); n.set('page', '1'); return n })
   }, [ss])
 
+
   const go = useCallback(p => {
     ss(pv => { const n = new URLSearchParams(pv); n.set('page', String(p)); return n })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -169,6 +170,7 @@ export default function Catalog() {
   }, [])
 
   const hasActiveFilters = !!(f.search || f.format || f.status || f.genre || f.year)
+
 
   return (
     <div className="catalog-page">

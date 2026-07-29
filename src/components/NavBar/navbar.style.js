@@ -58,134 +58,6 @@ N.MenuBtn = styled.button`
   }
 `
 
-N.Center = styled.div`
-  position: relative;
-  flex: 1;
-  max-width: 480px;
-  margin: 0 auto;
-
-  @media (max-width: 768px) {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    max-width: 100%;
-    padding: 0 12px;
-    z-index: 270;
-    display: ${({ focused }) => (focused ? 'block' : 'none')};
-  }
-`
-
-N.SearchWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  background: ${({ focused }) => (focused ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)')};
-  border: 1px solid ${({ focused }) => (focused ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)')};
-  border-radius: var(--radius-full);
-  padding: 0 1rem;
-  height: 40px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(255,255,255,0.1);
-    border-color: rgba(255,255,255,0.12);
-  }
-`
-
-N.SearchIconInner = styled.span`
-  color: var(--text-secondary);
-  margin-right: 0.5rem;
-  display: flex;
-  align-items: center;
-`
-
-N.SearchInput = styled.input`
-  flex: 1;
-  background: none;
-  outline: none;
-  color: var(--text-primary);
-  font-size: 14px;
-  height: 100%;
-
-  &::placeholder {
-    color: var(--text-muted);
-  }
-`
-
-N.Dropdown = styled.div`
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  max-height: 400px;
-  overflow-y: auto;
-  z-index: 200;
-`
-
-N.DropdownItem = styled.div`
-  display: flex;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-
-  &:last-child { border-bottom: none; }
-  &:hover { background: rgba(255,255,255,0.05); }
-`
-
-N.DropdownImg = styled.img`
-  width: 45px;
-  height: 63px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-`
-
-N.DropdownInfo = styled.div`
-  flex: 1;
-  min-width: 0;
-`
-
-N.DropdownTitle = styled.div`
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  ${N.DropdownItem}:hover & {
-    color: var(--accent);
-  }
-`
-
-N.DropdownSub = styled.div`
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`
-
-N.DropdownMeta = styled.div`
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-`
-
-N.DropdownEmpty = styled.div`
-  padding: 16px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
-`
-
 N.Right = styled.div`
   display: flex;
   align-items: center;
@@ -224,11 +96,6 @@ N.NavItem = styled.button`
     span { display: none; }
   }
 
-  &.mobile-search-btn {
-    @media (min-width: 769px) {
-      display: none;
-    }
-  }
 `
 
 N.Divider = styled.div`
@@ -239,18 +106,6 @@ N.Divider = styled.div`
 
   @media (max-width: 768px) {
     display: none;
-  }
-`
-
-N.MobileSearchOverlay = styled.div`
-  display: none;
-  @media (max-width: 768px) {
-    display: ${({ open }) => open ? 'block' : 'none'};
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 260;
-    top: 56px;
   }
 `
 

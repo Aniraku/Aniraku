@@ -46,6 +46,26 @@ F.ColTitle = styled.h4`
   letter-spacing: 0.5px;
 `
 
+// ponytail: <details> for mobile accordion, always open on desktop
+F.ColLinks = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+// ponytail: mobile-only collapsible accordion
+F.MobileDetails = styled.details`
+  @media (min-width: 769px) {
+    &[open] { display: contents; }
+  }
+  @media (max-width: 768px) {
+    summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: '+'; font-size: 16px; color: var(--text-muted); transition: transform 0.2s; padding-left: 8px; }
+    &[open] summary::after { content: '−'; }
+  }
+`
+
 F.Disclaimer = styled.p`
   font-size: 12px;
   color: var(--text-muted);

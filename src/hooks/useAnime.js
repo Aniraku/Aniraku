@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
+import { anilistQuery, BROWSE_QUERY, ANIME_DETAIL_QUERY } from '../lib/anilist'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -42,21 +42,7 @@ export function useGenre({ genre }) {
   }, { staleTime: 300000 })
 }
 
-export function useLatestEpisode() {
-  return useQuery(['latest'], async () => {
-    return browse({ page: 1, perPage: 20, sort: ['TRENDING'] })
-  }, { staleTime: 300000 })
-}
-
-export const useSearchAnime = (filter) => {
-  return useQuery(['searchAnime', filter], async () => {
-    if (!filter || filter.length < 2) return []
-    return browse({ page: 1, perPage: 10, search: filter })
-  }, { enabled: !!filter && filter.length > 1, staleTime: 60000 })
-}
-
 export function useAnimeDetails(id) {
-  const { ANIME_DETAIL_QUERY } = require('../lib/anilist')
   return useQuery(['anime', id], async () => {
     const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
     return data.Media
@@ -64,7 +50,6 @@ export function useAnimeDetails(id) {
 }
 
 export function useAnimeEpisodes(id) {
-  const { ANIME_DETAIL_QUERY } = require('../lib/anilist')
   return useQuery(['episodes', id], async () => {
     const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
     const media = data.Media

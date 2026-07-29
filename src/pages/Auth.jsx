@@ -140,6 +140,10 @@ const Auth = ({ mode }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (!isLogin && password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
     setLoading(true)
     try {
       if (isLogin) {
@@ -150,8 +154,9 @@ const Auth = ({ mode }) => {
       navigate('/home')
     } catch (err) {
       setError(err.message || 'Something went wrong')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleForgot = async () => {
@@ -167,8 +172,9 @@ const Auth = ({ mode }) => {
       setSent(true)
     } catch (err) {
       setError(err.message || 'Failed to send reset email')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
