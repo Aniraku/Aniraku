@@ -63,7 +63,7 @@ const App = () => {
       <AuthProvider>
         <ErrorBoundary>
           <Routes>
-            <Route path="/" element={<Navigate to="/home" replace />} />
+            <Route path="/" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
             <Route path="/home" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
             <Route path="/catalog" element={<Suspense fallback={<Skeleton />}><Catalog /></Suspense>} />
             <Route path="/schedule" element={<Suspense fallback={<Skeleton />}><Schedule /></Suspense>} />

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
@@ -107,6 +107,7 @@ function FilterSelect({ options, value, onChange, ariaLabel }) {
 
 export default function Catalog() {
   const [sp, ss] = useSearchParams()
+  const navigate = useNavigate()
   const [searchInput, setSearchInput] = useState(sp.get('search') || '')
   const [debouncedSearch, setDebouncedSearch] = useState(sp.get('search') || '')
   const searchRef = useRef(null)
@@ -127,34 +128,38 @@ export default function Catalog() {
   const total = data?.pageInfo?.total || 0
   const last = data?.pageInfo?.lastPage || 1
 
-  const set = useCallback((k, v) => {
-    ss(p => { const n = new URLSearchParams(p); v ? n.set(k, v) : n.delete(k); n.set('page', '1'); return n })
-  }, [ss])
+  const mkUrl = useCallback((overrides) => {
+    const n = new URLSearchParams(sp)
+    for (const [k, v] of Object.entries(overrides)) {
+      v ? n.set(k, v) : n.delete(k)
+    }
+    return `/catalog?${n.toString()}`
+  }, [sp])
 
+  const set = useCallback((k, v) => {
+    navigate(mkUrl({ [k]: v, page: '1' }))
+  }, [navigate, mkUrl])
 
   const go = useCallback(p => {
-    ss(pv => { const n = new URLSearchParams(pv); n.set('page', String(p)); return n })
+    navigate(mkUrl({ page: String(p) }))
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [ss])
+  }, [navigate, mkUrl])
 
   const clr = useCallback(() => {
     setSearchInput('')
     setDebouncedSearch('')
-    ss({})
-  }, [ss])
+    navigate('/catalog')
+  }, [navigate])
 
-  // Debounce typed search into the URL/query so we don't refetch on every keystroke
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return }
     const t = setTimeout(() => {
       const val = searchInput.trim()
       setDebouncedSearch(val)
-      ss(p => {
-        const n = new URLSearchParams(p)
-        val ? n.set('search', val) : n.delete('search')
-        n.set('page', '1')
-        return n
-      }, { replace: true })
+      const n = new URLSearchParams(sp)
+      val ? n.set('search', val) : n.delete('search')
+      n.set('page', '1')
+      navigate(`/catalog?${n.toString()}`, { replace: true })
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps

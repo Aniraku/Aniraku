@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { Link } from 'react-router-dom'
 
 export const N = {}
 
@@ -88,6 +89,35 @@ N.SearchInput = styled.input`
   font-size: 14px;
 
   &::placeholder { color: var(--text-muted); }
+`
+
+N.NavLinks = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  @media (max-width: 768px) { display: none; }
+`
+
+N.NavLink = styled(Link)`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  white-space: nowrap;
+
+  &:hover { color: var(--accent); background: rgba(255,255,255,0.04); }
+  &.active { color: var(--accent); }
+
+  span { font-size: 12px; }
+
+  @media (max-width: 900px) { padding: 6px 10px; span { display: none; } }
 `
 
 N.Right = styled.div`

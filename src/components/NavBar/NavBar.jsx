@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { FaBars, FaBell, FaSearch, FaRandom } from 'react-icons/fa'
+import { FaBars, FaBell, FaSearch, FaRandom, FaHome, FaThLarge, FaCalendarAlt } from 'react-icons/fa'
 import { N } from './navbar.style'
 import SideBar from './SideBar'
 import Logo from '../Logo'
@@ -98,6 +98,12 @@ const NavBar = () => {
         <FaSearch size={14} />
         <N.SearchInput ref={searchRef} value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search anime..." />
       </N.SearchForm>
+
+      <N.NavLinks>
+        <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}><FaHome size={15} /><span>Home</span></N.NavLink>
+        <N.NavLink to="/catalog" className={location.pathname === '/catalog' ? 'active' : ''}><FaThLarge size={14} /><span>Catalog</span></N.NavLink>
+        <N.NavLink to="/schedule" className={location.pathname === '/schedule' ? 'active' : ''}><FaCalendarAlt size={14} /><span>Schedule</span></N.NavLink>
+      </N.NavLinks>
 
       <N.Right>
         <N.DesktopNavItem onClick={() => navigate('/random')} title="Random Anime">
