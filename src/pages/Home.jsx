@@ -19,7 +19,7 @@ const Section = styled.section`
 
   @media (max-width: 480px) {
     padding: 0 12px;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
   }
 `
 
@@ -71,23 +71,32 @@ const ScrollRow = styled.div`
 const GenreChip = styled(Link)`
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 14px;
+  border-radius: 6px;
+  padding: 4px 10px;
   text-decoration: none;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-size: 11px;
   font-weight: 500;
   transition: all 0.2s;
   &:hover {
     border-color: var(--accent);
     color: var(--text-primary);
   }
+  @media (max-width: 480px) {
+    padding: 3px 8px;
+    font-size: 10px;
+    border-radius: 5px;
+  }
 `
 
 const GenreRow = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+
+  @media (max-width: 480px) {
+    gap: 4px;
+  }
 `
 
 const QuickLinks = styled.div`

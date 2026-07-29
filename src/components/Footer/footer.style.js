@@ -12,8 +12,8 @@ F.Footer = styled.footer`
     margin-top: 4rem;
   }
   @media (max-width: 768px) {
-    padding: 1rem 1rem 5rem;
-    margin-top: 1.5rem;
+    padding: 1.25rem 1rem 5rem;
+    margin-top: 0.5rem;
   }
 `
 
