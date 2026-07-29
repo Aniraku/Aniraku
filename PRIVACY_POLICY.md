@@ -1,59 +1,62 @@
 # Privacy Policy
 
-**Last updated: July 2026**
+Last updated July 2026.
 
-Aniraku ("we", "our") operates the Aniraku anime streaming platform. This Privacy Policy describes how we collect, use, and protect your information.
+We run Aniraku at [aniraku.vercel.app](https://aniraku.vercel.app). Here's what happens with your data.
 
-## Information We Collect
+## What we collect
 
-### Account Information
-- Email address (via Supabase authentication)
-- Username
-- Profile preferences
+If you make an account:
 
-### Usage Data
-- Watch history and progress
-- Search queries
-- Browser type and IP address (for rate limiting)
+- Your email (handled by Supabase — we never see the password)
+- A username
+- Whatever avatar you set
 
-### Streaming Data
-- We do not log which anime you watch
-- Torrent connections are ephemeral and not tied to accounts
+As you use the site:
 
-## How We Use Information
+- Watch history and progress (what episode, how far in)
+- Bookmarks you save
+- Search terms you type
 
-- Provide and improve the streaming service
-- Save your watch progress across devices
-- Authenticate and protect against abuse
+## What we don't
 
-## Data Storage
+- We don't track *which* anime you watch. We know you watched episode 5 of *something*, but we don't keep a "this person watched Naruto" kind of log.
+- No analytics. No tracking cookies. No ads.
+- Your data isn't sold to anyone, shared with advertisers, or used to build profiles.
 
-- Account data is stored in Supabase (hosted on AWS)
-- Watch progress is stored per-user in our database
-- No cookies are used for tracking
+## Where stuff lives
 
-## Third-Party Services
+- Account info is in Supabase. It sits on AWS, encrypted at rest.
+- Watch progress lives in two places — your browser's localStorage, and in Supabase if you're signed in. The local copy means your progress works even offline or when the backend is down.
+- Bookmarks are local-only for now, saved in your browser.
 
-- **AniList** — Anime metadata (titles, covers, descriptions)
-- **Supabase** — Authentication and database
-- **Senshi/AnimeTosho** — Streaming sources (we proxy requests; your IP is not exposed to them directly)
+## Third parties
 
-## Data Retention
+- **AniList** — we grab anime metadata (titles, artwork, descriptions) from their public GraphQL API. We don't send them anything about you.
+- **Supabase** — handles auth and stores user data. Your password never touches our servers.
+- **Streaming backend** — a separate service resolves where video files actually come from. Your requests go through it as a proxy; the upstream sources don't see your IP.
 
-- Account data: retained until you delete your account
-- Watch history: retained until you delete it
-- Torrent data: cleared after 24 hours of inactivity
+## How long we keep things
 
-## Your Rights
+- Account data? Until you delete your account.
+- Watch history? Until you clear it.
+- Local browser data? Until you clear your site data in browser settings.
 
-- Request access to your data
-- Request deletion of your data
+## If you're under 13
+
+This site isn't meant for kids under 13. We don't knowingly collect data from anyone that young. If you think we accidentally have, open a GitHub issue and we'll take care of it.
+
+## Your rights
+
+- Ask us what data we have on you
+- Ask us to delete it
 - Export your watch history
+- Delete local data anytime by clearing your browser's site data
 
 ## Changes
 
-We may update this policy. Continued use constitutes acceptance.
+If we update this policy, we'll note it here. Using the site after changes means you're okay with them.
 
-## Contact
+## Questions?
 
-Open an issue on GitHub for privacy concerns.
+Open an issue on [GitHub](https://github.com/Aniraku/Aniraku/issues) or find us on [Discord](https://discord.gg/aniraku).
