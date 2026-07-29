@@ -360,6 +360,7 @@ const AnimeDetail = () => {
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setActiveTab('episodes')
     Promise.all([
@@ -372,6 +373,7 @@ const AnimeDetail = () => {
       }).catch(() => []),
       anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
     ]).then(([data, epData, relData, simData]) => {
+      if (cancelled) return
       setAnime(data)
       const eps = epData?.episodes
       if (eps && eps.length > 0) {
@@ -386,7 +388,8 @@ const AnimeDetail = () => {
       setSimilar(simData || [])
       setRelations(relData || [])
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [id])
 
   const confirmNsfw = () => {
