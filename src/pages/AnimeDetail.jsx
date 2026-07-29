@@ -6,7 +6,6 @@ import Footer from '../components/Footer/Footer'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
 import { API_BASE } from '../config'
-import { setAnimeDetailSEO } from '../lib/seo'
 import styled from 'styled-components'
 
 const Page = styled.div`
@@ -360,7 +359,6 @@ const AnimeDetail = () => {
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
   useEffect(() => {
-    let cancelled = false
     setLoading(true)
     setActiveTab('episodes')
     Promise.all([
@@ -373,7 +371,6 @@ const AnimeDetail = () => {
       }).catch(() => []),
       anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
     ]).then(([data, epData, relData, simData]) => {
-      if (cancelled) return
       setAnime(data)
       const eps = epData?.episodes
       if (eps && eps.length > 0) {
@@ -388,8 +385,7 @@ const AnimeDetail = () => {
       setSimilar(simData || [])
       setRelations(relData || [])
       setLoading(false)
-    }).catch(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    }).catch(() => setLoading(false))
   }, [id])
 
   const confirmNsfw = () => {
@@ -469,13 +465,6 @@ const AnimeDetail = () => {
   const tabs = []
   if (hasEpisodes) tabs.push({ key: 'episodes', label: `Episodes (${episodes.length})` })
   if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
-
-  // Dynamic SEO metadata
-  useEffect(() => {
-    if (anime) {
-      setAnimeDetailSEO(anime)
-    }
-  }, [anime?.id])
 
   return (
     <Page>
