@@ -1,7 +1,7 @@
 # Aniraku
 
 <p align="center">
-  <img src="public/og-image.svg" alt="Aniraku" width="500" />
+  <img src="public/og-image.png" alt="Aniraku" width="500" />
 </p>
 
 <p align="center">
