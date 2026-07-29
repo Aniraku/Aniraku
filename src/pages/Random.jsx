@@ -98,7 +98,7 @@ export default function Random() {
             {anime.genres && anime.genres.length > 0 && (
               <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {anime.genres.map(g => (
-                  <Link key={g} to={`/catalog?genre=${encodeURIComponent(g)}`} style={{ padding: '3px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontSize: 11, textDecoration: 'none', transition: 'all 0.2s' }}>{g}</Link>
+                  <Link key={g} to={`/catalog?genre=${encodeURIComponent(g)}`} style={{ padding: '3px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 500, textDecoration: 'none', transition: 'all 0.2s' }}>{g}</Link>
                 ))}
               </div>
             )}
