@@ -78,6 +78,19 @@ export const ANIME_DETAIL_QUERY = `
   }
 `
 
+export const RECOMMEND_QUERY = `
+  query ($id: Int, $genres: [String], $page: Int, $perPage: Int) {
+    Media(id: $id, type: ANIME) { id genres }
+    Page(page: $page, perPage: $perPage) {
+      media(genre_in: $genres, type: ANIME, sort: SCORE_DESC, id_not: $id) {
+        id title { romaji english userPreferred }
+        coverImage { extraLarge large medium color }
+        format episodes averageScore status genres
+      }
+    }
+  }
+`
+
 export const SCHEDULE_QUERY = `
   query ($weekStart: Int, $weekEnd: Int) {
     Page(perPage: 50) {

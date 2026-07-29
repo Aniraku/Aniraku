@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY, ANIME_DETAIL_QUERY } from '../lib/anilist'
+import { anilistQuery, BROWSE_QUERY, ANIME_DETAIL_QUERY, RECOMMEND_QUERY } from '../lib/anilist'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -46,6 +46,16 @@ export function useAnimeDetails(id) {
   return useQuery(['anime', id], async () => {
     const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
     return data.Media
+  }, { enabled: !!id, staleTime: 300000 })
+}
+
+export function useSimilar(id) {
+  return useQuery(['similar', id], async () => {
+    const { data } = await anilistQuery(RECOMMEND_QUERY, { id: parseInt(id), genres: [], page: 1, perPage: 12 })
+    const genres = data.Media?.genres || []
+    if (!genres.length) return []
+    const { data: d2 } = await anilistQuery(RECOMMEND_QUERY, { id: parseInt(id), genres, page: 1, perPage: 12 })
+    return d2.Page.media || []
   }, { enabled: !!id, staleTime: 300000 })
 }
 

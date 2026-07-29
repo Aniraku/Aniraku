@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { FaPlay, FaStar, FaBookmark, FaRegBookmark } from 'react-icons/fa'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import useLocalStorage from '../hooks/useLocalStorage'
-import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
+import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
 import { API_BASE } from '../config'
 import styled from 'styled-components'
 
@@ -47,8 +47,8 @@ const BannerContent = styled.div`
   display: flex;
   gap: 24px;
   align-items: flex-end;
-  @media (max-width: 768px) { padding: 0 16px; gap: 16px; }
-  @media (max-width: 480px) { padding: 0 12px; gap: 12px; }
+  @media (max-width: 768px) { gap: 16px; padding: 0 16px; }
+  @media (max-width: 480px) { gap: 12px; padding: 0 12px; }
 `
 
 const Cover = styled.img`
@@ -59,7 +59,7 @@ const Cover = styled.img`
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   flex-shrink: 0;
   @media (max-width: 768px) { width: 110px; height: 155px; }
-  @media (max-width: 480px) { width: 90px; height: 127px; }
+  @media (max-width: 480px) { width: 90px; height: 127px; border-radius: 6px; }
 `
 
 const Info = styled.div`
@@ -113,8 +113,9 @@ const WatchBtn = styled(Link)`
   font-size: 14px;
   text-decoration: none;
   transition: opacity 0.2s;
+  min-height: 44px;
   &:hover { opacity: 0.9; }
-  @media (max-width: 480px) { padding: 8px 18px; font-size: 13px; }
+  @media (max-width: 480px) { padding: 8px 18px; font-size: 13px; min-height: 40px; }
 `
 
 const BookmarkBtn = styled.button`
@@ -130,8 +131,10 @@ const BookmarkBtn = styled.button`
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
   &:hover { border-color: var(--accent); }
-  @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; }
+  @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; min-height: 40px; }
 `
 
 const Content = styled.div`
@@ -178,11 +181,12 @@ const GenreTag = styled(Link)`
   font-size: 11px;
   font-weight: 500;
   text-decoration: none;
-  min-height: unset !important;
-  min-width: unset !important;
   transition: all 0.2s;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
   &:hover { border-color: var(--accent); color: var(--text-primary); }
-  @media (max-width: 480px) { padding: 2px 8px; font-size: 10px; border-radius: 6px; }
+  @media (max-width: 480px) { padding: 2px 8px; font-size: 10px; border-radius: 6px; min-height: 26px; }
 `
 
 const Tabs = styled.div`
@@ -193,6 +197,7 @@ const Tabs = styled.div`
   overflow-x: auto;
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
+  -webkit-overflow-scrolling: touch;
 `
 
 const Tab = styled.button`
@@ -206,8 +211,10 @@ const Tab = styled.button`
   cursor: pointer;
   white-space: nowrap;
   transition: color 0.2s, border-color 0.2s;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
   &:hover { color: var(--text-primary); }
-  @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; }
+  @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; min-height: 40px; }
 `
 
 const EpisodeList = styled.div`
@@ -217,8 +224,10 @@ const EpisodeList = styled.div`
   border-radius: 8px;
   border: 1px solid var(--border);
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
   &::-webkit-scrollbar { width: 6px; }
   &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  @media (max-width: 480px) { max-height: 400px; border-radius: 6px; }
 `
 
 const EpisodeRow = styled(Link)`
@@ -231,9 +240,12 @@ const EpisodeRow = styled(Link)`
   color: var(--text-muted);
   font-size: 13px;
   transition: background 0.15s;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
   &:hover { background: rgba(255,255,255,0.03); }
   &:last-child { border-bottom: none; }
-  @media (max-width: 480px) { padding: 6px 12px; gap: 10px; font-size: 12px; }
+  &:active { background: rgba(255,255,255,0.05); }
+  @media (max-width: 480px) { padding: 6px 12px; gap: 10px; font-size: 12px; min-height: 40px; }
 `
 
 const EpThumb = styled.img`
@@ -243,6 +255,7 @@ const EpThumb = styled.img`
   border-radius: 4px;
   flex-shrink: 0;
   background: var(--bg-card);
+  @media (max-width: 480px) { width: 50px; height: 28px; }
 `
 
 const EpNum = styled.span`
@@ -252,26 +265,6 @@ const EpNum = styled.span`
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
-`
-
-const RelationsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 10px;
-  }
-`
-
-const RecGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 12px;
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 10px;
-  }
 `
 
 const Spinner = styled.div`
@@ -299,94 +292,214 @@ const RELATION_LABELS = {
   PARENT: 'Parent', COMPANION: 'Companion', INCLUDES: 'Includes', GIFTED_FROM: 'Based On',
 }
 
+const CardLink = styled(Link)`
+  text-decoration: none;
+  display: block;
+  -webkit-tap-highlight-color: transparent;
+`
+
+const CardInner = styled.div`
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-card);
+  aspect-ratio: 16/10;
+  @media (max-width: 480px) { border-radius: 6px; }
+`
+
+const CardImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: filter 0.3s;
+  ${CardLink}:hover & { filter: brightness(1.15); }
+  @media (hover: none) { transition: none; }
+`
+
+const CardGradient = styled.div`
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%);
+`
+
+const CardBadge = styled.span`
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: ${p => p.$variant === 'score' ? 'rgba(0,0,0,0.8)' : 'rgba(99,102,241,0.9)'};
+  color: ${p => p.$variant === 'score' ? '#ffc107' : '#fff'};
+  font-size: ${p => p.$variant === 'score' ? '10px' : '9px'};
+  font-weight: 700;
+  padding: ${p => p.$variant === 'score' ? '2px 6px' : '2px 7px'};
+  border-radius: 3px;
+  ${p => p.$variant === 'score' ? '' : 'text-transform: uppercase; letter-spacing: 0.3px;'}
+  z-index: 1;
+  @media (max-width: 480px) {
+    font-size: ${p => p.$variant === 'score' ? '9px' : '8px'};
+    padding: ${p => p.$variant === 'score' ? '1px 5px' : '1px 5px'};
+  }
+`
+
+const CardTitle = styled.p`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 8px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+  margin: 0;
+  @media (max-width: 480px) { font-size: 11px; padding: 16px 6px 6px; }
+`
+
+const CardMeta = styled.div`
+  position: absolute;
+  bottom: 28px;
+  left: 8px;
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
+  @media (max-width: 480px) { bottom: 24px; left: 6px; font-size: 9px; gap: 4px; }
+`
+
+const Grid = styled.div`
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  @media (min-width: 768px) and (max-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (min-width: 1025px) {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+  }
+`
+
+const NsfwCard = styled.div`
+  text-align: center;
+  padding: 40px;
+  max-width: 400px;
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  margin: 0 16px;
+  @media (max-width: 480px) { padding: 28px 20px; border-radius: 12px; margin: 0 12px; }
+`
+
+const NsfwBtn = styled.button`
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+`
+
+const OutlineLink = styled(Link)`
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+`
+
 const RelationCard = ({ r }) => {
   const item = r?.node || r
   if (!item?.id) return null
   const t = item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown'
   const label = RELATION_LABELS[r?.relationType] || r?.relationType?.replace('_', ' ') || ''
   return (
-    <Link to={`/anime/${item.id}`} style={{ textDecoration: 'none' }}>
-      <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', background: 'var(--bg-card)', aspectRatio: '16/10' }}>
-        <img src={item.coverImage?.large || ''} alt={t} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%)' }} />
-        <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(99,102,241,0.9)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 3, textTransform: 'uppercase', letterSpacing: 0.3 }}>
-          {label}
-        </span>
-        <p style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 8px 8px', fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-          {t}
-        </p>
-      </div>
-    </Link>
+    <CardLink to={`/anime/${item.id}`}>
+      <CardInner>
+        <CardImg src={item.coverImage?.large || ''} alt={t} loading="lazy" />
+        <CardGradient />
+        <CardBadge>{label}</CardBadge>
+        <CardTitle>{t}</CardTitle>
+      </CardInner>
+    </CardLink>
   )
 }
 
 const RecCard = ({ item }) => {
   const t = item.title?.english || item.title?.romaji || 'Unknown'
   return (
-    <Link to={`/anime/${item.id}`} style={{ textDecoration: 'none' }}>
-      <div style={{ position: 'relative', borderRadius: 6, overflow: 'hidden', background: 'var(--bg-card)', aspectRatio: '16/10' }}>
-        <img src={item.coverImage?.large || ''} alt={t} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'filter 0.3s' }} loading="lazy" onMouseOver={e => e.currentTarget.style.filter = 'brightness(1.15)'} onMouseOut={e => e.currentTarget.style.filter = ''} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%)' }} />
+    <CardLink to={`/anime/${item.id}`}>
+      <CardInner>
+        <CardImg src={item.coverImage?.large || ''} alt={t} loading="lazy" />
+        <CardGradient />
         {item.averageScore > 0 && (
-          <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.8)', color: '#ffc107', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 3 }}>
-            ★ {item.averageScore}%
-          </span>
+          <CardBadge $variant="score">★ {item.averageScore}%</CardBadge>
         )}
-        <p style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 8px 8px', fontSize: 12, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-          {t}
-        </p>
-        <div style={{ position: 'absolute', bottom: 28, left: 8, display: 'flex', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+        <CardTitle>{t}</CardTitle>
+        <CardMeta>
           {item.format && <span>{item.format.replace('_', ' ')}</span>}
           {item.episodes && <span>{item.episodes} ep</span>}
-        </div>
-      </div>
-    </Link>
+        </CardMeta>
+      </CardInner>
+    </CardLink>
   )
 }
 
 const AnimeDetail = () => {
   const { id } = useParams()
-  const [anime, setAnime] = useState(null)
-  const [episodes, setEpisodes] = useState([])
-  const [loading, setLoading] = useState(true)
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
-  const [similar, setSimilar] = useState([])
-  const [relations, setRelations] = useState([])
   const [activeTab, setActiveTab] = useState('episodes')
+  const [episodes, setEpisodes] = useState([])
   const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
   })
+
+  const { data: anime, isLoading } = useAnimeDetails(id)
+  const { data: similar } = useSimilar(id)
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
-  useEffect(() => {
-    setLoading(true)
+  const relations = React.useMemo(() => {
+    if (!anime?.relations?.edges) return []
+    return anime.relations.edges
+      .filter(e => e.node?.id && ['ADAPTATION', 'SEQUEL', 'PREQUEL', 'SPIN_OFF', 'SIDE_STORY'].includes(e.relationType))
+      .map(e => ({ ...e.node, relationType: e.relationType }))
+  }, [anime])
+
+  React.useEffect(() => {
+    if (!anime) return
+    fetch(`${API_BASE}/api/v1/anime/${id}/episodes`)
+      .then(r => r.ok ? r.json() : { episodes: [] })
+      .then(epData => {
+        const eps = epData?.episodes
+        if (eps?.length > 0) {
+          setEpisodes(eps)
+        } else if (anime?.episodes) {
+          setEpisodes(Array.from({ length: anime.episodes }, (_, i) => ({
+            number: i + 1,
+            title: `Episode ${i + 1}`,
+            thumbnail: anime.coverImage?.medium || '',
+          })))
+        }
+      })
+      .catch(() => {})
     setActiveTab('episodes')
-    Promise.all([
-      anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => r.data.Media).catch(() => null),
-      fetch(`${API_BASE}/api/v1/anime/${id}/episodes`).then(r => r.ok ? r.json() : { episodes: [] }).catch(() => ({ episodes: [] })),
-      anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) }).then(r => {
-        const edges = r.data.Media?.relations?.edges || []
-        return edges.filter(e => e.node?.id && (e.relationType === 'ADAPTATION' || e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL' || e.relationType === 'SPIN_OFF' || e.relationType === 'SIDE_STORY'))
-          .map(e => ({ ...e.node, relationType: e.relationType }))
-      }).catch(() => []),
-      anilistQuery(BROWSE_QUERY, { page: 1, perPage: 12, sort: ['SCORE_DESC'] }).then(r => r.data.Page.media).catch(() => []),
-    ]).then(([data, epData, relData, simData]) => {
-      setAnime(data)
-      const eps = epData?.episodes
-      if (eps && eps.length > 0) {
-        setEpisodes(eps)
-      } else if (data?.episodes) {
-        setEpisodes(Array.from({ length: data.episodes }, (_, i) => ({
-          number: i + 1,
-          title: `Episode ${i + 1}`,
-          thumbnail: data.coverImage?.medium || '',
-        })))
-      }
-      setSimilar(simData || [])
-      setRelations(relData || [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [id])
+  }, [anime, id])
 
   const confirmNsfw = () => {
     setNsfwConfirmed(true)
@@ -400,16 +513,16 @@ const AnimeDetail = () => {
   const toggleBookmark = () => {
     if (isBookmarked) {
       setBookmarks(bookmarks.filter(b => b.id !== parseInt(id)))
-    } else {
+    } else if (anime) {
       setBookmarks([...bookmarks, {
         id: parseInt(id),
-        title: anime?.title?.english || anime?.title?.romaji || 'Unknown',
-        image: anime?.coverImage?.large || '',
+        title: anime.title?.english || anime.title?.romaji || 'Unknown',
+        image: anime.coverImage?.large || '',
       }])
     }
   }
 
-  if (loading) return (
+  if (isLoading) return (
     <>
       <NavBar />
       <Center><Spinner /></Center>
@@ -420,7 +533,7 @@ const AnimeDetail = () => {
     <>
       <NavBar />
       <Center>
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', padding: '0 20px' }}>
           <p style={{ fontSize: 18, marginBottom: 12, color: 'var(--text-muted)' }}>Anime not found</p>
           <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
         </div>
@@ -432,10 +545,7 @@ const AnimeDetail = () => {
     <>
       <NavBar />
       <Center>
-        <div style={{
-          textAlign: 'center', padding: 40, maxWidth: 400,
-          background: 'var(--bg-elevated)', borderRadius: 16, border: '1px solid var(--border)',
-        }}>
+        <NsfwCard>
           <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
           <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>
             Age-Restricted Content
@@ -443,17 +553,11 @@ const AnimeDetail = () => {
           <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
             This anime contains adult content. You must be at least 18 years old to view it.
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <button onClick={confirmNsfw} style={{
-              background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10,
-              padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}>I am 18+ — Continue</button>
-            <Link to="/home" style={{
-              background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)',
-              borderRadius: 10, padding: '10px 24px', fontSize: 14, textDecoration: 'none',
-            }}>Go Back</Link>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <NsfwBtn onClick={confirmNsfw}>I am 18+ — Continue</NsfwBtn>
+            <OutlineLink to="/home">Go Back</OutlineLink>
           </div>
-        </div>
+        </NsfwCard>
       </Center>
     </>
   )
@@ -531,7 +635,7 @@ const AnimeDetail = () => {
                     <EpisodeRow key={num} to={`/watch/${id}-episode-${num}`}>
                       <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
                       <EpNum>{num}</EpNum>
-                      <span style={{ flex: 1 }}>{ep.title || `Episode ${num}`}</span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title || `Episode ${num}`}</span>
                       <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                     </EpisodeRow>
                   )
@@ -540,19 +644,19 @@ const AnimeDetail = () => {
             )}
 
             {activeTab === 'relations' && hasRelations && (
-              <RelationsGrid>
-                {relations.map((r, i) => <RelationCard key={r?.id || i} r={{ node: r, relationType: r.relationType || '' }} />)}
-              </RelationsGrid>
+              <Grid>
+                {relations.map(r => <RelationCard key={r.id} r={{ node: r, relationType: r.relationType || '' }} />)}
+              </Grid>
             )}
           </Section>
         )}
 
-        {similar.length > 0 && (
+        {similar?.length > 0 && (
           <Section>
             <SectionTitle>Similar Anime</SectionTitle>
-            <RecGrid>
-              {similar.map((item, idx) => <RecCard key={item.id || idx} item={item} />)}
-            </RecGrid>
+            <Grid>
+              {similar.map(item => <RecCard key={item.id} item={item} />)}
+            </Grid>
           </Section>
         )}
       </Content>
