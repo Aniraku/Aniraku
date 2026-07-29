@@ -5,8 +5,11 @@ const API = 'https://aniraku-backend.onrender.com/api/v1'
 const SITE = 'https://aniraku.vercel.app'
 const OUT_DIR = path.resolve('public')
 const PER_PAGE = 50
-const MAX_RETRIES = 3
 const CHUNK_SIZE = 1000
+const WAKEUP_TIMEOUT_MS = 5 * 60 * 1000  // 5 minutes total
+const WAKEUP_POLL_INTERVAL_MS = 30000     // Check every 30 seconds
+const FETCH_RETRIES = 3                   // Retries per individual page fetch
+const FETCH_RETRY_DELAY_MS = 5000         // 5s between retries on a single page
 
 const STATIC_URLS = [
   { loc: '/', freq: 'daily', priority: '1.0' },
@@ -24,7 +27,6 @@ const STATIC_URLS = [
   { loc: '/license', freq: 'yearly', priority: '0.2' },
 ]
 
-// Genre pages for SEO discovery
 const GENRES = [
   'Action', 'Adventure', 'Comedy', 'Drama', 'Ecchi',
   'Fantasy', 'Horror', 'Mahou Shoujo', 'Mecha', 'Music',
@@ -38,7 +40,6 @@ const GENRE_URLS = GENRES.map(g => ({
   priority: '0.65',
 }))
 
-// Format/Status filtered pages
 const FILTER_URLS = [
   { loc: '/catalog?format=MOVIE&sort=SCORE_DESC', freq: 'daily', priority: '0.7' },
   { loc: '/catalog?format=TV&sort=SCORE_DESC', freq: 'daily', priority: '0.7' },
@@ -80,8 +81,61 @@ ${children.join('\n')}
   fs.writeFileSync(filePath, xml, 'utf-8')
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * Send a single "wake-up ping" to the backend.
+ * Returns true if backend responded with 2xx, false otherwise.
+ */
+async function wakeUpPing() {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
+    const res = await fetch(`${API}/browse?page=1&perPage=1&sort=POPULARITY_DESC`, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'AnirakuSitemap/1.0' }
+    })
+    clearTimeout(timer)
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Wait until the backend wakes up, polling every WAKEUP_POLL_INTERVAL_MS
+ * for up to WAKEUP_TIMEOUT_MS.
+ */
+async function waitForBackend() {
+  const startTime = Date.now()
+  let attempt = 0
+
+  while (Date.now() - startTime < WAKEUP_TIMEOUT_MS) {
+    attempt++
+    const elapsed = Math.round((Date.now() - startTime) / 1000)
+    process.stdout.write(`  Waiting for backend... attempt ${attempt} (${elapsed}s elapsed)\r`)
+    
+    const alive = await wakeUpPing()
+    if (alive) {
+      console.log(`  Backend is awake after ${elapsed}s!`)
+      return true
+    }
+    
+    await sleep(WAKEUP_POLL_INTERVAL_MS)
+  }
+
+  const totalElapsed = Math.round((Date.now() - startTime) / 1000)
+  console.log(`  Backend did not respond within ${WAKEUP_TIMEOUT_MS / 1000}s (${totalElapsed}s).`)
+  return false
+}
+
+/**
+ * Fetch a single page from the backend with retries.
+ */
 async function fetchPage(page) {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
     try {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 30000)
@@ -91,19 +145,19 @@ async function fetchPage(page) {
       })
       clearTimeout(timer)
       if (res.ok) return res.json()
-      if (attempt < MAX_RETRIES) {
-        console.error(`  browse?page=${page} ${res.status}, retry ${attempt}/${MAX_RETRIES}...`)
-        await new Promise(r => setTimeout(r, 3000 * attempt))
+      if (attempt < FETCH_RETRIES) {
+        console.error(`  browse?page=${page} ${res.status}, retry ${attempt}/${FETCH_RETRIES} in ${FETCH_RETRY_DELAY_MS / 1000}s...`)
+        await sleep(FETCH_RETRY_DELAY_MS)
       } else {
-        console.error(`  browse?page=${page} ${res.status} after ${MAX_RETRIES} attempts, skipping`)
+        console.error(`  browse?page=${page} ${res.status} after ${FETCH_RETRIES} attempts, skipping`)
         return null
       }
     } catch (err) {
-      if (attempt < MAX_RETRIES) {
-        console.error(`  browse?page=${page} error: ${err.message}, retry ${attempt}/${MAX_RETRIES}...`)
-        await new Promise(r => setTimeout(r, 3000 * attempt))
+      if (attempt < FETCH_RETRIES) {
+        console.error(`  browse?page=${page} error: ${err.message}, retry ${attempt}/${FETCH_RETRIES} in ${FETCH_RETRY_DELAY_MS / 1000}s...`)
+        await sleep(FETCH_RETRY_DELAY_MS)
       } else {
-        console.error(`  browse?page=${page} error: ${err.message} after ${MAX_RETRIES} attempts, skipping`)
+        console.error(`  browse?page=${page} error: ${err.message} after ${FETCH_RETRIES} attempts, skipping`)
         return null
       }
     }
@@ -114,7 +168,7 @@ async function fetchPage(page) {
 async function fetchAllPages() {
   const first = await fetchPage(1)
   if (!first || !first.media) {
-    console.error('Could not fetch first page. Backend may be waking up.')
+    console.error('Could not fetch first page.')
     return []
   }
 
@@ -136,7 +190,44 @@ async function fetchAllPages() {
 const today = new Date().toISOString().slice(0, 10)
 
 console.log('Generating sitemaps...')
-console.log(`Fetching anime catalog from ${API}/browse ...`)
+console.log(`Backend: ${API}`)
+
+// Step 1: Wake up the backend (wait up to 5 minutes)
+console.log('\n--- Step 1: Waking up backend (max 5 min wait) ---')
+const backendReady = await waitForBackend()
+
+if (!backendReady) {
+  console.log('\nBackend is still asleep. Generating static-only sitemap.')
+  
+  // Write static sitemap
+  const staticUrls = STATIC_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority))
+  const staticSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'static.xml'), staticUrls)
+  console.log(`  sitemaps/static.xml — ${staticUrls.length} URLs, ${staticSize} bytes`)
+
+  // Write genre/filter sitemap
+  const genreUrls = [
+    ...GENRE_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority)),
+    ...FILTER_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority)),
+  ]
+  const genreSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'genres.xml'), genreUrls)
+  console.log(`  sitemaps/genres.xml — ${genreUrls.length} URLs, ${genreSize} bytes`)
+
+  // Write sitemap index (static + genres only)
+  const childIndexes = [
+    { loc: '/sitemaps/static.xml', lastmod: today },
+    { loc: '/sitemaps/genres.xml', lastmod: today },
+  ]
+  const indexChildren = childIndexes.map(c =>
+    `  <sitemap><loc>${SITE}${c.loc}</loc><lastmod>${c.lastmod}</lastmod></sitemap>`
+  )
+  writeSitemapIndex(path.join(OUT_DIR, 'sitemap.xml'), indexChildren)
+  console.log(`  sitemap.xml (index) — ${childIndexes.length} children`)
+  console.log('\nDone (backend unavailable — no anime pages included).')
+  process.exit(0)
+}
+
+// Step 2: Fetch all anime pages
+console.log('\n--- Step 2: Fetching anime catalog ---')
 const media = await fetchAllPages()
 console.log(`Fetched ${media.length} anime entries`)
 
@@ -187,4 +278,4 @@ const indexChildren = childIndexes.map(c =>
 )
 writeSitemapIndex(path.join(OUT_DIR, 'sitemap.xml'), indexChildren)
 console.log(`  sitemap.xml (index) — ${childIndexes.length} children`)
-console.log(`Done. ${uniqueMedia.length} anime across ${chunks.length} chunk(s).`)
+console.log(`\nDone. ${uniqueMedia.length} anime across ${chunks.length} chunk(s).`)
