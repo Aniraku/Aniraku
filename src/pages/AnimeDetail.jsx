@@ -170,16 +170,16 @@ const GenreRow = styled.div`
 `
 
 const GenreTag = styled(Link)`
-  padding: 2px 8px;
+  padding: 3px 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   text-decoration: none;
   transition: all 0.2s;
   &:hover { border-color: var(--accent); color: var(--text-primary); }
-  @media (max-width: 480px) { padding: 1px 6px; font-size: 9px; border-radius: 6px; }
+  @media (max-width: 480px) { padding: 2px 8px; font-size: 10px; border-radius: 6px; }
 `
 
 const Tabs = styled.div`

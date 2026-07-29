@@ -69,10 +69,10 @@ const ScrollRow = styled.div`
 `
 
 const GenreChip = styled(Link)`
-  background: var(--bg-card);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 10px;
+  border-radius: 8px;
+  padding: 3px 10px;
   text-decoration: none;
   color: var(--text-muted);
   font-size: 11px;
@@ -83,9 +83,9 @@ const GenreChip = styled(Link)`
     color: var(--text-primary);
   }
   @media (max-width: 480px) {
-    padding: 3px 8px;
+    padding: 2px 8px;
     font-size: 10px;
-    border-radius: 5px;
+    border-radius: 6px;
   }
 `
 
