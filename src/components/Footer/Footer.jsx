@@ -9,6 +9,21 @@ const letters = [
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ]
 
+const browseLinks = [
+  { label: 'Home', to: '/home' },
+  { label: 'Catalog', to: '/catalog' },
+  { label: 'Schedule', to: '/schedule' },
+  { label: 'Most Popular', to: '/catalog?sort=POPULARITY_DESC' },
+  { label: 'Top Airing', to: '/catalog?status=RELEASING' },
+]
+
+const resourceLinks = [
+  { label: 'Privacy', to: '/privacy' },
+  { label: 'Terms', to: '/terms' },
+  { label: 'DMCA', to: '/dmca' },
+  { label: 'AGPL License', to: '/license' },
+]
+
 const Footer = () => {
   return (
     <F.Footer>
@@ -26,31 +41,28 @@ const Footer = () => {
         </F.Col>
 
         <F.Col>
-          <F.MobileDetails open>
+          <F.MobileDetails>
             <summary><F.ColTitle as="span">Browse</F.ColTitle></summary>
             <F.ColLinks>
-              <F.LinkItem as={Link} to="/home">Home</F.LinkItem>
-              <F.LinkItem as={Link} to="/catalog">Catalog</F.LinkItem>
-              <F.LinkItem as={Link} to="/schedule">Schedule</F.LinkItem>
-              <F.LinkItem as={Link} to="/catalog?sort=POPULARITY_DESC">Most Popular</F.LinkItem>
-              <F.LinkItem as={Link} to="/catalog?status=RELEASING">Top Airing</F.LinkItem>
+              {browseLinks.map(l => (
+                <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
+              ))}
             </F.ColLinks>
           </F.MobileDetails>
         </F.Col>
 
         <F.Col>
-          <F.MobileDetails open>
+          <F.MobileDetails>
             <summary><F.ColTitle as="span">Resources</F.ColTitle></summary>
             <F.ColLinks>
-              <F.LinkItem as={Link} to="/privacy">Privacy</F.LinkItem>
-              <F.LinkItem as={Link} to="/terms">Terms</F.LinkItem>
-              <F.LinkItem as={Link} to="/dmca">DMCA</F.LinkItem>
-              <F.LinkItem as={Link} to="/license">AGPL License</F.LinkItem>
+              {resourceLinks.map(l => (
+                <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
+              ))}
             </F.ColLinks>
           </F.MobileDetails>
         </F.Col>
 
-        <F.Col>
+        <F.Col className="az-col">
           <F.ColTitle>A-Z List</F.ColTitle>
           <F.AzGrid>
             {letters.map((item, idx) => (

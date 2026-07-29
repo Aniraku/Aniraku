@@ -10,7 +10,7 @@ F.Footer = styled.footer`
   margin-top: 4rem;
 
   @media (max-width: 768px) {
-    padding: 1.5rem 1rem 4rem;
+    padding: 1.5rem 1rem 4.5rem;
     margin-top: 2rem;
   }
 `
@@ -24,6 +24,7 @@ F.Grid = styled.div`
 
   @media (max-width: 900px) {
     grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
   }
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
@@ -35,6 +36,10 @@ F.Col = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+
+  @media (max-width: 600px) {
+    &.az-col { display: none; }
+  }
 `
 
 F.ColTitle = styled.h4`
@@ -44,12 +49,6 @@ F.ColTitle = styled.h4`
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
-
-  @media (max-width: 600px) {
-    font-size: 11px;
-    padding: 10px 0;
-    &:only-child { display: none; }
-  }
 `
 
 F.ColLinks = styled.div`
@@ -64,11 +63,27 @@ F.MobileDetails = styled.details`
   }
   @media (max-width: 768px) {
     border-bottom: 1px solid var(--border);
-    summary { list-style: none; cursor: pointer; display: flex; align-items: center; padding: 10px 0; }
+    padding-bottom: 2px;
+    summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      user-select: none;
+    }
     summary::-webkit-details-marker { display: none; }
-    summary::after { content: '+'; font-size: 14px; color: var(--text-muted); margin-left: auto; padding-right: 4px; }
-    &[open] summary::after { content: '−'; }
-    &[open] { padding-bottom: 6px; }
+    summary::after {
+      content: '+';
+      font-size: 13px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      margin-left: 8px;
+      transition: transform 0.2s;
+    }
+    &[open] summary::after { content: '\2212'; }
+    &[open] summary { margin-bottom: 4px; }
   }
 `
 
@@ -78,11 +93,6 @@ F.Disclaimer = styled.p`
   line-height: 1.6;
   max-width: 320px;
   margin: 0;
-
-  @media (max-width: 600px) {
-    font-size: 11px;
-    line-height: 1.5;
-  }
 `
 
 F.Socials = styled.div`
@@ -105,12 +115,6 @@ F.SocialLink = styled.a`
   &:hover {
     color: var(--accent);
     border-color: var(--accent);
-    background: var(--accent-glow);
-  }
-
-  @media (max-width: 768px) {
-    width: 36px;
-    height: 36px;
   }
 `
 
@@ -122,20 +126,12 @@ F.LinkItem = styled.p`
   margin: 0;
 
   &:hover { color: var(--accent); }
-
-  @media (max-width: 768px) {
-    font-size: 12px;
-  }
 `
 
 F.AzGrid = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-
-  @media (max-width: 768px) {
-    display: none;
-  }
 `
 
 F.AzLink = styled(Link)`
@@ -159,19 +155,10 @@ F.Bottom = styled.div`
   padding-top: 1rem;
   border-top: 1px solid var(--border);
   text-align: center;
-
-  @media (max-width: 600px) {
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-  }
 `
 
 F.Copyright = styled.p`
   font-size: 11px;
   color: var(--text-muted);
   margin: 0;
-
-  @media (max-width: 600px) {
-    font-size: 10px;
-  }
 `
