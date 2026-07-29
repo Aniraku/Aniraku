@@ -228,7 +228,7 @@ const Home = () => {
       </Section>
 
       <Section>
-        <SectionTitle>Browse by Genre</SectionTitle>
+        <SectionTitle>Browse by Tags</SectionTitle>
         <GenreRow>
           {genres.map(g => (
             <GenreChip key={g} to={`/catalog?genre=${encodeURIComponent(g)}`}>{g}</GenreChip>
