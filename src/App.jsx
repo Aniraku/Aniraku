@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, Component, useEffect } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 import { AuthProvider } from "./hooks/useAuth"
 import Error from "./pages/Error"
 import HomeSkeleton from "./components/Loader/HomeSkeleton"
@@ -102,6 +103,7 @@ const App = () => {
             <Route path="/*" element={<Error />} />
           </Routes>
           <Analytics />
+          <SpeedInsights />
         </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
