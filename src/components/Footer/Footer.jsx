@@ -107,7 +107,7 @@ const Footer = () => {
           <F.MobileDot>·</F.MobileDot>
           <F.MobileLink as={Link} to="/terms">Terms</F.MobileLink>
           <F.MobileDot>·</F.MobileDot>
-          <F.MobileLink as={Link} to="/license">License</F.LinkItem>
+          <F.MobileLink as={Link} to="/license">License</F.MobileLink>
         </F.MobileLinks>
         <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0</F.Copyright>
       </F.MobileFooter>
