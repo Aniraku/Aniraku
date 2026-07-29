@@ -44,7 +44,7 @@ export const BROWSE_QUERY = `
   query ($page: Int, $perPage: Int, $search: String, $genre: String, $format: MediaFormat, $status: MediaStatus, $season: MediaSeason, $year: Int, $sort: [MediaSort]) {
     Page(page: $page, perPage: $perPage) {
       pageInfo { total lastPage hasNextPage currentPage perPage }
-      media(search: $search, genre: $genre, format: $format, status: $status, season: $season, seasonYear: $year, type: ANIME, sort: $sort, isAdult: false) {
+      media(search: $search, genre: $genre, format: $format, status: $status, season: $season, seasonYear: $year, type: ANIME, sort: $sort) {
         id title { romaji english native userPreferred }
         coverImage { extraLarge large medium color }
         bannerImage format status episodes averageScore popularity season seasonYear genres isAdult
@@ -57,7 +57,7 @@ export const BROWSE_QUERY = `
 export const TRENDING_QUERY = `
   query ($page: Int, $perPage: Int) {
     Page(page: $page, perPage: $perPage) {
-      media(type: ANIME, sort: TRENDING, isAdult: false) {
+      media(type: ANIME, sort: TRENDING) {
         id title { romaji english userPreferred }
         coverImage { extraLarge large }
         format episodes averageScore status
@@ -81,7 +81,7 @@ export const ANIME_DETAIL_QUERY = `
 export const SCHEDULE_QUERY = `
   query ($weekStart: Int, $weekEnd: Int) {
     Page(perPage: 50) {
-      media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC, isAdult: false) {
+      media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
         id title { romaji english userPreferred }
         coverImage { large }
         format
