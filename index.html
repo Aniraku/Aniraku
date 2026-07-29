@@ -13,7 +13,8 @@
   <!-- CSP: allow AniList GraphQL + Supabase + Google Fonts + Miruro CDN + Backend -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://graphql.anilist.co https://aniraku-backend.onrender.com https://sbjdrjaovcgvttfnpfsz.supabase.co https://*.onrender.com https://*.vercel.app wss://*.onrender.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; media-src 'self' blob: data: https:;" />
 
-  <!-- iOS PWA -->
+  <!-- PWA -->
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="apple-touch-icon" href="/icons/icon-180.svg" />
@@ -27,11 +28,9 @@
   <meta name="googlebot" content="index, follow" />
   <meta name="author" content="Aniraku" />
   <link rel="canonical" href="https://aniraku.vercel.app/" id="canonical-link" />
-  <script>document.addEventListener('DOMContentLoaded',function(){var c=document.getElementById('canonical-link'),o=window.location.origin.includes('localhost')||window.location.origin.includes('127.0.0.1')?'http://localhost:3000':'https://aniraku.vercel.app';if(c){c.href=o+window.location.pathname}})</script>
 
 <!-- Google Site Verification -->
 <meta name="google-site-verification" content="8lE4K_TtF7U4BTxLPGU_QtufIMbQKWbV9l8P0xxTIx8" />
-  <script>var SITE=window.location.origin.includes('localhost')||window.location.origin.includes('127.0.0.1')?'http://localhost:3000':'https://aniraku.vercel.app'</script>
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
@@ -53,7 +52,7 @@
   <meta name="twitter:image" content="https://aniraku.vercel.app/og-image.svg" id="tw-image" />
   <meta name="twitter:site" content="@sho_islam0311" />
   <meta name="twitter:creator" content="@sho_islam0311" />
-  <script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('[id$="-url"],[id$="-image"]').forEach(function(e){e.content=e.content.replace('https://aniraku.vercel.app',SITE)})})</script>
+  <script src="/seo.js"></script>
 
   <!-- Fonts preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
