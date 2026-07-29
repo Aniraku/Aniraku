@@ -1,15 +1,16 @@
 import fs from 'fs'
 import path from 'path'
 
-const API = 'https://aniraku-backend.onrender.com/api/v1'
+const API_BASE = 'https://aniraku-backend.onrender.com/api/v1'
+const ANILIST_PROXY = `${API_BASE}/anilist`
 const SITE = 'https://aniraku.vercel.app'
 const OUT_DIR = path.resolve('public')
 const PER_PAGE = 50
 const CHUNK_SIZE = 1000
 const WAKEUP_TIMEOUT_MS = 5 * 60 * 1000  // 5 minutes total
 const WAKEUP_POLL_INTERVAL_MS = 30000     // Check every 30 seconds
-const FETCH_RETRIES = 3                   // Retries per individual page fetch
-const FETCH_RETRY_DELAY_MS = 5000         // 5s between retries on a single page
+const FETCH_RETRIES = 3
+const FETCH_RETRY_DELAY_MS = 5000
 
 const STATIC_URLS = [
   { loc: '/', freq: 'daily', priority: '1.0' },
@@ -55,6 +56,21 @@ const FILTER_URLS = [
   { loc: '/catalog?sort=TITLE_ROMAJI', freq: 'weekly', priority: '0.4' },
 ]
 
+// GraphQL query matching the frontend's BROWSE_QUERY
+const BROWSE_QUERY = `
+  query ($page: Int, $perPage: Int, $search: String, $genre: String, $format: MediaFormat, $status: MediaStatus, $season: MediaSeason, $year: Int, $sort: [MediaSort]) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { total lastPage hasNextPage currentPage perPage }
+      media(search: $search, genre: $genre, format: $format, status: $status, season: $season, seasonYear: $year, type: ANIME, sort: $sort) {
+        id title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        bannerImage format status episodes averageScore popularity season seasonYear genres isAdult
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+  }
+`
+
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
@@ -86,19 +102,35 @@ function sleep(ms) {
 }
 
 /**
- * Send a single "wake-up ping" to the backend.
- * Returns true if backend responded with 2xx, false otherwise.
+ * Send a GraphQL query to the AniList proxy endpoint.
+ */
+async function graphqlFetch(query, variables = {}) {
+  const res = await fetch(ANILIST_PROXY, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ query, variables }),
+  })
+  if (!res.ok) return null
+  const json = await res.json()
+  if (json.data) return json.data
+  return null
+}
+
+/**
+ * Wake-up ping: fetch 1 item from the backend to trigger cold start.
  */
 async function wakeUpPing() {
   try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
-    const res = await fetch(`${API}/browse?page=1&perPage=1&sort=POPULARITY_DESC`, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'AnirakuSitemap/1.0' }
+    const data = await graphqlFetch(BROWSE_QUERY, {
+      page: 1,
+      perPage: 1,
+      type: 'ANIME',
+      sort: ['POPULARITY_DESC'],
     })
-    clearTimeout(timer)
-    return res.ok
+    return data !== null && data.Page !== undefined
   } catch {
     return false
   }
@@ -116,13 +148,13 @@ async function waitForBackend() {
     attempt++
     const elapsed = Math.round((Date.now() - startTime) / 1000)
     process.stdout.write(`  Waiting for backend... attempt ${attempt} (${elapsed}s elapsed)\r`)
-    
+
     const alive = await wakeUpPing()
     if (alive) {
       console.log(`  Backend is awake after ${elapsed}s!`)
       return true
     }
-    
+
     await sleep(WAKEUP_POLL_INTERVAL_MS)
   }
 
@@ -132,32 +164,34 @@ async function waitForBackend() {
 }
 
 /**
- * Fetch a single page from the backend with retries.
+ * Fetch a single page of anime from the backend.
  */
 async function fetchPage(page) {
   for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
     try {
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 30000)
-      const res = await fetch(`${API}/browse?page=${page}&perPage=${PER_PAGE}&sort=POPULARITY_DESC`, {
-        signal: controller.signal,
-        headers: { 'User-Agent': 'AnirakuSitemap/1.0' }
+      const data = await graphqlFetch(BROWSE_QUERY, {
+        page,
+        perPage: PER_PAGE,
+        sort: ['POPULARITY_DESC'],
       })
-      clearTimeout(timer)
-      if (res.ok) return res.json()
+
+      if (data && data.Page && data.Page.media) {
+        return data.Page
+      }
+
       if (attempt < FETCH_RETRIES) {
-        console.error(`  browse?page=${page} ${res.status}, retry ${attempt}/${FETCH_RETRIES} in ${FETCH_RETRY_DELAY_MS / 1000}s...`)
+        console.error(`  page ${page} returned empty, retry ${attempt}/${FETCH_RETRIES} in ${FETCH_RETRY_DELAY_MS / 1000}s...`)
         await sleep(FETCH_RETRY_DELAY_MS)
       } else {
-        console.error(`  browse?page=${page} ${res.status} after ${FETCH_RETRIES} attempts, skipping`)
+        console.error(`  page ${page} failed after ${FETCH_RETRIES} attempts, skipping`)
         return null
       }
     } catch (err) {
       if (attempt < FETCH_RETRIES) {
-        console.error(`  browse?page=${page} error: ${err.message}, retry ${attempt}/${FETCH_RETRIES} in ${FETCH_RETRY_DELAY_MS / 1000}s...`)
+        console.error(`  page ${page} error: ${err.message}, retry ${attempt}/${FETCH_RETRIES} in ${FETCH_RETRY_DELAY_MS / 1000}s...`)
         await sleep(FETCH_RETRY_DELAY_MS)
       } else {
-        console.error(`  browse?page=${page} error: ${err.message} after ${FETCH_RETRIES} attempts, skipping`)
+        console.error(`  page ${page} error: ${err.message} after ${FETCH_RETRIES} attempts, skipping`)
         return null
       }
     }
@@ -173,8 +207,10 @@ async function fetchAllPages() {
   }
 
   const media = [...first.media]
-  const lastPage = first.pageInfo?.lastPage || 1
-  console.log(`  page 1/${lastPage} — ${first.media.length} items, total ${first.pageInfo?.total || '?'}`)
+  const pageInfo = first.pageInfo || {}
+  const lastPage = pageInfo.lastPage || 1
+  const total = pageInfo.total || 0
+  console.log(`  page 1/${lastPage} — ${first.media.length} items, total ${total}`)
 
   for (let page = 2; page <= lastPage; page++) {
     const data = await fetchPage(page)
@@ -190,7 +226,7 @@ async function fetchAllPages() {
 const today = new Date().toISOString().slice(0, 10)
 
 console.log('Generating sitemaps...')
-console.log(`Backend: ${API}`)
+console.log(`Backend proxy: ${ANILIST_PROXY}`)
 
 // Step 1: Wake up the backend (wait up to 5 minutes)
 console.log('\n--- Step 1: Waking up backend (max 5 min wait) ---')
@@ -198,13 +234,11 @@ const backendReady = await waitForBackend()
 
 if (!backendReady) {
   console.log('\nBackend is still asleep. Generating static-only sitemap.')
-  
-  // Write static sitemap
+
   const staticUrls = STATIC_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority))
   const staticSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'static.xml'), staticUrls)
   console.log(`  sitemaps/static.xml — ${staticUrls.length} URLs, ${staticSize} bytes`)
 
-  // Write genre/filter sitemap
   const genreUrls = [
     ...GENRE_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority)),
     ...FILTER_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority)),
@@ -212,7 +246,6 @@ if (!backendReady) {
   const genreSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'genres.xml'), genreUrls)
   console.log(`  sitemaps/genres.xml — ${genreUrls.length} URLs, ${genreSize} bytes`)
 
-  // Write sitemap index (static + genres only)
   const childIndexes = [
     { loc: '/sitemaps/static.xml', lastmod: today },
     { loc: '/sitemaps/genres.xml', lastmod: today },
