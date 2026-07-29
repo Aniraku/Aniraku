@@ -92,16 +92,16 @@ const GenreRow = styled.div`
 
 const QuickLinks = styled.div`
   display: flex;
-  gap: 10px;
-  margin-bottom: 2rem;
+  gap: 8px;
+  margin-bottom: 1.5rem;
   overflow-x: auto;
   padding: 0 1rem;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
   @media (max-width: 480px) {
-    gap: 8px;
-    margin-bottom: 1.5rem;
+    gap: 6px;
+    margin-bottom: 1rem;
     padding: 0 12px;
   }
 `
@@ -110,15 +110,15 @@ const QuickLink = styled(Link)`
   flex: 0 0 auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 18px;
+  border-radius: 10px;
+  padding: 10px 14px;
   text-decoration: none;
   color: var(--text-primary);
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;

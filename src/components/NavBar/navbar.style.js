@@ -36,7 +36,7 @@ N.Nav = styled.nav`
 N.Left = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-shrink: 0;
 `
 
@@ -62,12 +62,11 @@ N.MenuBtn = styled.button`
 N.SearchForm = styled.form`
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  max-width: 320px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 10px;
+  gap: 6px;
+  width: 200px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-muted);
@@ -86,7 +85,7 @@ N.SearchInput = styled.input`
   background: none;
   outline: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
 
   &::placeholder { color: var(--text-muted); }
 `
@@ -131,55 +130,24 @@ N.Right = styled.div`
   }
 `
 
-N.DesktopNavItem = styled.button`
+N.RightBtn = styled.button`
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   background: none;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px;
   border-radius: var(--radius-sm);
   font-size: 13px;
-  font-weight: 500;
   transition: color var(--transition-fast);
-  white-space: nowrap;
 
   &:hover { color: var(--accent); }
 
   @media (max-width: 768px) { display: none; }
-
-  span { font-size: 12px; }
 `
 
-N.NavItem = styled.button`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  font-size: 10px;
-  transition: color var(--transition-fast);
 
-  span {
-    font-size: 10px;
-    white-space: nowrap;
-  }
-
-  &:hover {
-    color: var(--accent);
-  }
-
-  @media (max-width: 768px) {
-    padding: 10px 12px;
-    span { display: none; }
-  }
-
-`
 
 N.Divider = styled.div`
   width: 1px;

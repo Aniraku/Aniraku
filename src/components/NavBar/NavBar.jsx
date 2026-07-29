@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { FaBars, FaBell, FaSearch, FaRandom, FaHome, FaThLarge, FaCalendarAlt } from 'react-icons/fa'
+import { FaBars, FaBell, FaSearch, FaRandom } from 'react-icons/fa'
 import { N } from './navbar.style'
 import SideBar from './SideBar'
 import Logo from '../Logo'
@@ -92,35 +92,31 @@ const NavBar = () => {
         </N.MenuBtn>
         <SideBar open={open} setOpen={setOpen} />
         <Logo to="/home" height={36} showText />
+        <N.NavLinks>
+          <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}>Home</N.NavLink>
+          <N.NavLink to="/catalog" className={location.pathname === '/catalog' ? 'active' : ''}>Catalog</N.NavLink>
+          <N.NavLink to="/schedule" className={location.pathname === '/schedule' ? 'active' : ''}>Schedule</N.NavLink>
+        </N.NavLinks>
       </N.Left>
 
       <N.SearchForm onSubmit={handleSearch}>
-        <FaSearch size={14} />
-        <N.SearchInput ref={searchRef} value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search anime..." />
+        <FaSearch size={13} />
+        <N.SearchInput ref={searchRef} value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search..." />
       </N.SearchForm>
 
-      <N.NavLinks>
-        <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}><FaHome size={15} /><span>Home</span></N.NavLink>
-        <N.NavLink to="/catalog" className={location.pathname === '/catalog' ? 'active' : ''}><FaThLarge size={14} /><span>Catalog</span></N.NavLink>
-        <N.NavLink to="/schedule" className={location.pathname === '/schedule' ? 'active' : ''}><FaCalendarAlt size={14} /><span>Schedule</span></N.NavLink>
-      </N.NavLinks>
-
       <N.Right>
-        <N.DesktopNavItem onClick={() => navigate('/random')} title="Random Anime">
-          <FaRandom size={16} />
-          <span>Random</span>
-        </N.DesktopNavItem>
+        <N.RightBtn onClick={() => navigate('/random')} title="Random Anime"><FaRandom size={15} /></N.RightBtn>
 
         {user && (
           <div ref={notifRef} style={{ position: 'relative' }}>
-            <N.NavItem onClick={() => setShowNotifs(!showNotifs)} title="Notifications" style={{ position: 'relative' }}>
-              <FaBell size={16} />
+            <N.RightBtn onClick={() => setShowNotifs(!showNotifs)} title="Notifications" style={{ position: 'relative' }}>
+              <FaBell size={15} />
               {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: -2, right: -4, background: 'var(--accent)', color: 'var(--bg)', fontSize: 10, fontWeight: 700, borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ position: 'absolute', top: -2, right: -2, background: 'var(--accent)', color: 'var(--bg)', fontSize: 9, fontWeight: 700, borderRadius: '50%', width: 15, height: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
-            </N.NavItem>
+            </N.RightBtn>
             {showNotifs && (
               <div style={{ position: 'absolute', top: '100%', right: 0, width: 300, maxHeight: 400, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 1000, marginTop: 8 }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: 14, fontWeight: 600 }}>Notifications</div>
