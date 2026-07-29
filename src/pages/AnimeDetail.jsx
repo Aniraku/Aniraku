@@ -178,6 +178,8 @@ const GenreTag = styled(Link)`
   font-size: 11px;
   font-weight: 500;
   text-decoration: none;
+  min-height: unset !important;
+  min-width: unset !important;
   transition: all 0.2s;
   &:hover { border-color: var(--accent); color: var(--text-primary); }
   @media (max-width: 480px) { padding: 2px 8px; font-size: 10px; border-radius: 6px; }

@@ -77,6 +77,8 @@ const GenreChip = styled(Link)`
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
+  min-height: unset !important;
+  min-width: unset !important;
   transition: all 0.2s;
   &:hover {
     border-color: var(--accent);
