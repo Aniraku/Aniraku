@@ -4,13 +4,40 @@ const FALLBACK_IMAGE = `${SITE}/og-image.svg`
 
 const BOT_RE = /bot|crawler|spider|googlebot|bingbot|yandex|facebookexternalhit|twitterbot|whatsapp|linkedin|slack|telegram|discord|pinterest|slurp|duckduckbot|baiduspider|youtube|embedly|preview|headless|ia_archiver|applebot|curl|wget|validator|facebook|twitter/i
 
-function htmlShell({ title, description, image, url, type }) {
+function escape(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, ' ')
+}
+
+function getAnimeType(format) {
+  if (format === 'MOVIE') return 'Movie'
+  if (format === 'OVA' || format === 'ONA' || format === 'SPECIAL') return 'TVEpisode'
+  return 'TVSeries'
+}
+
+function htmlShell({ title, description, image, url, type, animeType, score, episodes, genres, startDate }) {
+  // Build rich JSON-LD structured data
+  let jsonld = `{"@context":"https://schema.org","@type":"${animeType || 'WebPage'}","name":"${title}","description":"${description}","url":"${url}","image":"${image}"`
+  if (genres && genres.length > 0) jsonld += `,"genre":[${genres.map(g => `"${escape(g)}"`).join(',')}]`
+  if (score) jsonld += `,"aggregateRating":{"@type":"AggregateRating","ratingValue":"${(score/10).toFixed(1)}","bestRating":"10","worstRating":"1"}`
+  if (episodes) jsonld += `,"numberOfEpisodes":${episodes}`
+  if (startDate) jsonld += `,"datePublished":"${startDate}"`
+  jsonld += `,"inLanguage":"ja","contentRating":"PG-13"`
+  jsonld += `,"provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"}`
+  jsonld += `,"isPartOf":{"@type":"WebSite","name":"Aniraku","url":"${SITE}"}}`
+
+  // Breadcrumb
+  const breadcrumb = `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE}/"},{"@type":"ListItem","position":2,"name":"Catalog","item":"${SITE}/catalog"},{"@type":"ListItem","position":3,"name":"${title}"}]}`
+
   return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>${title}</title>
 <meta name="description" content="${description}"/>
+<meta name="robots" content="index, follow, max-image-preview:large"/>
+<meta name="author" content="Aniraku Contributors"/>
 <link rel="canonical" href="${url}"/>
+<link rel="preconnect" href="https://s4.anilist.co" crossorigin/>
+
 <meta property="og:type" content="${type}"/>
 <meta property="og:url" content="${url}"/>
 <meta property="og:title" content="${title}"/>
@@ -18,21 +45,24 @@ function htmlShell({ title, description, image, url, type }) {
 <meta property="og:image" content="${image}"/>
 <meta property="og:image:width" content="1200"/>
 <meta property="og:image:height" content="630"/>
+<meta property="og:image:type" content="image/png"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="og:site_name" content="Aniraku"/>
+
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:url" content="${url}"/>
 <meta name="twitter:title" content="${title}"/>
 <meta name="twitter:description" content="${description}"/>
 <meta name="twitter:image" content="${image}"/>
+<meta name="twitter:image:alt" content="${title}"/>
 <meta name="twitter:site" content="@sho_islam0311"/>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"${title}","description":"${description}","url":"${url}","image":"${image}"}</script>
+<meta name="twitter:creator" content="@sho_islam0311"/>
+
+<script type="application/ld+json">${jsonld}</script>
+<script type="application/ld+json">${breadcrumb}</script>
+
 <script>location.href="${url}"</script>
 </head><body><h1>${title}</h1><p>${description}</p></body></html>`
-}
-
-function escape(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, ' ')
 }
 
 async function fetchAnime(id) {
@@ -59,7 +89,20 @@ export default async function middleware(request) {
       const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
       const desc = escape(rawDesc || `Watch ${title} online — Sub & Dub available.`)
       const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
-      return new Response(htmlShell({ title: `${title} | Aniraku`, description: desc, image, url: `${SITE}/anime/${m[1]}`, type: 'website' }), {
+      const animeType = getAnimeType(anime.format)
+      const animeUrl = `${SITE}/anime/${m[1]}`
+      return new Response(htmlShell({
+        title: `${title} — Watch Online Free | Aniraku`,
+        description: desc,
+        image,
+        url: animeUrl,
+        type: 'video.tv_show',
+        animeType,
+        score: anime.averageScore,
+        episodes: anime.episodes,
+        genres: anime.genres || [],
+        startDate: anime.startDate?.year || '',
+      }), {
         headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
       })
     }
@@ -75,7 +118,43 @@ export default async function middleware(request) {
       const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
       const desc = escape(rawDesc || `Watch ${title} Episode ${ep} online — Sub & Dub available.`)
       const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
-      return new Response(htmlShell({ title: `${title} — Episode ${ep} | Aniraku`, description: desc, image, url: `${SITE}/watch/${m[1]}-episode-${ep}`, type: 'video.episode' }), {
+      const watchUrl = `${SITE}/watch/${m[1]}-episode-${ep}`
+
+      // VideoObject JSON-LD
+      const videoJsonld = `{"@context":"https://schema.org","@type":"VideoObject","name":"${title} - Episode ${ep}","description":"${desc}","thumbnailUrl":"${image}","contentUrl":"${watchUrl}","embedUrl":"${watchUrl}","duration":"PT24M","uploadDate":"${new Date().toISOString().split('T')[0]}","provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"},"isPartOf":{"@type":"TVSeries","name":"${title}","url":"${SITE}/anime/${m[1]}"}}`
+
+      const watchBreadcrumb = `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE}/"},{"@type":"ListItem","position":2,"name":"Catalog","item":"${SITE}/catalog"},{"@type":"ListItem","position":3,"name":"${title}","item":"${SITE}/anime/${m[1]}"},{"@type":"ListItem","position":4,"name":"Episode ${ep}"}]}`
+
+      return new Response(`<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>${title} — Episode ${ep} | Aniraku</title>
+<meta name="description" content="${desc}"/>
+<meta name="robots" content="index, follow"/>
+<link rel="canonical" href="${watchUrl}"/>
+
+<meta property="og:type" content="video.episode"/>
+<meta property="og:url" content="${watchUrl}"/>
+<meta property="og:title" content="${title} — Episode ${ep} | Aniraku"/>
+<meta property="og:description" content="${desc}"/>
+<meta property="og:image" content="${image}"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="og:site_name" content="Aniraku"/>
+
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:url" content="${watchUrl}"/>
+<meta name="twitter:title" content="${title} — Episode ${ep}"/>
+<meta name="twitter:description" content="${desc}"/>
+<meta name="twitter:image" content="${image}"/>
+<meta name="twitter:site" content="@sho_islam0311"/>
+
+<script type="application/ld+json">${videoJsonld}</script>
+<script type="application/ld+json">${watchBreadcrumb}</script>
+
+<script>location.href="${watchUrl}"</script>
+</head><body><h1>${title} — Episode ${ep}</h1><p>${desc}</p></body></html>`, {
         headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
       })
     }

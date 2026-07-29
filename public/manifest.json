@@ -1,15 +1,19 @@
 {
-  "name": "Aniraku — Free Anime Streaming",
+  "name": "Aniraku — Free Anime Streaming | Watch Sub & Dub Online",
   "short_name": "Aniraku",
-  "description": "Free, open-source anime streaming client. Browse, watch, and track anime.",
-  "start_url": "/home",
+  "description": "Watch anime online for free on Aniraku. Stream the latest anime episodes in HD with subtitles and dubs. Browse top airing, most popular, and trending anime series and movies.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#e2e8f0",
-  "categories": ["entertainment", "anime", "streaming"],
+  "categories": ["entertainment", "video", "anime", "streaming"],
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
     { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" },
     { "src": "/icons/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml" }
-  ]
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

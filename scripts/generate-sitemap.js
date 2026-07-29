@@ -10,12 +10,48 @@ const CHUNK_SIZE = 1000
 
 const STATIC_URLS = [
   { loc: '/', freq: 'daily', priority: '1.0' },
+  { loc: '/home', freq: 'daily', priority: '0.95' },
   { loc: '/catalog', freq: 'daily', priority: '0.8' },
-  { loc: '/schedule', freq: 'weekly', priority: '0.6' },
+  { loc: '/schedule', freq: 'weekly', priority: '0.7' },
+  { loc: '/top-airing', freq: 'daily', priority: '0.75' },
+  { loc: '/most-popular', freq: 'daily', priority: '0.75' },
+  { loc: '/movies', freq: 'daily', priority: '0.7' },
+  { loc: '/tv-series', freq: 'daily', priority: '0.7' },
+  { loc: '/random', freq: 'monthly', priority: '0.3' },
   { loc: '/privacy', freq: 'monthly', priority: '0.3' },
   { loc: '/terms', freq: 'monthly', priority: '0.3' },
   { loc: '/dmca', freq: 'monthly', priority: '0.3' },
   { loc: '/license', freq: 'yearly', priority: '0.2' },
+]
+
+// Genre pages for SEO discovery
+const GENRES = [
+  'Action', 'Adventure', 'Comedy', 'Drama', 'Ecchi',
+  'Fantasy', 'Horror', 'Mahou Shoujo', 'Mecha', 'Music',
+  'Mystery', 'Psychological', 'Romance', 'Sci-Fi',
+  'Slice of Life', 'Sports', 'Supernatural', 'Thriller',
+]
+
+const GENRE_URLS = GENRES.map(g => ({
+  loc: `/catalog?genre=${encodeURIComponent(g)}`,
+  freq: 'weekly',
+  priority: '0.65',
+}))
+
+// Format/Status filtered pages
+const FILTER_URLS = [
+  { loc: '/catalog?format=MOVIE&sort=SCORE_DESC', freq: 'daily', priority: '0.7' },
+  { loc: '/catalog?format=TV&sort=SCORE_DESC', freq: 'daily', priority: '0.7' },
+  { loc: '/catalog?format=OVA&sort=SCORE_DESC', freq: 'weekly', priority: '0.5' },
+  { loc: '/catalog?format=ONA&sort=SCORE_DESC', freq: 'weekly', priority: '0.5' },
+  { loc: '/catalog?format=SPECIAL&sort=SCORE_DESC', freq: 'weekly', priority: '0.5' },
+  { loc: '/catalog?status=RELEASING', freq: 'daily', priority: '0.7' },
+  { loc: '/catalog?status=FINISHED', freq: 'weekly', priority: '0.6' },
+  { loc: '/catalog?status=NOT_YET_RELEASED', freq: 'weekly', priority: '0.6' },
+  { loc: '/catalog?sort=POPULARITY_DESC', freq: 'daily', priority: '0.75' },
+  { loc: '/catalog?sort=SCORE_DESC', freq: 'daily', priority: '0.75' },
+  { loc: '/catalog?sort=START_DATE_DESC', freq: 'daily', priority: '0.65' },
+  { loc: '/catalog?sort=TITLE_ROMAJI', freq: 'weekly', priority: '0.4' },
 ]
 
 function escapeXml(s) {
@@ -109,6 +145,14 @@ const staticUrls = STATIC_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priorit
 const staticSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'static.xml'), staticUrls)
 console.log(`  sitemaps/static.xml — ${staticUrls.length} URLs, ${staticSize} bytes`)
 
+// Write genre/filter sitemap
+const genreUrls = [
+  ...GENRE_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority)),
+  ...FILTER_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority)),
+]
+const genreSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'genres.xml'), genreUrls)
+console.log(`  sitemaps/genres.xml — ${genreUrls.length} URLs, ${genreSize} bytes`)
+
 // Write anime chunk sitemaps
 const seen = new Set()
 const uniqueMedia = media.filter(item => {
@@ -122,10 +166,10 @@ for (let i = 0; i < uniqueMedia.length; i += CHUNK_SIZE) {
   chunks.push(uniqueMedia.slice(i, i + CHUNK_SIZE))
 }
 
-const childIndexes = [{
-  loc: '/sitemaps/static.xml',
-  lastmod: today
-}]
+const childIndexes = [
+  { loc: '/sitemaps/static.xml', lastmod: today },
+  { loc: '/sitemaps/genres.xml', lastmod: today },
+]
 
 for (let i = 0; i < chunks.length; i++) {
   const name = `anime-${i + 1}.xml`

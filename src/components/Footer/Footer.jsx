@@ -15,6 +15,24 @@ const browseLinks = [
   { label: 'Schedule', to: '/schedule' },
   { label: 'Most Popular', to: '/catalog?sort=POPULARITY_DESC' },
   { label: 'Top Airing', to: '/catalog?status=RELEASING' },
+  { label: 'Top Rated', to: '/catalog?sort=SCORE_DESC' },
+  { label: 'Anime Movies', to: '/catalog?format=MOVIE' },
+  { label: 'TV Series', to: '/catalog?format=TV' },
+]
+
+const popularGenres = [
+  { label: 'Action', to: '/catalog?genre=Action' },
+  { label: 'Romance', to: '/catalog?genre=Romance' },
+  { label: 'Comedy', to: '/catalog?genre=Comedy' },
+  { label: 'Fantasy', to: '/catalog?genre=Fantasy' },
+  { label: 'Sci-Fi', to: '/catalog?genre=Sci-Fi' },
+  { label: 'Horror', to: '/catalog?genre=Horror' },
+  { label: 'Slice of Life', to: '/catalog?genre=Slice%20of%20Life' },
+  { label: 'Sports', to: '/catalog?genre=Sports' },
+  { label: 'Supernatural', to: '/catalog?genre=Supernatural' },
+  { label: 'Mystery', to: '/catalog?genre=Mystery' },
+  { label: 'Drama', to: '/catalog?genre=Drama' },
+  { label: 'Adventure', to: '/catalog?genre=Adventure' },
 ]
 
 const resourceLinks = [
@@ -51,9 +69,9 @@ const Footer = () => {
         </F.Col>
 
         <F.Col>
-          <F.ColTitle>Resources</F.ColTitle>
+          <F.ColTitle>Genres</F.ColTitle>
           <F.ColLinks>
-            {resourceLinks.map(l => (
+            {popularGenres.map(l => (
               <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
             ))}
           </F.ColLinks>
@@ -89,7 +107,7 @@ const Footer = () => {
           <F.MobileDot>·</F.MobileDot>
           <F.MobileLink as={Link} to="/terms">Terms</F.MobileLink>
           <F.MobileDot>·</F.MobileDot>
-          <F.MobileLink as={Link} to="/license">License</F.MobileLink>
+          <F.MobileLink as={Link} to="/license">License</F.LinkItem>
         </F.MobileLinks>
         <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0</F.Copyright>
       </F.MobileFooter>

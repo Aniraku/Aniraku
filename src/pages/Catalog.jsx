@@ -5,6 +5,7 @@ import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
+import { setCatalogSEO } from '../lib/seo'
 
 const PER_PAGE = 24
 const SEARCH_DEBOUNCE_MS = 400
@@ -127,6 +128,11 @@ export default function Catalog() {
   const media = data?.media || []
   const total = data?.pageInfo?.total || 0
   const last = data?.pageInfo?.lastPage || 1
+
+  // Dynamic SEO metadata for catalog/search pages
+  useEffect(() => {
+    setCatalogSEO(sp)
+  }, [sp])
 
   const mkUrl = useCallback((overrides) => {
     const n = new URLSearchParams(sp)

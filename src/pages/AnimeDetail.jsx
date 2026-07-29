@@ -6,6 +6,7 @@ import Footer from '../components/Footer/Footer'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
 import { API_BASE } from '../config'
+import { setAnimeDetailSEO } from '../lib/seo'
 import styled from 'styled-components'
 
 const Page = styled.div`
@@ -465,6 +466,13 @@ const AnimeDetail = () => {
   const tabs = []
   if (hasEpisodes) tabs.push({ key: 'episodes', label: `Episodes (${episodes.length})` })
   if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
+
+  // Dynamic SEO metadata
+  useEffect(() => {
+    if (anime) {
+      setAnimeDetailSEO(anime)
+    }
+  }, [anime])
 
   return (
     <Page>

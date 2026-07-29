@@ -8,6 +8,7 @@ import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { setWatchSEO } from '../lib/seo'
 
 const EPISODES_PER_PAGE = 50
 
@@ -393,6 +394,13 @@ export default function Watch() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [animeId])
+
+  // Dynamic SEO metadata
+  useEffect(() => {
+    if (anime) {
+      setWatchSEO(anime, epNumber)
+    }
+  }, [anime, epNumber])
 
   // Check for resume position on mount
   useEffect(() => {

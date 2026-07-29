@@ -1,7 +1,13 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { setStaticPageSEO } from '../lib/seo'
 
 const Privacy = () => {
+  useEffect(() => {
+    setStaticPageSEO('Privacy Policy', '/privacy')
+  }, [])
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: '#fff', padding: '40px 20px' }}>
       <div style={{ maxWidth: 800, margin: '0 auto' }}>

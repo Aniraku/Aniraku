@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
+import { setScheduleSEO } from '../lib/seo'
 import styled from 'styled-components'
 
 const Page = styled.div`min-height:100vh;background:var(--bg);`
@@ -56,6 +57,11 @@ const Schedule = () => {
   }, { staleTime: 30 * 60 * 1000 })
 
   const [searchQuery, setSearchQuery] = React.useState('')
+
+  // Dynamic SEO metadata
+  useEffect(() => {
+    setScheduleSEO()
+  }, [])
 
   const items = Array.isArray(data) ? data : []
   const dayItems = items.filter(item => {

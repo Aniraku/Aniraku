@@ -1,9 +1,15 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
+import { setStaticPageSEO } from '../lib/seo'
 
 const License = () => {
+  useEffect(() => {
+    setStaticPageSEO('AGPL-3.0 License', '/license')
+  }, [])
+
   return (
     <>
       <NavBar />

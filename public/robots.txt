@@ -1,10 +1,55 @@
+# =============================================================
+# robots.txt for Aniraku — https://aniraku.vercel.app
+# Last updated: 2026-07-29
+# =============================================================
+
 User-agent: *
 Allow: /
-Disallow: /api/
+Allow: /home
+Allow: /catalog
+Allow: /schedule
+Allow: /anime/
+Allow: /watch/
+Allow: /top-airing
+Allow: /most-popular
+Allow: /movies
+Allow: /tv-series
+Allow: /random
+Allow: /privacy
+Allow: /terms
+Allow: /dmca
+Allow: /license
+
+# Block private/auth routes only
 Disallow: /login
 Disallow: /signup
-Disallow: /admin
 Disallow: /profile
-Disallow: /*?*
+Disallow: /admin
+Disallow: /api/
+Disallow: /sitemaps/
 
+# Block query-param combos that create infinite crawl space
+Disallow: /*?page=2
+Disallow: /*?page=3
+Disallow: /*?page=4
+Disallow: /*?page=5
+Disallow: /*?page=6
+Disallow: /*?page=7
+Disallow: /*?page=8
+Disallow: /*?page=9
+Disallow: /*?page=10
+
+# Allow important query params for genre/filter discovery
+Allow: /*?genre=
+Allow: /*?format=
+Allow: /*?status=
+Allow: /*?sort=
+Allow: /*?search=
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 2
+
+# =============================================================
+# Sitemaps
+# =============================================================
 Sitemap: https://aniraku.vercel.app/sitemap.xml

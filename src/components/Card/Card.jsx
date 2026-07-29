@@ -16,10 +16,10 @@ const Card = ({ data }) => {
 
   return (
     <C.Card style={{ '--media-color': accentColor }}>
-      <Link to={`/watch/${id}-episode-1`}>
+      <Link to={`/anime/${id}`} title={`View ${title} details`}>
         <C.Poster>
           {poster ? (
-            <C.Image src={poster} alt={title} />
+            <C.Image src={poster} alt={`${title} - Anime Poster`} loading="lazy" />
           ) : (
             <div style={{ width: '100%', height: '100%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>No Image</div>
           )}
@@ -37,7 +37,9 @@ const Card = ({ data }) => {
         </C.Poster>
       </Link>
       <C.Details>
-        <C.Name>{title}</C.Name>
+        <Link to={`/anime/${id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <C.Name>{title}</C.Name>
+        </Link>
       </C.Details>
     </C.Card>
   )

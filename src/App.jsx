@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, Component } from "react"
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import React, { Suspense, lazy, Component, useEffect } from "react"
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider } from "./hooks/useAuth"
 import Error from "./pages/Error"
 import HomeSkeleton from "./components/Loader/HomeSkeleton"
@@ -57,11 +57,24 @@ const GenreRedirect = () => {
   return <Navigate to={`/catalog?genre=${encodeURIComponent(genre)}`} replace />
 }
 
+// ScrollToTop + SEO meta reset on route change
+const ScrollToTop = () => {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    // Remove any previous structured data scripts added by page components
+    const existing = document.querySelectorAll('script[data-aniraku-seo="true"]')
+    existing.forEach(el => el.remove())
+  }, [pathname])
+  return null
+}
+
 const App = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
         <ErrorBoundary>
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
             <Route path="/home" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />

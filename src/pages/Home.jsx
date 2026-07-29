@@ -10,6 +10,7 @@ import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
 import { useAiring, useMovies, useSeries } from '../hooks/useAnime'
+import { setHomepageSEO } from '../lib/seo'
 
 const Section = styled.section`
   max-width: 1400px;
@@ -159,6 +160,11 @@ const Home = () => {
   const { data: airing = [], isFetched: airingDone } = useAiring()
   const { data: movies = [], isFetched: moviesDone } = useMovies()
   const { data: topTV = [], isFetched: tvDone } = useSeries()
+
+  // Set homepage SEO metadata on mount
+  React.useEffect(() => {
+    setHomepageSEO()
+  }, [])
 
   return (
     <>
