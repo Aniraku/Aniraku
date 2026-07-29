@@ -26,4 +26,3 @@ dist-ssr
 .vercel
 .env*
 .next
-.github

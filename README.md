@@ -1,104 +1,231 @@
 # Aniraku
 
-An open-source anime streaming platform built with Go and React. Features multiple streaming sources with automatic fallback and a clean modern UI.
+<p align="center">
+  <img src="public/og-image.svg" alt="Aniraku" width="600" />
+</p>
+
+<p align="center">
+  <strong>Open-source anime streaming platform</strong> — watch anime online for free in HD with subtitles and dubs.
+</p>
+
+<p align="center">
+  <a href="https://aniraku.vercel.app"><strong>aniraku.vercel.app</strong></a>
+  ·
+  <a href="https://discord.gg/aniraku">Discord</a>
+  ·
+  <a href="https://github.com/Aniraku/Aniraku/issues">Report Bug</a>
+</p>
+
+---
 
 ## Features
 
-- **Multi-source streaming** — Miruro (primary) with Senshi HLS fallback
-- **SUB/DUB support** — Language selection per episode
-- **Anime metadata** — AniList integration for covers, descriptions, schedules
-- **Artplayer** — Custom video player with skip intro, playback rate, PIP, fullscreen, hotkeys
-- **Watch history** — Auto-saves progress per episode
-- **Catalog & search** — Browse by genre, format, status, season
-- **Dark mode** — Always-on dark theme
-- **Responsive** — Mobile-first design
+- **🎬 Multi-source streaming** — SUB and DUB sources with automatic fallback
+- **🎨 Modern UI** — Clean, responsive, always-on dark theme with mobile-first design
+- **📺 Artplayer** — Custom video player with skip intro, playback rate, PiP, fullscreen, hotkeys, subtitle size control, and theater mode
+- **🕓 Watch history** — Auto-saves progress locally and syncs to your account
+- **🔍 Catalog & search** — Browse by genre, format, status, season, and year with instant search (⌘K)
+- **📅 Airing schedule** — Daily schedule view showing when your favorite anime air next
+- **⭐ Trending & top rated** — Discover popular, top rated, and currently airing anime
+- **📱 PWA ready** — Install as a standalone app on mobile and desktop
+- **🚀 SEO optimized** — Dynamic meta tags, Open Graph, Twitter Cards, JSON-LD structured data, sitemap generation
+- **🔐 Supabase Auth** — Login, signup, profile, bookmarks, and notifications
+- **➕ More** — Random anime picker, NSFW gate, genre chips, relation browsing, similar recommendations
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Go 1.24, Chi router, zerolog |
-| Frontend | React 18, Vite, Artplayer |
-| Metadata | AniList GraphQL API |
-| Streaming | Miruro API, Senshi HLS |
-| Auth | Supabase (JWT) |
-| Database | Supabase (PostgreSQL) |
+| Layer               | Technology                                                       |
+| ------------------- | ---------------------------------------------------------------- |
+| Framework           | [React 18](https://react.dev/) + [Vite 6](https://vitejs.dev/)  |
+| Routing             | [React Router v6](https://reactrouter.com/)                      |
+| Styling             | [styled-components](https://styled-components.com/)              |
+| State / Caching     | [TanStack React Query v4](https://tanstack.com/query/v4)         |
+| Video Player        | [Artplayer 5](https://artplayer.org/) + [hls.js](https://github.com/video-dev/hls.js/) |
+| Auth & DB           | [Supabase](https://supabase.com/) (PostgreSQL + JWT)              |
+| Metadata            | [AniList GraphQL API](https://anilist.co/graphiql)               |
+| SPA SEO             | Custom dynamic meta/JSON-LD helper                               |
+| Deployment          | [Vercel](https://vercel.com/) (aniraku.vercel.app)               |
+| Backend             | Go API server (separate repo) at `aniraku-backend.onrender.com`  |
+
+## Project Structure
+
+```
+aniraku/
+├── public/                    # Static assets
+│   ├── favicon.svg
+│   ├── og-image.svg
+│   ├── manifest.json          # PWA manifest
+│   ├── robots.txt
+│   ├── sitemap.xml
+│   ├── seo.js                 # Client-side SEO fallback
+│   └── icons/                 # PWA icons (180, 192, 512)
+├── scripts/
+│   └── generate-sitemap.js    # Sitemap builder
+├── src/
+│   ├── main.jsx               # App entrypoint
+│   ├── App.jsx                # Router + routes
+│   ├── config.js              # API base URL config
+│   ├── index.css              # Global styles & CSS variables
+│   ├── components/
+│   │   ├── Card/              # Anime card components
+│   │   ├── Featured/          # Featured / hero section
+│   │   ├── Footer/            # Site footer
+│   │   ├── Hero/              # Hero banner
+│   │   ├── Loader/            # Loading skeletons
+│   │   ├── MultiSwiper/       # Swiper carousel wrapper
+│   │   ├── NavBar/            # NavBar + SideBar
+│   │   ├── Spinner/           # Loading spinner
+│   │   └── Trending/          # Trending section
+│   ├── hooks/
+│   │   ├── useAnime.js        # AniList data hooks
+│   │   ├── useAuth.jsx        # Supabase auth context
+│   │   ├── useDebounce.js     # Debounce utility
+│   │   ├── useLocalStorage.js # Persistent state
+│   │   └── useMediaQuery.js   # Responsive breakpoints
+│   ├── lib/
+│   │   ├── anilist.js         # AniList GraphQL queries
+│   │   ├── avatars.js         # Avatar generator
+│   │   ├── seo.js             # Dynamic SEO metadata helper
+│   │   └── supabase.js        # Supabase client
+│   └── pages/
+│       ├── Home.jsx           # Homepage (hero, trending, airing, movies, TV)
+│       ├── Watch.jsx          # Video player + episode browser
+│       ├── AnimeDetail.jsx    # Anime detail (banner, synopsis, episodes, relations)
+│       ├── Catalog.jsx        # Browse / search / filter grid
+│       ├── Schedule.jsx       # Weekly airing schedule
+│       ├── Auth.jsx           # Login / signup
+│       ├── Profile.jsx        # User profile
+│       ├── Admin.jsx          # Admin dashboard
+│       ├── Random.jsx         # Random anime picker
+│       ├── Error.jsx          # 404 page
+│       ├── Dmca.jsx           # DMCA policy
+│       ├── Privacy.jsx        # Privacy policy
+│       ├── License.jsx        # MIT license page
+│       └── Terms.jsx          # Terms of service
+├── index.html                 # HTML shell with CSP, OG, JSON-LD, PWA metas
+├── middleware.js              # Vercel middleware (bot-facing SEO shells)
+├── vercel.json                # Vercel deploy config (routes, headers, env)
+├── vite.config.js             # Vite build config
+└── package.json
+```
 
 ## Quick Start
 
 ### Prerequisites
 
-- Go 1.24+
-- Node.js 18+
-- pnpm
+- **Node.js** 18+
+- **npm** (or pnpm / yarn)
 
-### Backend
-
-```bash
-# Install dependencies
-go mod download
-
-# Build
-go build -o aurelia-server ./cmd/aurelia-server/
-
-# Run
-./aurelia-server --config config.yaml
-```
-
-Server starts on `http://127.0.0.1:43211`
-
-### Frontend
+### Local Development
 
 ```bash
-cd web
+# Clone the repo
+git clone https://github.com/Aniraku/Aniraku.git
+cd Aniraku
 
 # Install dependencies
-pnpm install
+npm install
 
-# Development
-pnpm dev
-
-# Build for production
-pnpm build
+# Start the dev server
+npm run dev
 ```
 
-## Configuration
+The dev server starts at `http://localhost:3000`.
 
-Copy `config.example.yaml` to `config.yaml` and configure:
+### Environment Variables
 
-```yaml
-server:
-  host: "127.0.0.1"
-  port: 43211
-  debug: true
+Create a `.env` file in the root (optional — defaults work for development):
 
-supabase:
-  url: "https://your-project.supabase.co"
-  key: "your-anon-key"
-  service_key: "your-service-key"
-  jwt_aud: "authenticated"
+```env
+VITE_API_URL=http://127.0.0.1:43211        # Backend API (defaults to production)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-## API Endpoints
+Without Supabase credentials, the app runs in read-only mode (browsing + streaming still work; auth features are disabled).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/health` | Health check |
-| GET | `/api/v1/anime/{id}` | Anime details |
-| GET | `/api/v1/anime/{id}/episodes` | Episode list |
-| POST | `/api/v1/stream` | Get streaming source |
-| GET | `/api/v1/miruro/episodes/{id}` | Miruro episode list |
-| GET | `/api/v1/miruro/has-dub/{id}` | Check DUB availability |
-| GET | `/api/v1/search?q=...` | Search anime |
-| GET | `/api/v1/browse` | Browse catalog |
-| GET | `/api/v1/trending` | Trending anime |
+### Production Build
 
-## Architecture
-
+```bash
+npm run build          # Vite production build → dist/
+npm run preview        # Preview the production build locally
 ```
-Client → Miruro (primary) → Senshi HLS (fallback)
-```
+
+### Scripts
+
+| Script               | Description                         |
+| -------------------- | ----------------------------------- |
+| `npm run dev`        | Start Vite dev server               |
+| `npm run build`      | Production build                    |
+| `npm run preview`    | Preview production build            |
+| `npm run generate-sitemap` | Generate sitemap.xml          |
+
+## Backend
+
+This repository is the **React frontend only**. The streaming backend is a separate Go service deployed at `aniraku-backend.onrender.com`. It handles:
+
+- Streaming source resolution (Miruro, Senshi, and others)
+- Proxy for HLS manifests and subtitles
+- AniList GraphQL proxy (avoids CORS issues)
+- Rate limiting and abuse protection
+
+The frontend communicates with the backend via the REST API configured in `src/config.js`.
+
+## Deployment
+
+This project is deployed on **Vercel** at [aniraku.vercel.app](https://aniraku.vercel.app).
+
+### Deploy Your Own
+
+1. Fork this repository
+2. Import it on [Vercel](https://vercel.com/new)
+3. Set environment variables (see above)
+4. Deploy — Vercel auto-detects Vite and uses the config in `vercel.json`
+
+## Routes
+
+| Path                              | Page                    |
+| --------------------------------- | ----------------------- |
+| `/` `/home`                       | Homepage                |
+| `/catalog`                        | Browse / search catalog |
+| `/catalog?genre=Action`           | Genre filter            |
+| `/catalog?sort=SCORE_DESC`        | Sorted catalog          |
+| `/schedule`                       | Weekly airing schedule  |
+| `/watch/:animeId-episode-:num`    | Video player            |
+| `/anime/:id`                      | Anime detail page       |
+| `/random`                         | Random anime picker     |
+| `/login` `/signup`                | Authentication          |
+| `/profile`                        | User profile            |
+| `/admin`                          | Admin dashboard         |
+| `/top-airing`                     | ↪ Redirects to catalog  |
+| `/most-popular`                   | ↪ Redirects to catalog  |
+| `/movies`                         | ↪ Redirects to catalog  |
+| `/tv-series`                      | ↪ Redirects to catalog  |
+| `/dmca` `/privacy` `/license` `/terms` | Legal pages        |
+
+## Keyboard Shortcuts (Watch Page)
+
+| Key         | Action                      |
+| ----------- | --------------------------- |
+| `Space`     | Play / Pause                |
+| `←` / `J`   | Rewind 10s                  |
+| `→` / `L`   | Forward 10s                 |
+| `↑` / `↓`   | Volume up / down            |
+| `F`         | Toggle fullscreen           |
+| `T`         | Toggle theater mode         |
+| `M`         | Mute / unmute               |
+| `P`         | Picture-in-Picture          |
+| `C`         | Cycle subtitles             |
+| `D`         | Switch source (SUB/DUB)     |
+| `N`         | Next episode                |
+| `B`         | Previous episode            |
+| `,` / `.`   | Playback speed down / up    |
+| `Esc`       | Exit fullscreen / theater   |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, guidelines, and pulling in streaming sources.
 
 ## License
 
-MIT
+[MIT](https://github.com/Aniraku/Aniraku/blob/main/LICENSE) © Aniraku Contributors
