@@ -165,21 +165,21 @@ const Desc = styled.p`
 
 const GenreRow = styled.div`
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 `
 
 const GenreTag = styled(Link)`
-  padding: 3px 10px;
+  padding: 2px 8px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
   text-decoration: none;
   transition: all 0.2s;
   &:hover { border-color: var(--accent); color: var(--text-primary); }
-  @media (max-width: 480px) { padding: 2px 8px; font-size: 10px; }
+  @media (max-width: 480px) { padding: 1px 6px; font-size: 9px; border-radius: 6px; }
 `
 
 const Tabs = styled.div`

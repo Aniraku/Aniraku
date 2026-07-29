@@ -6,16 +6,19 @@ export const F = {}
 F.Footer = styled.footer`
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
-  padding: 3rem 1.5rem 1.5rem;
-  margin-top: 4rem;
 
+  @media (min-width: 769px) {
+    padding: 3rem 1.5rem 1.5rem;
+    margin-top: 4rem;
+  }
   @media (max-width: 768px) {
-    padding: 1.5rem 1rem 4.5rem;
-    margin-top: 2rem;
+    padding: 1rem 1rem 5rem;
+    margin-top: 1.5rem;
   }
 `
 
-F.Grid = styled.div`
+/* Desktop grid — hidden on mobile */
+F.DesktopGrid = styled.div`
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1.5fr;
   gap: 2rem;
@@ -27,19 +30,56 @@ F.Grid = styled.div`
     gap: 1.5rem;
   }
   @media (max-width: 600px) {
-    grid-template-columns: 1fr;
-    gap: 0;
+    display: none;
   }
+`
+
+/* Mobile layout — hidden on desktop */
+F.MobileFooter = styled.div`
+  display: none;
+
+  @media (max-width: 600px) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+  }
+`
+
+F.MobileTop = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`
+
+F.MobileLinks = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+`
+
+F.MobileLink = styled(Link)`
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+
+  &:hover { color: var(--accent); }
+`
+
+F.MobileDot = styled.span`
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.4;
 `
 
 F.Col = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-
-  @media (max-width: 600px) {
-    &.az-col { display: none; }
-  }
 `
 
 F.ColTitle = styled.h4`
@@ -55,36 +95,6 @@ F.ColLinks = styled.div`
   display: flex;
   flex-direction: column;
   gap: 6px;
-`
-
-F.MobileDetails = styled.details`
-  @media (min-width: 769px) {
-    &[open] { display: contents; }
-  }
-  @media (max-width: 768px) {
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 2px;
-    summary {
-      list-style: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 0;
-      user-select: none;
-    }
-    summary::-webkit-details-marker { display: none; }
-    summary::after {
-      content: '+';
-      font-size: 13px;
-      color: var(--text-muted);
-      flex-shrink: 0;
-      margin-left: 8px;
-      transition: transform 0.2s;
-    }
-    &[open] summary::after { content: '\2212'; }
-    &[open] summary { margin-bottom: 4px; }
-  }
 `
 
 F.Disclaimer = styled.p`
@@ -155,6 +165,10 @@ F.Bottom = styled.div`
   padding-top: 1rem;
   border-top: 1px solid var(--border);
   text-align: center;
+
+  @media (max-width: 600px) {
+    display: none;
+  }
 `
 
 F.Copyright = styled.p`

@@ -27,7 +27,8 @@ const resourceLinks = [
 const Footer = () => {
   return (
     <F.Footer>
-      <F.Grid>
+      {/* Desktop grid */}
+      <F.DesktopGrid>
         <F.Col>
           <Logo to="/home" height={36} showText />
           <F.Disclaimer>
@@ -41,28 +42,24 @@ const Footer = () => {
         </F.Col>
 
         <F.Col>
-          <F.MobileDetails>
-            <summary><F.ColTitle as="span">Browse</F.ColTitle></summary>
-            <F.ColLinks>
-              {browseLinks.map(l => (
-                <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
-              ))}
-            </F.ColLinks>
-          </F.MobileDetails>
+          <F.ColTitle>Browse</F.ColTitle>
+          <F.ColLinks>
+            {browseLinks.map(l => (
+              <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
+            ))}
+          </F.ColLinks>
         </F.Col>
 
         <F.Col>
-          <F.MobileDetails>
-            <summary><F.ColTitle as="span">Resources</F.ColTitle></summary>
-            <F.ColLinks>
-              {resourceLinks.map(l => (
-                <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
-              ))}
-            </F.ColLinks>
-          </F.MobileDetails>
+          <F.ColTitle>Resources</F.ColTitle>
+          <F.ColLinks>
+            {resourceLinks.map(l => (
+              <F.LinkItem key={l.to} as={Link} to={l.to}>{l.label}</F.LinkItem>
+            ))}
+          </F.ColLinks>
         </F.Col>
 
-        <F.Col className="az-col">
+        <F.Col>
           <F.ColTitle>A-Z List</F.ColTitle>
           <F.AzGrid>
             {letters.map((item, idx) => (
@@ -76,7 +73,26 @@ const Footer = () => {
             ))}
           </F.AzGrid>
         </F.Col>
-      </F.Grid>
+      </F.DesktopGrid>
+
+      {/* Mobile layout */}
+      <F.MobileFooter>
+        <F.MobileTop>
+          <Logo to="/home" height={28} showText />
+          <F.Socials>
+            <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer"><FaGithub size={16} /></F.SocialLink>
+            <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer"><FaDiscord size={16} /></F.SocialLink>
+          </F.Socials>
+        </F.MobileTop>
+        <F.MobileLinks>
+          <F.MobileLink as={Link} to="/dmca">DMCA</F.MobileLink>
+          <F.MobileDot>·</F.MobileDot>
+          <F.MobileLink as={Link} to="/terms">Terms</F.MobileLink>
+          <F.MobileDot>·</F.MobileDot>
+          <F.MobileLink as={Link} to="/license">License</F.MobileLink>
+        </F.MobileLinks>
+        <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0</F.Copyright>
+      </F.MobileFooter>
 
       <F.Bottom>
         <F.Copyright>&copy; 2026 Aniraku Contributors · AGPL-3.0 · Not affiliated with AniList or any studio</F.Copyright>
