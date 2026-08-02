@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaPlay, FaFire, FaStar, FaTv, FaFilm } from 'react-icons/fa'
-import NavBar from '../components/NavBar/NavBar'
 import Hero from '../components/Hero/Hero'
 import ContinueWatching from '../components/ContinueWatching'
 import Trending from '../components/Trending/Trending'
@@ -215,7 +214,6 @@ const Home = () => {
 
   return (
     <>
-      <NavBar />
       <main>
       <Hero />
       <ContinueWatching />

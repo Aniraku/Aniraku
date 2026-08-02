@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import { supabase } from '../lib/supabase'
 import styled from 'styled-components'
@@ -105,7 +104,6 @@ const Admin = () => {
   if (!isAdmin) {
     return (
       <>
-        <NavBar />
         <Page>
           <Container>
             <Title>Access Denied</Title>
@@ -120,7 +118,6 @@ const Admin = () => {
 
   return (
     <>
-      <NavBar />
       <Page>
         <Container>
           <Title>Admin Dashboard</Title>

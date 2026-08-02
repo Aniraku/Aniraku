@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { Link } from 'react-router-dom'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
 import { setScheduleSEO } from '../lib/seo'
@@ -80,7 +79,6 @@ const Schedule = () => {
 
   return (
     <Page>
-      <NavBar />
       <Container>
         <Title>Airing Schedule</Title>
         <Subtitle>See when your favorite anime air next</Subtitle>

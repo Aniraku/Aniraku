@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import { AVATAR_LIST, avatarUrl, defaultAvatar } from '../lib/avatars'
 import { supabase } from '../lib/supabase'
@@ -155,7 +154,6 @@ const Profile = () => {
   if (!user) {
     return (
       <>
-        <NavBar />
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ textAlign: 'center', color: 'var(--text-primary)' }}>
             <h2 style={{ fontSize: 22, marginBottom: 12 }}>You are not logged in</h2>
@@ -171,7 +169,6 @@ const Profile = () => {
 
   return (
     <>
-      <NavBar />
       <div className="profile-page" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)', padding: '40px 20px' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div className="profile-header" style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>

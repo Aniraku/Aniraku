@@ -5,7 +5,6 @@ import Hls from 'hls.js'
 import { FaStepForward, FaStepBackward, FaSearch } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -879,7 +878,6 @@ export default function Watch() {
   if (loading) {
     return (
       <>
-        <NavBar />
         <div style={{ background: 'var(--bg)' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0' }}>
             <div style={{ width: '100%', aspectRatio: '16/9', background: 'var(--bg-card)', position: 'relative', overflow: 'hidden' }}>
@@ -905,8 +903,7 @@ export default function Watch() {
       if (!nsfwConfirmed) {
         return (
           <>
-            <NavBar />
-            <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+                <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
               <div style={{
                 textAlign: 'center', padding: 40, maxWidth: 400,
                 background: 'var(--bg-elevated)', borderRadius: 16, border: '1px solid var(--border)',
@@ -930,7 +927,6 @@ export default function Watch() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: '#fff', paddingBottom: 80 }}>
-      <NavBar />
       <main>
 
       {/* Toast notification */}
@@ -1099,15 +1095,15 @@ export default function Watch() {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
             {epNumber > 1 && (
-            <Link to={`/watch/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}-episode-${epNumber - 1}`} style={navBtnStyle}>
+              <Link to={`/watch/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}-episode-${epNumber - 1}`} style={navBtnStyle}>
                 <FaStepBackward size={12} /> Previous
               </Link>
-            }
+            )}
             {epNumber < episodes.length && (
               <Link to={`/watch/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}-episode-${epNumber + 1}`} style={navBtnStyle}>
                 Next <FaStepForward size={12} />
               </Link>
-            }
+            )}
             <Link to={`/anime/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}`} style={navBtnStyle}>Details</Link>
           </div>
 

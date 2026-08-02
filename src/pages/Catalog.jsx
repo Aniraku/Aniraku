@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
 import { setCatalogSEO } from '../lib/seo'
@@ -186,7 +185,6 @@ export default function Catalog() {
 
   return (
     <div className="catalog-page">
-      <NavBar />
 
       <div className="catalog-container">
         <header className="catalog-header">

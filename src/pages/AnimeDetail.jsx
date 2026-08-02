@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { FaPlay, FaStar, FaBookmark, FaRegBookmark } from 'react-icons/fa'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
@@ -534,14 +533,12 @@ const AnimeDetail = () => {
 
   if (isLoading) return (
     <>
-      <NavBar />
       <Center><Spinner /></Center>
     </>
   )
 
   if (!anime) return (
     <>
-      <NavBar />
       <Center>
         <div style={{ textAlign: 'center', padding: '0 20px' }}>
           <p style={{ fontSize: 18, marginBottom: 12, color: 'var(--text-muted)' }}>Anime not found</p>
@@ -553,7 +550,6 @@ const AnimeDetail = () => {
 
   if (anime.isAdult && !nsfwConfirmed) return (
     <>
-      <NavBar />
       <Center>
         <NsfwCard>
           <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
@@ -582,7 +578,6 @@ const AnimeDetail = () => {
 
   return (
     <Page>
-      <NavBar />
       <main>
       <Banner>
         <BannerImg src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} alt="" />

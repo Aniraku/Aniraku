@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { FaRandom, FaPlay, FaRedo } from 'react-icons/fa'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
-import NavBar from '../components/NavBar/NavBar'
 import Footer from '../components/Footer/Footer'
 import MobileBottomNav from '../components/MobileBottomNav'
 import { generateSlug } from '../lib/slug'
@@ -50,7 +49,6 @@ export default function Random() {
 
   return (
     <Page>
-      <NavBar />
       <Container>
         <Title>Discover Random Anime</Title>
         <Subtitle>Not sure what to watch? Let fate decide.</Subtitle>
