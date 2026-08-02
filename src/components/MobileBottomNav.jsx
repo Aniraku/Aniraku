@@ -1,6 +1,6 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser } from 'react-icons/fa'
+import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser, FaStepBackward, FaStepForward, FaArrowLeft } from 'react-icons/fa'
 import styled from 'styled-components'
 
 const Bar = styled.nav`
@@ -58,6 +58,60 @@ const MobileBottomNav = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const path = location.pathname
+
+  const isWatch = path.startsWith('/watch/')
+  const isAnimeDetail = path.startsWith('/anime/')
+
+  if (isWatch) {
+    return (
+      <Bar style={{ borderRadius: 16, padding: '6px 12px', gap: 4 }}>
+        <Item onClick={() => navigate(-1)}>
+          <FaArrowLeft size={16} />
+          <span>Back</span>
+        </Item>
+        <Item onClick={() => {
+          const art = document.querySelector('.art-video-player')?.__artplayer
+          if (art) art.backward && art.backward(10)
+        }}>
+          <FaStepBackward size={16} />
+          <span>-10s</span>
+        </Item>
+        <Item onClick={() => {
+          const art = document.querySelector('.art-video-player')?.__artplayer
+          if (art) art.toggle()
+        }}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>▶</span>
+          <span>Play</span>
+        </Item>
+        <Item onClick={() => {
+          const art = document.querySelector('.art-video-player')?.__artplayer
+          if (art) art.forward && art.forward(10)
+        }}>
+          <FaStepForward size={16} />
+          <span>+10s</span>
+        </Item>
+      </Bar>
+    )
+  }
+
+  if (isAnimeDetail) {
+    return (
+      <Bar style={{ borderRadius: 16, padding: '6px 12px' }}>
+        <Item onClick={() => navigate(-1)}>
+          <FaArrowLeft size={16} />
+          <span>Back</span>
+        </Item>
+        <Item active={path === '/home' ? 1 : 0} onClick={() => navigate('/home')}>
+          <FaHome size={16} />
+          <span>Home</span>
+        </Item>
+        <Item active={path === '/catalog' ? 1 : 0} onClick={() => navigate('/catalog')}>
+          <FaThLarge size={16} />
+          <span>Catalog</span>
+        </Item>
+      </Bar>
+    )
+  }
 
   const items = [
     { icon: FaHome, label: 'Home', to: '/home' },

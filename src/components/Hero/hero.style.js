@@ -127,9 +127,9 @@ H.Content = styled.div`
   flex-direction: column;
   color: var(--accent);
   left: 2em;
-  bottom: 2em;
-  padding-bottom: 3em;
   bottom: 0 !important;
+  padding-bottom: 3em;
+  overflow: hidden;
 
   @media screen and (max-width: 1200px) {
     width: 50%;

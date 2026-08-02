@@ -929,7 +929,7 @@ export default function Watch() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: '#fff' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: '#fff', paddingBottom: 80 }}>
       <NavBar />
       <main>
 
@@ -949,9 +949,10 @@ export default function Watch() {
 
       {/* Player Container */}
       <div ref={playerContainerRef} className="watch-player-wrapper" style={{
-        position: 'relative', maxWidth: theaterMode ? '100%' : 1200,
+        maxWidth: theaterMode ? '100%' : 1200,
         margin: '0 auto', background: '#000',
         transition: 'max-width 0.3s ease',
+        position: 'sticky', top: 0, zIndex: 10,
       }}>
         {embedUrl ? (
           <iframe
@@ -1246,7 +1247,7 @@ export default function Watch() {
         .art-subtitle-wrap span { line-height: 1.4 !important; }
 
         @media (max-width: 768px) {
-          .watch-player-wrapper { max-width: 100% !important; }
+          .watch-player-wrapper { max-width: 100% !important; position: -webkit-sticky !important; position: sticky !important; }
           .watch-info-section { flex-direction: column !important; gap: 16px !important; padding: 16px !important; }
           .watch-episode-sidebar { width: 100% !important; flex-shrink: 1 !important; max-height: none !important; }
           .watch-ep-toggle { display: flex !important; }
