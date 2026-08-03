@@ -45,9 +45,14 @@ export const useNsfw = () => {
   return { nsfwEnabled, updateNsfw }
 }
 
-// filterAdult drops adult titles from a result list when the account has
-// NSFW content disabled. Items without an isAdult flag pass through.
+// A title counts as NSFW only when it carries the Hentai genre on AniList.
+// isAdult alone is too broad — AniList flags some non-hentai series as adult.
+export const isNsfw = (item) =>
+  Array.isArray(item?.genres) && item.genres.some(g => g.toLowerCase() === 'hentai')
+
+// filterAdult drops hentai titles from a result list when the account has
+// NSFW content disabled. Everything else always passes through.
 export const filterAdult = (items, nsfwEnabled) => {
   if (nsfwEnabled || !Array.isArray(items)) return items
-  return items.filter(item => !item.isAdult)
+  return items.filter(item => !isNsfw(item))
 }

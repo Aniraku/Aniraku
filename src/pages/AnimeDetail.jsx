@@ -6,7 +6,7 @@ import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
 import { useAuth } from '../hooks/useAuth'
-import { filterAdult, useNsfw } from '../hooks/useNsfw'
+import { filterAdult, isNsfw, useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import { API_BASE } from '../config'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
@@ -574,7 +574,7 @@ const AnimeDetail = () => {
     </>
   )
 
-  if (anime.isAdult && !nsfwEnabled) return (
+  if (isNsfw(anime) && !nsfwEnabled) return (
     <>
       <Center>
         <NsfwCard>

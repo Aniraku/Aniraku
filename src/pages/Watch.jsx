@@ -9,7 +9,7 @@ import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { useNsfw } from '../hooks/useNsfw'
+import { isNsfw, useNsfw } from '../hooks/useNsfw'
 import { setWatchSEO } from '../lib/seo'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 
@@ -916,7 +916,7 @@ export default function Watch() {
     )
   }
 
-  if (anime?.isAdult && !nsfwEnabled) {
+  if (isNsfw(anime) && !nsfwEnabled) {
     return (
       <>
         <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>

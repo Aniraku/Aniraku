@@ -60,7 +60,7 @@ export const TRENDING_QUERY = `
       media(type: ANIME, sort: TRENDING) {
         id title { romaji english userPreferred }
         coverImage { extraLarge large }
-        format episodes averageScore status isAdult
+        format episodes averageScore status genres isAdult
       }
     }
   }
@@ -97,7 +97,7 @@ export const SCHEDULE_QUERY = `
       media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
         id title { romaji english userPreferred }
         coverImage { large }
-        format isAdult
+        format genres isAdult
         airingSchedule(notYetAired: true, greaterThan: $weekStart, lessThan: $weekEnd) {
           nodes { episode airingAt timeUntilAiring }
         }
