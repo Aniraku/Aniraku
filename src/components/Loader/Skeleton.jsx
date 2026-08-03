@@ -7,24 +7,12 @@ function Skeleton() {
     <>
       <NavBar />
       <L.Wrapper>
-        <L.Skeleton>
-          <L.Card />
-        </L.Skeleton>
-        <L.Skeleton>
-          <L.Card />
-        </L.Skeleton>
-        <L.Skeleton>
-          <L.Card />
-        </L.Skeleton>
-        <L.Skeleton>
-          <L.Card />
-        </L.Skeleton>
-        <L.Skeleton>
-          <L.Card />
-        </L.Skeleton>
-        <L.Skeleton>
-          <L.Card />
-        </L.Skeleton>
+        {Array.from({ length: 12 }).map((_, i) => (
+          <L.CardBlock key={i}>
+            <L.Card />
+            <L.CardBar />
+          </L.CardBlock>
+        ))}
       </L.Wrapper>
     </>
   )
