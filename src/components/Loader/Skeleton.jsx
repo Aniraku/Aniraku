@@ -7,7 +7,7 @@ function Skeleton() {
     <>
       <NavBar />
       <L.Wrapper>
-        {Array.from({ length: 12 }).map((_, i) => (
+        {Array.from({ length: 8 }).map((_, i) => (
           <L.CardBlock key={i}>
             <L.Card />
             <L.CardBar />

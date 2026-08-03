@@ -13,7 +13,7 @@ const Base = styled.div`
     var(--bg-elevated) 65%
   );
   background-size: 200% 100%;
-  animation: ${shimmer} 1.4s ease-in-out infinite;
+  animation: ${shimmer} 1.1s ease-in-out infinite;
   border-radius: var(--radius-md, 8px);
   @media (prefers-reduced-motion: reduce) {
     animation: none;

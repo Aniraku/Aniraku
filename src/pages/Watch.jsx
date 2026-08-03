@@ -1293,9 +1293,9 @@ export default function Watch() {
         }
       `}</style>
 
-      {anime && episode && (
+      {anime && epNumber && (
         <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 20px 48px' }}>
-          <Comments animeId={anime.id} episodeNumber={episode} />
+          <Comments animeId={anime.id} episodeNumber={epNumber} />
         </div>
       )}
     </main>

@@ -6,7 +6,7 @@ import { AuthProvider } from "./hooks/useAuth"
 import NavBar from "./components/NavBar/NavBar"
 import MobileBottomNav from "./components/MobileBottomNav"
 import Error from "./pages/Error"
-import HomeSkeleton from "./components/Loader/HomeSkeleton"
+import Home from "./pages/Home"
 import Skeleton from "./components/Loader/Skeleton"
 
 class ErrorBoundary extends Component {
@@ -40,7 +40,6 @@ class ErrorBoundary extends Component {
   }
 }
 
-const Home = lazy(() => import("./pages/Home"))
 const Watch = lazy(() => import("./pages/Watch"))
 const Dmca = lazy(() => import("./pages/Dmca"))
 const Privacy = lazy(() => import("./pages/Privacy"))
@@ -83,8 +82,8 @@ const App = () => {
           <NavBar />
           <MobileBottomNav />
           <Routes>
-            <Route path="/" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
-            <Route path="/home" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
+            <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/catalog" element={<Suspense fallback={<Skeleton />}><Catalog /></Suspense>} />
             <Route path="/schedule" element={<Suspense fallback={<Skeleton />}><Schedule /></Suspense>} />
             <Route path="/watch/:slugId" element={<Suspense fallback={<Skeleton />}><Watch /></Suspense>} />

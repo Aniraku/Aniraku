@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { FaChevronLeft, FaChevronRight, FaPlayCircle, FaClock } from "react-icons/fa";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import "swiper/swiper-bundle.css";
@@ -6,20 +6,24 @@ import { H } from "./hero.style";
 import { useTrendingAnime } from "../../hooks/useAnime";
 import { filterAdult, useNsfw } from "../../hooks/useNsfw";
 import { generateSlug } from "../../lib/slug";
+import { L } from "../Loader/loader.style";
 
 const SkeletonSlide = () => (
   <H.Slides>
     <H.ImgContainer>
-      <H.Img src="" alt="" style={{ background: '#3d3e44', filter: 'none' }} />
+      <L.Skeleton style={{ position: "absolute", inset: 0, borderRadius: 0 }} />
     </H.ImgContainer>
     <H.Content>
-      <H.Rank><p style={{ opacity: 0.4 }}>{'     '}</p></H.Rank>
-      <H.Title style={{ background: '#4a4b51', borderRadius: 4, width: '60%', height: 40, color: 'transparent' }}>{' '}</H.Title>
+      <L.Skeleton style={{ width: 80, height: 20, borderRadius: 999 }} />
+      <L.Skeleton style={{ width: "62%", maxWidth: 460, height: 44, borderRadius: 8, marginTop: 18 }} />
       <H.Icons>
-        <H.Icon style={{ background: '#4a4b51', borderRadius: 4, width: 60, height: 16, color: 'transparent' }}>{' '}</H.Icon>
-        <H.Icon style={{ background: '#4a4b51', borderRadius: 4, width: 60, height: 16, color: 'transparent' }}>{' '}</H.Icon>
+        <L.Skeleton style={{ width: 72, height: 16, borderRadius: 6 }} />
+        <L.Skeleton style={{ width: 72, height: 16, borderRadius: 6 }} />
       </H.Icons>
-      <H.Description style={{ background: '#4a4b51', borderRadius: 4, width: '80%', height: 60, color: 'transparent' }}>{' '}</H.Description>
+      <L.Skeleton style={{ width: "78%", maxWidth: 500, height: 52, borderRadius: 8 }} />
+      <H.WatchBtn>
+        <L.Skeleton style={{ width: 150, height: 44, borderRadius: 999 }} />
+      </H.WatchBtn>
     </H.Content>
   </H.Slides>
 );
