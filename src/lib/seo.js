@@ -245,7 +245,7 @@ export function setWatchSEO(anime, episodeNumber) {
     "isPartOf": {
       "@type": "TVSeries",
       "name": title,
-      "url": `${SITE}/anime/${slug}-${anime.id}`
+      "url": `${SITE}/anime/${watchSlug}-${anime.id}`
     }
   };
 
@@ -256,7 +256,7 @@ export function setWatchSEO(anime, episodeNumber) {
     "itemListElement": [
       { "@type": "ListItem", "position": 1, "name": "Home", "item": `${SITE}/` },
       { "@type": "ListItem", "position": 2, "name": "Catalog", "item": `${SITE}/catalog` },
-      { "@type": "ListItem", "position": 3, "name": title, "item": `${SITE}/anime/${slug}-${anime.id}` },
+      { "@type": "ListItem", "position": 3, "name": title, "item": `${SITE}/anime/${watchSlug}-${anime.id}` },
       { "@type": "ListItem", "position": 4, "name": `Episode ${epNum}` }
     ]
   };
