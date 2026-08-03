@@ -16,10 +16,21 @@ C.Poster = styled.div`
   overflow: hidden;
   background: var(--bg-card);
   cursor: pointer;
+  transition: transform var(--transition-normal);
+  z-index: 1;
 
   &:active {
     transform: scale(0.97);
     transition: transform 0.1s;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: scale(1.08);
+      z-index: 10;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+    }
   }
 `;
 
@@ -134,6 +145,70 @@ C.EpBadge = styled.span`
 
 C.Details = styled.div`
   padding: 10px 4px 4px;
+  transition: transform var(--transition-normal);
+
+  @media (hover: hover) and (pointer: fine) {
+    ${C.Poster}:hover + & {
+      transform: translateY(4px);
+    }
+  }
+`;
+
+C.Preview = styled.div`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 32px 10px 10px;
+  background: linear-gradient(to top, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.75) 60%, transparent 100%);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  z-index: 4;
+  pointer-events: none;
+
+  @media (hover: hover) and (pointer: fine) {
+    ${C.Poster}:hover & {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    display: none;
+  }
+`;
+
+C.PreviewMeta = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  span {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+  }
+`;
+
+C.PreviewAction = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #000;
+  cursor: pointer;
 `;
 
 C.Name = styled.h3`

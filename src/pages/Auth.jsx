@@ -134,12 +134,29 @@ const Auth = ({ mode }) => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const [recovering, setRecovering] = useState(false)
   const [usernameAvail, setUsernameAvail] = useState(null)
   const [checkingName, setCheckingName] = useState(false)
   const timer = useRef(null)
   const { signIn, signUp } = useAuth()
   const navigate = useNavigate()
   const isLogin = mode === 'login'
+
+  // Password recovery: the reset email links back to /login carrying a
+  // recovery session. Detect it (event, or hash on a fresh load) and swap
+  // the form for a "set new password" screen.
+  useEffect(() => {
+    if (!isLogin) return
+    let mounted = true
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, '?'))
+    if (params.get('type') === 'recovery') setRecovering(true)
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+      if (event === 'PASSWORD_RECOVERY' && session) setRecovering(true)
+    })
+    return () => { mounted = false; subscription.unsubscribe() }
+  }, [isLogin])
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current)
@@ -200,6 +217,26 @@ const Auth = ({ mode }) => {
     }
   }
 
+  const handleResetPassword = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
+      navigate('/home')
+    } catch (err) {
+      console.error('Reset error:', err)
+      setError(err?.message || 'Failed to reset password')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <Wrapper>
       <Box>
@@ -228,7 +265,19 @@ const Auth = ({ mode }) => {
             </div>
           )}
 
-          {!sent && <form onSubmit={handleSubmit}>
+          {!sent && recovering && isLogin && (
+            <form onSubmit={handleResetPassword}>
+              <Field>
+                <Label>New Password</Label>
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min 6 characters" minLength={6} autoFocus />
+              </Field>
+              <Submit type="submit" $loading={loading}>
+                {loading ? 'Please wait...' : 'Set New Password'}
+              </Submit>
+            </form>
+          )}
+
+          {!sent && !recovering && <form onSubmit={handleSubmit}>
             {!isLogin && (
               <Field>
                 <Label>Username</Label>

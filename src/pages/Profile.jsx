@@ -117,6 +117,9 @@ const Profile = () => {
   const clearHistory = () => {
     setHistory([])
     localStorage.removeItem('aniraku-watch-history')
+    if (user) {
+      supabase.from('watch_history').delete().eq('user_id', user.id).then()
+    }
   }
 
   const importAniList = async () => {
@@ -225,6 +228,7 @@ const Profile = () => {
               <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
               <div className="profile-actions" style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button onClick={handleSave} disabled={saving} style={primaryBtn}>{saving ? 'Saving…' : 'Save Changes'}</button>
+                <Link to="/settings" style={ghostBtn}>Settings</Link>
                 <button onClick={handleSignOut} style={ghostBtn}>Sign Out</button>
               </div>
             </div>
@@ -394,7 +398,7 @@ const primaryBtn = {
 }
 const ghostBtn = {
   padding: '10px 24px', background: 'var(--bg-elevated)', color: 'var(--text-muted)', border: 'none', borderRadius: 8,
-  fontWeight: 600, fontSize: 14, cursor: 'pointer',
+  fontWeight: 600, fontSize: 14, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 }
 
 export default Profile

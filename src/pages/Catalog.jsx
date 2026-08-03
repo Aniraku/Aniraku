@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
+import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
@@ -124,7 +125,8 @@ export default function Catalog() {
 
   const pg = parseInt(sp.get('page') || '1', 10)
   const { data, isLoading, isFetching } = useBrowse(f, pg)
-  const media = data?.media || []
+  const { nsfwEnabled } = useNsfw()
+  const media = filterAdult(data?.media || [], nsfwEnabled)
   const total = data?.pageInfo?.total || 0
   const last = data?.pageInfo?.lastPage || 1
 

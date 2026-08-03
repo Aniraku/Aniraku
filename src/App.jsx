@@ -50,6 +50,7 @@ const Terms = lazy(() => import("./pages/Terms"))
 const AnimeDetail = lazy(() => import("./pages/AnimeDetail"))
 const Auth = lazy(() => import("./pages/Auth"))
 const Profile = lazy(() => import("./pages/Profile"))
+const Settings = lazy(() => import("./pages/Settings"))
 const Catalog = lazy(() => import("./pages/Catalog"))
 const Schedule = lazy(() => import("./pages/Schedule"))
 const Admin = lazy(() => import("./pages/Admin"))
@@ -96,6 +97,7 @@ const App = () => {
             <Route path="/login" element={<Suspense fallback={<Skeleton />}><Auth mode="login" /></Suspense>} />
             <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
             <Route path="/profile" element={<Suspense fallback={<Skeleton />}><Profile /></Suspense>} />
+            <Route path="/settings" element={<Suspense fallback={<Skeleton />}><Settings /></Suspense>} />
             <Route path="/admin" element={<Suspense fallback={<Skeleton />}><Admin /></Suspense>} />
             {/* Redirect aliases for sidebar nav */}
             <Route path="/top-airing" element={<Navigate to="/catalog?status=RELEASING" replace />} />

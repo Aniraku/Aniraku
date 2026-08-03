@@ -6,7 +6,7 @@ import styled from 'styled-components'
 const Bar = styled.nav`
   display: none;
   position: fixed;
-  bottom: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0));
   left: 50%;
   transform: translateX(-50%);
   background: rgba(20, 20, 20, 0.92);
@@ -51,6 +51,15 @@ const Item = styled.button`
   span {
     font-size: 9px;
     font-weight: 500;
+  }
+
+  @media (max-width: 420px) {
+    padding: 8px 9px;
+    min-width: 44px;
+  }
+
+  @media (max-width: 360px) {
+    padding: 8px 7px;
   }
 `
 

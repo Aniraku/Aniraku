@@ -6,8 +6,10 @@ import { FaStepForward, FaStepBackward, FaSearch } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
+import Comments from '../components/Comments/Comments'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useNsfw } from '../hooks/useNsfw'
 import { setWatchSEO } from '../lib/seo'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 
@@ -273,6 +275,7 @@ export default function Watch() {
   const { slugId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { nsfwEnabled } = useNsfw()
 
   const artRef = useRef(null)
   const artInstance = useRef(null)
@@ -616,6 +619,19 @@ export default function Watch() {
       }
     })
 
+    // Lock page scroll while fullscreen so the page never scrolls behind the
+    // video (also covers iOS native fullscreen, which re-scrolls on exit).
+    let scrollY = 0
+    art.on('fullscreen', (state) => {
+      if (state) {
+        scrollY = window.scrollY
+        document.documentElement.classList.add('body-hidden')
+      } else {
+        document.documentElement.classList.remove('body-hidden')
+        window.scrollTo({ top: scrollY, left: 0 })
+      }
+    })
+
     // Save watch history
     let lastSave = 0
     art.on('video:timeupdate', () => {
@@ -900,32 +916,27 @@ export default function Watch() {
     )
   }
 
-  if (anime?.isAdult) {
-    try {
-      const nsfwConfirmed = JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(animeId)]
-      if (!nsfwConfirmed) {
-        return (
-          <>
-                <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-              <div style={{
-                textAlign: 'center', padding: 40, maxWidth: 400,
-                background: 'var(--bg-elevated)', borderRadius: 16, border: '1px solid var(--border)',
-              }}>
-                <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
-                <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Age-Restricted Content</p>
-                <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
-                  This anime contains adult content. Confirm your age on the details page first.
-                </p>
-                <Link to={`/anime/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}`} style={{
-                  background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10,
-                  padding: '10px 24px', fontSize: 14, fontWeight: 600, textDecoration: 'none',
-                }}>Go to Details</Link>
-              </div>
-            </div>
-          </>
-        )
-      }
-    } catch {}
+  if (anime?.isAdult && !nsfwEnabled) {
+    return (
+      <>
+        <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+          <div style={{
+            textAlign: 'center', padding: 40, maxWidth: 400,
+            background: 'var(--bg-elevated)', borderRadius: 16, border: '1px solid var(--border)',
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
+            <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Mature Content</p>
+            <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
+              This anime contains adult content. Enable NSFW content in your settings to view it.
+            </p>
+            <Link to="/settings" style={{
+              background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 10,
+              padding: '10px 24px', fontSize: 14, fontWeight: 600, textDecoration: 'none',
+            }}>Open Settings</Link>
+          </div>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -1281,6 +1292,12 @@ export default function Watch() {
           .watch-source-btn { padding: 10px 18px !important; }
         }
       `}</style>
+
+      {anime && episode && (
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 20px 48px' }}>
+          <Comments animeId={anime.id} episodeNumber={episode} />
+        </div>
+      )}
     </main>
     </div>
   )

@@ -8,6 +8,7 @@ import Trending from '../components/Trending/Trending'
 import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
 import { useAiring, useMovies, useSeries } from '../hooks/useAnime'
+import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
@@ -150,6 +151,98 @@ const QuickLink = styled(Link)`
   }
 `
 
+const GuestBanner = styled.section`
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2.5rem 1rem;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 1.75rem 1rem;
+  }
+`
+
+const GuestCopy = styled.div`
+  h1 {
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+  p {
+    color: var(--text-secondary);
+    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+    line-height: 1.6;
+    max-width: 46ch;
+  }
+`
+
+const GuestCTA = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1.5rem;
+`
+
+const GuestCtaLink = styled(Link)`
+  padding: 12px 22px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  &:active { transform: scale(0.97); }
+
+  &.primary {
+    background: var(--accent);
+    color: #000;
+    &:hover { background: var(--accent-dim); }
+  }
+  &.ghost {
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    &:hover { border-color: var(--border-hover); background: var(--bg-elevated); }
+  }
+`
+
+const FeatureGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+`
+
+const Feature = styled.div`
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  p {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+`
+
 const skeletonRow = Array.from({ length: 6 }, (_, i) => i)
 
 const Home = () => {
@@ -163,6 +256,7 @@ const Home = () => {
   const { data: topTV = [], isFetched: tvDone } = useSeries()
 
   const { user } = useAuth()
+  const { nsfwEnabled } = useNsfw()
 
   // Set homepage SEO metadata on mount
   React.useEffect(() => {
@@ -215,6 +309,39 @@ const Home = () => {
     <>
       <main>
       <Hero />
+
+      {!user && (
+        <GuestBanner>
+          <GuestCopy>
+            <h1>Watch anime free, in HD.</h1>
+            <p>
+              Sub or dub, subtitles, multiple servers — no ads and no account
+              needed to start watching. Sign in to sync your history and
+              bookmarks across every device.
+            </p>
+            <GuestCTA>
+              <GuestCtaLink className="primary" to="/catalog"><FaPlay size={12} /> Start Watching</GuestCtaLink>
+              <GuestCtaLink className="ghost" to="/login">Log In</GuestCtaLink>
+              <GuestCtaLink className="ghost" to="/signup">Create Account</GuestCtaLink>
+            </GuestCTA>
+          </GuestCopy>
+          <FeatureGrid>
+            <Feature>
+              <h3><FaPlay size={12} /> No ads</h3>
+              <p>Watch uninterrupted with no trackers or ad breaks.</p>
+            </Feature>
+            <Feature>
+              <h3><FaTv size={12} /> Sub &amp; dub</h3>
+              <p>Switch languages and quality without leaving the player.</p>
+            </Feature>
+            <Feature>
+              <h3><FaStar size={12} /> Syncs everywhere</h3>
+              <p>History, bookmarks and progress follow your account.</p>
+            </Feature>
+          </FeatureGrid>
+        </GuestBanner>
+      )}
+
       <ContinueWatching />
 
       <QuickLinks>
@@ -232,7 +359,7 @@ const Home = () => {
           <Link to="/catalog?status=RELEASING">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {airingDone ? airing.slice(0, 15).map(item => (
+          {airingDone ? filterAdult(airing, nsfwEnabled).slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-air-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
@@ -250,7 +377,7 @@ const Home = () => {
           <Link to="/catalog?format=MOVIE&sort=SCORE_DESC">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {moviesDone ? movies.slice(0, 15).map(item => (
+          {moviesDone ? filterAdult(movies, nsfwEnabled).slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-mov-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
@@ -268,7 +395,7 @@ const Home = () => {
           <Link to="/catalog?format=TV&sort=SCORE_DESC">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {tvDone ? topTV.slice(0, 15).map(item => (
+          {tvDone ? filterAdult(topTV, nsfwEnabled).slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-tv-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>

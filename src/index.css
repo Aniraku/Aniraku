@@ -1,4 +1,5 @@
 :root {
+  /* Colors */
   --bg: #000;
   --bg-secondary: #0a0a0a;
   --bg-card: #111;
@@ -12,19 +13,67 @@
   --accent-dim: #cbd5e1;
   --accent-glow: rgba(226, 232, 240, 0.15);
   --danger: #e50914;
+  --success: #22c55e;
+  --warning: #eab308;
+
+  /* Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-full: 9999px;
+
+  /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+
+  /* Motion */
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 350ms ease;
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
   --font-body: 'Rubik', sans-serif;
   --font-brand: 'Agbalumo', cursive;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-overlay: 500;
+  --z-nav: 900;
+  --z-modal: 1000;
+  --z-toast: 1100;
+
+  /* Focus ring */
+  --ring-color: var(--accent);
+  --ring-width: 2px;
+  --ring-offset: 2px;
+
   --header-h: 64px;
 }
 
@@ -61,6 +110,36 @@ ul { list-style: none; }
 a { text-decoration: none; color: inherit; }
 button, input { border: none; font-family: inherit; }
 img { display: block; max-width: 100%; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-body);
+  font-weight: var(--weight-semibold);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+}
+
+:focus-visible {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+}
+input:focus, textarea:focus, select:focus, button:focus-visible {
+  outline: var(--ring-width) solid var(--ring-color);
+  outline-offset: var(--ring-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 .body-hidden {
   width: 100%;
@@ -283,10 +362,18 @@ img { display: block; max-width: 100%; }
   height: 70px;
 }
 
-/* Android / Mobile fixes */
+/* iOS safe areas — single source of truth. The fixed header/nav own their
+   own insets; body only needs side/bottom insets so content never sits
+   under the notch or home indicator. */
 @supports (padding: env(safe-area-inset-bottom)) {
-  body { padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-  .bottom-nav-spacer { height: calc(70px + env(safe-area-inset-bottom)); }
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-nav-spacer {
+    height: calc(70px + env(safe-area-inset-bottom));
+  }
 }
 
 /* Extra small screens (< 360px) */
@@ -374,20 +461,11 @@ video {
   html { font-size: 13px; }
 }
 
-/* --- Touch targets: minimum 48x48px on touch devices --- */
+/* --- Touch targets: minimum 44x44px on touch devices --- */
 @media (hover: none) and (pointer: coarse) {
   a, button, [role="button"], input[type="checkbox"], input[type="radio"] {
     min-height: 44px;
     min-width: 44px;
-  }
-}
-
-/* --- Safe area for notch devices (iPhone X+) --- */
-@supports (padding: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
   }
 }
 
@@ -509,12 +587,6 @@ video {
   }
 }
 
-/* --- Input focus ring accessibility --- */
-input:focus, textarea:focus, select:focus, button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /* --- Prevent text overflow on mobile --- */
 @media (max-width: 768px) {
   h1 { font-size: 1.5rem !important; }
@@ -556,21 +628,9 @@ input:focus, textarea:focus, select:focus, button:focus-visible {
   }
 }
 
-/* --- Touch-friendly tap targets --- */
-@media (max-width: 768px) {
-  button, a, [role="button"] {
-    min-height: 44px;
-  }
-}
-
-/* --- Safe area insets for iOS --- */
+/* --- Safe area insets for iOS (kept for the legacy .mobile-bottom-nav) --- */
 @supports (padding: env(safe-area-inset-bottom)) {
   .mobile-bottom-nav {
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
   }
-}
-
-/* --- Smooth scrolling --- */
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
 }

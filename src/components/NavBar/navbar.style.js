@@ -11,8 +11,8 @@ N.Nav = styled.nav`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: var(--header-h);
-  padding: 0 1.5rem;
+  height: calc(var(--header-h) + env(safe-area-inset-top, 0));
+  padding: env(safe-area-inset-top, 0) 1.5rem 0;
   background: ${({ isScrolled, isHome }) =>
     isHome
       ? isScrolled

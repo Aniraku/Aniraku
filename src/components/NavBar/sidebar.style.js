@@ -17,6 +17,7 @@ S.SideMenu = styled.div`
   gap: 0.5em;
   z-index: 300;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding-top: env(safe-area-inset-top, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
 
   @media only screen and (max-width: 768px) {

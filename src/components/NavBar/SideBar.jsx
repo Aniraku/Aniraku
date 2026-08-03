@@ -1,9 +1,9 @@
 import React from "react"
-import { FaAngleLeft, FaRandom } from "react-icons/fa"
+import { FaAngleLeft, FaRandom, FaCog, FaShieldAlt } from "react-icons/fa"
 import { Link, useNavigate } from "react-router-dom"
 import { S } from "./sidebar.style"
 
-const SideBar = ({ open, setOpen }) => {
+const SideBar = ({ open, setOpen, profile }) => {
   const navigate = useNavigate()
   const clickHandler = (e) => {
     setOpen(false)
@@ -20,6 +20,20 @@ const SideBar = ({ open, setOpen }) => {
           <FaRandom size={20} color="var(--accent)" />
           <p>Random</p>
         </S.SettingsItem>
+        <S.SettingsItem>
+          <Link to="/settings" onClick={() => setOpen(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em', color: 'var(--text-primary)', textDecoration: 'none' }}>
+            <FaCog size={20} color="var(--accent)" />
+            <p style={{ fontSize: 12 }}>Settings</p>
+          </Link>
+        </S.SettingsItem>
+        {profile?.role === 'admin' && (
+          <S.SettingsItem>
+            <Link to="/admin" onClick={() => setOpen(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em', color: 'var(--text-primary)', textDecoration: 'none' }}>
+              <FaShieldAlt size={20} color="var(--accent)" />
+              <p style={{ fontSize: 12 }}>Admin</p>
+            </Link>
+          </S.SettingsItem>
+        )}
       </S.SettingsIcon>
       <S.NavList>
         <S.Item>

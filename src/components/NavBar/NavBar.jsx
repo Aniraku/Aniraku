@@ -91,7 +91,7 @@ const NavBar = () => {
         <N.MenuBtn onClick={() => setOpen(true)}>
           <FaBars size={20} />
         </N.MenuBtn>
-        <SideBar open={open} setOpen={setOpen} />
+        <SideBar open={open} setOpen={setOpen} profile={profile} />
         <Logo to="/home" height={36} showText />
         <N.NavLinks>
           <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}>Home</N.NavLink>

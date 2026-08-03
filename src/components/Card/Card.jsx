@@ -36,6 +36,17 @@ const Card = ({ data }) => {
             {format && <C.Badge>{format}</C.Badge>}
           </C.Badges>
           {episodes && <C.EpBadge>Ep {episodes}</C.EpBadge>}
+          <C.Preview>
+            <C.PreviewMeta>
+              {format && <span>{format}</span>}
+              {episodes && <span>{episodes} eps</span>}
+              {score && <span>{score}%</span>}
+            </C.PreviewMeta>
+            <C.PreviewAction>
+              <FaPlay size={10} />
+              <span>Watch Now</span>
+            </C.PreviewAction>
+          </C.Preview>
         </C.Poster>
       </Link>
       <C.Details>

@@ -4,6 +4,7 @@ import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import "swiper/swiper-bundle.css";
 import { H } from "./hero.style";
 import { useTrendingAnime } from "../../hooks/useAnime";
+import { filterAdult, useNsfw } from "../../hooks/useNsfw";
 import { generateSlug } from "../../lib/slug";
 
 const SkeletonSlide = () => (
@@ -25,7 +26,8 @@ const SkeletonSlide = () => (
 
 const Hero = () => {
   const { data, isFetched } = useTrendingAnime();
-  const items = Array.isArray(data) ? data : [];
+  const { nsfwEnabled } = useNsfw();
+  const items = filterAdult(Array.isArray(data) ? data : [], nsfwEnabled);
 
   if (!isFetched) {
     return (

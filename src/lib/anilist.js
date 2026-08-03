@@ -60,7 +60,7 @@ export const TRENDING_QUERY = `
       media(type: ANIME, sort: TRENDING) {
         id title { romaji english userPreferred }
         coverImage { extraLarge large }
-        format episodes averageScore status
+        format episodes averageScore status isAdult
       }
     }
   }
@@ -85,7 +85,7 @@ export const RECOMMEND_QUERY = `
       media(genre_in: $genres, type: ANIME, sort: SCORE_DESC, id_not: $id) {
         id title { romaji english userPreferred }
         coverImage { extraLarge large medium color }
-        format episodes averageScore status genres
+        format episodes averageScore status genres isAdult
       }
     }
   }
@@ -97,7 +97,7 @@ export const SCHEDULE_QUERY = `
       media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
         id title { romaji english userPreferred }
         coverImage { large }
-        format
+        format isAdult
         airingSchedule(notYetAired: true, greaterThan: $weekStart, lessThan: $weekEnd) {
           nodes { episode airingAt timeUntilAiring }
         }

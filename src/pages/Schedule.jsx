@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
+import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import { Link } from 'react-router-dom'
 import Footer from '../components/Footer/Footer'
 import { setScheduleSEO } from '../lib/seo'
@@ -63,7 +64,8 @@ const Schedule = () => {
   }, [])
 
   const items = Array.isArray(data) ? data : []
-  const dayItems = items.filter(item => {
+  const { nsfwEnabled } = useNsfw()
+  const dayItems = filterAdult(items, nsfwEnabled).filter(item => {
     if (item.day !== activeDay) return false
     if (!searchQuery.trim()) return true
     const title = (item.title?.english || item.title?.romaji || '').toLowerCase()

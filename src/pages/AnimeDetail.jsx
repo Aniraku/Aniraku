@@ -2,8 +2,12 @@ import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { FaPlay, FaStar, FaBookmark, FaRegBookmark } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
+import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
+import { useAuth } from '../hooks/useAuth'
+import { useNsfw } from '../hooks/useNsfw'
+import { supabase } from '../lib/supabase'
 import { API_BASE } from '../config'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 import styled from 'styled-components'
@@ -464,16 +468,34 @@ const RecCard = ({ item }) => {
 const AnimeDetail = () => {
   const { slugId } = useParams()
   const id = extractIdFromSlug(slugId)
+  const { user } = useAuth()
+  const { nsfwEnabled } = useNsfw()
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [activeTab, setActiveTab] = useState('episodes')
   const [episodes, setEpisodes] = useState([])
-  const [nsfwConfirmed, setNsfwConfirmed] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')[String(id)] || false } catch { return false }
-  })
 
   const { data: anime, isLoading } = useAnimeDetails(id)
   const { data: similar } = useSimilar(id)
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
+
+  // Merge server-side bookmarks into local state when signed in, so a
+  // bookmark made on another device is visible here immediately.
+  React.useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    supabase.from('bookmarks').select('anime_id,title,image').eq('user_id', user.id)
+      .then(({ data }) => {
+        if (cancelled || !data?.length) return
+        setBookmarks(prev => {
+          const mapped = data.map(b => ({ id: b.anime_id, title: b.title, image: b.image }))
+          const ids = new Set(mapped.map(m => m.id))
+          const merged = [...mapped, ...prev.filter(p => !ids.has(p.id))]
+          return merged
+        })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [user, setBookmarks])
 
   const relations = React.useMemo(() => {
     if (!anime?.relations?.edges) return []
@@ -510,24 +532,28 @@ const AnimeDetail = () => {
     setActiveTab('episodes')
   }, [anime, id])
 
-  const confirmNsfw = () => {
-    setNsfwConfirmed(true)
-    try {
-      const raw = JSON.parse(localStorage.getItem('aniraku-nsfw-confirmed') || '{}')
-      raw[String(id)] = true
-      localStorage.setItem('aniraku-nsfw-confirmed', JSON.stringify(raw))
-    } catch {}
-  }
-
   const toggleBookmark = () => {
+    const numericId = parseInt(id)
     if (isBookmarked) {
-      setBookmarks(bookmarks.filter(b => b.id !== parseInt(id)))
+      setBookmarks(bookmarks.filter(b => b.id !== numericId))
+      if (user) {
+        supabase.from('bookmarks').delete().eq('user_id', user.id).eq('anime_id', numericId).then()
+      }
     } else if (anime) {
       setBookmarks([...bookmarks, {
-        id: parseInt(id),
+        id: numericId,
         title: anime.title?.english || anime.title?.romaji || 'Unknown',
         image: anime.coverImage?.large || '',
       }])
+      if (user) {
+        supabase.from('bookmarks').insert({
+          user_id: user.id,
+          anime_id: numericId,
+          title: anime.title?.english || anime.title?.romaji || 'Unknown',
+          image: anime.coverImage?.large || '',
+          added_at: Date.now(),
+        }).then()
+      }
     }
   }
 
@@ -548,19 +574,19 @@ const AnimeDetail = () => {
     </>
   )
 
-  if (anime.isAdult && !nsfwConfirmed) return (
+  if (anime.isAdult && !nsfwEnabled) return (
     <>
       <Center>
         <NsfwCard>
           <div style={{ fontSize: 48, marginBottom: 16 }}>18+</div>
           <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text)' }}>
-            Age-Restricted Content
+            Mature Content
           </p>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
-            This anime contains adult content. You must be at least 18 years old to view it.
+            This title contains adult content. Enable NSFW content in your settings to view it.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <NsfwBtn onClick={confirmNsfw}>I am 18+ — Continue</NsfwBtn>
+            <NsfwBtn as={Link} to="/settings">Open Settings</NsfwBtn>
             <OutlineLink to="/home">Go Back</OutlineLink>
           </div>
         </NsfwCard>
@@ -657,14 +683,16 @@ const AnimeDetail = () => {
           </Section>
         )}
 
-        {similar?.length > 0 && (
+        {filterAdult(similar, nsfwEnabled)?.length > 0 && (
           <Section>
             <SectionTitle>Similar Anime</SectionTitle>
             <Grid>
-              {similar.map(item => <RecCard key={item.id} item={item} />)}
+              {filterAdult(similar, nsfwEnabled).map(item => <RecCard key={item.id} item={item} />)}
             </Grid>
           </Section>
         )}
+
+        <Comments animeId={anime.id} />
       </Content>
       </main>
       <Footer />
