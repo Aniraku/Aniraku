@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { FaRandom, FaPlay, FaRedo } from 'react-icons/fa'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
-import MobileBottomNav from '../components/MobileBottomNav'
 import { generateSlug } from '../lib/slug'
 import styled from 'styled-components'
 
@@ -105,7 +104,6 @@ export default function Random() {
         )}
       </Container>
       <Footer />
-      <MobileBottomNav />
       <div className="bottom-nav-spacer" />
     </Page>
   )

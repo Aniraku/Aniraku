@@ -7,7 +7,6 @@ import ContinueWatching from '../components/ContinueWatching'
 import Trending from '../components/Trending/Trending'
 import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
-import MobileBottomNav from '../components/MobileBottomNav'
 import { useAiring, useMovies, useSeries } from '../hooks/useAnime'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
@@ -291,7 +290,6 @@ const Home = () => {
 
       </main>
       <Footer />
-      <MobileBottomNav />
       <div className="bottom-nav-spacer" />
       <style>{`@media(max-width:480px){.card-skeleton{width:130px!important}}`}</style>
     </>

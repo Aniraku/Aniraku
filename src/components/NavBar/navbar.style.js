@@ -28,8 +28,7 @@ N.Nav = styled.nav`
   gap: 1rem;
 
   @media (max-width: 768px) {
-    padding: 0 0.75rem;
-    height: 56px;
+    display: none;
   }
 `
 

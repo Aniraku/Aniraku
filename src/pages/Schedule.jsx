@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { Link } from 'react-router-dom'
 import Footer from '../components/Footer/Footer'
-import MobileBottomNav from '../components/MobileBottomNav'
 import { setScheduleSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
 import styled from 'styled-components'
@@ -116,7 +115,6 @@ const Schedule = () => {
         )}
       </Container>
       <Footer />
-      <MobileBottomNav />
       <div className="bottom-nav-spacer" />
     </Page>
   )

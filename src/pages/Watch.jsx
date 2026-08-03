@@ -299,6 +299,7 @@ export default function Watch() {
   const baseName = slugParts?.[1] || slugId || ''
   const epNumber = parseInt(slugParts?.[2] || '1', 10)
   const animeId = extractIdFromSlug(baseName)
+  const isMovie = anime?.format === 'MOVIE'
 
   const showToast = useCallback((msg, icon) => {
     setToast({ msg, icon })
@@ -467,6 +468,7 @@ export default function Watch() {
     if (artInstance.current) {
       artInstance.current.destroy(false)
       artInstance.current = null
+      if (artRef.current) artRef.current.__artplayer = null
     }
   }, [])
 
@@ -608,7 +610,7 @@ export default function Watch() {
 
     // Auto next episode
     art.on('video:ended', () => {
-      if (epNumber < episodes.length) {
+      if (!isMovie && epNumber < episodes.length) {
         const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
         navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
       }
@@ -649,6 +651,7 @@ export default function Watch() {
     })
 
     artInstance.current = art
+    if (artRef.current) artRef.current.__artplayer = art
   }, [animeId, anime?.id, epNumber, episodes, anime, navigate, destroyPlayer])
 
   const streamRetries = useRef({})
@@ -959,7 +962,7 @@ export default function Watch() {
             title="Embedded player"
           />
         ) : (
-          <div ref={artRef} style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
+          <div ref={artRef} data-aniraku-player style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
         )}
 
         {streamLoading && (
@@ -1070,6 +1073,7 @@ export default function Watch() {
       </div>
 
       {/* Episode sidebar toggle for mobile */}
+      {!isMovie && (
       <button onClick={() => setShowEpSidebar(p => !p)} className="watch-ep-toggle" style={{
         display: 'none', width: '100%', padding: '10px 14px', margin: '12px auto 0',
         maxWidth: 1200, background: 'var(--bg-elevated)', border: '1px solid var(--border)',
@@ -1079,6 +1083,7 @@ export default function Watch() {
         <span>Episodes ({episodes.length})</span>
         <span style={{ transform: showEpSidebar ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
       </button>
+      )}
 
       {/* Info + Episodes */}
       <div className="watch-info-section" style={{
@@ -1090,16 +1095,16 @@ export default function Watch() {
             {anime?.title?.english || anime?.title?.romaji || 'Loading...'}
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 6 }}>
-            Episode {epNumber} of {episodes.length || '?'} · {currentSource?.lang?.toUpperCase() || 'SUB'} via {currentSource?.label || 'Server 1'}
+            {isMovie ? 'Movie' : `Episode ${epNumber} of ${episodes.length || '?'}`} · {currentSource?.lang?.toUpperCase() || 'SUB'} via {currentSource?.label || 'Server 1'}
           </p>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-            {epNumber > 1 && (
+            {!isMovie && epNumber > 1 && (
               <Link to={`/watch/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}-episode-${epNumber - 1}`} style={navBtnStyle}>
                 <FaStepBackward size={12} /> Previous
               </Link>
             )}
-            {epNumber < episodes.length && (
+            {!isMovie && epNumber < episodes.length && (
               <Link to={`/watch/${generateSlug(anime?.title?.english || anime?.title?.romaji || '')}-${animeId}-episode-${epNumber + 1}`} style={navBtnStyle}>
                 Next <FaStepForward size={12} />
               </Link>
@@ -1142,6 +1147,7 @@ export default function Watch() {
         </div>
 
         {/* Episode sidebar */}
+        {!isMovie && (
         <div className="watch-episode-sidebar" style={{
           width: 340, flexShrink: 0, minWidth: 0, maxWidth: '100%',
           display: showEpSidebar ? 'block' : 'none',
@@ -1230,6 +1236,7 @@ export default function Watch() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       <Footer />

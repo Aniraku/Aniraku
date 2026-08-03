@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { AuthProvider } from "./hooks/useAuth"
+import NavBar from "./components/NavBar/NavBar"
+import MobileBottomNav from "./components/MobileBottomNav"
 import Error from "./pages/Error"
 import HomeSkeleton from "./components/Loader/HomeSkeleton"
 import Skeleton from "./components/Loader/Skeleton"
@@ -77,6 +79,8 @@ const App = () => {
       <AuthProvider>
         <ErrorBoundary>
           <ScrollToTop />
+          <NavBar />
+          <MobileBottomNav />
           <Routes>
             <Route path="/" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />
             <Route path="/home" element={<Suspense fallback={<HomeSkeleton />}><Home /></Suspense>} />

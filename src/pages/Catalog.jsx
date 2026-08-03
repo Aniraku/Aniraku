@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
-import MobileBottomNav from '../components/MobileBottomNav'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
 
@@ -249,7 +248,6 @@ export default function Catalog() {
       </div>
 
       <Footer />
-      <MobileBottomNav />
       <div className="bottom-nav-spacer" />
 
       <style>{`

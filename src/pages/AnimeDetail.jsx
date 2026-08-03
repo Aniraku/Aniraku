@@ -570,10 +570,11 @@ const AnimeDetail = () => {
 
   const title = anime.title?.english || anime.title?.romaji || 'Unknown'
   const desc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 500)
+  const isMovie = anime.format === 'MOVIE'
   const hasEpisodes = episodes.length > 0
   const hasRelations = relations.length > 0
   const tabs = []
-  if (hasEpisodes) tabs.push({ key: 'episodes', label: `Episodes (${episodes.length})` })
+  if (hasEpisodes && !isMovie) tabs.push({ key: 'episodes', label: `Episodes (${episodes.length})` })
   if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
 
   return (
@@ -589,7 +590,7 @@ const AnimeDetail = () => {
             <Meta>
               {anime.averageScore && <Score><FaStar /> {anime.averageScore}%</Score>}
               {anime.format && <span>{anime.format}</span>}
-              {anime.episodes && <span>{anime.episodes} episodes</span>}
+              {!isMovie && anime.episodes && <span>{anime.episodes} episodes</span>}
               {anime.status && <span>{anime.status}</span>}
             </Meta>
             <Actions>
