@@ -179,6 +179,12 @@ export default function Catalog() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // Focus search when arriving via the nav Search button (/catalog?search=)
+  useEffect(() => {
+    if (sp.get('search') === '') searchRef.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const hasActiveFilters = !!(f.search || f.format || f.status || f.genre || f.year)
 
 
