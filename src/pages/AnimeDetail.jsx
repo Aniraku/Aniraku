@@ -6,7 +6,7 @@ import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
 import { useAuth } from '../hooks/useAuth'
-import { filterAdult, isNsfw, useNsfw } from '../hooks/useNsfw'
+import { filterAdult, isNsfw, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import { API_BASE } from '../config'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
@@ -476,6 +476,7 @@ const AnimeDetail = () => {
 
   const { data: anime, isLoading } = useAnimeDetails(id)
   const { data: similar } = useSimilar(id)
+  const similarList = useStreamable(filterAdult(similar || [], nsfwEnabled))
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
   // Merge server-side bookmarks into local state when signed in, so a
@@ -683,11 +684,11 @@ const AnimeDetail = () => {
           </Section>
         )}
 
-        {filterAdult(similar, nsfwEnabled)?.length > 0 && (
+        {similarList?.length > 0 && (
           <Section>
             <SectionTitle>Similar Anime</SectionTitle>
             <Grid>
-              {filterAdult(similar, nsfwEnabled).map(item => <RecCard key={item.id} item={item} />)}
+              {similarList.map(item => <RecCard key={item.id} item={item} />)}
             </Grid>
           </Section>
         )}

@@ -8,7 +8,7 @@ import Trending from '../components/Trending/Trending'
 import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
 import { useAiring, useMovies, useSeries } from '../hooks/useAnime'
-import { filterAdult, useNsfw } from '../hooks/useNsfw'
+import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
@@ -257,6 +257,9 @@ const Home = () => {
 
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
+  const airingList = useStreamable(filterAdult(airing, nsfwEnabled))
+  const moviesList = useStreamable(filterAdult(movies, nsfwEnabled))
+  const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
 
   // Set homepage SEO metadata on mount
   React.useEffect(() => {
@@ -359,7 +362,7 @@ const Home = () => {
           <Link to="/catalog?status=RELEASING">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {airingDone ? filterAdult(airing, nsfwEnabled).slice(0, 15).map(item => (
+          {airingDone ? airingList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-air-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
@@ -377,7 +380,7 @@ const Home = () => {
           <Link to="/catalog?format=MOVIE&sort=SCORE_DESC">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {moviesDone ? filterAdult(movies, nsfwEnabled).slice(0, 15).map(item => (
+          {moviesDone ? moviesList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-mov-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
@@ -395,7 +398,7 @@ const Home = () => {
           <Link to="/catalog?format=TV&sort=SCORE_DESC">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {tvDone ? filterAdult(topTV, nsfwEnabled).slice(0, 15).map(item => (
+          {tvDone ? tvList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-tv-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
