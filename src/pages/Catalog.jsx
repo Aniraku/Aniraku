@@ -289,12 +289,15 @@ export default function Catalog() {
 
         @media (min-width: 640px) {
           .catalog-container { padding: 24px 24px 96px; }
-          .filter-bar { grid-template-columns: repeat(5, minmax(0,1fr)) auto; align-items: center; }
           .clear-filters { grid-column: auto; }
+        }
+        @media (min-width: 640px) and (max-width: 1023px) {
+          .filter-bar { grid-template-columns: repeat(3, minmax(0,1fr)); align-items: center; }
         }
         @media (min-width: 1024px) {
           .catalog-container { padding: 32px 32px 100px; }
           .catalog-title { font-size: 24px; }
+          .filter-bar { grid-template-columns: repeat(5, minmax(0,1fr)) auto; align-items: center; }
         }
 
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; transition: opacity .15s; }

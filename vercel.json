@@ -12,7 +12,8 @@
     { "source": "/og-image.png", "destination": "/og-image.png" },
     { "source": "/google0e4c03928112e656.html", "destination": "/google0e4c03928112e656.html" },
     { "source": "/icons/(.*)", "destination": "/icons/$1" },
-    { "source": "/((?!assets/|favicon\\.svg|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.svg|og-image\\.png|google0e4c03928112e656\\.html|icons/).*)", "destination": "/index.html" }
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/((?!assets/|favicon\\.svg|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.svg|og-image\\.png|google0e4c03928112e656\\.html|icons/|sw\\.js).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -90,6 +91,12 @@
       "source": "/favicon.svg",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
       ]
     }
   ],

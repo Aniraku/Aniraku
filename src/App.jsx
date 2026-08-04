@@ -16,28 +16,50 @@ class ErrorBoundary extends Component {
     return { hasError: true, error }
   }
 
-  reset = () => {
+  componentDidUpdate(prevProps) {
+    if (this.props.resetKey !== prevProps.resetKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null })
+    }
+  }
+
+  retry = () => {
     this.setState({ hasError: false, error: null })
+  }
+
+  home = () => {
     window.location.href = "/"
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "sans-serif", background: "#000", color: "#e2e8f0" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "sans-serif", background: "#000", color: "#e2e8f0", padding: "1rem", textAlign: "center" }}>
           <h2 style={{ marginBottom: "0.5rem" }}>Something went wrong</h2>
-          <p style={{ marginBottom: "1rem", color: "#8c8c8c" }}>{this.state.error?.message || "An unexpected error occurred."}</p>
-          <button
-            onClick={this.reset}
-            style={{ padding: "0.5rem 1.5rem", background: "var(--accent)", color: "#000", border: "none", borderRadius: "9999px", cursor: "pointer", fontSize: "1rem", fontWeight: 600 }}
-          >
-            Back to Home
-          </button>
+          <p style={{ marginBottom: "1rem", color: "var(--text-muted, #8c8c8c)" }}>{this.state.error?.message || "An unexpected error occurred."}</p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
+            <button
+              onClick={this.retry}
+              style={{ padding: "0.5rem 1.5rem", background: "var(--accent)", color: "#000", border: "none", borderRadius: "9999px", cursor: "pointer", fontSize: "1rem", fontWeight: 600 }}
+            >
+              Try again
+            </button>
+            <button
+              onClick={this.home}
+              style={{ padding: "0.5rem 1.5rem", background: "transparent", color: "var(--text-muted, #8c8c8c)", border: "1px solid var(--border, #333)", borderRadius: "9999px", cursor: "pointer", fontSize: "1rem" }}
+            >
+              Back to Home
+            </button>
+          </div>
         </div>
       )
     }
     return this.props.children
   }
+}
+
+const RouteBoundary = ({ children }) => {
+  const { pathname } = useLocation()
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
 }
 
 const Watch = lazy(() => import("./pages/Watch"))
@@ -86,8 +108,8 @@ const App = () => {
             <Route path="/home" element={<Home />} />
             <Route path="/catalog" element={<Suspense fallback={<Skeleton />}><Catalog /></Suspense>} />
             <Route path="/schedule" element={<Suspense fallback={<Skeleton />}><Schedule /></Suspense>} />
-            <Route path="/watch/:slugId" element={<Suspense fallback={<Skeleton />}><Watch /></Suspense>} />
-            <Route path="/anime/:slugId" element={<Suspense fallback={<Skeleton />}><AnimeDetail /></Suspense>} />
+            <Route path="/watch/:slugId" element={<RouteBoundary><Suspense fallback={<Skeleton />}><Watch /></Suspense></RouteBoundary>} />
+            <Route path="/anime/:slugId" element={<RouteBoundary><Suspense fallback={<Skeleton />}><AnimeDetail /></Suspense></RouteBoundary>} />
             <Route path="/dmca" element={<Suspense fallback={<Skeleton />}><Dmca /></Suspense>} />
             <Route path="/privacy" element={<Suspense fallback={<Skeleton />}><Privacy /></Suspense>} />
             <Route path="/license" element={<Suspense fallback={<Skeleton />}><License /></Suspense>} />

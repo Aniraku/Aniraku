@@ -1007,7 +1007,7 @@ export default function Watch() {
             title="Embedded player"
           />
         ) : (
-          <div ref={artRef} data-aniraku-player style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
+          <div ref={artRef} data-aniraku-player aria-label="Video player" role="region" style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
         )}
 
         {streamLoading && (

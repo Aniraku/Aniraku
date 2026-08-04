@@ -8,7 +8,7 @@
   --border-hover: #444;
   --text-primary: #e2e8f0;
   --text-secondary: #8c8c8c;
-  --text-muted: #555;
+  --text-muted: #808080;
   --accent: #e2e8f0;
   --accent-dim: #cbd5e1;
   --accent-glow: rgba(226, 232, 240, 0.15);
@@ -123,13 +123,20 @@ button {
   background: none;
 }
 
-:focus-visible {
+:focus-visible,
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
   outline: var(--ring-width) solid var(--ring-color);
   outline-offset: var(--ring-offset);
 }
 input:focus, textarea:focus, select:focus, button:focus-visible {
   outline: var(--ring-width) solid var(--ring-color);
   outline-offset: var(--ring-offset);
+}
+.artplayer-app :focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
