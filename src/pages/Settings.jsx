@@ -12,6 +12,10 @@ const Page = styled.div`
   background: var(--bg);
   color: var(--text-primary);
   padding: 40px 20px calc(40px + env(safe-area-inset-bottom, 0));
+
+  @media (max-width: 480px) {
+    padding: 24px 16px calc(32px + env(safe-area-inset-bottom, 0));
+  }
 `
 
 const Container = styled.div`
@@ -59,6 +63,10 @@ const Card = styled.section`
   border-radius: var(--radius-lg);
   padding: 20px;
   margin-bottom: 16px;
+
+  @media (max-width: 480px) {
+    padding: 16px;
+  }
 `
 
 const CardTitle = styled.h2`
@@ -75,9 +83,16 @@ const Row = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 `
 
 const RowLabel = styled.div`
+  min-width: 0;
   h3 {
     font-size: 15px;
     font-weight: 600;
@@ -98,6 +113,7 @@ const Switch = styled.button`
   flex: 0 0 auto;
   width: 52px;
   height: 30px;
+  min-height: 30px;
   border-radius: var(--radius-full);
   background: ${({ active }) => (active ? 'var(--accent)' : 'var(--border)')};
   transition: background var(--transition-fast);
@@ -108,7 +124,8 @@ const Switch = styled.button`
   &::after {
     content: '';
     position: absolute;
-    top: 3px;
+    top: 50%;
+    margin-top: -12px;
     left: ${({ active }) => (active ? '25px' : '3px')};
     width: 24px;
     height: 24px;
@@ -151,6 +168,10 @@ const DangerInput = styled.input`
   outline: none;
   box-sizing: border-box;
   &:focus { border-color: #ef4444; }
+
+  @media (max-width: 480px) {
+    max-width: 100%;
+  }
 `
 
 const DangerMsg = styled.p`
@@ -219,6 +240,7 @@ const Settings = () => {
           </Container>
         </Page>
         <Footer />
+        <div className="bottom-nav-spacer" />
       </>
     )
   }
@@ -254,14 +276,14 @@ const Settings = () => {
                 <h3>Profile</h3>
                 <p>Username, display name, avatar, bookmarks and watch history.</p>
               </RowLabel>
-              <button onClick={() => navigate('/profile')} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Open Profile</button>
+              <button onClick={() => navigate('/profile')} className="settings-row-btn" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Open Profile</button>
             </Row>
             <Row style={{ marginTop: 12 }}>
               <RowLabel>
                 <h3>Sign out</h3>
                 <p>End this session on this device.</p>
               </RowLabel>
-              <button onClick={handleSignOut} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={handleSignOut} className="settings-row-btn" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <FaSignOutAlt size={13} /> Sign Out
               </button>
             </Row>
@@ -277,7 +299,7 @@ const Settings = () => {
               {!confirmArmed ? (
                 <DangerBtn onClick={() => setConfirmArmed(true)}><FaTrash size={13} /> Delete Account</DangerBtn>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                <div className="settings-confirm" style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                   <DangerInput
                     type="text"
                     placeholder='Type "DELETE" to confirm'
@@ -295,9 +317,16 @@ const Settings = () => {
           </Card>
         </Container>
       </Page>
-      <Footer />
-    </>
-  )
+        <Footer />
+        <div className="bottom-nav-spacer" />
+        <style>{`
+          @media (max-width: 480px) {
+            .settings-row-btn { width: 100% !important; justify-content: center; }
+            .settings-confirm { width: 100% !important; align-items: stretch !important; }
+          }
+        `}</style>
+      </>
+    )
 }
 
 export default Settings

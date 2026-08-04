@@ -280,6 +280,7 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
+  const touchSeekTimer = useRef(null)
 
   const [anime, setAnime] = useState(null)
   const [episodes, setEpisodes] = useState([])
@@ -295,6 +296,7 @@ export default function Watch() {
   const [resumePos, setResumePos] = useState(null)
   const [resumeCountdown, setResumeCountdown] = useState(0)
   const [showEpSidebar, setShowEpSidebar] = useState(true)
+  const [touchSeekVisible, setTouchSeekVisible] = useState(false)
 
   const slugParts = slugId?.match(/^(.+)-episode-(\d+)$/)
   const baseName = slugParts?.[1] || slugId || ''
@@ -857,6 +859,12 @@ export default function Watch() {
     if (!container) return
 
     const onTouchStart = (e) => {
+      if (e.target.closest && e.target.closest('.watch-touch-seek')) return
+
+      setTouchSeekVisible(true)
+      clearTimeout(touchSeekTimer.current)
+      touchSeekTimer.current = setTimeout(() => setTouchSeekVisible(false), 3000)
+
       const touch = e.touches[0]
       const rect = container.getBoundingClientRect()
       const x = touch.clientX - rect.left
@@ -926,6 +934,7 @@ export default function Watch() {
     return () => {
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
+      clearTimeout(touchSeekTimer.current)
     }
   }, [showToast])
 
@@ -996,6 +1005,7 @@ export default function Watch() {
       <div ref={playerContainerRef} className="watch-player-wrapper" style={{
         maxWidth: theaterMode ? '100%' : 1200,
         margin: '0 auto', background: '#000',
+        position: 'relative',
         transition: 'max-width 0.3s ease',
       }}>
         {embedUrl ? (
@@ -1007,7 +1017,43 @@ export default function Watch() {
             title="Embedded player"
           />
         ) : (
-          <div ref={artRef} data-aniraku-player aria-label="Video player" role="region" style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
+          <>
+            <div ref={artRef} data-aniraku-player aria-label="Video player" role="region" style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
+
+            {/* Touch seek buttons */}
+            <div className={touchSeekVisible ? 'watch-touch-seek visible' : 'watch-touch-seek'}>
+              <button
+                className="watch-touch-seek-btn watch-touch-seek-back"
+                aria-label="Rewind 10 seconds"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  const art = artInstance.current
+                  if (art) {
+                    art.video.currentTime = Math.max(0, art.video.currentTime - 10)
+                    showToast('−10s')
+                  }
+                }}
+              >
+                <FaStepBackward size={20} />
+              </button>
+              <button
+                className="watch-touch-seek-btn watch-touch-seek-fwd"
+                aria-label="Forward 10 seconds"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  const art = artInstance.current
+                  if (art) {
+                    art.video.currentTime = Math.min(art.video.duration || Infinity, art.video.currentTime + 10)
+                    showToast('+10s')
+                  }
+                }}
+              >
+                <FaStepForward size={20} />
+              </button>
+            </div>
+          </>
         )}
 
         {streamLoading && (
@@ -1299,6 +1345,44 @@ export default function Watch() {
         .art-settings .art-settings-build { max-height: 50vh; overflow-y: auto; }
         .art-video-player { border-radius: 0; }
         .art-subtitle-wrap span { line-height: 1.4 !important; }
+
+        /* Touch seek buttons */
+        .watch-touch-seek {
+          display: none;
+          position: absolute;
+          inset: 0;
+          z-index: 10;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+        .watch-touch-seek.visible { opacity: 1; }
+        .watch-touch-seek.visible .watch-touch-seek-btn { pointer-events: auto; }
+        .watch-touch-seek-btn {
+          pointer-events: none;
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          background: rgba(0,0,0,0.55);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255,255,255,0.15);
+          color: var(--accent);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          touch-action: manipulation;
+        }
+        .watch-touch-seek-back { left: 12px; }
+        .watch-touch-seek-fwd { right: 12px; }
+
+        @media (hover: none) and (pointer: coarse) {
+          .watch-touch-seek { display: flex; }
+        }
 
         @media (max-width: 768px) {
           .watch-player-wrapper { max-width: 100% !important; }

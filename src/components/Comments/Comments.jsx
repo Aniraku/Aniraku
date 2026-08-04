@@ -5,6 +5,17 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import styled from 'styled-components'
 
+const cleanContent = (raw) => {
+  const out = []
+  for (const ch of raw) {
+    const code = ch.codePointAt(0)
+    if (code >= 0xD800 && code <= 0xDFFF) continue
+    out.push(ch)
+    if (out.length >= 2000) break
+  }
+  return out.join('')
+}
+
 const Wrapper = styled.section`
   margin-top: 40px;
 `
@@ -56,6 +67,12 @@ const ComposerName = styled.span`
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
+`
+
+const ErrorMsg = styled.p`
+  color: #ef4444;
+  font-size: 13px;
+  margin: 0;
 `
 
 const Textarea = styled.textarea`
@@ -236,6 +253,8 @@ const Comments = ({ animeId, episodeNumber, label }) => {
 
   useEffect(() => { load() }, [load])
 
+  const [postError, setPostError] = useState('')
+
   const nameOf = (uid) => {
     const p = profiles[uid]
     return p?.display_name || p?.username || 'Anonymous'
@@ -258,13 +277,14 @@ const Comments = ({ animeId, episodeNumber, label }) => {
         user_id: user.id,
         anime_id: animeId,
         episode_number: episodeNumber || null,
-        content: text.slice(0, 2000),
+        content: cleanContent(text),
         parent_id: null,
       })
       .select()
       .single()
     setBusy(false)
-    if (error) { console.error('Comment post:', error); return }
+    if (error) { console.error('Comment post:', error); setPostError('Could not post your comment. Please try again.'); return }
+    setPostError('')
     setComments(prev => [...prev, data])
     setProfiles(prev => ({
       ...prev,
@@ -287,13 +307,14 @@ const Comments = ({ animeId, episodeNumber, label }) => {
         user_id: user.id,
         anime_id: animeId,
         episode_number: episodeNumber || null,
-        content: text.slice(0, 2000),
+        content: cleanContent(text),
         parent_id: parentId,
       })
       .select()
       .single()
     setBusy(false)
-    if (error) { console.error('Reply post:', error); return }
+    if (error) { console.error('Reply post:', error); setPostError('Could not post your reply. Please try again.'); return }
+    setPostError('')
     setComments(prev => [...prev, data])
     setProfiles(prev => ({
       ...prev,
@@ -360,7 +381,7 @@ const Comments = ({ animeId, episodeNumber, label }) => {
             <Textarea
               placeholder={`Reply to ${nameOf(c.user_id)}…`}
               value={replyText}
-              onChange={e => setReplyText(e.target.value)}
+              onChange={e => { setReplyText(e.target.value); setPostError('') }}
               rows={2}
             />
             <PostBtn $disabled={busy || !replyText.trim()} onClick={() => submitReply(c.id)}>Post</PostBtn>
@@ -387,11 +408,12 @@ const Comments = ({ animeId, episodeNumber, label }) => {
               <Textarea
                 placeholder="Share your thoughts…"
                 value={content}
-                onChange={e => setContent(e.target.value)}
+                onChange={e => { setContent(e.target.value); setPostError('') }}
                 maxLength={2000}
               />
               <PostBtn type="submit" $disabled={busy || !content.trim()}>Post</PostBtn>
             </form>
+            {postError && <ErrorMsg>{postError}</ErrorMsg>}
           </div>
         </Composer>
       ) : (
