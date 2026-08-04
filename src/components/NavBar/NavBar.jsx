@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { FaBars, FaBell, FaSearch, FaRandom } from 'react-icons/fa'
 import { N } from './navbar.style'
 import SideBar from './SideBar'
@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { avatarUrl, defaultAvatar } from '../../lib/avatars'
 import { supabase } from '../../lib/supabase'
 import { generateSlug } from '../../lib/slug'
+import { API_BASE } from '../../config'
 
 const NavBar = () => {
   const [open, setOpen] = useState(false)
@@ -41,19 +42,40 @@ const NavBar = () => {
     if (!user) return
     const fetchNotifs = async () => {
       try {
-        const { data, error } = await supabase.from('notifications')
-          .select('id, type, message, anime_id, created_at, read')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20)
-        if (error) return
-        setNotifications(data || [])
-      } catch {}
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+
+        const res = await fetch(`${API_BASE}/api/v1/notifications`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setNotifications(data || [])
+        }
+      } catch (err) {
+        console.error('[NavBar] fetchNotifs error:', err)
+      }
     }
     fetchNotifs()
     const interval = setInterval(fetchNotifs, 30000)
     return () => clearInterval(interval)
   }, [user])
+
+  const markRead = async (id) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      await fetch(`${API_BASE}/api/v1/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    } catch {}
+  }
 
   useEffect(() => {
     const handler = (e) => {
@@ -123,8 +145,12 @@ const NavBar = () => {
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: 14, fontWeight: 600 }}>Notifications</div>
                 {notifications.length === 0 ? (
                   <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No notifications yet</div>
-                ) : notifications.map(n => (
-                  <div key={n.id} onClick={() => { setShowNotifs(false); if (n.anime_id) navigate(`/anime/${n.anime_id}`) }} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: n.read ? 'transparent' : 'rgba(var(--accent-rgb, 226,232,240), 0.05)', fontSize: 13, color: 'var(--text-primary)' }}>
+                    ) : notifications.map(n => (
+                  <div key={n.id} onClick={() => { 
+                    setShowNotifs(false); 
+                    if (!n.read) markRead(n.id);
+                    if (n.anime_id) navigate(`/anime/${n.anime_id}`);
+                  }} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: n.read ? 'transparent' : 'rgba(var(--accent-rgb, 226,232,240), 0.05)', fontSize: 13, color: 'var(--text-primary)' }}>
                     <p style={{ margin: 0 }}>{n.message}</p>
                     <p style={{ margin: 0, marginTop: 4, fontSize: 11, color: 'var(--text-muted)' }}>{n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}</p>
                   </div>
