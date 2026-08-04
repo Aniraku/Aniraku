@@ -1,11 +1,13 @@
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
+import Card from '../components/Card/Card'
+import { FaChevronDown, FaTimes, FaSliders, FaX } from 'react-icons/fa'
 
 const PER_PAGE = 24
 const SEARCH_DEBOUNCE_MS = 400
