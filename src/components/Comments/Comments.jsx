@@ -31,6 +31,27 @@ const Avatar = styled.img`
   flex-shrink: 0;
 `
 
+const InitialAvatar = styled.div`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+  text-transform: uppercase;
+`
+
+const ComposerName = styled.span`
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+`
+
 const Textarea = styled.textarea`
   flex: 1;
   background: var(--bg-elevated);
@@ -160,6 +181,7 @@ const Comments = ({ animeId, episodeNumber }) => {
   const { user } = useAuth()
   const [comments, setComments] = useState([])
   const [profiles, setProfiles] = useState({})
+  const [myProfile, setMyProfile] = useState(null)
   const [likedIds, setLikedIds] = useState(new Set())
   const [content, setContent] = useState('')
   const [replyTo, setReplyTo] = useState(null)
@@ -191,6 +213,12 @@ const Comments = ({ animeId, episodeNumber }) => {
     }
 
     if (user) {
+      const { data: me } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (me) setMyProfile(me)
       const { data: likes } = await supabase
         .from('comment_likes')
         .select('comment_id')
@@ -208,6 +236,10 @@ const Comments = ({ animeId, episodeNumber }) => {
   }
 
   const avatarOf = (uid) => profiles[uid]?.avatar_url || null
+
+  const AvatarBlock = ({ url, name }) => url
+    ? <Avatar src={url} alt="" />
+    : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
   const submit = async (e) => {
     e.preventDefault()
@@ -230,7 +262,11 @@ const Comments = ({ animeId, episodeNumber }) => {
     setComments(prev => [...prev, data])
     setProfiles(prev => ({
       ...prev,
-      [user.id]: prev[user.id] || { username: user.user_metadata?.username, display_name: null, avatar_url: null },
+      [user.id]: prev[user.id] || {
+        username: myProfile?.username || user.user_metadata?.username,
+        display_name: myProfile?.display_name || null,
+        avatar_url: myProfile?.avatar_url || null,
+      },
     }))
     setContent('')
   }
@@ -255,7 +291,11 @@ const Comments = ({ animeId, episodeNumber }) => {
     setComments(prev => [...prev, data])
     setProfiles(prev => ({
       ...prev,
-      [user.id]: prev[user.id] || { username: user.user_metadata?.username, display_name: null, avatar_url: null },
+      [user.id]: prev[user.id] || {
+        username: myProfile?.username || user.user_metadata?.username,
+        display_name: myProfile?.display_name || null,
+        avatar_url: myProfile?.avatar_url || null,
+      },
     }))
     setReplyTo(null)
     setReplyText('')
@@ -288,9 +328,7 @@ const Comments = ({ animeId, episodeNumber }) => {
     return (
       <Mine key={c.id}>
         <ItemHead>
-          {avatarOf(c.user_id)
-            ? <Avatar src={avatarOf(c.user_id)} alt="" />
-            : <Avatar alt="" />}
+          <AvatarBlock url={avatarOf(c.user_id)} name={nameOf(c.user_id)} />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <ItemName to="/profile">{nameOf(c.user_id)}</ItemName>
             <ItemTime>{timeAgo(c.created_at)}</ItemTime>
@@ -332,18 +370,22 @@ const Comments = ({ animeId, episodeNumber }) => {
 
       {user ? (
         <Composer>
-          {user.user_metadata?.avatar_url
-            ? <Avatar src={user.user_metadata.avatar_url} alt="" />
-            : <Avatar alt="" />}
-          <form style={{ flex: 1, display: 'flex', gap: 10, alignItems: 'flex-start' }} onSubmit={submit}>
-            <Textarea
-              placeholder="Share your thoughts…"
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              maxLength={2000}
-            />
-            <PostBtn type="submit" $disabled={busy || !content.trim()}>Post</PostBtn>
-          </form>
+          <AvatarBlock
+            url={myProfile?.avatar_url}
+            name={myProfile?.display_name || myProfile?.username || user.email || 'You'}
+          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <ComposerName>{myProfile?.display_name || myProfile?.username || user.email}</ComposerName>
+            <form style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }} onSubmit={submit}>
+              <Textarea
+                placeholder="Share your thoughts…"
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                maxLength={2000}
+              />
+              <PostBtn type="submit" $disabled={busy || !content.trim()}>Post</PostBtn>
+            </form>
+          </div>
         </Composer>
       ) : (
         <GuestBox>
