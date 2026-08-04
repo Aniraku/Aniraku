@@ -72,7 +72,12 @@ function escapeXml(s) {
 }
 
 function urlEntry(loc, lastmod, freq, priority) {
-  return `  <url><loc>${SITE}${escapeXml(loc)}</loc><lastmod>${lastmod}</lastmod><changefreq>${freq}</changefreq><priority>${priority}</priority></url>`
+  return `  <url>
+    <loc>${SITE}${escapeXml(loc)}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>${freq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`
 }
 
 function writeSitemap(filePath, urls) {
@@ -247,7 +252,10 @@ if (!backendReady) {
     { loc: '/sitemaps/genres.xml', lastmod: today },
   ]
   const indexChildren = childIndexes.map(c =>
-    `  <sitemap><loc>${SITE}${c.loc}</loc><lastmod>${c.lastmod}</lastmod></sitemap>`
+    `  <sitemap>
+    <loc>${SITE}${c.loc}</loc>
+    <lastmod>${c.lastmod}</lastmod>
+  </sitemap>`
   )
   writeSitemapIndex(path.join(OUT_DIR, 'sitemap.xml'), indexChildren)
   console.log(`  sitemap.xml (index) — ${childIndexes.length} children`)
@@ -305,7 +313,10 @@ for (let i = 0; i < chunks.length; i++) {
 
 // Write sitemap index
 const indexChildren = childIndexes.map(c =>
-  `  <sitemap><loc>${SITE}${c.loc}</loc><lastmod>${c.lastmod}</lastmod></sitemap>`
+  `  <sitemap>
+    <loc>${SITE}${c.loc}</loc>
+    <lastmod>${c.lastmod}</lastmod>
+  </sitemap>`
 )
 writeSitemapIndex(path.join(OUT_DIR, 'sitemap.xml'), indexChildren)
 console.log(`  sitemap.xml (index) — ${childIndexes.length} children`)
