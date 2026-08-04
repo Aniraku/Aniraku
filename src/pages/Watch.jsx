@@ -13,8 +13,6 @@ import { extractIdFromSlug, generateSlug } from '../lib/slug'
 
 const EPISODES_PER_PAGE = 50
 
-let toastTimer = null
-
 function formatAiringDate(unixTimestamp) {
   if (!unixTimestamp) return ''
   const date = new Date(unixTimestamp * 1000)
@@ -64,6 +62,7 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
 
       const tag = e.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (tag === 'BUTTON' || tag === 'A' || e.target.isContentEditable) return
 
       const key = e.code
       const ctrl = e.ctrlKey || e.metaKey
@@ -162,7 +161,7 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
                 showToast('Subtitles Off')
               } else {
                 art.subtitle = {
-                  url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(sub.url)}`,
+                  url: sub.url,
                   type: 'srt',
                 }
                 showToast(`Subtitles: ${sub.label || 'Track ' + nextIdx}`)
@@ -281,6 +280,11 @@ export default function Watch() {
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
   const touchSeekTimer = useRef(null)
+  const buildIdRef = useRef(0)
+  const mountedRef = useRef(true)
+  const requestSeqRef = useRef(0)
+  const pendingRequestRef = useRef(null)
+  const toastTimerRef = useRef(null)
 
   const [anime, setAnime] = useState(null)
   const [episodes, setEpisodes] = useState([])
@@ -303,6 +307,13 @@ export default function Watch() {
   const epNumber = parseInt(slugParts?.[2] || '1', 10)
   const animeId = extractIdFromSlug(baseName)
   const isMovie = anime?.format === 'MOVIE'
+
+  const routeRef = useRef(slugId)
+  routeRef.current = slugId
+  const epNumberRef = useRef(epNumber)
+  epNumberRef.current = epNumber
+  const episodesRef = useRef(episodes)
+  episodesRef.current = episodes
 
   const showToast = useCallback((msg, icon) => {
     setToast({ msg, icon })
@@ -588,6 +599,17 @@ export default function Watch() {
 
           let recoveryAttempts = 0
           const maxRecoveryAttempts = 5
+          let triedDirect = false
+
+          const tryDirectPlayback = () => {
+            if (triedDirect) return
+            triedDirect = true
+            // Try to load the original URL directly (bypass proxy)
+            const directUrl = url.replace(`${PROXY_BASE}/proxy?url=`, '')
+            const decodedUrl = decodeURIComponent(directUrl.split('&headers=')[0])
+            console.log('[Watch] Proxy failed, trying direct playback:', decodedUrl)
+            hls.loadSource(decodedUrl)
+          }
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (!data.fatal) return
@@ -613,6 +635,12 @@ export default function Watch() {
             }
           })
 
+          hls.on(Hls.Events.MANIFEST_LOAD_ERROR, () => {
+            if (!triedDirect) {
+              tryDirectPlayback()
+            }
+          })
+
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play().catch(() => {})
           })
@@ -626,8 +654,10 @@ export default function Watch() {
     }
 
     if (subtitles && subtitles.length > 0 && subtitles[0].url) {
+      const subtitleUrl = subtitles[0].url
+      const proxiedSubtitleUrl = `${PROXY_BASE}/proxy?url=${encodeURIComponent(subtitleUrl)}${headersParam}`
       playerConfig.subtitle = {
-        url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(subtitles[0].url)}${headersParam}`,
+        url: proxiedSubtitleUrl,
         type: 'srt',
         encoding: 'utf-8',
         style: {
@@ -638,6 +668,11 @@ export default function Watch() {
           padding: '2px 8px',
           textShadow: '0 1px 3px rgba(0,0,0,0.8)',
         },
+        // Fallback: if proxied subtitle fails, try direct
+        onerror: () => {
+          console.log('[Watch] Proxy subtitle failed, trying direct:', subtitleUrl)
+          playerConfig.subtitle.url = subtitleUrl
+        }
       }
     }
 
