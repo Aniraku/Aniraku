@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pagination } from 'swiper/modules'
+import { Pagination, Navigation } from 'swiper/modules'
 import { S } from './swiper.style'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { useTrendingAnime } from '../../hooks/useAnime'
@@ -22,7 +22,7 @@ const MultiSwiper = () => {
           900: { slidesPerView: 4, spaceBetween: 15 },
           1300: { slidesPerView: 6, spaceBetween: 15 },
         }}
-        modules={[Pagination]}
+        modules={[Pagination, Navigation]}
         navigation={{ nextEl: '.btn-nextTwo', prevEl: '.btn-prevTwo' }}
       >
         {isFetched
@@ -53,8 +53,8 @@ const MultiSwiper = () => {
         }
       </S.Swiper>
       <S.NavBtn>
-        <div className="btn-nextTwo"><FaChevronRight /></div>
-        <div className="btn-prevTwo"><FaChevronLeft /></div>
+        <button type="button" className="btn-nextTwo" aria-label="Next"><FaChevronRight /></button>
+        <button type="button" className="btn-prevTwo" aria-label="Previous"><FaChevronLeft /></button>
       </S.NavBtn>
     </S.SwiperContainer>
   )

@@ -1,7 +1,8 @@
-const VERSION = 'aniraku-shell-v1'
+const VERSION = 'aniraku-shell-v2'
 const CORE_ASSETS = [
   '/',
   '/manifest.json',
+  '/seo.js',
   '/favicon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -34,8 +35,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const copy = response.clone()
-          caches.open(VERSION).then((cache) => cache.put('/', copy))
+          if (response.ok) {
+            const copy = response.clone()
+            caches.open(VERSION).then((cache) => cache.put('/', copy))
+          }
           return response
         })
         .catch(() => caches.match('/'))

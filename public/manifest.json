@@ -3,11 +3,12 @@
   "short_name": "Aniraku",
   "description": "Watch anime online for free on Aniraku. Stream the latest anime episodes in HD with subtitles and dubs. Browse top airing, most popular, and trending anime series and movies.",
   "start_url": "/",
+  "id": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#000000",
-  "theme_color": "#e2e8f0",
+  "theme_color": "#000000",
   "categories": ["entertainment", "video", "anime", "streaming"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

@@ -7,7 +7,7 @@ import { useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/Footer/Footer'
 
-const Page = styled.div`
+const Page = styled.main`
   min-height: 100vh;
   background: var(--bg);
   color: var(--text-primary);
@@ -113,7 +113,7 @@ const Switch = styled.button`
   flex: 0 0 auto;
   width: 52px;
   height: 30px;
-  min-height: 30px;
+  min-height: 44px;
   border-radius: var(--radius-full);
   background: ${({ active }) => (active ? 'var(--accent)' : 'var(--border)')};
   transition: background var(--transition-fast);
@@ -220,7 +220,7 @@ const Settings = () => {
   if (!user) {
     return (
       <>
-        <Page>
+        <Page id="main">
           <Container>
             <Title>Settings</Title>
             <Subtitle>
@@ -247,7 +247,7 @@ const Settings = () => {
 
   return (
     <>
-      <Page>
+      <Page id="main">
         <Container>
           <Header>
             <BackBtn to="/profile" aria-label="Back to profile"><FaChevronLeft size={16} /></BackBtn>
@@ -302,6 +302,7 @@ const Settings = () => {
                 <div className="settings-confirm" style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                   <DangerInput
                     type="text"
+                    aria-label="Type DELETE to confirm"
                     placeholder='Type "DELETE" to confirm'
                     value={confirmText}
                     onChange={e => setConfirmText(e.target.value)}

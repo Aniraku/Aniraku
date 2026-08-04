@@ -8,6 +8,7 @@ export function generateSlug(title) {
     .slice(0, 60)
     .replace(/^-|-$/g, '')
 }
+export default generateSlug
 
 export function extractIdFromSlug(slugId) {
   if (!slugId) return null

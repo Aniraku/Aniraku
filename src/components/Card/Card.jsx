@@ -23,12 +23,12 @@ const Card = ({ data }) => {
           {poster ? (
             <C.Image src={poster} alt={`${title} - Anime Poster`} loading="lazy" />
           ) : (
-            <div style={{ width: '100%', height: '100%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>No Image</div>
+            <div style={{ width: '100%', height: '100%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No Image</div>
           )}
           <C.Overlay>
             <FaPlay size={28} />
           </C.Overlay>
-          <C.BookmarkBtn onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <C.BookmarkBtn onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} aria-label="Bookmark" title="Bookmark">
             <FaBookmark size={12} />
           </C.BookmarkBtn>
           <C.Badges>

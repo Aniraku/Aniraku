@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
@@ -63,10 +63,10 @@ function useBrowse(f, p) {
     if (f.year) variables.year = parseInt(f.year, 10)
     const { data } = await anilistQuery(BROWSE_QUERY, variables)
     return { media: data.Page.media, pageInfo: data.Page.pageInfo }
-  }, { keepPreviousData: true, staleTime: 30000 })
+  }, { keepPreviousData: true, staleTime: 300000 })
 }
 
-function Card({ a }) {
+const Card = memo(function Card({ a }) {
   const title = a.title?.english || a.title?.romaji || a.title?.userPreferred || 'Unknown'
   const img = a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium
   const highScore = typeof a.averageScore === 'number' && a.averageScore >= 75
@@ -91,7 +91,7 @@ function Card({ a }) {
       </div>
     </Link>
   )
-}
+})
 
 function FilterSelect({ options, value, onChange, ariaLabel }) {
   return (

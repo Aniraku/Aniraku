@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { FaRegThumbsUp, FaThumbsUp, FaTrash, FaReply } from 'react-icons/fa'
 import { supabase } from '../../lib/supabase'
@@ -200,6 +200,61 @@ const timeAgo = (iso) => {
   return new Date(iso).toLocaleDateString()
 }
 
+const nameOf = (profiles, uid) => {
+  const p = profiles[uid]
+  return p?.display_name || p?.username || 'Anonymous'
+}
+
+const avatarOf = (profiles, uid) => profiles[uid]?.avatar_url || null
+
+const AvatarBlock = ({ url, name }) => url
+  ? <Avatar src={url} alt="" />
+  : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
+
+const renderItem = (c, reply, {
+  profiles, likedIds, replyTo, replyText, busy, user,
+  toggleLike, remove, submitReply, setReplyTo, setReplyText, setPostError,
+}) => {
+  const Mine = reply ? ItemReply : Item
+  return (
+    <Mine key={c.id}>
+      <ItemHead>
+        <AvatarBlock url={avatarOf(profiles, c.user_id)} name={nameOf(profiles, c.user_id)} />
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <ItemName to="/profile">{nameOf(profiles, c.user_id)}</ItemName>
+          <ItemTime>{timeAgo(c.created_at)}</ItemTime>
+        </div>
+      </ItemHead>
+      <ItemBody>{c.content}</ItemBody>
+      <ItemActions>
+        <Action $active={likedIds.has(c.id)} onClick={() => toggleLike(c.id)} title="Like">
+          {likedIds.has(c.id) ? <FaThumbsUp size={13} /> : <FaRegThumbsUp size={13} />}
+          {c.likes || 0}
+        </Action>
+        <Action onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText('') }}>
+          <FaReply size={12} /> Reply
+        </Action>
+        {user && user.id === c.user_id && (
+          <Action onClick={() => remove(c.id)} title="Delete" style={{ marginLeft: 'auto' }}>
+            <FaTrash size={12} /> Delete
+          </Action>
+        )}
+      </ItemActions>
+      {replyTo === c.id && (
+        <Composer style={{ marginTop: 12, marginBottom: 0 }}>
+          <Textarea
+            placeholder={`Reply to ${nameOf(profiles, c.user_id)}…`}
+            value={replyText}
+            onChange={e => { setReplyText(e.target.value); setPostError('') }}
+            rows={2}
+          />
+          <PostBtn $disabled={busy || !replyText.trim()} onClick={() => submitReply(c.id)}>Post</PostBtn>
+        </Composer>
+      )}
+    </Mine>
+  )
+}
+
 const Comments = ({ animeId, episodeNumber, label }) => {
   const { user } = useAuth()
   const [comments, setComments] = useState([])
@@ -212,59 +267,57 @@ const Comments = ({ animeId, episodeNumber, label }) => {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    const query = supabase
-      .from('comments')
-      .select('*')
-      .eq('anime_id', animeId)
-      .order('created_at', { ascending: true })
-    if (episodeNumber) query.eq('episode_number', episodeNumber)
-    const { data, error } = await query
-    if (error) { console.error('Comments load:', error); setLoading(false); return }
-    const rows = data || []
-    setComments(rows)
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      const query = supabase
+        .from('comments')
+        .select('*')
+        .eq('anime_id', animeId)
+        .order('created_at', { ascending: true })
+        .limit(200)
+      if (episodeNumber) query.eq('episode_number', episodeNumber)
+      const { data, error } = await query
+      if (cancelled) return
+      if (error) { console.error('Comments load:', error); setLoading(false); return }
+      const rows = data || []
+      setComments(rows)
 
-    const ids = [...new Set(rows.map(c => c.user_id).filter(Boolean))]
-    if (ids.length) {
-      const { data: profs } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url')
-        .in('id', ids)
-      if (profs) {
-        setProfiles(Object.fromEntries(profs.map(p => [p.id, p])))
+      const ids = [...new Set(rows.map(c => c.user_id).filter(Boolean))]
+      if (ids.length) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .in('id', ids)
+        if (cancelled) return
+        if (profs) {
+          setProfiles(Object.fromEntries(profs.map(p => [p.id, p])))
+        }
       }
-    }
 
-    if (user) {
-      const { data: me } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle()
-      if (me) setMyProfile(me)
-      const { data: likes } = await supabase
-        .from('comment_likes')
-        .select('comment_id')
-        .eq('user_id', user.id)
-      if (likes) setLikedIds(new Set(likes.map(l => l.comment_id)))
+      if (user) {
+        const { data: me } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .eq('id', user.id)
+          .maybeSingle()
+        if (cancelled) return
+        if (me) setMyProfile(me)
+        const { data: likes } = await supabase
+          .from('comment_likes')
+          .select('comment_id')
+          .eq('user_id', user.id)
+        if (cancelled) return
+        if (likes) setLikedIds(new Set(likes.map(l => l.comment_id)))
+      }
+      setLoading(false)
     }
-    setLoading(false)
+    load()
+    return () => { cancelled = true }
   }, [animeId, episodeNumber, user])
 
-  useEffect(() => { load() }, [load])
-
   const [postError, setPostError] = useState('')
-
-  const nameOf = (uid) => {
-    const p = profiles[uid]
-    return p?.display_name || p?.username || 'Anonymous'
-  }
-
-  const avatarOf = (uid) => profiles[uid]?.avatar_url || null
-
-  const AvatarBlock = ({ url, name }) => url
-    ? <Avatar src={url} alt="" />
-    : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
   const submit = async (e) => {
     e.preventDefault()
@@ -342,53 +395,27 @@ const Comments = ({ animeId, episodeNumber, label }) => {
 
   const remove = async (id) => {
     if (!user) return
-    const { error } = await supabase.from('comments').delete().eq('id', id)
+    const { error } = await supabase.from('comments').delete().or(`id.eq.${id},parent_id.eq.${id}`)
     if (error) { console.error('Comment delete:', error); return }
-    setComments(prev => prev.filter(c => c.id !== id))
+    setComments(prev => prev.filter(c => c.id !== id && c.parent_id !== id))
   }
 
   const topLevel = comments.filter(c => !c.parent_id)
   const repliesOf = (id) => comments.filter(c => c.parent_id === id)
 
-  const renderItem = (c, reply) => {
-    const Mine = reply ? ItemReply : Item
-    return (
-      <Mine key={c.id}>
-        <ItemHead>
-          <AvatarBlock url={avatarOf(c.user_id)} name={nameOf(c.user_id)} />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <ItemName to="/profile">{nameOf(c.user_id)}</ItemName>
-            <ItemTime>{timeAgo(c.created_at)}</ItemTime>
-          </div>
-        </ItemHead>
-        <ItemBody>{c.content}</ItemBody>
-        <ItemActions>
-          <Action $active={likedIds.has(c.id)} onClick={() => toggleLike(c.id)} title="Like">
-            {likedIds.has(c.id) ? <FaThumbsUp size={13} /> : <FaRegThumbsUp size={13} />}
-            {c.likes || 0}
-          </Action>
-          <Action onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText('') }}>
-            <FaReply size={12} /> Reply
-          </Action>
-          {user && user.id === c.user_id && (
-            <Action onClick={() => remove(c.id)} title="Delete" style={{ marginLeft: 'auto' }}>
-              <FaTrash size={12} /> Delete
-            </Action>
-          )}
-        </ItemActions>
-        {replyTo === c.id && (
-          <Composer style={{ marginTop: 12, marginBottom: 0 }}>
-            <Textarea
-              placeholder={`Reply to ${nameOf(c.user_id)}…`}
-              value={replyText}
-              onChange={e => { setReplyText(e.target.value); setPostError('') }}
-              rows={2}
-            />
-            <PostBtn $disabled={busy || !replyText.trim()} onClick={() => submitReply(c.id)}>Post</PostBtn>
-          </Composer>
-        )}
-      </Mine>
-    )
+  const itemProps = {
+    profiles,
+    likedIds,
+    replyTo,
+    replyText,
+    busy,
+    user,
+    toggleLike,
+    remove,
+    submitReply,
+    setReplyTo,
+    setReplyText,
+    setPostError,
   }
 
   return (
@@ -430,8 +457,8 @@ const Comments = ({ animeId, episodeNumber, label }) => {
         <List>
           {topLevel.map(c => (
             <React.Fragment key={c.id}>
-              {renderItem(c, false)}
-              {repliesOf(c.id).map(r => renderItem(r, true))}
+              {renderItem(c, false, itemProps)}
+              {repliesOf(c.id).map(r => renderItem(r, true, itemProps))}
             </React.Fragment>
           ))}
         </List>

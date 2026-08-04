@@ -62,14 +62,20 @@ export const AuthProvider = ({ children }) => {
       setLoading(false)
       return
     }
+    let mounted = true
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
       setUser(session?.user || null)
-      if (session?.user) fetchProfile(session.user.id, session.user.email)
+      if (session?.user) {
+        fetchProfile(session.user.id, session.user.email)
+        supabase.rpc('is_admin').then(({ data }) => { if (mounted) setIsAdmin(!!data) }).catch(() => { if (mounted) setIsAdmin(false) })
+      }
       else setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
       setUser(session?.user || null)
       if (session?.user) {
         fetchProfile(session.user.id, session.user.email)
@@ -82,7 +88,7 @@ export const AuthProvider = ({ children }) => {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => { mounted = false; subscription.unsubscribe() }
   }, [fetchProfile])
 
   const signUp = async (email, password, username) => {
@@ -108,7 +114,15 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {}
+    try {
+      localStorage.removeItem('aniraku-bookmarks')
+      localStorage.removeItem('aniraku-watch-history')
+      localStorage.removeItem('aniraku-episode-track')
+      localStorage.removeItem('aniraku-nsfw-enabled')
+    } catch {}
     setUser(null)
     setProfile(null)
     setIsAdmin(false)
@@ -121,6 +135,15 @@ export const AuthProvider = ({ children }) => {
     // Use .update() to avoid NOT NULL violation on username when only updating avatar/bio
     const { error } = await supabase.from('profiles').update(fields).eq('id', user.id)
     if (error) throw error
+    if (fields.username || fields.display_name) {
+      const { error: metaErr } = await supabase.auth.updateUser({
+        data: {
+          username: fields.username || user.user_metadata?.username,
+          display_name: fields.display_name || user.user_metadata?.display_name,
+        },
+      })
+      if (metaErr) throw metaErr
+    }
     setProfile(prev => ({ ...prev, ...fields }))
   }
 

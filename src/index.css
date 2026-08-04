@@ -156,6 +156,25 @@ input:focus, textarea:focus, select:focus, button:focus-visible {
   top: 0; bottom: 0; right: 0; left: 0;
 }
 
+/* Skip link — visually hidden until focused */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 2000;
+  padding: 12px 20px;
+  background: var(--accent);
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 0;
+  top: 0;
+}
+
 /* Glow decorative blobs */
 .glow {
   position: absolute;
@@ -270,6 +289,14 @@ input:focus, textarea:focus, select:focus, button:focus-visible {
   background: var(--accent);
 }
 
+/* Larger touch target for pagination bullets on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .swiper-pagination-bullet {
+    width: 22px;
+    height: 22px;
+  }
+}
+
 .btn-prev, .btn-next {
   position: absolute;
   background-color: var(--bg-elevated);
@@ -304,7 +331,6 @@ input:focus, textarea:focus, select:focus, button:focus-visible {
   border-radius: var(--radius-md);
   text-align: center;
   cursor: pointer;
-  outline: 0;
   box-shadow: none;
   color: #fff;
 }

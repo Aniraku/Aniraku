@@ -12,11 +12,13 @@ S.SideMenu = styled.div`
   width: 280px;
   background-color: #1a1c21;
   transform: ${({ open }) => (!open ? 'translateX(-300px)' : 'translateX(0)')};
+  visibility: ${({ open }) => (open ? 'visible' : 'hidden')};
+  pointer-events: ${({ open }) => (open ? 'auto' : 'none')};
   overflow-y: auto;
   overflow-x: hidden;
   gap: 0.5em;
   z-index: 300;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s;
   padding-top: env(safe-area-inset-top, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
 
@@ -129,16 +131,21 @@ S.GenreList = styled.div`
   padding: 4px 0 8px;
   font-size: 13px;
 `
-S.GenreItem = styled.p`
+S.GenreItem = styled.button`
   padding: 8px 12px;
   margin: 0;
   border-radius: 6px;
   cursor: pointer;
+  text-align: left;
   -webkit-tap-highlight-color: transparent;
   transition: background 0.15s;
 
   &:hover, &:active {
     background: rgba(255, 255, 255, 0.06);
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    min-height: 44px;
   }
 
   &:nth-of-type(7n + 1) {

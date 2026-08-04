@@ -6,7 +6,7 @@ import Footer from '../components/Footer/Footer'
 import { generateSlug } from '../lib/slug'
 import styled from 'styled-components'
 
-const Page = styled.div`min-height:100vh;background:var(--bg);`
+const Page = styled.main`min-height:100vh;background:var(--bg);`
 const Container = styled.div`max-width:600px;margin:0 auto;padding:4rem 1rem;text-align:center;`
 const Title = styled.h1`font-size:1.5rem;font-weight:700;margin-bottom:0.5rem;`
 const Subtitle = styled.p`color:var(--text-secondary);font-size:14px;margin-bottom:2rem;`
@@ -47,7 +47,7 @@ export default function Random() {
   }, [])
 
   return (
-    <Page>
+    <Page id="main">
       <Container>
         <Title>Discover Random Anime</Title>
         <Subtitle>Not sure what to watch? Let fate decide.</Subtitle>

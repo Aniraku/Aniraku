@@ -54,8 +54,8 @@ const Footer = () => {
             Stream links are resolved from publicly available third-party sources at playback time.
           </F.Disclaimer>
           <F.Socials>
-            <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer"><FaGithub size={18} /></F.SocialLink>
-            <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer"><FaDiscord size={18} /></F.SocialLink>
+            <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer" aria-label="GitHub"><FaGithub size={18} /></F.SocialLink>
+            <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer" aria-label="Discord"><FaDiscord size={18} /></F.SocialLink>
           </F.Socials>
         </F.Col>
 
@@ -98,8 +98,8 @@ const Footer = () => {
         <F.MobileTop>
           <Logo to="/home" height={28} showText />
           <F.Socials>
-            <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer"><FaGithub size={16} /></F.SocialLink>
-            <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer"><FaDiscord size={16} /></F.SocialLink>
+            <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer" aria-label="GitHub"><FaGithub size={16} /></F.SocialLink>
+            <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer" aria-label="Discord"><FaDiscord size={16} /></F.SocialLink>
           </F.Socials>
         </F.MobileTop>
         <F.MobileLinks>

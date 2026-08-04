@@ -31,6 +31,7 @@ const SkeletonSlide = () => (
 const Hero = () => {
   const { data, isFetched } = useTrendingAnime();
   const items = useStreamable(filterAdult(Array.isArray(data) ? data : [], useNsfw().nsfwEnabled));
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (!isFetched) {
     return (
@@ -73,8 +74,8 @@ const Hero = () => {
       pagination={{ clickable: true }}
       direction="horizontal"
       loop={items.length > 1}
-      autoplay={{ delay: 5000, disableOnInteraction: false }}
-      modules={[Pagination]}
+      autoplay={reducedMotion ? false : { delay: 5000, disableOnInteraction: false }}
+      modules={[Navigation, Pagination, Autoplay]}
       className="swiper"
       navigation={{ nextEl: ".btn-next", prevEl: ".btn-prev" }}
     >
@@ -99,8 +100,8 @@ const Hero = () => {
           </H.Content>
         </H.Slides>
       ))}
-      <div className="btn-prev"><FaChevronLeft /></div>
-      <div className="btn-next"><FaChevronRight /></div>
+      <button type="button" className="btn-prev" aria-label="Previous"><FaChevronLeft /></button>
+      <button type="button" className="btn-next" aria-label="Next"><FaChevronRight /></button>
     </H.Swiper>
   );
 };

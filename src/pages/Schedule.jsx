@@ -56,7 +56,13 @@ const Schedule = () => {
     return scheduled
   }, { staleTime: 30 * 60 * 1000 })
 
+  const [searchInput, setSearchInput] = React.useState('')
   const [searchQuery, setSearchQuery] = React.useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   // Dynamic SEO metadata
   useEffect(() => {
@@ -64,7 +70,9 @@ const Schedule = () => {
   }, [])
 
   const items = Array.isArray(data) ? data : []
-  const dayItems = useStreamable(filterAdult(items, useNsfw().nsfwEnabled)).filter(item => {
+  const { nsfwEnabled } = useNsfw()
+  const streamed = useStreamable(filterAdult(items, nsfwEnabled))
+  const dayItems = streamed.filter(item => {
     if (item.day !== activeDay) return false
     if (!searchQuery.trim()) return true
     const title = (item.title?.english || item.title?.romaji || '').toLowerCase()
@@ -82,7 +90,7 @@ const Schedule = () => {
       <Container>
         <Title>Airing Schedule</Title>
         <Subtitle>See when your favorite anime air next</Subtitle>
-        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search schedule..." style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', fontSize: 14, marginBottom: 12, outline: 'none' }} />
+        <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Search schedule..." aria-label="Search schedule" style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', fontSize: 14, marginBottom: 12 }} />
         <DaysRow>
           {DAYS.map(day => (
             <DayTab key={day} active={activeDay === day ? 1 : 0} onClick={() => setActiveDay(day)}>
@@ -104,7 +112,7 @@ const Schedule = () => {
           <List>
             {dayItems.map((item, idx) => (
               <Card key={item.id || idx} to={`/anime/${generateSlug(item.title?.english || item.title?.romaji || '')}-${item.id}`}>
-                <Thumb src={item.coverImage?.large || ''} alt="" />
+                <Thumb src={item.coverImage?.large || ''} alt="" loading="lazy" />
                 <Info>
                   <Name>{item.title?.english || item.title?.romaji || 'Unknown'}</Name>
                   <Meta>{item.format || 'TV'} · Ep {item.episode}</Meta>

@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { generateSlug } from '../src/lib/slug.js'
 
 const API_BASE = 'https://aniraku-backend.onrender.com/api/v1'
 const ANILIST_PROXY = `${API_BASE}/anilist`
@@ -14,7 +15,6 @@ const FETCH_RETRY_DELAY_MS = 5000
 
 const STATIC_URLS = [
   { loc: '/', freq: 'daily', priority: '1.0' },
-  { loc: '/home', freq: 'daily', priority: '0.95' },
   { loc: '/catalog', freq: 'daily', priority: '0.8' },
   { loc: '/schedule', freq: 'weekly', priority: '0.7' },
   { loc: '/random', freq: 'monthly', priority: '0.3' },
@@ -303,7 +303,7 @@ for (let i = 0; i < chunks.length; i++) {
   const name = `anime-${i + 1}.xml`
   const urls = chunks[i].map(item => {
     const t = item.title?.english || item.title?.romaji || ''
-    const slug = t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    const slug = generateSlug(t)
     return urlEntry(`/anime/${slug}-${item.id}`, today, 'monthly', '0.6')
   })
   const size = writeSitemap(path.join(OUT_DIR, 'sitemaps', name), urls)

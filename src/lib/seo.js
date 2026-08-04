@@ -4,6 +4,8 @@
 // and JSON-LD structured data for SPA route changes.
 // =============================================================
 
+import { generateSlug } from './slug';
+
 const SITE = 'https://www.aniraku.tech';
 
 /**
@@ -107,12 +109,12 @@ export function setAnimeDetailSEO(anime) {
   if (!anime) return;
 
   const title = anime.title?.english || anime.title?.romaji || 'Unknown Anime';
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const slug = generateSlug(title);
   const desc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 280);
   const format = anime.format || 'TV';
   const episodes = anime.episodes || '';
   const genres = (anime.genres || []).join(', ');
-  const score = anime.averageScore || '';
+  const pubDate = /^\d{4}-\d{2}-\d{2}$/.test(anime.startDate?.fuzzy || '') ? anime.startDate.fuzzy : '';
 
   // Document title
   setTitle(`${title} — Watch ${format} Online Free | Aniraku`);
@@ -150,21 +152,12 @@ export function setAnimeDetailSEO(anime) {
     "description": desc || `Watch ${title} online for free on Aniraku.`,
     "image": anime.coverImage?.large || anime.coverImage?.medium || `${SITE}/og-image.png`,
     "genre": anime.genres || [],
-    "datePublished": anime.startDate?.year || '',
+    ...(pubDate ? { "datePublished": pubDate } : {}),
     "startDate": anime.startDate?.fuzzy || '',
     "endDate": anime.endDate?.fuzzy || '',
     "numberOfEpisodes": anime.episodes || 0,
     "inLanguage": "Japanese",
     "contentRating": "PG-13",
-    ...(score ? {
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": (score / 10).toFixed(1),
-        "bestRating": "10",
-        "worstRating": "1",
-        "ratingCount": anime.popularity || 0
-      }
-    } : {}),
     "provider": {
       "@type": "Organization",
       "name": "Aniraku",
@@ -206,7 +199,7 @@ export function setWatchSEO(anime, episodeNumber) {
   setMeta('keywords', `${title}, ${title} episode ${epNum}, watch ${title} episode ${epNum} online, ${title} streaming, anime streaming, watch anime free, aniraku`);
   setMeta('robots', 'index, follow');
 
-  const watchSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const watchSlug = generateSlug(title);
   const watchUrl = `/watch/${watchSlug}-${anime.id}-episode-${epNum}`;
   setCanonical(watchUrl);
 
@@ -216,11 +209,14 @@ export function setWatchSEO(anime, episodeNumber) {
   setMetaProperty('og:url', `${SITE}${watchUrl}`);
   setMetaProperty('og:type', 'video.episode');
   setMetaProperty('og:image', anime.coverImage?.large || anime.coverImage?.medium || `${SITE}/og-image.png`);
+  setMetaProperty('og:image:width', '500');
+  setMetaProperty('og:image:height', '750');
 
   // Twitter
   setMetaProperty('twitter:title', `Watch ${title} Episode ${epNum} Online Free`);
   setMetaProperty('twitter:description', `Watch ${title} Episode ${epNum} online for free. Stream in HD with subtitles and dub support.`);
   setMetaProperty('twitter:url', `${SITE}${watchUrl}`);
+  setMetaProperty('twitter:image', anime.coverImage?.medium || `${SITE}/og-image.png`);
 
   // JSON-LD VideoObject
   const jsonld = {
@@ -229,10 +225,7 @@ export function setWatchSEO(anime, episodeNumber) {
     "name": `${title} — Episode ${epNum}`,
     "description": `Watch ${title} Episode ${epNum} online on Aniraku. Free anime streaming with subtitles and dub support.`,
     "thumbnailUrl": anime.coverImage?.large || anime.coverImage?.medium || `${SITE}/og-image.png`,
-    "contentUrl": `${SITE}${watchUrl}`,
-    "embedUrl": `${SITE}${watchUrl}`,
-    "duration": "PT24M",
-    "uploadDate": new Date().toISOString().split('T')[0],
+    ...(anime.duration ? { "duration": `PT${anime.duration}M` } : {}),
     "interactionStatistic": {
       "@type": "InteractionCounter",
       "interactionType": "https://schema.org/WatchAction"

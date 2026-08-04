@@ -11,7 +11,7 @@ const SideBar = ({ open, setOpen, profile, isAdmin }) => {
     if (genre) navigate(`/catalog?genre=${encodeURIComponent(genre)}`)
   }
   return (
-    <S.SideMenu open={open}>
+    <S.SideMenu open={open} id="sidebar-menu">
       <S.CloseButton onClick={() => setOpen(false)}>
         <FaAngleLeft /> Close menu
       </S.CloseButton>
@@ -48,16 +48,16 @@ const SideBar = ({ open, setOpen, profile, isAdmin }) => {
         <S.Item>
           <p style={{ marginBottom: "1em" }}>Genre</p>
           <S.GenreList>
-            <S.GenreItem onClick={clickHandler}>Action</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Adventure</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Comedy</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Drama</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Fantasy</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Horror</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Romance</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Sci-Fi</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Slice of Life</S.GenreItem>
-            <S.GenreItem onClick={clickHandler}>Supernatural</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Action</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Adventure</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Comedy</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Drama</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Fantasy</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Horror</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Romance</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Sci-Fi</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Slice of Life</S.GenreItem>
+            <S.GenreItem type="button" onClick={clickHandler}>Supernatural</S.GenreItem>
           </S.GenreList>
         </S.Item>
       </S.NavList>

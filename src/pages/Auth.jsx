@@ -165,10 +165,11 @@ const Auth = ({ mode }) => {
     if (clean.length < 3) { setUsernameAvail(null); setCheckingName(false); return }
     setCheckingName(true)
     timer.current = setTimeout(async () => {
-      const { data } = await supabase.rpc('check_username_available', { username: clean })
+      const { data } = await supabase.rpc('check_username_available', { username: clean }).catch(() => ({}))
       setUsernameAvail(data)
       setCheckingName(false)
     }, 400)
+    return () => clearTimeout(timer.current)
   }, [username])
 
   const handleSubmit = async (e) => {

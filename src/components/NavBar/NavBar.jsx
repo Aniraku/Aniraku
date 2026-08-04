@@ -110,7 +110,7 @@ const NavBar = () => {
     <N.Nav isScrolled={isScrolled} isHome={isHome}>
       <N.LayoutBg open={open} onClick={() => setOpen(false)} />
       <N.Left>
-        <N.MenuBtn onClick={() => setOpen(true)}>
+        <N.MenuBtn onClick={() => setOpen(true)} aria-expanded={open} aria-controls="sidebar-menu">
           <FaBars size={20} />
         </N.MenuBtn>
         <SideBar open={open} setOpen={setOpen} profile={profile} isAdmin={isAdmin} />
@@ -132,7 +132,7 @@ const NavBar = () => {
 
         {user && (
           <div ref={notifRef} style={{ position: 'relative' }}>
-            <N.RightBtn onClick={() => setShowNotifs(!showNotifs)} title="Notifications" style={{ position: 'relative' }}>
+            <N.RightBtn onClick={() => setShowNotifs(!showNotifs)} title="Notifications" style={{ position: 'relative' }} aria-expanded={showNotifs} aria-controls="notifications-panel">
               <FaBell size={15} />
               {unreadCount > 0 && (
                 <span style={{ position: 'absolute', top: -2, right: -2, background: 'var(--accent)', color: 'var(--bg)', fontSize: 9, fontWeight: 700, borderRadius: '50%', width: 15, height: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -141,19 +141,19 @@ const NavBar = () => {
               )}
             </N.RightBtn>
             {showNotifs && (
-              <div style={{ position: 'absolute', top: '100%', right: 0, width: 300, maxHeight: 400, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 1000, marginTop: 8 }}>
+              <div id="notifications-panel" style={{ position: 'absolute', top: '100%', right: 0, width: 300, maxHeight: 400, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 1000, marginTop: 8 }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: 14, fontWeight: 600 }}>Notifications</div>
                 {notifications.length === 0 ? (
                   <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No notifications yet</div>
-                    ) : notifications.map(n => (
-                  <div key={n.id} onClick={() => { 
+) : notifications.map(n => (
+                  <button type="button" key={n.id} onClick={() => { 
                     setShowNotifs(false); 
                     if (!n.read) markRead(n.id);
                     if (n.anime_id) navigate(`/anime/${n.anime_id}`);
-                  }} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: n.read ? 'transparent' : 'rgba(var(--accent-rgb, 226,232,240), 0.05)', fontSize: 13, color: 'var(--text-primary)' }}>
+                  }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: n.read ? 'transparent' : 'rgba(var(--accent-rgb, 226,232,240), 0.05)', fontSize: 13, color: 'var(--text-primary)' }}>
                     <p style={{ margin: 0 }}>{n.message}</p>
                     <p style={{ margin: 0, marginTop: 4, fontSize: 11, color: 'var(--text-muted)' }}>{n.created_at ? new Date(n.created_at).toLocaleDateString() : ''}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

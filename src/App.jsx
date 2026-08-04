@@ -98,6 +98,7 @@ const ScrollToTop = () => {
 const App = () => {
   return (
     <BrowserRouter>
+      <a className="skip-link" href="#main">Skip to content</a>
       <AuthProvider>
         <ErrorBoundary>
           <ScrollToTop />

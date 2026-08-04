@@ -1,39 +1,76 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './useAuth'
 import { supabase } from '../lib/supabase'
 import { API_BASE } from '../config'
 
 const LOCAL_KEY = 'aniraku-nsfw-enabled'
 
+const readLocal = () => {
+  try { return localStorage.getItem(LOCAL_KEY) === 'true' } catch { return false }
+}
+
+// Shared per-account NSFW state: every useNsfw instance subscribes to one
+// module-level value so N instances on a page fire a single user_settings
+// query and stay in sync when the toggle flips anywhere.
+const shared = {
+  userId: null,
+  value: null,
+  pending: null,
+  listeners: new Set(),
+}
+
+const publish = (v) => {
+  shared.value = v
+  shared.listeners.forEach(l => l(v))
+}
+
 // Per-account NSFW preference. Stored in user_settings (key: nsfw_enabled)
 // when signed in; falls back to localStorage for guests so the toggle still
 // works without an account. Default is off.
 export const useNsfw = () => {
   const { user } = useAuth()
-  const [nsfwEnabled, setNsfwEnabled] = useState(() => {
-    try { return localStorage.getItem(LOCAL_KEY) === 'true' } catch { return false }
-  })
+  const [nsfwEnabled, setNsfwEnabled] = useState(() =>
+    shared.userId === (user?.id || null) && shared.value !== null ? shared.value : readLocal()
+  )
 
   useEffect(() => {
-    if (!user) return
+    const uid = user?.id || null
+    if (shared.userId !== uid) {
+      shared.userId = uid
+      shared.value = null
+      shared.pending = null
+    }
+    const listener = (v) => setNsfwEnabled(v)
+    shared.listeners.add(listener)
+    if (shared.value !== null) {
+      setNsfwEnabled(shared.value)
+      return () => { shared.listeners.delete(listener) }
+    }
+    if (!user) {
+      publish(readLocal())
+      return () => { shared.listeners.delete(listener) }
+    }
     let cancelled = false
-    supabase.from('user_settings')
+    const query = shared.pending || supabase.from('user_settings')
       .select('value')
       .eq('user_id', user.id)
       .eq('key', 'nsfw_enabled')
       .maybeSingle()
+    shared.pending = query
+    query
       .then(({ data }) => {
-        if (cancelled) return
-        const v = data?.value === true
-        setNsfwEnabled(v)
-        try { localStorage.setItem(LOCAL_KEY, String(v)) } catch {}
+        if (cancelled || shared.userId !== uid) return
+        publish(data?.value === true)
       })
       .catch(() => {})
-    return () => { cancelled = true }
+      .finally(() => {
+        if (shared.pending === query) shared.pending = null
+      })
+    return () => { cancelled = true; shared.listeners.delete(listener) }
   }, [user])
 
   const updateNsfw = useCallback(async (enabled) => {
-    setNsfwEnabled(enabled)
+    publish(enabled)
     try { localStorage.setItem(LOCAL_KEY, String(enabled)) } catch {}
     if (user) {
       await supabase.from('user_settings').upsert(
@@ -43,7 +80,9 @@ export const useNsfw = () => {
     }
   }, [user])
 
-  return { nsfwEnabled, updateNsfw }
+  const toggleNsfw = useCallback(() => updateNsfw(!nsfwEnabled), [nsfwEnabled, updateNsfw])
+
+  return { nsfwEnabled, toggleNsfw, updateNsfw }
 }
 
 // A title counts as NSFW only when it carries the Hentai genre on AniList.
@@ -86,13 +125,16 @@ async function hasMiruroStreams(id) {
 // is disabled it drops all hentai, mirroring filterAdult.
 export const useStreamable = (items) => {
   const { nsfwEnabled } = useNsfw()
-  const list = Array.isArray(items) ? items : []
-  const rest = list.filter(it => !isNsfw(it))
-  const adult = list.filter(isNsfw)
+  const list = useMemo(() => (Array.isArray(items) ? items : []), [items])
+  const rest = useMemo(() => list.filter(it => !isNsfw(it)), [list])
+  const adult = useMemo(() => list.filter(isNsfw), [list])
   const [extra, setExtra] = useState([])
 
   useEffect(() => {
-    if (!nsfwEnabled || adult.length === 0) { setExtra([]); return }
+    if (!nsfwEnabled || adult.length === 0) {
+      setExtra(prev => (prev.length ? [] : prev))
+      return
+    }
     let cancelled = false
     Promise.all(adult.map(async it => ((await hasMiruroStreams(it.id)) ? it : null)))
       .then(kept => {
@@ -102,8 +144,7 @@ export const useStreamable = (items) => {
       })
       .catch(() => {})
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nsfwEnabled, list])
+  }, [nsfwEnabled, adult])
 
   return nsfwEnabled ? [...rest, ...extra] : rest
 }
