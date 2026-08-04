@@ -1155,6 +1155,10 @@ export default function Watch() {
               </p>
             </div>
           )}
+
+          {anime && (
+            <Comments animeId={anime.id} episodeNumber={epNumber} label={`Episode ${epNumber}${episodes?.length ? ` of ${episodes.length}` : ''}`} />
+          )}
         </div>
 
         {/* Episode sidebar */}
@@ -1293,11 +1297,6 @@ export default function Watch() {
         }
       `}</style>
 
-      {anime && epNumber && (
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 20px 48px' }}>
-          <Comments animeId={anime.id} episodeNumber={epNumber} label={`Episode ${epNumber}${episodes?.length ? ` of ${episodes.length}` : ''}`} />
-        </div>
-      )}
     </main>
     </div>
   )
