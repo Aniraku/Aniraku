@@ -7,7 +7,7 @@ import ContinueWatching from '../components/ContinueWatching'
 import Trending from '../components/Trending/Trending'
 import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
-import { useAiring, useMovies, useSeries } from '../hooks/useAnime'
+import { useAiring, useMovies, useSeries, useHomePageData } from '../hooks/useAnime'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
@@ -251,9 +251,8 @@ const Home = () => {
     'Slice of Life', 'Sports', 'Supernatural', 'Mystery', 'Drama',
   ]
 
-  const { data: airing = [], isFetched: airingDone } = useAiring()
-  const { data: movies = [], isFetched: moviesDone } = useMovies()
-  const { data: topTV = [], isFetched: tvDone } = useSeries()
+  const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
+  const { trending = [], airing = [], movies = [], topTV = [] } = homeData
 
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
@@ -334,7 +333,7 @@ const Home = () => {
               <p>Watch uninterrupted with no trackers or ad breaks.</p>
             </Feature>
             <Feature>
-              <h3><FaTv size={12} /> Sub &amp; dub</h3>
+              <h3><FaTv size={12} /> Sub & dub</h3>
               <p>Switch languages and quality without leaving the player.</p>
             </Feature>
             <Feature>
@@ -362,7 +361,7 @@ const Home = () => {
           <Link to="/catalog?status=RELEASING">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {airingDone ? airingList.slice(0, 15).map(item => (
+          {homeDone ? airingList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-air-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
@@ -380,7 +379,7 @@ const Home = () => {
           <Link to="/catalog?format=MOVIE&sort=SCORE_DESC">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {moviesDone ? moviesList.slice(0, 15).map(item => (
+          {homeDone ? moviesList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-mov-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
@@ -398,7 +397,7 @@ const Home = () => {
           <Link to="/catalog?format=TV&sort=SCORE_DESC">View All</Link>
         </SectionTitle>
         <ScrollRow>
-          {tvDone ? tvList.slice(0, 15).map(item => (
+          {homeDone ? tvList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
             <div key={`sk-tv-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
