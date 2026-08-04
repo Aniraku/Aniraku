@@ -13,7 +13,13 @@ const Title = styled.h2`
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 16px;
+  margin-bottom: 4px;
+`
+
+const Subtitle = styled.p`
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 16px;
 `
 
 const Composer = styled.div`
@@ -177,7 +183,7 @@ const timeAgo = (iso) => {
   return new Date(iso).toLocaleDateString()
 }
 
-const Comments = ({ animeId, episodeNumber }) => {
+const Comments = ({ animeId, episodeNumber, label }) => {
   const { user } = useAuth()
   const [comments, setComments] = useState([])
   const [profiles, setProfiles] = useState({})
@@ -367,6 +373,7 @@ const Comments = ({ animeId, episodeNumber }) => {
   return (
     <Wrapper>
       <Title>Comments ({comments.length})</Title>
+      {label && <Subtitle>{label}</Subtitle>}
 
       {user ? (
         <Composer>

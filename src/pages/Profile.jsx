@@ -228,7 +228,7 @@ const Profile = () => {
               <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
               <div className="profile-actions" style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button onClick={handleSave} disabled={saving} style={primaryBtn}>{saving ? 'Saving…' : 'Save Changes'}</button>
-                <Link to="/settings" style={ghostBtn}>Settings</Link>
+                <Link to="/profile/settings" style={ghostBtn}>Settings</Link>
                 <button onClick={handleSignOut} style={ghostBtn}>Sign Out</button>
               </div>
             </div>

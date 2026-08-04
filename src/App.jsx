@@ -96,7 +96,8 @@ const App = () => {
             <Route path="/login" element={<Suspense fallback={<Skeleton />}><Auth mode="login" /></Suspense>} />
             <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
             <Route path="/profile" element={<Suspense fallback={<Skeleton />}><Profile /></Suspense>} />
-            <Route path="/settings" element={<Suspense fallback={<Skeleton />}><Settings /></Suspense>} />
+            <Route path="/profile/settings" element={<Suspense fallback={<Skeleton />}><Settings /></Suspense>} />
+            <Route path="/settings" element={<Navigate to="/profile/settings" replace />} />
             <Route path="/admin" element={<Suspense fallback={<Skeleton />}><Admin /></Suspense>} />
             {/* Redirect aliases for sidebar nav */}
             <Route path="/top-airing" element={<Navigate to="/catalog?status=RELEASING" replace />} />

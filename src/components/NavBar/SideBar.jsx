@@ -21,7 +21,7 @@ const SideBar = ({ open, setOpen, profile }) => {
           <p>Random</p>
         </S.SettingsItem>
         <S.SettingsItem>
-          <Link to="/settings" onClick={() => setOpen(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em', color: 'var(--text-primary)', textDecoration: 'none' }}>
+          <Link to="/profile/settings" onClick={() => setOpen(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em', color: 'var(--text-primary)', textDecoration: 'none' }}>
             <FaCog size={20} color="var(--accent)" />
             <p style={{ fontSize: 12 }}>Settings</p>
           </Link>

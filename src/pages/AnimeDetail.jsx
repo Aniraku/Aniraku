@@ -587,7 +587,7 @@ const AnimeDetail = () => {
             This title contains adult content. Enable NSFW content in your settings to view it.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <NsfwBtn as={Link} to="/settings">Open Settings</NsfwBtn>
+            <NsfwBtn as={Link} to="/profile/settings">Open Settings</NsfwBtn>
             <OutlineLink to="/home">Go Back</OutlineLink>
           </div>
         </NsfwCard>

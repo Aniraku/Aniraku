@@ -929,7 +929,7 @@ export default function Watch() {
             <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24 }}>
               This anime contains adult content. Enable NSFW content in your settings to view it.
             </p>
-            <Link to="/settings" style={{
+            <Link to="/profile/settings" style={{
               background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 10,
               padding: '10px 24px', fontSize: 14, fontWeight: 600, textDecoration: 'none',
             }}>Open Settings</Link>
@@ -1295,7 +1295,7 @@ export default function Watch() {
 
       {anime && epNumber && (
         <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 20px 48px' }}>
-          <Comments animeId={anime.id} episodeNumber={epNumber} />
+          <Comments animeId={anime.id} episodeNumber={epNumber} label={`Episode ${epNumber}${episodes?.length ? ` of ${episodes.length}` : ''}`} />
         </div>
       )}
     </main>
