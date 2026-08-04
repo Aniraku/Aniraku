@@ -59,7 +59,9 @@ export const filterAdult = (items, nsfwEnabled) => {
 }
 
 // Most hentai on AniList has no Miruro stream — surface only what can play.
-// Results are cached per anime so re-renders and repeated views cost nothing.
+// The backend probe actually resolves + reachability-verifies a real source,
+// so a "playable" result means the first episode really can stream. Results
+// are cached per anime so re-renders and repeated views cost nothing.
 const streamCache = new Map()
 
 async function hasMiruroStreams(id) {
@@ -67,13 +69,10 @@ async function hasMiruroStreams(id) {
   if (streamCache.has(id)) return streamCache.get(id)
   const p = (async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/v1/miruro/episodes/${id}`)
+      const res = await fetch(`${API_BASE}/api/v1/miruro/probe/${id}`)
       if (!res.ok) return false
       const d = await res.json()
-      return Object.values(d?.providers || {}).some(pv => {
-        const eps = pv?.episodes
-        return eps && ((Array.isArray(eps.sub) && eps.sub.length > 0) || (Array.isArray(eps.dub) && eps.dub.length > 0))
-      })
+      return d?.playable === true
     } catch {
       return false
     }
