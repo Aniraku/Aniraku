@@ -317,8 +317,8 @@ export default function Watch() {
 
   const showToast = useCallback((msg, icon) => {
     setToast({ msg, icon })
-    clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => setToast(''), 2500)
+    clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToast(''), 2500)
   }, [])
 
   const SOURCES = useMemo(() => {
@@ -771,7 +771,14 @@ export default function Watch() {
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000)
+      // Resolving a stream means scraping a provider, and the backend runs on
+      // a Render instance that cold-starts. Measured: ~3s warm, ~9s on a
+      // cache-bypassing refresh, and longer still after a spin-down. A 15s
+      // budget aborted those slow-but-successful requests, and an aborted
+      // fetch surfaces in the console as a CORS error ("No
+      // 'Access-Control-Allow-Origin' header"), which points debugging at the
+      // wrong layer entirely — the backend does send the header.
+      const timeoutId = setTimeout(() => controller.abort(), 60000)
       const res = await fetch(`${API_BASE}/api/v1/stream`, {
         method: 'POST',
         signal: controller.signal,
