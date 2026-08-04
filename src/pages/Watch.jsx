@@ -424,29 +424,63 @@ export default function Watch() {
     }
   }, [anime?.id, epNumber])
 
-  // Check for resume position on mount
+  // Check for resume position on mount. Prefer the newer of the remote
+  // (cross-device) row and the local row so progress follows the user
+  // between devices instead of only this browser's localStorage.
   useEffect(() => {
     if (!animeId || !epNumber) return
+    let cancelled = false
+    let interval = null
+
+    const applyResume = (entry) => {
+      if (cancelled || !entry || !(entry.time > 30)) return
+      setResumePos(entry.time)
+      let count = 3
+      setResumeCountdown(count)
+      interval = setInterval(() => {
+        count--
+        if (count <= 0) {
+          clearInterval(interval)
+          setResumeCountdown(0)
+        } else {
+          setResumeCountdown(count)
+        }
+      }, 1000)
+    }
+
+    const local = []
     try {
-      const raw = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
-      const entry = raw.find(h => String(h.animeId) === String(animeId) && h.episode === epNumber)
-      if (entry && entry.time > 30) {
-        setResumePos(entry.time)
-        let count = 3
-        setResumeCountdown(count)
-        const interval = setInterval(() => {
-          count--
-          if (count <= 0) {
-            clearInterval(interval)
-            setResumeCountdown(0)
-          } else {
-            setResumeCountdown(count)
-          }
-        }, 1000)
-        return () => clearInterval(interval)
-      }
+      local.push(...JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]'))
     } catch {}
-  }, [animeId, epNumber])
+
+    if (!user) {
+      applyResume(local.find(h => String(h.animeId) === String(animeId) && h.episode === epNumber))
+      return () => { cancelled = true; if (interval) clearInterval(interval) }
+    }
+
+    supabase.from('watch_history')
+      .select('progress,timestamp')
+      .eq('user_id', user.id)
+      .eq('anime_id', parseInt(animeId, 10))
+      .eq('episode_number', epNumber)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        const remote = data
+          ? { time: data.progress, timestamp: data.timestamp || 0 }
+          : null
+        const localEntry = local.find(h => String(h.animeId) === String(animeId) && h.episode === epNumber) || null
+        const sources = [remote, localEntry].filter(Boolean)
+        sources.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        applyResume(sources[0])
+      })
+      .catch(() => {
+        if (!cancelled) {
+          applyResume(local.find(h => String(h.animeId) === String(animeId) && h.episode === epNumber))
+        }
+      })
+    return () => { cancelled = true; if (interval) clearInterval(interval) }
+  }, [animeId, epNumber, user?.id])
 
   const handleResume = useCallback(() => {
     const art = artInstance.current

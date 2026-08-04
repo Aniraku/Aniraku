@@ -3,7 +3,7 @@ import { FaAngleLeft, FaRandom, FaCog, FaShieldAlt } from "react-icons/fa"
 import { Link, useNavigate } from "react-router-dom"
 import { S } from "./sidebar.style"
 
-const SideBar = ({ open, setOpen, profile }) => {
+const SideBar = ({ open, setOpen, profile, isAdmin }) => {
   const navigate = useNavigate()
   const clickHandler = (e) => {
     setOpen(false)
@@ -26,7 +26,7 @@ const SideBar = ({ open, setOpen, profile }) => {
             <p style={{ fontSize: 12 }}>Settings</p>
           </Link>
         </S.SettingsItem>
-        {profile?.role === 'admin' && (
+        {isAdmin && (
           <S.SettingsItem>
             <Link to="/admin" onClick={() => setOpen(false)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2em', color: 'var(--text-primary)', textDecoration: 'none' }}>
               <FaShieldAlt size={20} color="var(--accent)" />

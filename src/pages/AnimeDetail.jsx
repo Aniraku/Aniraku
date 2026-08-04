@@ -547,13 +547,13 @@ const AnimeDetail = () => {
         image: anime.coverImage?.large || '',
       }])
       if (user) {
-        supabase.from('bookmarks').insert({
+        supabase.from('bookmarks').upsert({
           user_id: user.id,
           anime_id: numericId,
           title: anime.title?.english || anime.title?.romaji || 'Unknown',
           image: anime.coverImage?.large || '',
           added_at: Date.now(),
-        }).then()
+        }, { onConflict: 'user_id,anime_id' }).then()
       }
     }
   }

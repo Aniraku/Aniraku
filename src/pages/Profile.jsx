@@ -62,13 +62,15 @@ const Profile = () => {
             timestamp: h.timestamp,
           }))
           setHistory(prev => {
-            const merged = [...mapped]
-            prev.forEach(p => {
-              if (!merged.find(m => m.animeId === p.animeId && m.episode === p.episode)) {
-                merged.push(p)
-              }
-            })
-            return merged.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 50)
+            const byKey = new Map()
+            const merge = (h) => {
+              const key = `${h.animeId}-${h.episode}`
+              const existing = byKey.get(key)
+              if (!existing || (h.timestamp || 0) > (existing.timestamp || 0)) byKey.set(key, h)
+            }
+            mapped.forEach(merge)
+            prev.forEach(merge)
+            return [...byKey.values()].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 50)
           })
         }
       }).catch(err => console.error('watch history fetch error:', err))

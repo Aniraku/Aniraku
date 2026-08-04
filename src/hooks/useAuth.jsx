@@ -19,11 +19,16 @@ function sanitizeUsername(raw) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async (userId, email) => {
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, bio, avatar_url, banner_url, location, socials, created_at')
+        .eq('id', userId)
+        .maybeSingle()
       if (error) throw error
       if (data) {
         setProfile(data)
@@ -39,7 +44,7 @@ export const AuthProvider = ({ children }) => {
             display_name: username,
             avatar_url: fallbackAvatar,
           }, { onConflict: 'id' })
-          .select()
+          .select('id, username, display_name, bio, avatar_url, banner_url, location, socials, created_at')
           .maybeSingle()
         setProfile(created || { id: userId, username, display_name: username, avatar_url: fallbackAvatar })
       }
@@ -66,9 +71,13 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null)
-      if (session?.user) fetchProfile(session.user.id, session.user.email)
+      if (session?.user) {
+        fetchProfile(session.user.id, session.user.email)
+        supabase.rpc('is_admin').then(({ data }) => setIsAdmin(!!data)).catch(() => setIsAdmin(false))
+      }
       else {
         setProfile(null)
+        setIsAdmin(false)
         setLoading(false)
       }
     })
@@ -102,6 +111,7 @@ export const AuthProvider = ({ children }) => {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    setIsAdmin(false)
   }
 
   const updateProfile = async (updates) => {
@@ -114,7 +124,7 @@ export const AuthProvider = ({ children }) => {
     setProfile(prev => ({ ...prev, ...fields }))
   }
 
-  const ctx = useMemo(() => ({ user, profile, loading, signUp, signIn, signOut, updateProfile, isSupabaseConfigured }), [user, profile, loading, isSupabaseConfigured])
+  const ctx = useMemo(() => ({ user, profile, isAdmin, loading, signUp, signIn, signOut, updateProfile, isSupabaseConfigured }), [user, profile, isAdmin, loading, isSupabaseConfigured])
   return (
     <AuthContext.Provider value={ctx}>
       {children}

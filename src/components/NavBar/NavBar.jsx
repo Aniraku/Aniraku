@@ -17,7 +17,7 @@ const NavBar = () => {
   const [searchQ, setSearchQ] = useState('')
   const notifRef = useRef(null)
   const searchRef = useRef(null)
-  const { user, profile } = useAuth()
+  const { user, profile, isAdmin } = useAuth()
   const navigate = useNavigate()
 
   const location = useLocation()
@@ -91,7 +91,7 @@ const NavBar = () => {
         <N.MenuBtn onClick={() => setOpen(true)}>
           <FaBars size={20} />
         </N.MenuBtn>
-        <SideBar open={open} setOpen={setOpen} profile={profile} />
+        <SideBar open={open} setOpen={setOpen} profile={profile} isAdmin={isAdmin} />
         <Logo to="/home" height={36} showText />
         <N.NavLinks>
           <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}>Home</N.NavLink>

@@ -71,35 +71,30 @@ const SectionTitle = styled.h3`
 `
 
 const Admin = () => {
-  const { user, profile, loading } = useAuth()
+  const { user, isAdmin, loading } = useAuth()
   const navigate = useNavigate()
   const [stats, setStats] = useState({ users: 0, comments: 0, bookmarks: 0 })
   const [recentUsers, setRecentUsers] = useState([])
+  const [statsError, setStatsError] = useState('')
 
   useEffect(() => {
     if (!loading && !user) navigate('/login')
   }, [user, loading, navigate])
 
   useEffect(() => {
-    if (!user) return
-    Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact', head: true }),
-      supabase.from('comments').select('id', { count: 'exact', head: true }),
-      supabase.from('bookmarks').select('id', { count: 'exact', head: true }),
-      supabase.from('profiles').select('id, username, display_name, created_at').order('created_at', { ascending: false }).limit(10),
-    ]).then(([users, comments, bookmarks, recent]) => {
+    if (!user || !isAdmin) return
+    supabase.rpc('admin_stats').then(({ data, error }) => {
+      if (error) { setStatsError(error.message || 'Failed to load stats'); return }
       setStats({
-        users: users.count || 0,
-        comments: comments.count || 0,
-        bookmarks: bookmarks.count || 0,
+        users: data?.users || 0,
+        comments: data?.comments || 0,
+        bookmarks: data?.bookmarks || 0,
       })
-      setRecentUsers(recent.data || [])
-    }).catch(() => {})
-  }, [user])
+      setRecentUsers(data?.recent_users || [])
+    }).catch(() => setStatsError('Failed to load stats'))
+  }, [user, isAdmin])
 
   if (loading || !user) return null
-
-  const isAdmin = profile?.role === 'admin'
 
   if (!isAdmin) {
     return (
@@ -124,6 +119,11 @@ const Admin = () => {
           <Subtitle>Manage users, content, and system health</Subtitle>
 
           <Grid>
+            {statsError && (
+              <Section>
+                <p style={{ color: '#ef4444', fontSize: 14 }}>{statsError}</p>
+              </Section>
+            )}
             <StatCard>
               <StatValue>{stats.users}</StatValue>
               <StatLabel>Total Users</StatLabel>

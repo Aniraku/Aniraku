@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
-import { filterAdult, useStreamable } from '../hooks/useNsfw'
+import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { Link } from 'react-router-dom'
 import Footer from '../components/Footer/Footer'
 import { setScheduleSEO } from '../lib/seo'

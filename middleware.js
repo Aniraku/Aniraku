@@ -61,7 +61,6 @@ function htmlShell({ title, description, image, url, type, animeType, score, epi
 <script type="application/ld+json">${jsonld}</script>
 <script type="application/ld+json">${breadcrumb}</script>
 
-<script>location.href="${url}"</script>
 </head><body><h1>${title}</h1><p>${description}</p></body></html>`
 }
 
@@ -74,15 +73,16 @@ async function fetchAnime(id) {
 }
 
 export default async function middleware(request) {
-  const ua = request.headers.get('user-agent') || ''
-  if (!BOT_RE.test(ua)) return
+  try {
+    const ua = request.headers.get('user-agent') || ''
+    if (!BOT_RE.test(ua)) return
 
-  const url = new URL(request.url)
-  const path = url.pathname
+    const url = new URL(request.url)
+    const path = url.pathname
 
-  // /anime/:slug-:id
-  m = path.match(/^\/anime\/(.+)-(\d+)$/)
-  if (m) {
+    // /anime/:slug-:id
+    const m = path.match(/^\/anime\/(.+)-(\d+)$/)
+    if (m) {
     const anime = await fetchAnime(m[2])
     if (anime) {
       const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m[2]}`)
@@ -109,21 +109,21 @@ export default async function middleware(request) {
   }
 
   // /watch/:slug-:id-episode-:ep
-  m = path.match(/^\/watch\/(.+)-(\d+)-episode-(\d+)$/)
-  if (m) {
-    const anime = await fetchAnime(m[2])
+  const m2 = path.match(/^\/watch\/(.+)-(\d+)-episode-(\d+)$/)
+  if (m2) {
+    const anime = await fetchAnime(m2[2])
     if (anime) {
-      const ep = m[3]
-      const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m[2]}`)
+      const ep = m2[3]
+      const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m2[2]}`)
       const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
       const desc = escape(rawDesc || `Watch ${title} Episode ${ep} online — Sub & Dub available.`)
       const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
-      const watchUrl = `${SITE}/watch/${m[0].slice(1)}`
+      const watchUrl = `${SITE}/watch/${m2[0].slice(1)}`
 
       // VideoObject JSON-LD
-      const videoJsonld = `{"@context":"https://schema.org","@type":"VideoObject","name":"${title} - Episode ${ep}","description":"${desc}","thumbnailUrl":"${image}","contentUrl":"${watchUrl}","embedUrl":"${watchUrl}","duration":"PT24M","uploadDate":"${new Date().toISOString().split('T')[0]}","provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"},"isPartOf":{"@type":"TVSeries","name":"${title}","url":"${SITE}/anime/${m[0].slice(1).replace(/-episode-\d+$/, '')}"}}`
+      const videoJsonld = `{"@context":"https://schema.org","@type":"VideoObject","name":"${title} - Episode ${ep}","description":"${desc}","thumbnailUrl":"${image}","contentUrl":"${watchUrl}","embedUrl":"${watchUrl}","duration":"PT24M","uploadDate":"${new Date().toISOString().split('T')[0]}","provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"},"isPartOf":{"@type":"TVSeries","name":"${title}","url":"${SITE}/anime/${m2[0].slice(1).replace(/-episode-\d+$/, '')}"}}`
 
-      const watchBreadcrumb = `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE}/"},{"@type":"ListItem","position":2,"name":"Catalog","item":"${SITE}/catalog"},{"@type":"ListItem","position":3,"name":"${title}","item":"${SITE}/anime/${m[0].slice(1).replace(/-episode-\d+$/, '')}"},{"@type":"ListItem","position":4,"name":"Episode ${ep}"}]}`
+      const watchBreadcrumb = `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE}/"},{"@type":"ListItem","position":2,"name":"Catalog","item":"${SITE}/catalog"},{"@type":"ListItem","position":3,"name":"${title}","item":"${SITE}/anime/${m2[0].slice(1).replace(/-episode-\d+$/, '')}"},{"@type":"ListItem","position":4,"name":"Episode ${ep}"}]}`
 
       return new Response(`<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"/>
@@ -153,10 +153,13 @@ export default async function middleware(request) {
 <script type="application/ld+json">${videoJsonld}</script>
 <script type="application/ld+json">${watchBreadcrumb}</script>
 
-<script>location.href="${watchUrl}"</script>
 </head><body><h1>${title} — Episode ${ep}</h1><p>${desc}</p></body></html>`, {
         headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
       })
     }
+  }
+  } catch (err) {
+    console.error('[middleware] bot prerender failed, falling through to SPA:', err)
+    return
   }
 }

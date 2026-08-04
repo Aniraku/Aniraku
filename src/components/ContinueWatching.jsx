@@ -124,22 +124,26 @@ const ContinueWatching = () => {
       local.push(...JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]'))
     } catch {}
 
-    const seen = new Set()
-    const merged = []
-    for (const item of [...serverItems, ...local]) {
-      const key = `${item.animeId}-${item.episode}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      merged.push({
+    const byKey = new Map()
+    const merge = (item) => {
+      const key = `${item.animeId}-${item.episode || item.episode_number}`
+      const candidate = {
         animeId: item.animeId,
-        title: item.title || `Anime ${item.animeId}`,
+        title: item.title || item.anime_title || `Anime ${item.animeId}`,
         image: item.image || item.anime_image || '',
         episode: item.episode || item.episode_number,
         time: item.time ?? item.progress ?? 0,
         duration: item.duration || 0,
         timestamp: item.timestamp || 0,
-      })
+      }
+      const existing = byKey.get(key)
+      // Newer write wins, whether it came from this device or another.
+      if (!existing || candidate.timestamp > existing.timestamp) byKey.set(key, candidate)
     }
+    serverItems.forEach(merge)
+    local.forEach(merge)
+
+    const merged = [...byKey.values()]
     merged.sort((a, b) => b.timestamp - a.timestamp)
     return merged.slice(0, 12)
   }, [serverItems])
