@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Artplayer from 'artplayer'
 import Hls from 'hls.js'
-import { FaStepForward, FaStepBackward, FaSearch } from 'react-icons/fa'
+import { FaStepForward, FaStepBackward, FaSearch, FaCommentDots } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
@@ -962,7 +962,6 @@ export default function Watch() {
         maxWidth: theaterMode ? '100%' : 1200,
         margin: '0 auto', background: '#000',
         transition: 'max-width 0.3s ease',
-        position: 'sticky', top: 0, zIndex: 10,
       }}>
         {embedUrl ? (
           <iframe
@@ -1157,7 +1156,9 @@ export default function Watch() {
           )}
 
           {anime && (
-            <Comments animeId={anime.id} episodeNumber={epNumber} label={`Episode ${epNumber}${episodes?.length ? ` of ${episodes.length}` : ''}`} />
+            <div id="watch-comments">
+              <Comments animeId={anime.id} episodeNumber={epNumber} label={`Episode ${epNumber}${episodes?.length ? ` of ${episodes.length}` : ''}`} />
+            </div>
           )}
         </div>
 
@@ -1265,7 +1266,7 @@ export default function Watch() {
         .art-subtitle-wrap span { line-height: 1.4 !important; }
 
         @media (max-width: 768px) {
-          .watch-player-wrapper { max-width: 100% !important; position: -webkit-sticky !important; position: sticky !important; }
+          .watch-player-wrapper { max-width: 100% !important; }
           .watch-info-section { flex-direction: column !important; gap: 16px !important; padding: 16px !important; }
           .watch-episode-sidebar { width: 100% !important; flex-shrink: 1 !important; max-height: none !important; }
           .watch-ep-toggle { display: flex !important; }
@@ -1296,6 +1297,22 @@ export default function Watch() {
           .watch-source-btn { padding: 10px 18px !important; }
         }
       `}</style>
+
+      {anime && (
+        <button
+          onClick={() => document.getElementById('watch-comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          style={{
+            position: 'fixed', bottom: 20, right: 20, zIndex: 60,
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'var(--accent)', color: 'var(--bg)', border: 'none',
+            borderRadius: 999, padding: '12px 18px', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+          }}
+          title="Jump to episode comments"
+        >
+          <FaCommentDots size={15} /> Comments
+        </button>
+      )}
 
     </main>
     </div>

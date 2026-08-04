@@ -681,6 +681,8 @@ const AnimeDetail = () => {
                 {relations.map(r => <RelationCard key={r.id} r={{ node: r, relationType: r.relationType || '' }} />)}
               </Grid>
             )}
+
+            <Comments animeId={anime.id} />
           </Section>
         )}
 
@@ -692,8 +694,6 @@ const AnimeDetail = () => {
             </Grid>
           </Section>
         )}
-
-        <Comments animeId={anime.id} />
       </Content>
       </main>
       <Footer />
