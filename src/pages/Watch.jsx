@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import Artplayer from 'artplayer'
-import Hls from 'hls.js'
 import { FaStepForward, FaStepBackward, FaSearch, FaCommentDots } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
@@ -511,7 +509,7 @@ export default function Watch() {
 
   useEffect(() => () => destroyPlayer(), [destroyPlayer])
 
-  const buildPlayer = useCallback((streamUrl, qualityList, subtitles, headers, onBlocked) => {
+  const buildPlayer = useCallback(async (streamUrl, qualityList, subtitles, headers, onBlocked) => {
     destroyPlayer()
     const container = artRef.current
     if (!container) return
@@ -559,66 +557,68 @@ export default function Watch() {
       playbackRate: true,
       quality: qualityList,
       customType: {
-        m3u8: function (video, url, art) {
-          if (Hls.isSupported()) {
-            if (art.hls) {
-              art.hls.destroy()
-            }
-            const hls = new Hls({
-              enableWorker: false,
-              maxBufferLength: 15,
-              maxMaxBufferLength: 60,
-              startFragPrefetch: true,
-              lowLatencyMode: false,
-              backBufferLength: 5,
-              appendInSequenceGaps: true,
-              maxBufferHole: 1.0,
-              forceKeyFrameOnDiscontinuity: true,
-              maxRecoveryAttempts: 10,
-              manifestLoadingMaxRetry: 10,
-              levelLoadingMaxRetry: 10,
-              fragLoadingMaxRetry: 10,
-              defaultAudioCodec: 'mp4a.40.2',
-            })
-
-            let recoveryAttempts = 0
-            const maxRecoveryAttempts = 5
-
-            hls.on(Hls.Events.ERROR, (_event, data) => {
-              if (!data.fatal) return
-              recoveryAttempts++
-              if (recoveryAttempts >= maxRecoveryAttempts) {
-                if (onBlocked) {
-                  onBlocked()
-                } else {
-                  setError('Stream failed after multiple retries. Try a different server.')
-                }
-                return
-              }
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                hls.startLoad()
-              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                hls.recoverMediaError()
-              } else {
-                if (onBlocked) {
-                  onBlocked()
-                } else {
-                  setError('Stream playback error. Try a different server.')
-                }
-              }
-            })
-
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              video.play().catch(() => {})
-            })
-
-            hls.loadSource(url)
-            hls.attachMedia(video)
-            art.hls = hls
-            art.on('destroy', () => hls.destroy())
-          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        m3u8: async function (video, url, art) {
+          if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = url
+            return
           }
+          const { default: Hls } = await import('hls.js')
+          if (!Hls.isSupported()) return
+          if (art.hls) {
+            art.hls.destroy()
+          }
+          const hls = new Hls({
+            enableWorker: false,
+            maxBufferLength: 15,
+            maxMaxBufferLength: 60,
+            startFragPrefetch: true,
+            lowLatencyMode: false,
+            backBufferLength: 5,
+            appendInSequenceGaps: true,
+            maxBufferHole: 1.0,
+            forceKeyFrameOnDiscontinuity: true,
+            maxRecoveryAttempts: 10,
+            manifestLoadingMaxRetry: 10,
+            levelLoadingMaxRetry: 10,
+            fragLoadingMaxRetry: 10,
+            defaultAudioCodec: 'mp4a.40.2',
+          })
+
+          let recoveryAttempts = 0
+          const maxRecoveryAttempts = 5
+
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (!data.fatal) return
+            recoveryAttempts++
+            if (recoveryAttempts >= maxRecoveryAttempts) {
+              if (onBlocked) {
+                onBlocked()
+              } else {
+                setError('Stream failed after multiple retries. Try a different server.')
+              }
+              return
+            }
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad()
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError()
+            } else {
+              if (onBlocked) {
+                onBlocked()
+              } else {
+                setError('Stream playback error. Try a different server.')
+              }
+            }
+          })
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(() => {})
+          })
+
+          hls.loadSource(url)
+          hls.attachMedia(video)
+          art.hls = hls
+          art.on('destroy', () => hls.destroy())
         }
       },
     }
@@ -639,6 +639,7 @@ export default function Watch() {
       }
     }
 
+    const { default: Artplayer } = await import('artplayer')
     const art = new Artplayer(playerConfig)
 
     if (subtitles && subtitles.length > 1) {
