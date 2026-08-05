@@ -1172,6 +1172,7 @@ export default function Watch() {
           <iframe
             src={embedUrl}
             style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh', border: 'none' }}
+            allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
             allowFullScreen
             sandbox="allow-scripts allow-same-origin allow-popups"
             title="Embedded player"
