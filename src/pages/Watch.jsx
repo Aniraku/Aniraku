@@ -362,9 +362,6 @@ export default function Watch() {
     return all.find(s => s.id === activeSource) || all[0] || null
   }, [SOURCES, activeSource])
 
-  const hasSub = servers.sub.length > 0
-  const hasDub = servers.dub.length > 0
-
   // Auto-select first working SUB source when servers load
   useEffect(() => {
     if (SOURCES.sub.length > 0 && !SOURCES.sub.find(s => s.id === activeSource)) {
@@ -945,36 +942,37 @@ export default function Watch() {
     }
   }, [animeId, epNumber, SOURCES, showToast, buildPlayer, destroyPlayer])
 
-  // Fetch servers when episode changes
+  // Fetch servers when episode changes. Miruro's dub endpoints 502
+  // transiently, so retry (with backoff) when a lang list comes back empty —
+  // a 12s-later retry usually recovers the list.
   useEffect(() => {
     if (!animeId || !epNumber) return
     let cancelled = false
+    let retries = 0
     const fetchServers = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=sub`)
         if (!res.ok) return
         const subServers = await res.json()
         if (cancelled) return
-        // Also fetch dub servers
+        let dubServers = []
         try {
           const dubRes = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=dub`)
-          const dubServers = dubRes.ok ? await dubRes.json() : []
-          if (!cancelled) {
-            const subs = Array.isArray(subServers) ? subServers : []
-            const dubs = Array.isArray(dubServers) ? dubServers : []
-            setServers({ sub: subs, dub: dubs })
-            if (subs.length === 0 && dubs.length === 0) {
-              setError('No video source found')
-            }
-          }
-        } catch {
-          if (!cancelled) {
-            const subs = Array.isArray(subServers) ? subServers : []
-            setServers({ sub: subs, dub: [] })
-            if (subs.length === 0) {
-              setError('No video source found')
-            }
-          }
+          dubServers = dubRes.ok ? await dubRes.json() : []
+        } catch {}
+        if (cancelled) return
+        const subs = Array.isArray(subServers) ? subServers : []
+        const dubs = Array.isArray(dubServers) ? dubServers : []
+        setServers(prev => ({
+          sub: subs.length > 0 ? subs : prev.sub,
+          dub: dubs.length > 0 ? dubs : prev.dub,
+        }))
+        if (subs.length === 0 && dubs.length === 0) {
+          setError('No video source found')
+        }
+        if ((subs.length === 0 || dubs.length === 0) && retries < 2) {
+          retries += 1
+          setTimeout(fetchServers, 12000)
         }
       } catch {}
     }
@@ -1297,7 +1295,7 @@ export default function Watch() {
 
       {/* Source selector */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 16px 0' }}>
-        {['sub', 'dub'].filter(lang => (lang === 'sub' ? hasSub : hasDub)).map(lang => (
+        {['sub', 'dub'].map(lang => (
           <div key={lang} style={{ marginBottom: 12 }}>
             <div style={{
               fontSize: 11, color: 'var(--text-muted)', marginBottom: 6,
@@ -1306,7 +1304,13 @@ export default function Watch() {
               {lang === 'sub' ? 'SUB' : 'DUB'}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              {SOURCES[lang].map(source => {
+              {SOURCES[lang].length === 0 ? (
+                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                  {lang === 'dub'
+                    ? 'No dub available for this episode right now — checking again shortly...'
+                    : 'No sub source available right now — checking again shortly...'}
+                </span>
+              ) : SOURCES[lang].map(source => {
                 const isActive = activeSource === source.id
                 return (
                   <button
