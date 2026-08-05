@@ -545,30 +545,53 @@ export default function Watch() {
     const headersParam = headers ? `&headers=${encodeURIComponent(JSON.stringify(headers))}` : ''
     const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
 
-    const playAsMp4 = (video, url, art) => {
-      // Native MP4: direct first (trusted browser), proxy as fallback, then next server.
-      let triedProxy = false
-      const load = (u) => {
-        video.src = u
+    // Probe a URL before handing it to the video element or hls.js. If the
+    // CDN blocks cross-origin reads (no ACAO header) or the request fails,
+    // skip straight to the proxy — the player never sees a failure, so it
+    // never flashes Artplayer's "Video Failed" error.
+    const probeUrl = async (u) => {
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 6000)
+        const r = await fetch(u, {
+          headers: { Range: 'bytes=0-65535' },
+          referrer: (headers && headers.Referer) || undefined,
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        return r.ok && r.status < 400
+      } catch {
+        return false
+      }
+    }
+
+    const playAsMp4 = async (video, url, art) => {
+      const proxiedUrl = proxied(url)
+      let step = (await probeUrl(url)) ? 0 : 1
+      if (step === 1) console.log('[Watch] Direct MP4 not CORS-reachable, using proxy:', url)
+      const load = () => {
+        video.src = step === 0 ? url : proxiedUrl
         video.load()
         video.play().catch(() => {})
       }
       video.onerror = () => {
-        video.onerror = null
-        if (!triedProxy) {
-          triedProxy = true
+        if (step === 0) {
+          step = 1
           console.log('[Watch] Direct MP4 failed, trying proxy:', url)
-          load(proxied(url))
+          load()
           return
         }
-        console.log('[Watch] Proxy MP4 failed too, moving to next server:', url)
-        if (onBlocked) {
-          onBlocked()
-        } else {
-          setError('Stream playback error. Try a different server.')
+        if (step === 1) {
+          step = 2
+          console.log('[Watch] Proxy MP4 failed too, moving to next server:', url)
+          if (onBlocked) {
+            onBlocked()
+          } else {
+            setError('Stream playback error. Try a different server.')
+          }
         }
       }
-      load(url)
+      load()
     }
 
     const playerConfig = {
@@ -617,7 +640,7 @@ export default function Watch() {
         },
         m3u8: async function (video, url, art) {
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = url
+            video.src = (await probeUrl(url)) ? url : proxied(url)
             return
           }
           const { default: Hls } = await import('hls.js')
@@ -660,6 +683,7 @@ export default function Watch() {
           // Chrome TLS). If the CDN rejects it (datacenter-only host, referer
           // gate, CORS), fall back to the backend proxy, then next server.
           let triedProxy = false
+          let netRetries = 0
 
           const fail = () => {
             if (!triedProxy) {
@@ -692,7 +716,12 @@ export default function Watch() {
               return
             }
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !triedProxy) {
-              hls.startLoad()
+              if (netRetries < 3) {
+                netRetries += 1
+                hls.startLoad()
+                return
+              }
+              fail()
               return
             }
             fail()
@@ -702,7 +731,9 @@ export default function Watch() {
             video.play().catch(() => {})
           })
 
-          hls.loadSource(url)
+          const chosenUrl = (await probeUrl(url)) ? url : proxied(url)
+          if (chosenUrl !== url) console.log('[Watch] Direct playlist not CORS-reachable, using proxy:', url)
+          hls.loadSource(chosenUrl)
           hls.attachMedia(video)
           art.hls = hls
           art.on('destroy', () => hls.destroy())
@@ -747,6 +778,13 @@ export default function Watch() {
       playerConfig.subtitle.url = resolvedSubtitleUrl
     }
     const art = new Artplayer(playerConfig)
+
+    // Keep Artplayer's built-in "Video Failed" layer out of sight — fallbacks
+    // (proxy switch, next server) handle real failures, and the error flash on
+    // a transient issue is worse than a silent transition.
+    art.on('video:error', () => {
+      try { art.layers.error.show = false } catch {}
+    })
 
     if (subtitles && subtitles.length > 1) {
       art._anirakuSubtitles = subtitles
