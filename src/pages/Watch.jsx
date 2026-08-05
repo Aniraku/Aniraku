@@ -295,6 +295,7 @@ export default function Watch() {
   const [epSearch, setEpSearch] = useState('')
   const [toast, setToast] = useState('')
   const [servers, setServers] = useState({ sub: [], dub: [] })
+  const [noStreamError, setNoStreamError] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
   const [resumeCountdown, setResumeCountdown] = useState(0)
@@ -830,13 +831,15 @@ export default function Watch() {
     loadingRef.current = true
     setStreamLoading(true)
     setError('')
+    setNoStreamError(false)
     setResumePos(null)
 
     const retryKey = sourceId
     if (forceRefresh) {
       streamRetries.current[retryKey] = (streamRetries.current[retryKey] || 0) + 1
       if (streamRetries.current[retryKey] > 3) {
-        setError('No video source found for this anime.')
+        setNoStreamError(true)
+        setError('We don\'t have streaming for this anime.')
         setStreamLoading(false)
         loadingRef.current = false
         return
@@ -876,7 +879,11 @@ export default function Watch() {
       const data = await res.json()
 
       if (data.error || !data.sources?.[0]?.url) {
-        setError(data.error || 'No video source found')
+        // Expired/dead CDN streams surface as a no-stream error — show the
+        // regular no-source state, never a broken player.
+        const isNoStream = /no streaming source|no video source|not available|blocked|unreachable|filtered/i.test(data.error || '')
+        setNoStreamError(isNoStream || !data.sources?.[0]?.url)
+        setError(isNoStream ? 'We don\'t have streaming for this anime.' : (data.error || 'No video source found'))
         setStreamLoading(false)
         loadingRef.current = false
         return
@@ -946,7 +953,8 @@ export default function Watch() {
           dub: dubs.length > 0 ? dubs : prev.dub,
         }))
         if (subs.length === 0 && dubs.length === 0) {
-          setError('No video source found')
+          setNoStreamError(true)
+          setError('We don\'t have streaming for this anime.')
         }
         if ((subs.length === 0 || dubs.length === 0) && retries < 2) {
           retries += 1
@@ -990,7 +998,8 @@ export default function Watch() {
     // Every server's stream is dead — tear the player down and fall back to
     // the regular "no stream found" state instead of leaving a broken player.
     destroyPlayer()
-    setError('No video source found for this anime.')
+    setNoStreamError(true)
+    setError('We don\'t have streaming for this anime.')
   }, [SOURCES, showToast, destroyPlayer])
 
   handleProviderBlockedRef.current = handleProviderBlocked
@@ -1004,6 +1013,7 @@ export default function Watch() {
     if (source) showToast(`Switching to ${source.lang.toUpperCase()}...`)
     setActiveSource(sourceId)
     setError('')
+    setNoStreamError(false)
   }, [activeSource, SOURCES, showToast])
 
   // Mobile gestures
@@ -1236,21 +1246,25 @@ export default function Watch() {
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, fontWeight: 500, maxWidth: 400, lineHeight: 1.5 }}>
               {error}
             </p>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 10, maxWidth: 400, lineHeight: 1.5 }}>
-              Streaming taking too long? Switch to a different server to start playing.
-            </p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button onClick={handleProviderBlocked} style={{
-                padding: '10px 24px', background: 'rgba(99,102,241,0.2)',
-                color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.4)', borderRadius: 8,
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}>Switch Server</button>
-              <button onClick={() => loadStream(activeSource, true)} style={{
-                padding: '10px 24px', background: 'rgba(226,232,240,0.12)',
-                color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)', borderRadius: 8,
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}>Retry</button>
-            </div>
+            {!noStreamError && (
+              <>
+                <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 10, maxWidth: 400, lineHeight: 1.5 }}>
+                  Streaming taking too long? Switch to a different server to start playing.
+                </p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button onClick={handleProviderBlocked} style={{
+                    padding: '10px 24px', background: 'rgba(99,102,241,0.2)',
+                    color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.4)', borderRadius: 8,
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Switch Server</button>
+                  <button onClick={() => loadStream(activeSource, true)} style={{
+                    padding: '10px 24px', background: 'rgba(226,232,240,0.12)',
+                    color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)', borderRadius: 8,
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Retry</button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
