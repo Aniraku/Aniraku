@@ -295,7 +295,6 @@ export default function Watch() {
   const [epSearch, setEpSearch] = useState('')
   const [toast, setToast] = useState('')
   const [servers, setServers] = useState({ sub: [], dub: [] })
-  const [embedUrl, setEmbedUrl] = useState('')
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
   const [resumeCountdown, setResumeCountdown] = useState(0)
@@ -831,14 +830,13 @@ export default function Watch() {
     loadingRef.current = true
     setStreamLoading(true)
     setError('')
-    setEmbedUrl('')
     setResumePos(null)
 
     const retryKey = sourceId
     if (forceRefresh) {
       streamRetries.current[retryKey] = (streamRetries.current[retryKey] || 0) + 1
       if (streamRetries.current[retryKey] > 3) {
-        setError('All providers blocked. Try again later or use a different server.')
+        setError('No video source found for this anime.')
         setStreamLoading(false)
         loadingRef.current = false
         return
@@ -871,11 +869,6 @@ export default function Watch() {
           lang: source.lang,
           quality: 'auto',
           refresh: forceRefresh,
-          // Title + MAL ID let the backend's ZEN API fallback match the
-          // anime without an extra AniList roundtrip (AniList rate limits
-          // used to silently kill the zein fallback).
-          title: anime?.title?.english || anime?.title?.romaji || '',
-          malId: anime?.idMal || 0,
         }),
       })
       clearTimeout(timeoutId)
@@ -890,14 +883,6 @@ export default function Watch() {
       }
 
       const firstSource = data.sources[0]
-
-      if (firstSource.type === 'embed') {
-        destroyPlayer()
-        setEmbedUrl(firstSource.url)
-        setStreamLoading(false)
-        loadingRef.current = false
-        return
-      }
 
       const qualityList = data.sources.map((src, idx) => ({
         default: idx === 0,
@@ -932,7 +917,7 @@ export default function Watch() {
       loadingRef.current = false
       return
     }
-  }, [animeId, epNumber, SOURCES, showToast, buildPlayer, destroyPlayer, anime])
+  }, [animeId, epNumber, SOURCES, showToast, buildPlayer, destroyPlayer])
 
   // Fetch servers when episode changes. Miruro's dub endpoints 502
   // transiently, so retry (with backoff) when a lang list comes back empty —
@@ -943,9 +928,7 @@ export default function Watch() {
     let retries = 0
     const fetchServers = async () => {
       try {
-        const t = anime?.title?.english || anime?.title?.romaji || ''
-        const m = anime?.idMal || 0
-        const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&title=${encodeURIComponent(t)}&malId=${m}`
+        const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}`
         const res = await fetch(`${base}&lang=sub`)
         if (!res.ok) return
         const subServers = await res.json()
@@ -973,7 +956,7 @@ export default function Watch() {
     }
     fetchServers()
     return () => { cancelled = true }
-  }, [animeId, epNumber, anime])
+  }, [animeId, epNumber])
 
   // Load stream on active source / episode change
   const loadStreamRef = useRef(loadStream)
@@ -1004,8 +987,11 @@ export default function Watch() {
       loadStreamRef.current(current, true)
       return
     }
-    setError('All providers blocked. Try again later or use a different server.')
-  }, [SOURCES, showToast])
+    // Every server's stream is dead — tear the player down and fall back to
+    // the regular "no stream found" state instead of leaving a broken player.
+    destroyPlayer()
+    setError('No video source found for this anime.')
+  }, [SOURCES, showToast, destroyPlayer])
 
   handleProviderBlockedRef.current = handleProviderBlocked
   useEffect(() => {
@@ -1176,17 +1162,6 @@ export default function Watch() {
         position: 'relative',
         transition: 'max-width 0.3s ease',
       }}>
-        {embedUrl ? (
-          <iframe
-            src={embedUrl}
-            style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh', border: 'none' }}
-            allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
-            allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-popups"
-            title="Embedded player"
-          />
-        ) : (
-          <>
             <div ref={artRef} data-aniraku-player aria-label="Video player" role="region" style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
 
             {/* Touch seek buttons */}
@@ -1222,8 +1197,6 @@ export default function Watch() {
                 <FaStepForward size={20} />
               </button>
             </div>
-          </>
-        )}
 
         {streamLoading && (
           <div style={{
