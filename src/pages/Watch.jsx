@@ -346,7 +346,11 @@ export default function Watch() {
       }).map(s => ({
         id: `${s.name}-${s.lang}`,
         label: s.name,
-        provider: s.provider,
+        // The backend resolves streams per named provider (bonk/moo/...);
+        // sending the generic "miruro" label would make every "switch
+        // server" request return whichever provider the backend happens to
+        // prefer instead of the server the user picked.
+        provider: s.name,
         lang: s.lang,
       }))
     }
