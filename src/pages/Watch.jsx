@@ -541,8 +541,6 @@ export default function Watch() {
     destroyPlayer()
     const container = artRef.current
     if (!container) return
-    // A fresh build is a fresh start — never inherit a stuck recovery flag.
-    recoveryBusyRef.current = false
 
     const headersParam = headers ? `&headers=${encodeURIComponent(JSON.stringify(headers))}` : ''
     const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
@@ -551,42 +549,16 @@ export default function Watch() {
       // Native MP4 through the backend proxy — the proxy adds the provider
       // referer and streams with CORS headers, so the video element loads
       // first try with no failed-request noise in the console. If the proxy
-      // stream itself errors, recover (next quality, then next server).
+      // stream itself errors, move to the next server.
       video.src = proxied(url)
       video.load()
       video.play().catch(() => {})
-      video.onerror = () => recoverPlayback()
-    }
-
-    // Auto-recover from a dead stream with a clear message instead of
-    // ArtPlayer's built-in reconnect loop (which re-loads the same dead URL):
-    // try the next quality of this server first, then fall through to the
-    // next server. The busy guard keeps this to one step per failure, so a
-    // dead CDN is skipped once instead of being hammered into rate-limiting.
-    const recoverPlayback = () => {
-      if (recoveryBusyRef.current) return
-      recoveryBusyRef.current = true
-      try {
-        const art = artInstance.current
-        const cur = art ? art.option.url : streamUrl
-        const idx = qualityList.findIndex(q => q.url === cur)
-        const next = idx >= 0 && idx + 1 < qualityList.length ? qualityList[idx + 1] : null
-        if (next) {
-          showToast('Stream issue — trying the next quality...')
-          try {
-            art.switchQuality(next.url)
-          } catch {
-            destroyPlayer()
-            buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
-          }
-        } else if (onBlocked) {
-          showToast('Stream unavailable — switching server...')
+      video.onerror = () => {
+        if (onBlocked) {
           onBlocked()
         } else {
           setError('Stream playback error. Try a different server.')
         }
-      } finally {
-        recoveryBusyRef.current = false
       }
     }
 
@@ -691,7 +663,11 @@ export default function Watch() {
               hls.loadSource(url)
               return
             }
-            recoverPlayback()
+            if (onBlocked) {
+              onBlocked()
+            } else {
+              setError('Stream playback error. Try a different server.')
+            }
           }
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -758,19 +734,13 @@ export default function Watch() {
     }
 
     const [{ default: Artplayer }] = await Promise.all([import('artplayer')])
-    // ArtPlayer's built-in "Reconnect: N" loop re-assigns art.url to the same
-    // dead URL (up to 5x, 1s apart), hammering the CDN into rate-limiting and
-    // painting a dead-end notice. Playback failures are recovered explicitly
-    // in recoverPlayback below instead — one bounded step per failure.
-    Artplayer.RECONNECT_TIME_MAX = 0
     const art = new Artplayer(playerConfig)
 
-    // ArtPlayer's built-in reconnect loop is disabled above, so a playback
-    // failure is handled here, explicitly: keep the error layer out of sight
-    // and recover with a clear message (next quality, then next server).
+    // Keep Artplayer's built-in "Video Failed" layer out of sight — fallbacks
+    // (proxy switch, next server) handle real failures, and the error flash on
+    // a transient issue is worse than a silent transition.
     art.on('video:error', () => {
       try { art.layers.error.show = false } catch {}
-      recoverPlayback()
     })
 
     if (subtitles && subtitles.length > 1) {
@@ -834,11 +804,10 @@ export default function Watch() {
 
     artInstance.current = art
     if (artRef.current) artRef.current.__artplayer = art
-  }, [animeId, anime?.id, epNumber, episodes, anime, navigate, destroyPlayer, showToast])
+  }, [animeId, anime?.id, epNumber, episodes, anime, navigate, destroyPlayer])
 
   const streamRetries = useRef({})
   const streamAbortRef = useRef(null)
-  const recoveryBusyRef = useRef(false)
   const [slowStream, setSlowStream] = useState(false)
 
   useEffect(() => {
