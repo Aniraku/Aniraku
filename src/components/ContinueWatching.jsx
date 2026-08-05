@@ -127,9 +127,16 @@ const ContinueWatching = () => {
     const byKey = new Map()
     const merge = (item) => {
       const key = `${item.animeId}-${item.episode || item.episode_number}`
+      // History rows occasionally carry the AniList title OBJECT instead of
+      // a string (older writes) — normalize so slug generation never sees
+      // a non-string (a toLowerCase() on an object crashes the Home page).
+      const rawTitle = item.title ?? item.anime_title ?? `Anime ${item.animeId}`
+      const title = (typeof rawTitle === 'object' && rawTitle !== null)
+        ? (rawTitle.english || rawTitle.romaji || rawTitle.userPreferred || rawTitle.native || `Anime ${item.animeId}`)
+        : String(rawTitle)
       const candidate = {
         animeId: item.animeId,
-        title: item.title || item.anime_title || `Anime ${item.animeId}`,
+        title,
         image: item.image || item.anime_image || '',
         episode: item.episode || item.episode_number,
         time: item.time ?? item.progress ?? 0,

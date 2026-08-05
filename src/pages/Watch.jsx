@@ -871,6 +871,11 @@ export default function Watch() {
           lang: source.lang,
           quality: 'auto',
           refresh: forceRefresh,
+          // Title + MAL ID let the backend's ZEN API fallback match the
+          // anime without an extra AniList roundtrip (AniList rate limits
+          // used to silently kill the zein fallback).
+          title: anime?.title?.english || anime?.title?.romaji || '',
+          malId: anime?.idMal || 0,
         }),
       })
       clearTimeout(timeoutId)
@@ -927,7 +932,7 @@ export default function Watch() {
       loadingRef.current = false
       return
     }
-  }, [animeId, epNumber, SOURCES, showToast, buildPlayer, destroyPlayer])
+  }, [animeId, epNumber, SOURCES, showToast, buildPlayer, destroyPlayer, anime])
 
   // Fetch servers when episode changes. Miruro's dub endpoints 502
   // transiently, so retry (with backoff) when a lang list comes back empty —
@@ -938,13 +943,16 @@ export default function Watch() {
     let retries = 0
     const fetchServers = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=sub`)
+        const t = anime?.title?.english || anime?.title?.romaji || ''
+        const m = anime?.idMal || 0
+        const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&title=${encodeURIComponent(t)}&malId=${m}`
+        const res = await fetch(`${base}&lang=sub`)
         if (!res.ok) return
         const subServers = await res.json()
         if (cancelled) return
         let dubServers = []
         try {
-          const dubRes = await fetch(`${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}&lang=dub`)
+          const dubRes = await fetch(`${base}&lang=dub`)
           dubServers = dubRes.ok ? await dubRes.json() : []
         } catch {}
         if (cancelled) return
@@ -965,7 +973,7 @@ export default function Watch() {
     }
     fetchServers()
     return () => { cancelled = true }
-  }, [animeId, epNumber])
+  }, [animeId, epNumber, anime])
 
   // Load stream on active source / episode change
   const loadStreamRef = useRef(loadStream)
