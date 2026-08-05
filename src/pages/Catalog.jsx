@@ -6,7 +6,6 @@ import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
-import Card from '../components/Card/Card'
 import { FaChevronDown, FaTimes, FaSliders, FaX } from 'react-icons/fa'
 
 const PER_PAGE = 24

@@ -315,6 +315,21 @@ export default function Watch() {
   const episodesRef = useRef(episodes)
   episodesRef.current = episodes
 
+  const activeSourceRef = useRef(activeSource)
+  activeSourceRef.current = activeSource
+  const blockedSourcesRef = useRef(new Set())
+  const lastBlockCycleRef = useRef(0)
+  const forceRefreshUsedRef = useRef(false)
+  const handleProviderBlockedRef = useRef(null)
+
+  // Reset per-episode block tracking when the anime or episode changes
+  useEffect(() => {
+    blockedSourcesRef.current = new Set()
+    lastBlockCycleRef.current = 0
+    forceRefreshUsedRef.current = false
+    streamRetries.current = {}
+  }, [animeId, epNumber])
+
   const showToast = useCallback((msg, icon) => {
     setToast({ msg, icon })
     clearTimeout(toastTimerRef.current)
@@ -638,6 +653,9 @@ export default function Watch() {
           hls.on(Hls.Events.MANIFEST_LOAD_ERROR, () => {
             if (!triedDirect) {
               tryDirectPlayback()
+            } else if (onBlocked) {
+              // Proxied and direct both failed — move on to the next server
+              onBlocked()
             }
           })
 
@@ -653,6 +671,7 @@ export default function Watch() {
       },
     }
 
+    let subtitleProbe = Promise.resolve('')
     if (subtitles && subtitles.length > 0 && subtitles[0].url) {
       const subtitleUrl = subtitles[0].url
       const proxiedSubtitleUrl = `${PROXY_BASE}/proxy?url=${encodeURIComponent(subtitleUrl)}${headersParam}`
@@ -668,15 +687,26 @@ export default function Watch() {
           padding: '2px 8px',
           textShadow: '0 1px 3px rgba(0,0,0,0.8)',
         },
-        // Fallback: if proxied subtitle fails, try direct
-        onerror: () => {
-          console.log('[Watch] Proxy subtitle failed, trying direct:', subtitleUrl)
-          playerConfig.subtitle.url = subtitleUrl
-        }
       }
+      // Resolve the subtitle URL before the player is created (a post-creation
+      // fallback can't change what was loaded): proxy first, direct as backup.
+      subtitleProbe = Promise.race([
+        fetch(proxiedSubtitleUrl).then(r => (r.ok ? proxiedSubtitleUrl : null)).catch(() => null),
+        new Promise(resolve => setTimeout(() => resolve(null), 4000)),
+      ]).then(chosen => {
+        if (chosen) return chosen
+        console.log('[Watch] Proxy subtitle failed, trying direct:', subtitleUrl)
+        return subtitleUrl
+      })
     }
 
-    const { default: Artplayer } = await import('artplayer')
+    const [{ default: Artplayer }, resolvedSubtitleUrl] = await Promise.all([
+      import('artplayer'),
+      subtitleProbe,
+    ])
+    if (resolvedSubtitleUrl && playerConfig.subtitle) {
+      playerConfig.subtitle.url = resolvedSubtitleUrl
+    }
     const art = new Artplayer(playerConfig)
 
     if (subtitles && subtitles.length > 1) {
@@ -755,15 +785,13 @@ export default function Watch() {
     const retryKey = sourceId
     if (forceRefresh) {
       streamRetries.current[retryKey] = (streamRetries.current[retryKey] || 0) + 1
-      if (streamRetries.current[retryKey] > 7) {
-        setError('All providers blocked. Try a different server.')
+      if (streamRetries.current[retryKey] > 3) {
+        setError('All providers blocked. Try again later or use a different server.')
         setStreamLoading(false)
         loadingRef.current = false
         return
       }
-      showToast(`Provider blocked (${streamRetries.current[retryKey]}/7), trying next...`)
-    } else {
-      streamRetries.current = {}
+      showToast(`Refreshing source (${streamRetries.current[retryKey]}/3)...`)
     }
 
     // Find the source to play
@@ -823,9 +851,7 @@ export default function Watch() {
       const defaultUrl = qualityList[0]?.url || ''
 
       const subs = firstSource.subtitles || []
-      const onBlocked = () => {
-        loadStream(sourceId, true)
-      }
+      const onBlocked = () => handleProviderBlockedRef.current?.()
       buildPlayer(defaultUrl, qualityList, subs, data.headers, onBlocked)
       setStreamLoading(false)
       loadingRef.current = false
@@ -882,6 +908,36 @@ export default function Watch() {
   // Load stream on active source / episode change
   const loadStreamRef = useRef(loadStream)
   loadStreamRef.current = loadStream
+
+  // When a server's CDN blocks playback, switch to the next available server
+  // instead of re-scraping the same one. The next server's sources are already
+  // cached by the backend (FindAllSources), so the switch is instant.
+  // Force-refreshed re-scraping happens only as a last resort, once per episode.
+  const handleProviderBlocked = useCallback(() => {
+    const all = [...SOURCES.sub, ...SOURCES.dub]
+    const current = activeSourceRef.current
+    const now = Date.now()
+    if (now - lastBlockCycleRef.current < 3000) return
+    lastBlockCycleRef.current = now
+
+    if (current) blockedSourcesRef.current.add(current)
+
+    const next = all.find(s => !blockedSourcesRef.current.has(s.id))
+    if (next) {
+      showToast(`Server blocked — switching to ${next.label} (${next.lang.toUpperCase()})...`)
+      setActiveSource(next.id)
+      return
+    }
+    if (!forceRefreshUsedRef.current && current) {
+      forceRefreshUsedRef.current = true
+      showToast('All servers blocked — retrying once...')
+      loadStreamRef.current(current, true)
+      return
+    }
+    setError('All providers blocked. Try again later or use a different server.')
+  }, [SOURCES, showToast])
+
+  handleProviderBlockedRef.current = handleProviderBlocked
   useEffect(() => {
     loadStreamRef.current(activeSource)
   }, [activeSource, epNumber])
