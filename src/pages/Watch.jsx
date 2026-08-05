@@ -280,10 +280,8 @@ export default function Watch() {
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
   const touchSeekTimer = useRef(null)
-  const buildIdRef = useRef(0)
+  const buildIdRef = useRef(0) // generation id — bumped every buildPlayer() call
   const mountedRef = useRef(true)
-  const requestSeqRef = useRef(0)
-  const pendingRequestRef = useRef(null)
   const toastTimerRef = useRef(null)
 
   const [anime, setAnime] = useState(null)
@@ -327,6 +325,7 @@ export default function Watch() {
     blockedSourcesRef.current = new Set()
     lastBlockCycleRef.current = 0
     forceRefreshUsedRef.current = false
+    recoveryBusyRef.current = false
     streamRetries.current = {}
   }, [animeId, epNumber])
 
@@ -533,14 +532,27 @@ export default function Watch() {
       artInstance.current = null
       if (artRef.current) artRef.current.__artplayer = null
     }
+    // Belt-and-suspenders: whatever recovery cycle was in flight for the
+    // player we just tore down can no longer run to completion, so the next
+    // episode must not inherit a "recovery in progress" lock that nothing
+    // is left to clear.
+    recoveryBusyRef.current = false
   }, [])
 
-  useEffect(() => () => destroyPlayer(), [destroyPlayer])
+  useEffect(() => () => { mountedRef.current = false; destroyPlayer() }, [destroyPlayer])
 
   const buildPlayer = useCallback(async (streamUrl, sourceType, qualityList, subtitles, headers, onBlocked) => {
     destroyPlayer()
     const container = artRef.current
     if (!container) return
+
+    // Generation guard: async recovery work kicked off by this build (quality
+    // switch promises, delayed retries, video/hls error callbacks) checks this
+    // id before touching state. If the user has since moved to another
+    // episode — which calls buildPlayer again and bumps this counter — stale
+    // work bails out instead of reaching into the new player with an old
+    // episode's URLs, or leaving the recovery lock stuck for it.
+    const myBuildId = ++buildIdRef.current
 
     const headersParam = headers ? `&headers=${encodeURIComponent(JSON.stringify(headers))}` : ''
     const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
@@ -554,6 +566,7 @@ export default function Watch() {
       video.load()
       video.play().catch(() => {})
       video.onerror = () => {
+        if (buildIdRef.current !== myBuildId) return
         showToast('Stream unavailable — switching server...')
         if (onBlocked) {
           onBlocked()
@@ -571,6 +584,11 @@ export default function Watch() {
     // keeps it to one step per failure — a dead CDN is skipped once, never
     // hammered into rate-limiting.
     const recoverPlayback = () => {
+      // A recovery cycle kicked off by a previous episode's player must never
+      // touch the current one — bail if a newer buildPlayer() has since run.
+      // This is what stops a stuck recoveryBusyRef from silently swallowing
+      // every future error once it happens once.
+      if (buildIdRef.current !== myBuildId) return
       if (recoveryBusyRef.current) return
       recoveryBusyRef.current = true
       const art = artInstance.current
@@ -593,9 +611,14 @@ export default function Watch() {
         }
         // Keep the guard held until the new quality either plays or fails, so
         // concurrent video:error events during the switch can't double-advance.
+        // This promise can settle long after the user has moved to another
+        // episode, so both branches re-check the build id before acting —
+        // otherwise a late resolution here could clear (or re-lock) the
+        // *next* episode's recovery flag out from under it.
         switching.then(
-          () => { recoveryBusyRef.current = false },
+          () => { if (buildIdRef.current === myBuildId) recoveryBusyRef.current = false },
           () => {
+            if (buildIdRef.current !== myBuildId) return
             recoveryBusyRef.current = false
             recoverPlayback()
           }
@@ -707,6 +730,7 @@ export default function Watch() {
           let mediaRetries = 0
 
           const fail = () => {
+            if (buildIdRef.current !== myBuildId) return
             if (!triedDirect) {
               triedDirect = true
               hls.loadSource(url)
@@ -721,6 +745,7 @@ export default function Watch() {
           }
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (buildIdRef.current !== myBuildId) return
             if (!data.fatal) return
             // Backend types tokenized MP4 URLs as HLS when the path has no
             // extension — if the manifest is actually MP4, play it natively.
@@ -761,7 +786,7 @@ export default function Watch() {
           hls.loadSource(proxied(url))
           hls.attachMedia(video)
           art.hls = hls
-          art.on('destroy', () => hls.destroy())
+          hlsInstance.current = hls
         }
       },
     }
@@ -905,8 +930,16 @@ export default function Watch() {
       showToast(`Refreshing source (${streamRetries.current[retryKey]}/3)...`)
     }
 
-    // Find the source to play
-    const source = [...SOURCES.sub, ...SOURCES.dub].find(s => s.id === sourceId) || SOURCES.sub[0] || { provider: 'miruro', lang: 'sub' }
+    // Find the source to play. If nothing matches yet, the server list for
+    // this episode simply hasn't arrived — bail without guessing a provider
+    // (a wrong guess wastes a request and can flash the wrong stream). The
+    // auto-select effect calls loadStream again with a real id once servers
+    // arrive; genuine "nothing available" is reported by the servers effect.
+    const source = [...SOURCES.sub, ...SOURCES.dub].find(s => s.id === sourceId)
+    if (!source) {
+      loadingRef.current = false
+      return
+    }
 
     const controller = new AbortController()
     streamAbortRef.current = controller
@@ -935,6 +968,7 @@ export default function Watch() {
       clearTimeout(timeoutId)
       if (streamAbortRef.current === controller) streamAbortRef.current = null
       const data = await res.json()
+      if (!mountedRef.current) return
 
       if (data.error || !data.sources?.[0]?.url) {
         // Expired/dead CDN streams surface as a no-stream error — show the
@@ -973,6 +1007,7 @@ export default function Watch() {
         // don't touch streamLoading or loadingRef here.
         return
       }
+      if (!mountedRef.current) return
       if (err.name === 'AbortError') {
         setError('Stream timed out. The backend server may be waking up — try again.')
       } else {
@@ -1013,6 +1048,7 @@ export default function Watch() {
         if (subs.length === 0 && dubs.length === 0) {
           setNoStreamError(true)
           setError('We don\'t have streaming for this anime.')
+          setStreamLoading(false)
         }
         if ((subs.length === 0 || dubs.length === 0) && retries < 2) {
           retries += 1
