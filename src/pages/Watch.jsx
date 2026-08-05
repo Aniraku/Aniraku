@@ -807,8 +807,26 @@ export default function Watch() {
   }, [animeId, anime?.id, epNumber, episodes, anime, navigate, destroyPlayer])
 
   const streamRetries = useRef({})
+  const streamAbortRef = useRef(null)
+  const [slowStream, setSlowStream] = useState(false)
+
+  useEffect(() => {
+    if (!streamLoading) {
+      setSlowStream(false)
+      return
+    }
+    const t = setTimeout(() => setSlowStream(true), 10000)
+    return () => clearTimeout(t)
+  }, [streamLoading])
 
   const loadStream = useCallback(async (sourceId, forceRefresh = false) => {
+    // Switching servers mid-load must cancel the in-flight scrape, or the
+    // new source's load bails on the loadingRef guard and nothing happens.
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort()
+      streamAbortRef.current = null
+      loadingRef.current = false
+    }
     if (loadingRef.current && !forceRefresh) return
     loadingRef.current = true
     setStreamLoading(true)
@@ -831,8 +849,9 @@ export default function Watch() {
     // Find the source to play
     const source = [...SOURCES.sub, ...SOURCES.dub].find(s => s.id === sourceId) || SOURCES.sub[0] || { provider: 'miruro', lang: 'sub' }
 
+    const controller = new AbortController()
+    streamAbortRef.current = controller
     try {
-      const controller = new AbortController()
       // Resolving a stream means scraping a provider, and the backend runs on
       // a Render instance that cold-starts. Measured: ~3s warm, ~9s on a
       // cache-bypassing refresh, and longer still after a spin-down. A 15s
@@ -855,6 +874,7 @@ export default function Watch() {
         }),
       })
       clearTimeout(timeoutId)
+      if (streamAbortRef.current === controller) streamAbortRef.current = null
       const data = await res.json()
 
       if (data.error || !data.sources?.[0]?.url) {
@@ -891,6 +911,13 @@ export default function Watch() {
       loadingRef.current = false
       return
     } catch (err) {
+      const superseded = streamAbortRef.current !== controller
+      if (streamAbortRef.current === controller) streamAbortRef.current = null
+      if (superseded) {
+        // A newer load took over — its loading state is authoritative, so
+        // don't touch streamLoading or loadingRef here.
+        return
+      }
       if (err.name === 'AbortError') {
         setError('Stream timed out. The backend server may be waking up — try again.')
       } else {
@@ -1201,6 +1228,18 @@ export default function Watch() {
                 animation: 'spin 1s linear infinite', margin: '0 auto 16px',
               }} />
               <p style={{ color: '#e2e8f0', fontSize: 14, fontWeight: 500 }}>Loading stream...</p>
+              {slowStream && (
+                <>
+                  <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, marginTop: 12, maxWidth: 320, lineHeight: 1.5 }}>
+                    Stream is taking a while — try switching to another server.
+                  </p>
+                  <button onClick={handleProviderBlocked} style={{
+                    marginTop: 14, padding: '10px 24px', background: 'rgba(99,102,241,0.2)',
+                    color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.4)', borderRadius: 8,
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Try another server</button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1215,11 +1254,21 @@ export default function Watch() {
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 15, fontWeight: 500, maxWidth: 400, lineHeight: 1.5 }}>
               {error}
             </p>
-            <button onClick={() => loadStream(activeSource, true)} style={{
-              marginTop: 16, padding: '10px 24px', background: 'rgba(226,232,240,0.12)',
-              color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)', borderRadius: 8,
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            }}>Retry</button>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, marginTop: 10, maxWidth: 400, lineHeight: 1.5 }}>
+              Streaming taking too long? Switch to a different server to start playing.
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button onClick={handleProviderBlocked} style={{
+                padding: '10px 24px', background: 'rgba(99,102,241,0.2)',
+                color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.4)', borderRadius: 8,
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}>Switch Server</button>
+              <button onClick={() => loadStream(activeSource, true)} style={{
+                padding: '10px 24px', background: 'rgba(226,232,240,0.12)',
+                color: '#e2e8f0', border: '1px solid rgba(226,232,240,0.2)', borderRadius: 8,
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}>Retry</button>
+            </div>
           </div>
         )}
 
