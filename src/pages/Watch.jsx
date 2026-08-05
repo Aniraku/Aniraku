@@ -537,17 +537,44 @@ export default function Watch() {
 
   useEffect(() => () => destroyPlayer(), [destroyPlayer])
 
-  const buildPlayer = useCallback(async (streamUrl, qualityList, subtitles, headers, onBlocked) => {
+  const buildPlayer = useCallback(async (streamUrl, sourceType, qualityList, subtitles, headers, onBlocked) => {
     destroyPlayer()
     const container = artRef.current
     if (!container) return
 
     const headersParam = headers ? `&headers=${encodeURIComponent(JSON.stringify(headers))}` : ''
+    const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
+
+    const playAsMp4 = (video, url, art) => {
+      // Native MP4: direct first (trusted browser), proxy as fallback, then next server.
+      let triedProxy = false
+      const load = (u) => {
+        video.src = u
+        video.load()
+        video.play().catch(() => {})
+      }
+      video.onerror = () => {
+        video.onerror = null
+        if (!triedProxy) {
+          triedProxy = true
+          console.log('[Watch] Direct MP4 failed, trying proxy:', url)
+          load(proxied(url))
+          return
+        }
+        console.log('[Watch] Proxy MP4 failed too, moving to next server:', url)
+        if (onBlocked) {
+          onBlocked()
+        } else {
+          setError('Stream playback error. Try a different server.')
+        }
+      }
+      load(url)
+    }
 
     const playerConfig = {
       container,
       url: streamUrl,
-      type: 'm3u8',
+      type: sourceType === 'mp4' ? 'mp4' : 'm3u8',
       autoplay: true,
       pip: true,
       autoSize: false,
@@ -585,6 +612,9 @@ export default function Watch() {
       playbackRate: true,
       quality: qualityList,
       customType: {
+        mp4: function (video, url, art) {
+          playAsMp4(video, url, art)
+        },
         m3u8: async function (video, url, art) {
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = url
@@ -595,6 +625,8 @@ export default function Watch() {
           if (art.hls) {
             art.hls.destroy()
           }
+          const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
+          const referer = (headers && headers.Referer) || ''
           const hls = new Hls({
             enableWorker: false,
             maxBufferLength: 15,
@@ -610,53 +642,60 @@ export default function Watch() {
             levelLoadingMaxRetry: 10,
             fragLoadingMaxRetry: 10,
             defaultAudioCodec: 'mp4a.40.2',
+            // Some CDNs (uwucdn, koto CDNs) require the provider referer and
+            // serve video to the browser only when it is present. hls.js
+            // fetches via fetch(); the `referrer` option is the sanctioned way
+            // for a browser to send a cross-origin Referer.
+            fetchSetup: referer
+              ? (context, init) => {
+                  try {
+                    init.referrer = referer
+                  } catch {}
+                  return new Request(context.url, init)
+                }
+              : undefined,
           })
 
-          let recoveryAttempts = 0
-          const maxRecoveryAttempts = 5
-          let triedDirect = false
+          // Direct browser playback first (trusted residential IP + real
+          // Chrome TLS). If the CDN rejects it (datacenter-only host, referer
+          // gate, CORS), fall back to the backend proxy, then next server.
+          let triedProxy = false
 
-          const tryDirectPlayback = () => {
-            if (triedDirect) return
-            triedDirect = true
-            // Try to load the original URL directly (bypass proxy)
-            const directUrl = url.replace(`${PROXY_BASE}/proxy?url=`, '')
-            const decodedUrl = decodeURIComponent(directUrl.split('&headers=')[0])
-            console.log('[Watch] Proxy failed, trying direct playback:', decodedUrl)
-            hls.loadSource(decodedUrl)
+          const fail = () => {
+            if (!triedProxy) {
+              triedProxy = true
+              console.log('[Watch] Direct playback failed, trying proxy:', url)
+              hls.loadSource(proxied(url))
+              return
+            }
+            console.log('[Watch] Proxy also failed, moving to next server:', url)
+            if (onBlocked) {
+              onBlocked()
+            } else {
+              setError('Stream playback error. Try a different server.')
+            }
           }
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (!data.fatal) return
-            recoveryAttempts++
-            if (recoveryAttempts >= maxRecoveryAttempts) {
-              if (onBlocked) {
-                onBlocked()
-              } else {
-                setError('Stream failed after multiple retries. Try a different server.')
-              }
+            // Backend types tokenized MP4 URLs as HLS when the path has no
+            // extension — if the manifest is actually MP4, play it natively.
+            if (data.type === Hls.ErrorTypes.MANIFEST_ERROR && data.details === Hls.ErrorDetails.MANIFEST_PARSE_ERROR) {
+              console.log('[Watch] Not a valid HLS playlist — trying as native MP4:', url)
+              hls.destroy()
+              art.hls = null
+              playAsMp4(video, url, art)
               return
             }
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hls.startLoad()
-            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError()
-            } else {
-              if (onBlocked) {
-                onBlocked()
-              } else {
-                setError('Stream playback error. Try a different server.')
-              }
+              return
             }
-          })
-
-          hls.on(Hls.Events.MANIFEST_LOAD_ERROR, () => {
-            if (!triedDirect) {
-              tryDirectPlayback()
-            } else if (onBlocked) {
-              // Proxied and direct both failed — move on to the next server
-              onBlocked()
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !triedProxy) {
+              hls.startLoad()
+              return
             }
+            fail()
           })
 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -689,14 +728,14 @@ export default function Watch() {
         },
       }
       // Resolve the subtitle URL before the player is created (a post-creation
-      // fallback can't change what was loaded): proxy first, direct as backup.
+      // fallback can't change what was loaded): direct first, proxy as backup.
       subtitleProbe = Promise.race([
-        fetch(proxiedSubtitleUrl).then(r => (r.ok ? proxiedSubtitleUrl : null)).catch(() => null),
+        fetch(subtitleUrl).then(r => (r.ok ? subtitleUrl : null)).catch(() => null),
         new Promise(resolve => setTimeout(() => resolve(null), 4000)),
       ]).then(chosen => {
         if (chosen) return chosen
-        console.log('[Watch] Proxy subtitle failed, trying direct:', subtitleUrl)
-        return subtitleUrl
+        console.log('[Watch] Direct subtitle failed, trying proxy:', subtitleUrl)
+        return proxiedSubtitleUrl
       })
     }
 
@@ -840,19 +879,19 @@ export default function Watch() {
         return
       }
 
-      const headersParam = data.headers ? `&headers=${encodeURIComponent(JSON.stringify(data.headers))}` : ''
-      
       const qualityList = data.sources.map((src, idx) => ({
         default: idx === 0,
         html: src.quality || 'Auto',
-        url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(src.url)}${headersParam}`,
+        url: src.url,
+        type: src.type || 'hls',
       }))
 
       const defaultUrl = qualityList[0]?.url || ''
+      const defaultType = qualityList[0]?.type || 'hls'
 
       const subs = firstSource.subtitles || []
       const onBlocked = () => handleProviderBlockedRef.current?.()
-      buildPlayer(defaultUrl, qualityList, subs, data.headers, onBlocked)
+      buildPlayer(defaultUrl, defaultType, qualityList, subs, data.headers, onBlocked)
       setStreamLoading(false)
       loadingRef.current = false
       return
