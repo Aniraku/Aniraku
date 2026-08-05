@@ -809,6 +809,15 @@ export default function Watch() {
     }
 
     const [{ default: Artplayer }] = await Promise.all([import('artplayer')])
+    // The import can resolve long after the user moved to another episode.
+    // A stale build must never create its player (two players end up
+    // stacked in one container, and the newer episode's player can be
+    // destroyed by the old one) nor touch the current player — bail out
+    // untouched. In the normal path destroyPlayer() above already cleared
+    // the old player; this second call is a no-op that also kills any
+    // player created by an overlapping build that lost the race.
+    if (buildIdRef.current !== myBuildId) return
+    destroyPlayer()
     const art = new Artplayer(playerConfig)
 
     // The built-in reconnect loop retries the same URL up to RECONNECT_TIME_MAX
@@ -938,6 +947,7 @@ export default function Watch() {
     const source = [...SOURCES.sub, ...SOURCES.dub].find(s => s.id === sourceId)
     if (!source) {
       loadingRef.current = false
+      setStreamLoading(false)
       return
     }
 
