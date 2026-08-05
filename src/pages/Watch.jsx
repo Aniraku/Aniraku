@@ -639,6 +639,8 @@ export default function Watch() {
           playAsMp4(video, url, art)
         },
         m3u8: async function (video, url, art) {
+          const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
+          const referer = (headers && headers.Referer) || ''
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = (await probeUrl(url)) ? url : proxied(url)
             return
@@ -648,8 +650,6 @@ export default function Watch() {
           if (art.hls) {
             art.hls.destroy()
           }
-          const proxied = (u) => `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
-          const referer = (headers && headers.Referer) || ''
           const hls = new Hls({
             enableWorker: false,
             maxBufferLength: 15,
