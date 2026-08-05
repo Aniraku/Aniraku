@@ -5,6 +5,7 @@ import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
+import EmbedPlayer from '../components/EmbedPlayer'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { isNsfw, useNsfw } from '../hooks/useNsfw'
@@ -299,6 +300,11 @@ export default function Watch() {
   const [resumeCountdown, setResumeCountdown] = useState(0)
   const [showEpSidebar, setShowEpSidebar] = useState(true)
   const [touchSeekVisible, setTouchSeekVisible] = useState(false)
+  // Player 2: iframe embed mode. embedUrl is the current stream's embed
+  // (provider episode page / iframe player); embedMode swaps the container.
+  const [embedUrl, setEmbedUrl] = useState('')
+  const [embedMode, setEmbedMode] = useState(false)
+  const [hasMediaStream, setHasMediaStream] = useState(false)
 
   const slugParts = slugId?.match(/^(.+)-episode-(\d+)$/)
   const baseName = slugParts?.[1] || slugId || ''
@@ -319,6 +325,8 @@ export default function Watch() {
   const lastBlockCycleRef = useRef(0)
   const forceRefreshUsedRef = useRef(false)
   const handleProviderBlockedRef = useRef(null)
+  const embedUrlRef = useRef('')
+  embedUrlRef.current = embedUrl
 
   // Reset per-episode block tracking when the anime or episode changes
   useEffect(() => {
@@ -327,6 +335,9 @@ export default function Watch() {
     forceRefreshUsedRef.current = false
     recoveryBusyRef.current = false
     streamRetries.current = {}
+    setEmbedUrl('')
+    setEmbedMode(false)
+    setHasMediaStream(false)
   }, [animeId, epNumber])
 
   const showToast = useCallback((msg, icon) => {
@@ -352,6 +363,9 @@ export default function Watch() {
         // prefer instead of the server the user picked.
         provider: s.name,
         lang: s.lang,
+        // Some servers only have an embed (episode-page) stream — surface
+        // that so the UI can offer the embedded player for them.
+        hasEmbed: Array.isArray(s.sources) && s.sources.some(src => src.type === 'embed'),
       }))
     }
     return {
@@ -565,12 +579,25 @@ export default function Watch() {
       // Native MP4 through the backend proxy — the proxy adds the provider
       // referer and streams with CORS headers, so the video element loads
       // first try with no failed-request noise in the console. If the proxy
-      // stream itself errors, move to the next server.
-      video.src = proxied(url)
-      video.load()
-      video.play().catch(() => {})
+      // stream errors, retry the URL directly: some CDNs block datacenter
+      // IPs (the proxy's vantage) but serve real browsers. Direct playback
+      // can't carry a referer or CORS, so crossOrigin is dropped for it.
+      let directTried = false
+      const tryUrl = (target, withCors) => {
+        video.crossOrigin = withCors ? 'anonymous' : null
+        video.src = target
+        video.load()
+        video.play().catch(() => {})
+      }
+      tryUrl(proxied(url), true)
       video.onerror = () => {
         if (buildIdRef.current !== myBuildId) return
+        if (!directTried) {
+          directTried = true
+          showToast('Trying direct playback...')
+          tryUrl(url, false)
+          return
+        }
         showToast('Stream unavailable — switching server...')
         if (onBlocked) {
           onBlocked()
@@ -997,7 +1024,35 @@ export default function Watch() {
 
       const firstSource = data.sources[0]
 
-      const qualityList = data.sources.map((src, idx) => ({
+      // Player 2 support: the backend now keeps embed streams (provider
+      // episode-page iframes) in the sources list. They are not qualities —
+      // the quality selector and the main player only get real hls/mp4
+      // sources; embeds go to the iframe player.
+      const mediaSources = data.sources.filter(src => src.type !== 'embed')
+      const embedSource = data.sources.find(src => src.type === 'embed')
+      const nextEmbedUrl = embedSource?.url || ''
+      setEmbedUrl(nextEmbedUrl)
+
+      if (mediaSources.length === 0) {
+        // No real stream at all — the embedded player is the only option.
+        if (nextEmbedUrl) {
+          setHasMediaStream(false)
+          setEmbedMode(true)
+          setStreamLoading(false)
+          loadingRef.current = false
+          return
+        }
+        setNoStreamError(true)
+        setError('No video source found for this server.')
+        setStreamLoading(false)
+        loadingRef.current = false
+        return
+      }
+
+      setHasMediaStream(true)
+      setEmbedMode(false)
+
+      const qualityList = mediaSources.map((src, idx) => ({
         default: idx === 0,
         html: src.quality || 'Auto',
         url: src.url,
@@ -1107,8 +1162,18 @@ export default function Watch() {
       loadStreamRef.current(current, true)
       return
     }
-    // Every server's stream is dead — tear the player down and fall back to
-    // the regular "no stream found" state instead of leaving a broken player.
+    // Every server's stream is dead. If the last response carried an embed
+    // (episode-page) source, offer the embedded player as the final option
+    // before giving up — some providers only work that way.
+    if (embedUrlRef.current) {
+      showToast('Trying the embedded player...')
+      const art = artInstance.current
+      if (art) art.pause()
+      setEmbedMode(true)
+      return
+    }
+    // Tear the player down and fall back to the regular "no stream found"
+    // state instead of leaving a broken player.
     destroyPlayer()
     setNoStreamError(true)
     setError('We don\'t have streaming for this anime.')
@@ -1126,6 +1191,7 @@ export default function Watch() {
     setActiveSource(sourceId)
     setError('')
     setNoStreamError(false)
+    setEmbedMode(false)
   }, [activeSource, SOURCES, showToast])
 
   // Mobile gestures
@@ -1284,9 +1350,22 @@ export default function Watch() {
         position: 'relative',
         transition: 'max-width 0.3s ease',
       }}>
+            {embedMode && embedUrl ? (
+              <EmbedPlayer
+                url={embedUrl}
+                title={`${anime?.title?.english || anime?.title?.romaji || ''} - Episode ${epNumber}`}
+                onBack={hasMediaStream ? () => {
+                  setEmbedMode(false)
+                  const art = artInstance.current
+                  if (art) art.play().catch(() => {})
+                } : null}
+              />
+            ) : (
             <div ref={artRef} data-aniraku-player aria-label="Video player" role="region" style={{ width: '100%', aspectRatio: '16/9', maxHeight: '80vh' }} />
+            )}
 
             {/* Touch seek buttons */}
+            {!embedMode && (
             <div className={touchSeekVisible ? 'watch-touch-seek visible' : 'watch-touch-seek'}>
               <button
                 className="watch-touch-seek-btn watch-touch-seek-back"
@@ -1319,8 +1398,9 @@ export default function Watch() {
                 <FaStepForward size={20} />
               </button>
             </div>
+            )}
 
-        {streamLoading && (
+        {!embedMode && streamLoading && (
           <div style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'rgba(0,0,0,0.7)', zIndex: 50, backdropFilter: 'blur(4px)',
@@ -1410,6 +1490,27 @@ export default function Watch() {
 
       </div>
 
+      {/* Player 2 toggle: the current stream also has an embed — offer it */}
+      {embedUrl && !embedMode && hasMediaStream && (
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '10px 16px 0', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => {
+              const art = artInstance.current
+              if (art) art.pause()
+              setEmbedMode(true)
+            }}
+            className="watch-source-btn"
+            style={{
+              padding: '8px 16px', background: 'rgba(99,102,241,0.12)',
+              color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.35)',
+              borderRadius: 10, fontWeight: 600, fontSize: 12.5, cursor: 'pointer',
+            }}
+          >
+            Embedded Player
+          </button>
+        </div>
+      )}
+
       {/* Source selector */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 16px 0' }}>
         {['sub', 'dub'].filter(lang => (lang === 'sub' ? hasSub : hasDub)).map(lang => (
@@ -1439,6 +1540,15 @@ export default function Watch() {
                     }}
                   >
                     {source.label}
+                    {source.hasEmbed && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: 0.5,
+                        color: '#818cf8', border: '1px solid rgba(129,140,248,0.4)',
+                        borderRadius: 4, padding: '1px 5px', marginLeft: 4,
+                      }}>
+                        EMBED
+                      </span>
+                    )}
                     {isActive && (
                       <div style={{
                         position: 'absolute', bottom: -1, left: '15%', right: '15%',
