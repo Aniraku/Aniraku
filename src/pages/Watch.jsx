@@ -554,11 +554,46 @@ export default function Watch() {
       video.load()
       video.play().catch(() => {})
       video.onerror = () => {
+        showToast('Stream unavailable — switching server...')
         if (onBlocked) {
           onBlocked()
         } else {
           setError('Stream playback error. Try a different server.')
         }
+      }
+    }
+
+    // One recovery step after ArtPlayer's built-in reconnect loop has truly
+    // given up (it retries the same URL RECONNECT_TIME_MAX times, 1s apart —
+    // that's what recovers flaky CDNs, so it is left to do its job). Only a
+    // URL that is provably dead reaches this: try the next quality of this
+    // server first, then fall through to the next server. The busy guard
+    // keeps it to one step per failure — a dead CDN is skipped once, never
+    // hammered into rate-limiting.
+    const recoverPlayback = () => {
+      if (recoveryBusyRef.current) return
+      recoveryBusyRef.current = true
+      try {
+        const art = artInstance.current
+        const cur = art ? art.option.url : streamUrl
+        const idx = qualityList.findIndex(q => q.url === cur)
+        const next = idx >= 0 && idx + 1 < qualityList.length ? qualityList[idx + 1] : null
+        if (next) {
+          showToast('Stream issue — trying the next quality...')
+          try {
+            art.switchQuality(next.url)
+          } catch {
+            destroyPlayer()
+            buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
+          }
+        } else if (onBlocked) {
+          showToast('Stream unavailable — switching server...')
+          onBlocked()
+        } else {
+          setError('Stream playback error. Try a different server.')
+        }
+      } finally {
+        recoveryBusyRef.current = false
       }
     }
 
@@ -663,6 +698,7 @@ export default function Watch() {
               hls.loadSource(url)
               return
             }
+            showToast('Stream unavailable — switching server...')
             if (onBlocked) {
               onBlocked()
             } else {
@@ -736,11 +772,18 @@ export default function Watch() {
     const [{ default: Artplayer }] = await Promise.all([import('artplayer')])
     const art = new Artplayer(playerConfig)
 
-    // Keep Artplayer's built-in "Video Failed" layer out of sight — fallbacks
-    // (proxy switch, next server) handle real failures, and the error flash on
-    // a transient issue is worse than a silent transition.
+    // The built-in reconnect loop retries the same URL up to RECONNECT_TIME_MAX
+    // times (1s apart) — leave it alone, it recovers flaky CDNs. Only when it
+    // has genuinely failed do we step in: hide the dead-end layer, say so, and
+    // try the next quality, then the next server.
+    let reconnectCount = 0
+    art.on('error', (_err, count) => { reconnectCount = count })
+    art.on('video:canplay', () => { reconnectCount = 0 })
     art.on('video:error', () => {
-      try { art.layers.error.show = false } catch {}
+      if (reconnectCount >= Artplayer.RECONNECT_TIME_MAX) {
+        try { art.layers.error.show = false } catch {}
+        recoverPlayback()
+      }
     })
 
     if (subtitles && subtitles.length > 1) {
@@ -804,10 +847,11 @@ export default function Watch() {
 
     artInstance.current = art
     if (artRef.current) artRef.current.__artplayer = art
-  }, [animeId, anime?.id, epNumber, episodes, anime, navigate, destroyPlayer])
+  }, [animeId, anime?.id, epNumber, episodes, anime, navigate, destroyPlayer, showToast])
 
   const streamRetries = useRef({})
   const streamAbortRef = useRef(null)
+  const recoveryBusyRef = useRef(false)
   const [slowStream, setSlowStream] = useState(false)
 
   useEffect(() => {
