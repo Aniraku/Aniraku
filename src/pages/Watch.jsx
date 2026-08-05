@@ -268,38 +268,6 @@ function formatTime(s) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-// Probe results are cached for 10 minutes: dead CDN URLs stay dead, and
-// re-probing every episode switch wastes seconds of the user's time.
-const probeCache = new Map()
-const PROBE_TTL = 10 * 60 * 1000
-
-// Probe one URL through the backend proxy (the real playback path) with a
-// small Range request. A 2xx/206 response means the video element or hls.js
-// will be able to load it — expired tokens and dead CDNs answer 401/403/502.
-async function probeProxied(u) {
-  const cached = probeCache.get(u)
-  if (cached && Date.now() - cached.t < PROBE_TTL) return cached.ok
-  let ok = false
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 6000)
-    const r = await fetch(u, { headers: { Range: 'bytes=0-65535' }, signal: controller.signal })
-    clearTimeout(timeout)
-    ok = r.ok && r.status < 400
-  } catch {
-    ok = false
-  }
-  probeCache.set(u, { ok, t: Date.now() })
-  return ok
-}
-
-// Return the index of the first quality that will actually play, or -1 when
-// every variant of this server is dead. Probes run in parallel.
-async function probePlayableQuality(proxied, qualityList) {
-  const results = await Promise.all(qualityList.map(q => probeProxied(proxied(q.url))))
-  return results.findIndex(ok => ok)
-}
-
 export default function Watch() {
   const { slugId } = useParams()
   const navigate = useNavigate()
@@ -581,64 +549,23 @@ export default function Watch() {
       // Native MP4 through the backend proxy — the proxy adds the provider
       // referer and streams with CORS headers, so the video element loads
       // first try with no failed-request noise in the console. If the proxy
-      // stream itself errors, recover (next quality, then next server).
+      // stream itself errors, move to the next server.
       video.src = proxied(url)
       video.load()
       video.play().catch(() => {})
-      video.onerror = () => recoverPlayback()
-    }
-
-    // Auto-recover from a dead stream instead of ArtPlayer's built-in
-    // "Reconnect" loop (which just re-loads the same dead URL): try the next
-    // quality of this server first, then fall through to the next server.
-    const recoverPlayback = () => {
-      if (recoveryBusyRef.current) return
-      recoveryBusyRef.current = true
-      try {
-        const art = artInstance.current
-        const cur = art ? art.option.url : streamUrl
-        const idx = qualityList.findIndex(q => q.url === cur)
-        const next = idx >= 0 && idx + 1 < qualityList.length ? qualityList[idx + 1] : null
-        if (next) {
-          showToast('Stream issue — trying next quality...')
-          try {
-            art.switchQuality(next.url)
-          } catch {
-            destroyPlayer()
-            buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
-          }
-        } else if (onBlocked) {
+      video.onerror = () => {
+        if (onBlocked) {
           onBlocked()
         } else {
           setError('Stream playback error. Try a different server.')
         }
-      } finally {
-        recoveryBusyRef.current = false
       }
     }
-
-    // Pick the quality that will actually play: probe every variant through
-    // the backend proxy (the real playback path) and start with the first one
-    // that responds. Users shouldn't have to discover that a quality switch
-    // fixes expired CDN URLs — the working one is chosen for them.
-    recoveryBusyRef.current = false
-    const playableIdx = await probePlayableQuality(proxied, qualityList)
-    if (playableIdx < 0) {
-      if (onBlocked) {
-        onBlocked()
-      } else {
-        setError('Stream playback error. Try a different server.')
-      }
-      return
-    }
-    qualityList.forEach((q, i) => { q.default = i === playableIdx })
-    const defaultUrl = qualityList[playableIdx].url
-    const defaultType = qualityList[playableIdx].type || 'hls'
 
     const playerConfig = {
       container,
-      url: defaultUrl,
-      type: defaultType === 'mp4' ? 'mp4' : 'm3u8',
+      url: streamUrl,
+      type: sourceType === 'mp4' ? 'mp4' : 'm3u8',
       autoplay: true,
       pip: true,
       autoSize: false,
@@ -736,7 +663,11 @@ export default function Watch() {
               hls.loadSource(url)
               return
             }
-            recoverPlayback()
+            if (onBlocked) {
+              onBlocked()
+            } else {
+              setError('Stream playback error. Try a different server.')
+            }
           }
 
           hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -807,12 +738,9 @@ export default function Watch() {
 
     // Keep Artplayer's built-in "Video Failed" layer out of sight — fallbacks
     // (proxy switch, next server) handle real failures, and the error flash on
-    // ArtPlayer's built-in reconnect loop re-loads the same dead URL and
-    // paints a dead-end "Reconnect: N" layer. Suppress the layer and recover
-    // automatically (next quality, then next server) instead.
+    // a transient issue is worse than a silent transition.
     art.on('video:error', () => {
       try { art.layers.error.show = false } catch {}
-      recoverPlayback()
     })
 
     if (subtitles && subtitles.length > 1) {
@@ -880,7 +808,6 @@ export default function Watch() {
 
   const streamRetries = useRef({})
   const streamAbortRef = useRef(null)
-  const recoveryBusyRef = useRef(false)
   const [slowStream, setSlowStream] = useState(false)
 
   useEffect(() => {
