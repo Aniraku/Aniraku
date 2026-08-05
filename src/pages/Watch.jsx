@@ -573,27 +573,41 @@ export default function Watch() {
     const recoverPlayback = () => {
       if (recoveryBusyRef.current) return
       recoveryBusyRef.current = true
-      try {
-        const art = artInstance.current
-        const cur = art ? art.option.url : streamUrl
-        const idx = qualityList.findIndex(q => q.url === cur)
-        const next = idx >= 0 && idx + 1 < qualityList.length ? qualityList[idx + 1] : null
-        if (next) {
-          showToast('Stream issue — trying the next quality...')
-          try {
-            art.switchQuality(next.url)
-          } catch {
-            destroyPlayer()
-            buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
-          }
-        } else if (onBlocked) {
-          showToast('Stream unavailable — switching server...')
-          onBlocked()
-        } else {
-          setError('Stream playback error. Try a different server.')
+      const art = artInstance.current
+      const cur = art ? art.option.url : streamUrl
+      const idx = qualityList.findIndex(q => q.url === cur)
+      const next = idx >= 0 && idx + 1 < qualityList.length ? qualityList[idx + 1] : null
+      if (next) {
+        showToast('Stream issue — trying the next quality...')
+        // switchQuality resolves on canplay and REJECTS with the error event
+        // if the new quality fails too — that rejection must be consumed or
+        // it becomes an unhandled promise error and recovery stalls silently.
+        let switching = null
+        try {
+          switching = art.switchQuality(next.url)
+        } catch {
+          recoveryBusyRef.current = false
+          destroyPlayer()
+          buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
+          return
         }
-      } finally {
-        recoveryBusyRef.current = false
+        // Keep the guard held until the new quality either plays or fails, so
+        // concurrent video:error events during the switch can't double-advance.
+        switching.then(
+          () => { recoveryBusyRef.current = false },
+          () => {
+            recoveryBusyRef.current = false
+            recoverPlayback()
+          }
+        )
+        return
+      }
+      recoveryBusyRef.current = false
+      showToast('Stream unavailable — switching server...')
+      if (onBlocked) {
+        onBlocked()
+      } else {
+        setError('Stream playback error. Try a different server.')
       }
     }
 
