@@ -1041,7 +1041,11 @@ export default function Watch() {
 
     if (current) blockedSourcesRef.current.add(current)
 
-    const next = all.find(s => !blockedSourcesRef.current.has(s.id))
+    // Stay within the selected language: a dead DUB server must fall through
+    // to another DUB server, never silently to SUB (and vice versa).
+    const currentLang = current ? all.find(s => s.id === current)?.lang : null
+    const pool = currentLang ? all.filter(s => s.lang === currentLang) : all
+    const next = pool.find(s => !blockedSourcesRef.current.has(s.id))
     if (next) {
       showToast(`Server blocked — switching to ${next.label} (${next.lang.toUpperCase()})...`)
       setActiveSource(next.id)
