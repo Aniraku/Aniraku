@@ -255,7 +255,7 @@ const EpisodeRow = styled(Link)`
 const EpThumb = styled.img`
   width: 60px;
   height: 34px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 4px;
   flex-shrink: 0;
   background: var(--bg-card);
