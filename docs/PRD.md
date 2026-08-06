@@ -6,7 +6,7 @@ Aniraku is a free anime streaming web app: browse anime, view details, watch epi
 
 **Live deployments:**
 - Frontend: Vercel (production from `main` branch)
-- Backend: Render (`https://aniraku-backend.onrender.com`)
+- Backend: Render (`https://aniraku-backend-fhyy.onrender.com`)
 - Database/Auth: Supabase (Postgres + GoTrue)
 
 ## 2. Goals
