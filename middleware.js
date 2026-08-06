@@ -1,4 +1,4 @@
-const BACKEND = 'https://aniraku-backend.onrender.com'
+const BACKEND = 'https://aniraku-backend-fhyy.onrender.com'
 const SITE = 'https://www.aniraku.tech'
 const FALLBACK_IMAGE = `${SITE}/og-image.png`
 

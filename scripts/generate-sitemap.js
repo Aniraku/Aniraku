@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { generateSlug } from '../src/lib/slug.js'
 
-const API_BASE = 'https://aniraku-backend.onrender.com/api/v1'
+const API_BASE = 'https://aniraku-backend-fhyy.onrender.com/api/v1'
 const ANILIST_PROXY = `${API_BASE}/anilist`
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
