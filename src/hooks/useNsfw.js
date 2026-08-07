@@ -101,12 +101,25 @@ export const filterAdult = (items, nsfwEnabled) => {
 // The backend probe actually resolves + reachability-verifies a real source,
 // so a "playable" result means the first episode really can stream. Results
 // are cached per anime so re-renders and repeated views cost nothing.
-const streamCache = new Map()
+// TTLs: a positive probe stays trusted for 30m (streams rarely vanish), but
+// a negative one only 5m — negatives usually mean Miruro was momentarily
+// down (Cloudflare challenge, 502), so hentai listings must recover quickly
+// instead of hiding titles off one bad probe.
+const streamCache = new Map() // id -> { promise, playable, at }
+const STREAM_TTL_PLAYABLE = 30 * 60 * 1000
+const STREAM_TTL_MISSING = 5 * 60 * 1000
 
-async function hasMiruroStreams(id) {
+function hasMiruroStreams(id) {
   if (!id) return Promise.resolve(false)
-  if (streamCache.has(id)) return streamCache.get(id)
-  const p = (async () => {
+  const now = Date.now()
+  const hit = streamCache.get(id)
+  if (hit) {
+    const ttl = hit.playable ? STREAM_TTL_PLAYABLE : STREAM_TTL_MISSING
+    if (now - hit.at < ttl) return Promise.resolve(hit.playable)
+    streamCache.delete(id)
+  }
+  const entry = { promise: null, playable: false, at: now }
+  entry.promise = (async () => {
     try {
       const res = await fetch(`${API_BASE}/api/v1/miruro/probe/${id}`)
       if (!res.ok) return false
@@ -115,9 +128,13 @@ async function hasMiruroStreams(id) {
     } catch {
       return false
     }
-  })()
-  streamCache.set(id, p)
-  return p
+  })().then(v => {
+    entry.playable = !!v
+    return !!v
+  })
+  // Shared promise: concurrent callers await the same in-flight probe.
+  streamCache.set(id, entry)
+  return entry.promise
 }
 
 // useStreamable keeps normal anime as-is and drops hentai entries that have

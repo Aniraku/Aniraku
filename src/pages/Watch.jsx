@@ -4,7 +4,6 @@ import React, {
   useRef,
   useMemo,
   useCallback,
-  useLayoutEffect,
 } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
@@ -160,6 +159,116 @@ function formatAiringDate(unixTimestamp) {
   return formattedDate
 }
 
+// Live countdown to the next airing episode. Ticks every second in a
+// tabular display font; the glow pulse is disabled for reduced-motion
+// users (the ticking itself is data, not motion, so it stays).
+function NextEpisodeCountdown({ episode, airingAt }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+  const pad = (n) => String(n).padStart(2, '0')
+  const diffMs = airingAt * 1000 - now
+  let d = 0
+  let h = 0
+  let m = 0
+  let s = 0
+  if (diffMs > 0) {
+    d = Math.floor(diffMs / 86400000)
+    h = Math.floor((diffMs % 86400000) / 3600000)
+    m = Math.floor((diffMs % 3600000) / 60000)
+    s = Math.floor((diffMs % 60000) / 1000)
+  }
+  // Most anime air weekly — the bar fills across a 7-day cycle.
+  const progress = Math.min(
+    100,
+    Math.max(0, ((WEEK_MS - Math.max(diffMs, 0)) / WEEK_MS) * 100)
+  )
+  const parts = []
+  if (d > 0) parts.push(`${d}d`)
+  parts.push(`${pad(h)}h`, `${pad(m)}m`, `${pad(s)}s`)
+  return (
+    <div
+      className="watch-countdown"
+      role="timer"
+      aria-label={`Next episode ${episode} in ${d} days, ${h} hours, ${m} minutes and ${s} seconds`}
+      style={{
+        marginTop: 16,
+        padding: '14px 16px',
+        borderRadius: 12,
+        background:
+          'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(16,185,129,0.04))',
+        border: '1px solid rgba(34,197,94,0.25)',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span
+          style={{
+            fontSize: 11,
+            letterSpacing: 2,
+            fontWeight: 700,
+            color: '#4ade80',
+            textTransform: 'uppercase',
+          }}
+        >
+          Next Episode · Ep {episode}
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
+          {new Date(airingAt * 1000).toLocaleDateString(undefined, {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+        </span>
+      </div>
+      <div
+        className="watch-count-digits"
+        style={{
+          fontFamily: "'Orbitron', 'Rajdhani', monospace",
+          fontSize: 'clamp(20px, 5vw, 30px)',
+          fontWeight: 600,
+          color: '#86efac',
+          fontVariantNumeric: 'tabular-nums',
+          letterSpacing: 2,
+          marginTop: 8,
+          animation: PREFERS_REDUCED_MOTION
+            ? 'none'
+            : 'watch-count-glow 2.4s ease-in-out infinite',
+        }}
+      >
+        {parts.join(' ')}
+      </div>
+      <div
+        style={{
+          marginTop: 10,
+          height: 4,
+          borderRadius: 2,
+          background: 'rgba(34,197,94,0.12)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${progress}%`,
+            borderRadius: 2,
+            background: 'linear-gradient(90deg, #22c55e, #4ade80)',
+            transition: PREFERS_REDUCED_MOTION ? 'none' : 'width 1s linear',
+          }}
+        />
+      </div>
+      <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+        {diffMs > 0 ? `Airing ${formatAiringDate(airingAt)}` : 'Airing now — refresh for the new episode'}
+      </div>
+    </div>
+  )
+}
+
 // Sleep w/ abort
 function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -290,6 +399,7 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
         e.preventDefault()
         e.stopImmediatePropagation()
         if (art) art.fullscreen = !art.fullscreen
+        else if (fsRequest) fsRequest.call(document.documentElement)
         return
       }
       if (key === 'KeyP') {
@@ -467,7 +577,6 @@ export default function Watch() {
   const forceRefreshUsedRef = useRef(false)
   const refreshAttemptedRef = useRef(new Set())
   const handleProviderBlockedRef = useRef(null)
-  const visibilityRef = useRef(true)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
   const netHintRef = useRef(getConnectionHint())
 
@@ -519,6 +628,16 @@ export default function Watch() {
     const onOnline = () => {
       setIsOnline(true)
       showToast('Back online — resuming…', { icon: 'wifi' })
+      // Verify the backend is actually up after reconnecting; Render may
+      // still be cold-starting while the browser is already back online.
+      checkBackendHealth().then((ok) => {
+        if (!ok && mountedRef.current) {
+          showToast('Backend is still warming up — retrying shortly…', {
+            icon: 'warn',
+            long: true,
+          })
+        }
+      })
       // If a stream load had been failed, kick it again.
       if (errorType === 'network' || errorType === 'timeout') {
         retryLastStream()
@@ -537,15 +656,6 @@ export default function Watch() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [errorType])
-
-  // Visibility change — pause heavy work when tab is hidden
-  useEffect(() => {
-    const onVis = () => {
-      visibilityRef.current = !document.hidden
-    }
-    document.addEventListener('visibilitychange', onVis)
-    return () => document.removeEventListener('visibilitychange', onVis)
-  }, [])
 
   // Page lifecycle — save & pause on hide, resume on show
   useEffect(() => {
@@ -940,7 +1050,9 @@ export default function Watch() {
             tryUrl(url, false)
             return
           }
-          showToast('Stream unavailable — switching server…')
+          showToast('CDN refused playback — trying the next server…', {
+            long: true,
+          })
           if (onBlocked) onBlocked()
           else setError('Stream playback error. Try a different server.')
         }
@@ -985,7 +1097,9 @@ export default function Watch() {
           return
         }
         recoveryBusyRef.current = false
-        showToast('Stream unavailable — switching server…')
+        showToast('All qualities failed — switching server…', {
+          long: true,
+        })
         if (onBlocked) onBlocked()
         else setError('Stream playback error. Try a different server.')
       }
@@ -995,16 +1109,23 @@ export default function Watch() {
         url: streamUrl,
         type: sourceType === 'mp4' ? 'mp4' : 'm3u8',
         autoplay: true,
-        pip: true,
+        // iOS Safari has no requestPictureInPicture — the attempt throws and
+        // ArtPlayer logs noise; Android TV / Smart TV apps handle PiP at the
+        // OS level, so the button is pointless there too.
+        pip: !IS_IOS && !IS_TV,
         autoSize: false,
-        autoMini: true,
+        // Minimizing into a floating corner fights the mobile UI (and iOS
+        // scroll-locking); on desktop it is a nice touch.
+        autoMini: !IS_MOBILE,
         fullscreen: true,
         fullscreenWeb: true,
         mutex: true,
         backdrop: true,
         playsInline: true,
         autoPlayback: true,
-        autoOrientation: true,
+        // TV remotes have no rotation sensor; keep the player orientation
+        // locked so Android TV never flips it.
+        autoOrientation: !IS_TV,
         airplay: true,
         hotkey: false,
         theme: '#e2e8f0',
@@ -1100,7 +1221,10 @@ export default function Watch() {
             }
             const hls = new Hls({
               enableWorker: false,
-              maxBufferLength: 15,
+              // Buffer budget follows the connection hint: keep the buffer
+              // modest on slow/unknown links so the player starts faster,
+              // larger on fast links so stalls are rare.
+              maxBufferLength: netHintRef.current.effectiveType === '4g' ? 30 : 12,
               maxMaxBufferLength: 60,
               startFragPrefetch: true,
               lowLatencyMode: false,
@@ -1141,7 +1265,7 @@ export default function Watch() {
                   { long: true }
                 )
               } else {
-                showToast('Stream unavailable — switching server…')
+                showToast('Playback error — switching server…')
               }
               if (onBlocked) onBlocked()
               else setError('Stream playback error. Try a different server.')
@@ -1863,6 +1987,48 @@ export default function Watch() {
             <div className="watch-skel-pill" />
           </div>
         </div>
+        <style>{`
+          .watch-skel-player {
+            aspect-ratio: 16 / 9;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            background: linear-gradient(
+              100deg,
+              var(--bg-card) 40%,
+              rgba(226,232,240,0.08) 50%,
+              var(--bg-card) 60%
+            );
+            background-size: 200% 100%;
+            animation: watch-shimmer 1.6s ease-in-out infinite;
+          }
+          .watch-skel-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+          .watch-skel-line {
+            height: 14px;
+            border-radius: 6px;
+            background: linear-gradient(100deg, var(--bg-card) 40%, rgba(226,232,240,0.08) 50%, var(--bg-card) 60%);
+            background-size: 200% 100%;
+            animation: watch-shimmer 1.6s ease-in-out infinite;
+          }
+          .watch-skel-line.w70 { width: 70%; }
+          .watch-skel-line.w40 { width: 40%; }
+          .watch-skel-pill {
+            width: 84px;
+            height: 32px;
+            border-radius: 999px;
+            background: linear-gradient(100deg, var(--bg-card) 40%, rgba(226,232,240,0.08) 50%, var(--bg-card) 60%);
+            background-size: 200% 100%;
+            animation: watch-shimmer 1.6s ease-in-out infinite;
+          }
+          @keyframes watch-shimmer {
+            from { background-position: 200% 0; }
+            to   { background-position: -200% 0; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .watch-skel-player, .watch-skel-line, .watch-skel-pill {
+              animation: none !important;
+            }
+          }
+        `}</style>
         <Footer />
       </>
     )
@@ -1965,7 +2131,7 @@ export default function Watch() {
           className="watch-toast"
           style={{
             position: 'fixed',
-            bottom: 24,
+            bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(15,23,42,0.92)',
@@ -1980,6 +2146,9 @@ export default function Watch() {
             alignItems: 'center',
             gap: 8,
             pointerEvents: 'none',
+            border: PREFERS_HIGH_CONTRAST
+              ? '2px solid rgba(255,255,255,0.5)'
+              : '1px solid rgba(255,255,255,0.1)',
             animation: PREFERS_REDUCED_MOTION
               ? 'none'
               : 'watch-toast-in 200ms ease-out',
@@ -2246,7 +2415,7 @@ export default function Watch() {
               >
                 {error}
               </div>
-              {errorType === 'backend' && (
+              {(errorType === 'backend' || errorType === 'timeout') && (
                 <div
                   style={{
                     fontSize: 12,
@@ -2255,8 +2424,75 @@ export default function Watch() {
                     maxWidth: 460,
                   }}
                 >
-                  This usually clears up in a few seconds — the backend
-                  cold-starts after idle.
+                  The streaming backend cold-starts after idle — this usually
+                  clears up in a few seconds. Retry in a moment.
+                </div>
+              )}
+              {errorType === 'network' && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 12,
+                    maxWidth: 460,
+                  }}
+                >
+                  The request never reached the backend. Check your Wi-Fi /
+                  mobile data, then retry — playback resumes where you left
+                  off.
+                </div>
+              )}
+              {errorType === 'cdn-unreachable' && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 12,
+                    maxWidth: 460,
+                  }}
+                >
+                  This server&apos;s CDN is unreachable right now. Force
+                  refresh for a fresh stream link, or switch servers.
+                </div>
+              )}
+              {errorType === 'expired' && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 12,
+                    maxWidth: 460,
+                  }}
+                >
+                  The stream link expired. Force refresh generates a new one —
+                  this usually fixes it.
+                </div>
+              )}
+              {errorType === 'blocked' && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 12,
+                    maxWidth: 460,
+                  }}
+                >
+                  This server is blocked in your region. Switch to another
+                  server — we have several per language.
+                </div>
+              )}
+              {noStreamError && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 12,
+                    maxWidth: 460,
+                  }}
+                >
+                  No provider is serving this episode right now. Switch
+                  servers or check back later — new sources appear as
+                  episodes go live.
                 </div>
               )}
               <div
@@ -2597,17 +2833,10 @@ export default function Watch() {
                 Details
               </h3>
               {anime?.nextAiringEpisode && anime.nextAiringEpisode.airingAt && (
-                <div
-                  className="watch-detail-row"
-                  style={{ marginBottom: 8, fontSize: 13 }}
-                >
-                  <strong style={{ color: 'var(--text-secondary)' }}>
-                    Next Episode: Ep {anime.nextAiringEpisode.episode}
-                  </strong>
-                  <div style={{ color: 'var(--text-muted)' }}>
-                    {formatAiringDate(anime.nextAiringEpisode.airingAt)}
-                  </div>
-                </div>
+                <NextEpisodeCountdown
+                  episode={anime.nextAiringEpisode.episode}
+                  airingAt={anime.nextAiringEpisode.airingAt}
+                />
               )}
               {anime?.status === 'FINISHED' && (
                 <div
@@ -2670,7 +2899,6 @@ export default function Watch() {
                 padding: 14,
                 position: 'sticky',
                 top: 16,
-                maxHeight: 'calc(100vh - 32px)',
                 overflowY: 'auto',
                 display:
                   !showEpSidebar && IS_MOBILE ? 'none' : 'block',
@@ -2991,9 +3219,14 @@ export default function Watch() {
         @keyframes watch-spin {
           to { transform: rotate(360deg); }
         }
+        @keyframes watch-count-glow {
+          0%, 100% { text-shadow: 0 0 10px rgba(34,197,94,0.3); }
+          50%      { text-shadow: 0 0 22px rgba(34,197,94,0.75); }
+        }
         .spin-anim { animation: watch-spin 1s linear infinite; }
         @media (prefers-reduced-motion: reduce) {
-          .spin-anim, [style*="watch-toast-in"], [style*="watch-spin"] {
+          .spin-anim, [style*="watch-toast-in"], [style*="watch-spin"],
+          [style*="watch-count-glow"] {
             animation: none !important;
           }
         }
@@ -3001,9 +3234,30 @@ export default function Watch() {
         .watch-art-mount video {
           background: #000;
         }
+        /* Episode sidebar: never taller than the visible viewport.
+           100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
+           fallback for older browsers. */
+        .watch-episodes { max-height: calc(100vh - 32px); }
+        @supports (height: 100dvh) {
+          .watch-episodes { max-height: calc(100dvh - 32px); }
+        }
+        /* Mobile / tablet polish */
+        .watch-player { -webkit-touch-callout: none; }
+        .watch-player * {
+          -webkit-user-select: none;
+          user-select: none;
+        }
+        @media (max-width: 768px) {
+          .watch-grid { grid-template-columns: 1fr !important; }
+          .watch-episodes { width: 100% !important; }
+        }
+        @media (hover: none) and (pointer: coarse) {
+          .watch-touch-seek-btn { min-width: 56px; min-height: 56px; }
+        }
         /* High-contrast support */
         @media (prefers-contrast: more) {
           .watch-source-btn { border-width: 2px !important; }
+          .watch-countdown { border-width: 2px !important; }
         }
       `}</style>
     </>
