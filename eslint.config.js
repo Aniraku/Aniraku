@@ -41,6 +41,7 @@ export default [
         HTMLElement: 'readonly',
         HTMLMediaElement: 'readonly',
         MediaSource: 'readonly',
+        DOMException: 'readonly',
         CustomEvent: 'readonly',
         Event: 'readonly',
         KeyboardEvent: 'readonly',
@@ -62,6 +63,10 @@ export default [
       react: { version: '18.3' },
     },
     rules: {
+      // JSX element names (components defined in the same file) count as
+      // usage for no-unused-vars — without this, locally-defined components
+      // render "never used" even though they appear in the markup.
+      'react/jsx-uses-vars': 'error',
       // SEC-01 guard: undeclared variables in middleware.js crash every
       // crawler request (500) while real browsers still get 200. This rule
       // must stay an error so that class of regression can never ship.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaChevronLeft, FaEye, FaEyeSlash, FaTrash, FaSignOutAlt } from 'react-icons/fa'
@@ -6,6 +6,20 @@ import { useAuth } from '../hooks/useAuth'
 import { useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/Footer/Footer'
+
+// Clear only this site's data. localStorage.clear() wipes every other app
+// on the same origin scope — and on the deployed site that origin is shared
+// with the whole site, so wipe only what Aniraku owns.
+const clearAnirakuStorage = () => {
+  try {
+    const keys = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && (k.startsWith('aniraku-') || k.startsWith('sb-'))) keys.push(k)
+    }
+    keys.forEach(k => localStorage.removeItem(k))
+  } catch {}
+}
 
 const Page = styled.main`
   min-height: 100vh;
@@ -120,6 +134,7 @@ const Switch = styled.button`
   cursor: pointer;
   border: none;
   padding: 0;
+  &:disabled { opacity: 0.55; cursor: wait; }
 
   &::after {
     content: '';
@@ -188,6 +203,31 @@ const Settings = () => {
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteErr, setDeleteErr] = useState('')
+  const [nsfwSaving, setNsfwSaving] = useState(false)
+  const [toast, setToast] = useState('')
+  const toastTimerRef = useRef(null)
+
+  const showToast = useCallback((msg) => {
+    setToast(msg)
+    clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToast(''), 2500)
+  }, [])
+
+  useEffect(() => () => clearTimeout(toastTimerRef.current), [])
+
+  const handleNsfwToggle = async (next) => {
+    if (nsfwSaving) return
+    setNsfwSaving(true)
+    try {
+      await updateNsfw(next)
+      showToast(next ? 'NSFW content enabled' : 'NSFW content hidden')
+    } catch (err) {
+      console.error('Save NSFW setting:', err)
+      showToast('Could not save — check your connection and try again')
+    } finally {
+      setNsfwSaving(false)
+    }
+  }
 
   const handleDelete = async () => {
     if (!user || confirmText !== 'DELETE' || deleting) return
@@ -200,13 +240,19 @@ const Settings = () => {
       setDeleting(false)
       return
     }
-    localStorage.clear()
+    clearAnirakuStorage()
     navigate('/home')
   }
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/home')
+    try {
+      await signOut()
+      showToast('Signed out')
+      navigate('/home')
+    } catch (err) {
+      console.error('Sign out:', err)
+      showToast('Could not sign out — try again')
+    }
   }
 
   if (loading) {
@@ -221,6 +267,16 @@ const Settings = () => {
     return (
       <>
         <Page id="main">
+          {toast && (
+            <div role="status" aria-live="polite" style={{
+              position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.88)', color: '#e2e8f0', padding: '8px 20px',
+              borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
+              border: '1px solid rgba(226,232,240,0.12)', backdropFilter: 'blur(8px)',
+              pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 32px)',
+              overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{toast}</div>
+          )}
           <Container>
             <Title>Settings</Title>
             <Subtitle>
@@ -234,7 +290,7 @@ const Settings = () => {
                   <h3>{nsfwEnabled ? <><FaEye size={13} /> NSFW content shown</> : <><FaEyeSlash size={13} /> NSFW content hidden</>}</h3>
                   <p>Show adult-rated titles in browsing and search results.</p>
                 </RowLabel>
-                <Switch active={nsfwEnabled} onClick={() => updateNsfw(!nsfwEnabled)} aria-label="Toggle NSFW content" role="switch" aria-checked={nsfwEnabled} />
+                <Switch active={nsfwEnabled} disabled={nsfwSaving} onClick={() => handleNsfwToggle(!nsfwEnabled)} aria-label="Toggle NSFW content" role="switch" aria-checked={nsfwEnabled} />
               </Row>
             </Card>
           </Container>
@@ -248,6 +304,16 @@ const Settings = () => {
   return (
     <>
       <Page id="main">
+        {toast && (
+          <div role="status" aria-live="polite" style={{
+            position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.88)', color: '#e2e8f0', padding: '8px 20px',
+            borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
+            border: '1px solid rgba(226,232,240,0.12)', backdropFilter: 'blur(8px)',
+            pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 32px)',
+            overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>{toast}</div>
+        )}
         <Container>
           <Header>
             <BackBtn to="/profile" aria-label="Back to profile"><FaChevronLeft size={16} /></BackBtn>
@@ -262,11 +328,16 @@ const Settings = () => {
                 <h3>{nsfwEnabled ? <><FaEye size={13} /> NSFW content shown</> : <><FaEyeSlash size={13} /> NSFW content hidden</>}</h3>
                 <p>Show adult-rated titles in browsing, search and recommendations.</p>
               </RowLabel>
-              <Switch active={nsfwEnabled} onClick={() => updateNsfw(!nsfwEnabled)} aria-label="Toggle NSFW content" role="switch" aria-checked={nsfwEnabled} />
+              <Switch active={nsfwEnabled} disabled={nsfwSaving} onClick={() => handleNsfwToggle(!nsfwEnabled)} aria-label="Toggle NSFW content" role="switch" aria-checked={nsfwEnabled} />
             </Row>
             <Hint>
               When disabled, adult titles are filtered from lists and their pages show a block screen. You can change this at any time.
             </Hint>
+            {nsfwSaving && (
+              <Hint style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
+                Saving to your account…
+              </Hint>
+            )}
           </Card>
 
           <Card>
