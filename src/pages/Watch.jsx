@@ -17,6 +17,7 @@ import {
   FaCheckCircle,
   FaSpinner,
   FaSignal,
+  FaUndo,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
@@ -565,7 +566,6 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
-  const touchSeekTimer = useRef(null)
   const buildIdRef = useRef(0)              // bumped on every buildPlayer
   const mountedRef = useRef(true)
   const toastTimerRef = useRef(null)
@@ -595,7 +595,6 @@ export default function Watch() {
   const [resumePos, setResumePos] = useState(null)
   const [resumeCountdown, setResumeCountdown] = useState(0)
   const [showEpSidebar, setShowEpSidebar] = useState(true)
-  const [touchSeekVisible, setTouchSeekVisible] = useState(false)
   const [isOnline, setIsOnline] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
@@ -1008,7 +1007,6 @@ export default function Watch() {
         } catch {}
       }
       clearTimeout(toastTimerRef.current)
-      clearTimeout(touchSeekTimer.current)
       destroyPlayer()
     },
     [destroyPlayer]
@@ -1876,6 +1874,58 @@ export default function Watch() {
   )
 
   // ────────────────────────────────────────────────────────────
+  // Touch seek (tap = ±10s, hold = repeat) for phones & tablets
+  // ────────────────────────────────────────────────────────────
+  const seekHoldTimerRef = useRef(null)
+  const seekBy = useCallback(
+    (dir) => {
+      const art = artInstance.current
+      if (!art) return
+      if (dir < 0) {
+        art.video.currentTime = Math.max(0, art.video.currentTime - 10)
+      } else {
+        art.video.currentTime = Math.min(
+          art.video.duration || Infinity,
+          art.video.currentTime + 10
+        )
+      }
+      showToast(dir < 0 ? '−10s' : '+10s')
+    },
+    [showToast]
+  )
+  const stopSeekHold = useCallback(() => {
+    if (seekHoldTimerRef.current) {
+      clearTimeout(seekHoldTimerRef.current)
+      seekHoldTimerRef.current = null
+    }
+  }, [])
+  const startSeekHold = useCallback(
+    (dir) => {
+      stopSeekHold()
+      // Repeat only after holding 350ms — a plain tap still seeks once.
+      seekHoldTimerRef.current = setTimeout(() => {
+        seekHoldTimerRef.current = setInterval(() => {
+          const art = artInstance.current
+          if (!art) {
+            stopSeekHold()
+            return
+          }
+          if (dir < 0) {
+            art.video.currentTime = Math.max(0, art.video.currentTime - 10)
+          } else {
+            art.video.currentTime = Math.min(
+              art.video.duration || Infinity,
+              art.video.currentTime + 10
+            )
+          }
+        }, 250)
+      }, 350)
+    },
+    [stopSeekHold]
+  )
+  useEffect(() => () => stopSeekHold(), [stopSeekHold])
+
+  // ────────────────────────────────────────────────────────────
   // Mobile gestures
   // ────────────────────────────────────────────────────────────
   const touchState = useRef({
@@ -1890,12 +1940,6 @@ export default function Watch() {
     if (!container) return
     const onTouchStart = (e) => {
       if (e.target.closest && e.target.closest('.watch-touch-seek')) return
-      setTouchSeekVisible(true)
-      clearTimeout(touchSeekTimer.current)
-      touchSeekTimer.current = setTimeout(
-        () => setTouchSeekVisible(false),
-        3_000
-      )
       const touch = e.touches[0]
       const rect = container.getBoundingClientRect()
       const x = touch.clientX - rect.left
@@ -1960,7 +2004,6 @@ export default function Watch() {
     return () => {
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
-      clearTimeout(touchSeekTimer.current)
     }
   }, [showToast])
 
@@ -2203,77 +2246,35 @@ export default function Watch() {
             role="region"
           />
 
-          {/* Touch-seek buttons (mobile) */}
+          {/* Touch seek: ±10s (phones + tablets). Tap once or hold to
+              repeat — handy for skipping intros. */}
           <button
             type="button"
             aria-label="Seek backward 10 seconds"
-            onClick={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              const art = artInstance.current
-              if (art) {
-                art.video.currentTime = Math.max(0, art.video.currentTime - 10)
-                showToast('−10s')
-              }
-            }}
+            title="Seek backward 10 seconds"
+            onClick={() => seekBy(-1)}
+            onPointerDown={() => startSeekHold(-1)}
+            onPointerUp={stopSeekHold}
+            onPointerLeave={stopSeekHold}
+            onPointerCancel={stopSeekHold}
             className="watch-touch-seek watch-touch-seek-left"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '30%',
-              height: '100%',
-              background: 'transparent',
-              border: 'none',
-              opacity: touchSeekVisible ? 0.18 : 0,
-              transition: PREFERS_REDUCED_MOTION
-                ? 'none'
-                : 'opacity 200ms ease',
-              cursor: 'pointer',
-              zIndex: 2,
-              color: '#fff',
-              fontSize: 28,
-              display: IS_MOBILE ? 'block' : 'none',
-            }}
+            style={{ ...touchSeekBtnStyle, left: 8 }}
           >
-            ‹
+            <FaUndo size={18} />
           </button>
           <button
             type="button"
             aria-label="Seek forward 10 seconds"
-            onClick={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              const art = artInstance.current
-              if (art) {
-                art.video.currentTime = Math.min(
-                  art.video.duration || Infinity,
-                  art.video.currentTime + 10
-                )
-                showToast('+10s')
-              }
-            }}
+            title="Seek forward 10 seconds"
+            onClick={() => seekBy(1)}
+            onPointerDown={() => startSeekHold(1)}
+            onPointerUp={stopSeekHold}
+            onPointerLeave={stopSeekHold}
+            onPointerCancel={stopSeekHold}
             className="watch-touch-seek watch-touch-seek-right"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '30%',
-              height: '100%',
-              background: 'transparent',
-              border: 'none',
-              opacity: touchSeekVisible ? 0.18 : 0,
-              transition: PREFERS_REDUCED_MOTION
-                ? 'none'
-                : 'opacity 200ms ease',
-              cursor: 'pointer',
-              zIndex: 2,
-              color: '#fff',
-              fontSize: 28,
-              display: IS_MOBILE ? 'block' : 'none',
-            }}
+            style={{ ...touchSeekBtnStyle, right: 8 }}
           >
-            ›
+            <FaRedo size={18} />
           </button>
 
           {/* Buffering indicator */}
@@ -3251,8 +3252,13 @@ export default function Watch() {
           .watch-grid { grid-template-columns: 1fr !important; }
           .watch-episodes { width: 100% !important; }
         }
+        /* Touch seek buttons: only on touch screens (phones + tablets).
+           iPads whose UA reports as desktop (iPad Pro) are caught by the
+           pointer-coarse query, not the UA sniff. */
+        .watch-touch-seek { display: none; }
+        .watch-touch-seek:active { opacity: 0.85; }
         @media (hover: none) and (pointer: coarse) {
-          .watch-touch-seek-btn { min-width: 56px; min-height: 56px; }
+          .watch-touch-seek { display: flex !important; }
         }
         /* High-contrast support */
         @media (prefers-contrast: more) {
@@ -3279,4 +3285,26 @@ const navBtnStyle = {
   border: '1px solid var(--border)',
   transition: 'all 0.15s',
   cursor: 'pointer',
+}
+
+// Floating ±10s seek buttons on the player, touch devices only.
+const touchSeekBtnStyle = {
+  position: 'absolute',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: 56,
+  height: 56,
+  borderRadius: '50%',
+  background: 'rgba(0,0,0,0.45)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  color: '#fff',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  zIndex: 2,
+  touchAction: 'manipulation',
+  boxShadow: '0 2px 12px rgba(0,0,0,0.35)',
+  WebkitBackdropFilter: 'blur(6px)',
+  backdropFilter: 'blur(6px)',
 }
