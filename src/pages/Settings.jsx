@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { FaChevronLeft, FaEye, FaEyeSlash, FaTrash, FaSignOutAlt, FaLink, FaUnlink, FaCheck } from 'react-icons/fa'
+import { FaChevronLeft, FaEye, FaEyeSlash, FaTrash, FaSignOutAlt, FaLink, FaUnlink, FaCheck, FaHistory, FaBookmark, FaKey, FaSync, FaLock } from 'react-icons/fa'
 import { useAuth } from '../hooks/useAuth'
 import { useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
@@ -20,6 +20,10 @@ const clearAnirakuStorage = () => {
     }
     keys.forEach(k => localStorage.removeItem(k))
   } catch {}
+}
+
+const removeLocalKey = (key) => {
+  try { localStorage.removeItem(key) } catch {}
 }
 
 const Page = styled.main`
@@ -93,12 +97,86 @@ const CardTitle = styled.h2`
   margin-bottom: 16px;
 `
 
+// ── Toggle switch ──────────────────────────────────────────────────────────
+// 64×44 hit area keeps the tap target comfortable while the visual track
+// stays a crisp 52×30 pill. The thumb rides the track via transform so it
+// slides (not jumps) and stays centered no matter how the pill scales.
+const Switch = styled.button`
+  position: relative;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  &:disabled { opacity: 0.55; cursor: wait; }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 52px;
+    height: 30px;
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
+    background: ${({ active }) => (active ? 'var(--accent)' : 'var(--border)')};
+    transition: background var(--transition-fast);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin-top: -12px;
+    border-radius: 50%;
+    background: ${({ active }) => (active ? '#000' : '#fff')};
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transform: translateX(${({ active }) => (active ? '11px' : '-11px')});
+    transition: transform var(--transition-fast);
+  }
+`
+
+// One toggle bar: icon + title + description on the left, switch on the
+// right. Used for every on/off preference so all rows look identical.
+const ToggleRow = ({ icon, title, desc, checked, disabled, onChange }) => (
+  <Row>
+    <RowLabel>
+      <h3>
+        {icon && <span className="row-icon" style={{ color: 'var(--text-muted)' }}>{icon}</span>}
+        {title}
+      </h3>
+      {desc && <p>{desc}</p>}
+    </RowLabel>
+    <Switch
+      active={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      aria-label={title}
+      role="switch"
+      aria-checked={checked}
+    />
+  </Row>
+)
+
+// Divides sibling rows so a card of toggles reads as one list.
+const RowDivider = styled.div`
+  & > *:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+  }
+`
+
 const Row = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+  padding: 14px 0;
 
   @media (max-width: 480px) {
     flex-direction: column;
@@ -123,32 +201,68 @@ const RowLabel = styled.div`
   }
 `
 
-const Switch = styled.button`
-  position: relative;
+const RowBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   flex: 0 0 auto;
-  width: 52px;
-  height: 30px;
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: ${({ $busy }) => ($busy ? 'wait' : 'pointer')};
+  opacity: ${({ $busy, $disabled }) => ($busy || $disabled ? 0.6 : 1)};
+  pointer-events: ${({ $disabled }) => ($disabled ? 'none' : 'auto')};
   min-height: 44px;
-  border-radius: var(--radius-full);
-  background: ${({ active }) => (active ? 'var(--accent)' : 'var(--border)')};
-  transition: background var(--transition-fast);
-  cursor: pointer;
-  border: none;
-  padding: 0;
-  &:disabled { opacity: 0.55; cursor: wait; }
 
-  &::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    margin-top: -12px;
-    left: ${({ active }) => (active ? '25px' : '3px')};
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: ${({ active }) => (active ? '#000' : '#fff')};
-    transition: left var(--transition-fast);
+  &:hover { border-color: var(--border-hover); }
+
+  @media (max-width: 480px) {
+    width: 100%;
   }
+`
+
+const RowBtnLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 44px;
+  text-decoration: none;
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
+`
+
+const RowBtnPrimary = styled(RowBtn)`
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  &:hover { border-color: var(--accent); }
+`
+
+const Badge = styled.span`
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  background: ${({ ok }) => (ok ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)')};
+  color: ${({ ok }) => (ok ? '#86efac' : 'var(--text-muted)')};
 `
 
 const Hint = styled.p`
@@ -170,6 +284,11 @@ const DangerBtn = styled.button`
   cursor: ${p => p.$disabled ? 'wait' : 'pointer'};
   opacity: ${p => p.$disabled ? 0.6 : 1};
   &:hover { background: rgba(239, 68, 68, 0.2); }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    justify-content: center;
+  }
 `
 
 const DangerInput = styled.input`
@@ -196,6 +315,25 @@ const DangerMsg = styled.p`
   margin-top: 10px;
 `
 
+const ErrMsg = styled.p`
+  font-size: 13px;
+  color: #fca5a5;
+  margin-top: 8px;
+`
+
+const Input = styled.input`
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  &:focus { border-color: var(--accent); }
+`
+
 const SyncRow = styled.div`
   display: flex;
   align-items: center;
@@ -213,36 +351,28 @@ const SyncRow = styled.div`
   }
 `
 
-const SyncBadge = styled.span`
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  margin-left: 6px;
-  vertical-align: 2px;
-  background: ${({ ok }) => (ok ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)')};
-  color: ${({ ok }) => (ok ? '#86efac' : 'var(--text-muted)')};
-`
-
-const SyncBtn = styled.button`
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+const SyncBtn = styled(RowBtn)`
   background: ${({ primary }) => (primary ? 'var(--accent)' : 'var(--bg-elevated)')};
   color: ${({ primary }) => (primary ? 'var(--bg)' : 'var(--text-primary)')};
-  border: 1px solid ${({ primary }) => (primary ? 'var(--accent)' : 'var(--border)')};
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: ${({ $busy }) => ($busy ? 'wait' : 'pointer')};
-  opacity: ${({ $busy }) => ($busy ? 0.6 : 1)};
-  min-height: 44px;
-  justify-content: center;
+  border-color: ${({ primary }) => (primary ? 'var(--accent)' : 'var(--border)')};
 `
 
+const Toast = ({ message }) => {
+  if (!message) return null
+  return (
+    <div role="status" aria-live="polite" style={{
+      position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.88)', color: '#e2e8f0', padding: '8px 20px',
+      borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
+      border: '1px solid rgba(226,232,240,0.12)', backdropFilter: 'blur(8px)',
+      pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 32px)',
+      overflow: 'hidden', textOverflow: 'ellipsis',
+    }}>{message}</div>
+  )
+}
+
 const Settings = () => {
-  const { user, loading, signOut } = useAuth()
+  const { user, profile, loading, signOut } = useAuth()
   const { nsfwEnabled, updateNsfw } = useNsfw()
   const navigate = useNavigate()
   const [confirmArmed, setConfirmArmed] = useState(false)
@@ -305,12 +435,16 @@ const Settings = () => {
   const [syncStatus, setSyncStatus] = useState(null)
   const [syncBusy, setSyncBusy] = useState({})
   const [syncVersion, setSyncVersion] = useState(0)
+  const [syncCheckedAt, setSyncCheckedAt] = useState(null)
 
   useEffect(() => {
     if (!user) return
     let cancelled = false
     getSyncStatus().then((data) => {
-      if (!cancelled && data) setSyncStatus(data)
+      if (!cancelled) {
+        if (data) setSyncStatus(data)
+        setSyncCheckedAt(Date.now())
+      }
     })
     return () => { cancelled = true }
   }, [user, syncVersion])
@@ -324,6 +458,10 @@ const Settings = () => {
       expiresAt: p?.expires_at || 0,
     }
   }
+
+  const connectedProviders = syncStatus
+    ? Object.keys(PROVIDER_LABELS).filter((p) => syncProviderStatus(p).connected)
+    : []
 
   const tokenHealth = (expiresAt) => {
     if (!expiresAt) return ''
@@ -361,55 +499,354 @@ const Settings = () => {
     }
   }
 
-  const renderSyncCard = () => (
+  // ── Change password ─────────────────────────────────────────
+  const canChangePassword = !!(user && user.email)
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwErr, setPwErr] = useState('')
+
+  const handlePassword = async () => {
+    if (pw.length < 6) { setPwErr('Password must be at least 6 characters'); return }
+    if (pw !== pw2) { setPwErr('Passwords do not match'); return }
+    setPwBusy(true)
+    setPwErr('')
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pw })
+      if (error) throw error
+      setPwOpen(false)
+      setPw('')
+      setPw2('')
+      showToast('Password updated')
+    } catch (err) {
+      console.error('Update password:', err)
+      setPwErr(err.message || 'Could not update password')
+    } finally {
+      setPwBusy(false)
+    }
+  }
+
+  // ── Clear watch history / bookmarks ─────────────────────────
+  const [clearing, setClearing] = useState('') // '' | 'history' | 'bookmarks' | 'local'
+
+  const handleClearHistory = async () => {
+    if (clearing) return
+    setClearing('history')
+    try {
+      if (user) {
+        const { error } = await supabase.from('watch_history').delete().eq('user_id', user.id)
+        if (error) throw error
+      }
+      removeLocalKey('aniraku-watch-history')
+      removeLocalKey('aniraku-episode-track')
+      setClearArm((a) => ({ ...a, history: false }))
+      showToast('Watch history cleared')
+    } catch (err) {
+      console.error('Clear watch history:', err)
+      showToast('Could not clear history — try again')
+    } finally {
+      setClearing('')
+    }
+  }
+
+  const handleClearBookmarks = async () => {
+    if (clearing) return
+    setClearing('bookmarks')
+    try {
+      if (user) {
+        const { error } = await supabase.from('bookmarks').delete().eq('user_id', user.id)
+        if (error) throw error
+      }
+      removeLocalKey('aniraku-bookmarks')
+      setClearArm((a) => ({ ...a, bookmarks: false }))
+      showToast('Bookmarks cleared')
+    } catch (err) {
+      console.error('Clear bookmarks:', err)
+      showToast('Could not clear bookmarks — try again')
+    } finally {
+      setClearing('')
+    }
+  }
+
+  const [clearArm, setClearArm] = useState({ history: false, bookmarks: false })
+
+  const renderContentCard = () => (
     <Card>
-      <CardTitle>Library Sync</CardTitle>
-      <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
-        Keep Aniraku in step with your MyAnimeList and AniList libraries.
-        When you finish an episode here, your progress is pushed to every
-        connected service automatically.
-      </p>
-      {['mal', 'anilist'].map((provider) => {
-        const { connected, username, reason, expiresAt } = syncProviderStatus(provider)
-        const busy = !!syncBusy[provider]
-        return (
-          <SyncRow key={provider}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-              {PROVIDER_LABELS[provider]}
-              <SyncBadge ok={connected}>{connected ? 'Connected' : 'Off'}</SyncBadge>
-              {connected && username && (
-                <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Syncing as <strong style={{ color: 'var(--text-secondary)' }}>{username}</strong>
-                </div>
-              )}
-              {connected && (
-                <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginTop: 1, opacity: 0.8 }}>
-                  {tokenHealth(expiresAt)}
-                </div>
-              )}
-              {!connected && reason && (
-                <div style={{ fontSize: 12, fontWeight: 400, color: '#fca5a5', marginTop: 2 }}>
-                  {reason}
-                </div>
-              )}
-            </div>
-            {connected ? (
-              <SyncBtn $busy={busy} onClick={() => handleDisconnect(provider)}>
-                <FaUnlink size={13} /> {busy ? 'Disconnecting…' : 'Disconnect'}
-              </SyncBtn>
-            ) : (
-              <SyncBtn primary $busy={busy} onClick={() => handleConnect(provider)}>
-                <FaLink size={13} /> Connect
-              </SyncBtn>
-            )}
-          </SyncRow>
-        )
-      })}
+      <CardTitle>Content</CardTitle>
+      <RowDivider>
+        <ToggleRow
+          icon={nsfwEnabled ? <FaEye size={13} /> : <FaEyeSlash size={13} />}
+          title={nsfwEnabled ? 'NSFW content shown' : 'NSFW content hidden'}
+          desc="Show adult-rated titles in browsing, search and recommendations."
+          checked={nsfwEnabled}
+          disabled={nsfwSaving}
+          onChange={handleNsfwToggle}
+        />
+      </RowDivider>
       <Hint>
-        Connecting opens {`${PROVIDER_LABELS.mal}`} / {`${PROVIDER_LABELS.anilist}`} in a new tab
-        and asks only for permission to update your library list — no password is
-        ever shared with Aniraku.
+        When disabled, adult titles are filtered from lists and their pages show a block screen.
+        You can change this at any time.
       </Hint>
+      {nsfwSaving && (
+        <Hint style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
+          Saving to your account…
+        </Hint>
+      )}
+    </Card>
+  )
+
+  const renderSyncCard = () => {
+    if (!user) {
+      // Guests can't hold OAuth tokens — point them at login instead of
+      // dead Connect buttons.
+      return (
+        <Card>
+          <CardTitle>Library Sync</CardTitle>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 4 }}>
+            Keep Aniraku in step with your MyAnimeList and AniList libraries. When you
+            finish an episode here, your progress is pushed to every connected service.
+          </p>
+          <RowDivider>
+            <Row>
+              <RowLabel>
+                <h3><FaLock size={13} /> Sync needs an account</h3>
+                <p>Log in to connect your library and push watch progress automatically.</p>
+              </RowLabel>
+              <RowBtnLink to="/login">Log in</RowBtnLink>
+            </Row>
+          </RowDivider>
+        </Card>
+      )
+    }
+
+    return (
+      <Card>
+        <CardTitle>Library Sync</CardTitle>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
+          Keep Aniraku in step with your MyAnimeList and AniList libraries.
+          When you finish an episode here, your progress is pushed to every
+          connected service automatically.
+        </p>
+        {['mal', 'anilist'].map((provider) => {
+          const { connected, username, reason, expiresAt } = syncProviderStatus(provider)
+          const busy = !!syncBusy[provider]
+          return (
+            <SyncRow key={provider}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {PROVIDER_LABELS[provider]}
+                <Badge ok={connected}>{connected ? 'Connected' : 'Off'}</Badge>
+                {connected && username && (
+                  <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
+                    Syncing as <strong style={{ color: 'var(--text-secondary)' }}>{username}</strong>
+                  </div>
+                )}
+                {connected && (
+                  <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginTop: 1, opacity: 0.8 }}>
+                    {tokenHealth(expiresAt)}
+                  </div>
+                )}
+                {!connected && reason && (
+                  <div style={{ fontSize: 12, fontWeight: 400, color: '#fca5a5', marginTop: 2 }}>
+                    {reason}
+                  </div>
+                )}
+              </div>
+              {connected ? (
+                <SyncBtn $busy={busy} onClick={() => handleDisconnect(provider)}>
+                  <FaUnlink size={13} /> {busy ? 'Disconnecting…' : 'Disconnect'}
+                </SyncBtn>
+              ) : (
+                <SyncBtn primary $busy={busy} onClick={() => handleConnect(provider)}>
+                  <FaLink size={13} /> Connect
+                </SyncBtn>
+              )}
+            </SyncRow>
+          )
+        })}
+        <Row style={{ borderTop: '1px solid var(--border)', marginTop: 8 }}>
+          <RowLabel>
+            <h3 style={{ fontSize: 13, fontWeight: 500 }}>
+              {connectedProviders.length
+                ? `${connectedProviders.length} service${connectedProviders.length > 1 ? 's' : ''} connected`
+                : 'No services connected yet'}
+            </h3>
+            <p>
+              {syncCheckedAt
+                ? `Checked ${new Date(syncCheckedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : 'Checking status…'}
+            </p>
+          </RowLabel>
+          <RowBtn onClick={() => { setSyncVersion((v) => v + 1) }}>
+            <FaSync size={13} /> Refresh
+          </RowBtn>
+        </Row>
+        <Hint>
+          Connecting opens {`${PROVIDER_LABELS.mal}`} / {`${PROVIDER_LABELS.anilist}`} in a new tab
+          and asks only for permission to update your library list — no password is
+          ever shared with Aniraku.
+        </Hint>
+      </Card>
+    )
+  }
+
+  const renderAccountCard = () => (
+    <Card>
+      <CardTitle>Account</CardTitle>
+      <RowDivider>
+        <Row>
+          <RowLabel>
+            <h3 style={{ fontSize: 13, fontWeight: 500 }}>Email</h3>
+            <p>{user.email || 'No email on this account'}</p>
+          </RowLabel>
+          {user.email_confirmed_at ? (
+            <Badge ok>Verified</Badge>
+          ) : (
+            <Badge ok={false}>Unverified</Badge>
+          )}
+        </Row>
+        {profile?.created_at && (
+          <Row>
+            <RowLabel>
+              <h3 style={{ fontSize: 13, fontWeight: 500 }}>Member since</h3>
+              <p>
+                {new Date(profile.created_at).toLocaleDateString(undefined, {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </p>
+            </RowLabel>
+          </Row>
+        )}
+        {canChangePassword && (
+          <>
+            <Row>
+              <RowLabel>
+                <h3 style={{ fontSize: 13, fontWeight: 500 }}>Password</h3>
+                <p>Update the password you use to sign in.</p>
+              </RowLabel>
+              <RowBtn onClick={() => setPwOpen((v) => !v)}>
+                <FaKey size={13} /> {pwOpen ? 'Cancel' : 'Change'}
+              </RowBtn>
+            </Row>
+            {pwOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Input
+                  type="password"
+                  aria-label="New password"
+                  placeholder="New password"
+                  value={pw}
+                  onChange={(e) => setPw(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="password"
+                  aria-label="Confirm new password"
+                  placeholder="Confirm new password"
+                  value={pw2}
+                  onChange={(e) => setPw2(e.target.value)}
+                  autoComplete="new-password"
+                />
+                {pwErr && <ErrMsg>{pwErr}</ErrMsg>}
+                <div>
+                  <RowBtnPrimary $busy={pwBusy} onClick={handlePassword}>
+                    <FaCheck size={13} /> {pwBusy ? 'Saving…' : 'Update Password'}
+                  </RowBtnPrimary>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        <Row>
+          <RowLabel>
+            <h3 style={{ fontSize: 13, fontWeight: 500 }}>Profile</h3>
+            <p>Username, display name, avatar, bookmarks and watch history.</p>
+          </RowLabel>
+          <RowBtn onClick={() => navigate('/profile')}>Open Profile</RowBtn>
+        </Row>
+        <Row>
+          <RowLabel>
+            <h3 style={{ fontSize: 13, fontWeight: 500 }}>Sign out</h3>
+            <p>End this session on this device.</p>
+          </RowLabel>
+          <RowBtn onClick={handleSignOut}>
+            <FaSignOutAlt size={13} /> Sign Out
+          </RowBtn>
+        </Row>
+      </RowDivider>
+    </Card>
+  )
+
+  const renderDataCard = (isGuest) => (
+    <Card>
+      <CardTitle>Data</CardTitle>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
+        {isGuest
+          ? 'Clearing removes this data from this device only. Log in to manage account-wide data.'
+          : 'Clearing removes this data from your account everywhere you are signed in.'}
+      </p>
+      <RowDivider>
+        <Row>
+          <RowLabel>
+            <h3 style={{ fontSize: 13, fontWeight: 500 }}><FaHistory size={12} /> Watch history</h3>
+            <p>Episodes you have watched, and where you left off.</p>
+          </RowLabel>
+          {!clearArm.history ? (
+            <RowBtn onClick={() => setClearArm((a) => ({ ...a, history: true }))}>Clear</RowBtn>
+          ) : (
+            <DangerBtn $disabled={!!clearing} onClick={handleClearHistory}>
+              <FaTrash size={12} /> {clearing === 'history' ? 'Clearing…' : 'Confirm clear'}
+            </DangerBtn>
+          )}
+        </Row>
+        <Row>
+          <RowLabel>
+            <h3 style={{ fontSize: 13, fontWeight: 500 }}><FaBookmark size={12} /> Bookmarks</h3>
+            <p>Anime you have saved to your library.</p>
+          </RowLabel>
+          {!clearArm.bookmarks ? (
+            <RowBtn onClick={() => setClearArm((a) => ({ ...a, bookmarks: true }))}>Clear</RowBtn>
+          ) : (
+            <DangerBtn $disabled={!!clearing} onClick={handleClearBookmarks}>
+              <FaTrash size={12} /> {clearing === 'bookmarks' ? 'Clearing…' : 'Confirm clear'}
+            </DangerBtn>
+          )}
+        </Row>
+      </RowDivider>
+      <Hint>
+        These actions cannot be undone. The buttons disarm themselves after clearing.
+      </Hint>
+    </Card>
+  )
+
+  const renderDangerCard = () => (
+    <Card style={{ borderColor: 'rgba(239, 68, 68, 0.35)' }}>
+      <CardTitle style={{ color: '#ef4444' }}>Danger Zone</CardTitle>
+      <RowDivider>
+        <Row>
+          <RowLabel>
+            <h3>Delete account</h3>
+            <p>Permanently removes your profile, watch history, bookmarks, comments and settings. This cannot be undone.</p>
+          </RowLabel>
+          {!confirmArmed ? (
+            <DangerBtn onClick={() => setConfirmArmed(true)}><FaTrash size={13} /> Delete Account</DangerBtn>
+          ) : (
+            <div className="settings-confirm" style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+              <DangerInput
+                type="text"
+                aria-label="Type DELETE to confirm"
+                placeholder='Type "DELETE" to confirm'
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                autoFocus
+              />
+              <DangerBtn $disabled={deleting || confirmText !== 'DELETE'} onClick={handleDelete}>
+                {deleting ? 'Deleting…' : 'Permanently Delete'}
+              </DangerBtn>
+            </div>
+          )}
+        </Row>
+      </RowDivider>
+      {deleteErr && <DangerMsg>{deleteErr}</DangerMsg>}
     </Card>
   )
 
@@ -425,32 +862,16 @@ const Settings = () => {
     return (
       <>
         <Page id="main">
-          {toast && (
-            <div role="status" aria-live="polite" style={{
-              position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.88)', color: '#e2e8f0', padding: '8px 20px',
-              borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
-              border: '1px solid rgba(226,232,240,0.12)', backdropFilter: 'blur(8px)',
-              pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 32px)',
-              overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>{toast}</div>
-          )}
+          <Toast message={toast} />
           <Container>
             <Title>Settings</Title>
             <Subtitle>
               Guest preferences are stored on this device only.{' '}
               <Link to="/login" style={{ color: 'var(--accent)' }}>Log in</Link> to sync them to your account.
             </Subtitle>
-            <Card>
-              <CardTitle>Content</CardTitle>
-              <Row>
-                <RowLabel>
-                  <h3>{nsfwEnabled ? <><FaEye size={13} /> NSFW content shown</> : <><FaEyeSlash size={13} /> NSFW content hidden</>}</h3>
-                  <p>Show adult-rated titles in browsing and search results.</p>
-                </RowLabel>
-                <Switch active={nsfwEnabled} disabled={nsfwSaving} onClick={() => handleNsfwToggle(!nsfwEnabled)} aria-label="Toggle NSFW content" role="switch" aria-checked={nsfwEnabled} />
-              </Row>
-            </Card>
+            {renderContentCard()}
+            {renderSyncCard()}
+            {renderDataCard(true)}
           </Container>
         </Page>
         <Footer />
@@ -462,16 +883,7 @@ const Settings = () => {
   return (
     <>
       <Page id="main">
-        {toast && (
-          <div role="status" aria-live="polite" style={{
-            position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.88)', color: '#e2e8f0', padding: '8px 20px',
-            borderRadius: 10, fontSize: 13, fontWeight: 600, zIndex: 9999,
-            border: '1px solid rgba(226,232,240,0.12)', backdropFilter: 'blur(8px)',
-            pointerEvents: 'none', whiteSpace: 'nowrap', maxWidth: 'calc(100vw - 32px)',
-            overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>{toast}</div>
-        )}
+        <Toast message={toast} />
         <Container>
           <Header>
             <BackBtn to="/profile" aria-label="Back to profile"><FaChevronLeft size={16} /></BackBtn>
@@ -479,81 +891,17 @@ const Settings = () => {
           </Header>
           <Subtitle>Preferences are saved to your account and follow you across devices.</Subtitle>
 
-          <Card>
-            <CardTitle>Content</CardTitle>
-            <Row>
-              <RowLabel>
-                <h3>{nsfwEnabled ? <><FaEye size={13} /> NSFW content shown</> : <><FaEyeSlash size={13} /> NSFW content hidden</>}</h3>
-                <p>Show adult-rated titles in browsing, search and recommendations.</p>
-              </RowLabel>
-              <Switch active={nsfwEnabled} disabled={nsfwSaving} onClick={() => handleNsfwToggle(!nsfwEnabled)} aria-label="Toggle NSFW content" role="switch" aria-checked={nsfwEnabled} />
-            </Row>
-            <Hint>
-              When disabled, adult titles are filtered from lists and their pages show a block screen. You can change this at any time.
-            </Hint>
-            {nsfwSaving && (
-              <Hint style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
-                Saving to your account…
-              </Hint>
-            )}
-          </Card>
-
+          {renderContentCard()}
           {renderSyncCard()}
-
-          <Card>
-            <CardTitle>Account</CardTitle>
-            <Row>
-              <RowLabel>
-                <h3>Profile</h3>
-                <p>Username, display name, avatar, bookmarks and watch history.</p>
-              </RowLabel>
-              <button onClick={() => navigate('/profile')} className="settings-row-btn" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Open Profile</button>
-            </Row>
-            <Row style={{ marginTop: 12 }}>
-              <RowLabel>
-                <h3>Sign out</h3>
-                <p>End this session on this device.</p>
-              </RowLabel>
-              <button onClick={handleSignOut} className="settings-row-btn" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '10px 16px', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <FaSignOutAlt size={13} /> Sign Out
-              </button>
-            </Row>
-          </Card>
-
-          <Card style={{ borderColor: 'rgba(239, 68, 68, 0.35)' }}>
-            <CardTitle style={{ color: '#ef4444' }}>Danger Zone</CardTitle>
-            <Row>
-              <RowLabel>
-                <h3>Delete account</h3>
-                <p>Permanently removes your profile, watch history, bookmarks, comments and settings. This cannot be undone.</p>
-              </RowLabel>
-              {!confirmArmed ? (
-                <DangerBtn onClick={() => setConfirmArmed(true)}><FaTrash size={13} /> Delete Account</DangerBtn>
-              ) : (
-                <div className="settings-confirm" style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-                  <DangerInput
-                    type="text"
-                    aria-label="Type DELETE to confirm"
-                    placeholder='Type "DELETE" to confirm'
-                    value={confirmText}
-                    onChange={e => setConfirmText(e.target.value)}
-                    autoFocus
-                  />
-                  <DangerBtn $disabled={deleting || confirmText !== 'DELETE'} onClick={handleDelete}>
-                    {deleting ? 'Deleting…' : 'Permanently Delete'}
-                  </DangerBtn>
-                </div>
-              )}
-            </Row>
-            {deleteErr && <DangerMsg>{deleteErr}</DangerMsg>}
-          </Card>
+          {renderAccountCard()}
+          {renderDataCard(false)}
+          {renderDangerCard()}
         </Container>
       </Page>
         <Footer />
         <div className="bottom-nav-spacer" />
         <style>{`
           @media (max-width: 480px) {
-            .settings-row-btn { width: 100% !important; justify-content: center; }
             .settings-confirm { width: 100% !important; align-items: stretch !important; }
           }
         `}</style>
