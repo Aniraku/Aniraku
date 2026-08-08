@@ -19,7 +19,9 @@ const Profile = () => {
   const [bookmarks, setBookmarks] = useState([])
   const [history, setHistory] = useState([])
   const [anilistUser, setAnilistUser] = useState('')
+  const [malUser, setMalUser] = useState('')
   const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) navigate('/login')
@@ -146,6 +148,70 @@ const Profile = () => {
       setMessage(err.message || 'Import failed — backend may need auth')
     }
     setImporting(false)
+  }
+
+  const importMAL = async () => {
+    if (!malUser.trim()) return
+    setImporting(true)
+    setMessage('')
+    try {
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      const res = await fetch(`${API_BASE}/api/v1/import/mal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ username: malUser.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Import failed')
+      setMessage(data.message || 'MAL import started. Check favorites after a moment.')
+    } catch (err) {
+      setMessage(err.message || 'Import failed — backend may need auth')
+    }
+    setImporting(false)
+  }
+
+  const exportList = async (source) => {
+    setExporting(true)
+    setMessage('')
+    try {
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+      const res = await fetch(`${API_BASE}/api/v1/export/${source}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({}),
+      })
+      const contentType = res.headers.get('content-type') || ''
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Export failed')
+      }
+      if (contentType.includes('application/json')) {
+        const data = await res.json()
+        setMessage(data.message || 'Export started')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const disposition = res.headers.get('content-disposition') || ''
+      const match = disposition.match(/filename="?([^";]+)"?/)
+      a.download = match ? match[1] : `aniraku-${source}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setMessage(`${source === 'mal' ? 'MAL' : 'AniList'} export downloaded`)
+    } catch (err) {
+      setMessage(err.message || 'Export failed — backend may need auth')
+    }
+    setExporting(false)
   }
 
   if (loading) {
@@ -356,6 +422,35 @@ const Profile = () => {
               <button onClick={importAniList} disabled={importing || !anilistUser.trim()} style={primaryBtn}>
                 {importing ? 'Importing…' : 'Import AniList'}
               </button>
+
+              <div style={{ borderTop: '1px solid var(--border)', margin: '24px 0' }} />
+
+              <h3 style={{ fontSize: 16, marginBottom: 8 }}>Import from MyAnimeList</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                Enter your MyAnimeList username to import your list. Works for public lists —
+                no MAL account link needed.
+              </p>
+              <label style={labelStyle}>MAL username</label>
+              <input type="text" value={malUser} onChange={e => setMalUser(e.target.value)} placeholder="your_mal_username" style={inputStyle} />
+              <button onClick={importMAL} disabled={importing || !malUser.trim()} style={primaryBtn}>
+                {importing ? 'Importing…' : 'Import MAL'}
+              </button>
+
+              <div style={{ borderTop: '1px solid var(--border)', margin: '24px 0' }} />
+
+              <h3 style={{ fontSize: 16, marginBottom: 8 }}>Export your list</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                Download your Aniraku favorites and list data in a format you can
+                move to another service.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button onClick={() => exportList('mal')} disabled={exporting} style={primaryBtn}>
+                  {exporting ? 'Exporting…' : 'Export MAL'}
+                </button>
+                <button onClick={() => exportList('anilist')} disabled={exporting} style={primaryBtn}>
+                  {exporting ? 'Exporting…' : 'Export AniList'}
+                </button>
+              </div>
             </div>
           )}
         </div>
