@@ -13,6 +13,7 @@ import {
   describeExport,
   PROVIDER_LABELS,
 } from '../lib/sync'
+import ProviderIcon from '../components/ProviderIcon'
 
 const Profile = () => {
   const { user, profile, loading, signOut, updateProfile } = useAuth()
@@ -423,11 +424,13 @@ const Profile = () => {
                       <div style={{
                         width: 40, height: 40, borderRadius: 10, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 800, fontSize: 18,
                         background: connected ? 'var(--accent)' : 'var(--border)',
-                        color: connected ? 'var(--bg)' : 'var(--text-muted)',
                       }}>
-                        {provider === 'mal' ? 'M' : 'A'}
+                        <ProviderIcon
+                          provider={provider}
+                          size={22}
+                          color={connected ? '#fff' : 'var(--text-muted)'}
+                        />
                       </div>
                       <div style={{ flex: 1, minWidth: 140 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
