@@ -321,7 +321,16 @@ const Settings = () => {
       connected: !!(p && p.connected),
       username: p?.username || '',
       reason: p?.reason || '',
+      expiresAt: p?.expires_at || 0,
     }
+  }
+
+  const tokenHealth = (expiresAt) => {
+    if (!expiresAt) return ''
+    const daysLeft = Math.floor((expiresAt - Date.now() / 1000) / 86400)
+    if (daysLeft > 30) return `token valid ~${Math.floor(daysLeft / 30)}mo`
+    if (daysLeft > 0) return `token expires in ${daysLeft}d`
+    return 'token expired — progress will refresh it automatically'
   }
 
   const handleConnect = async (provider) => {
@@ -361,7 +370,7 @@ const Settings = () => {
         connected service automatically.
       </p>
       {['mal', 'anilist'].map((provider) => {
-        const { connected, username, reason } = syncProviderStatus(provider)
+        const { connected, username, reason, expiresAt } = syncProviderStatus(provider)
         const busy = !!syncBusy[provider]
         return (
           <SyncRow key={provider}>
@@ -371,6 +380,11 @@ const Settings = () => {
               {connected && username && (
                 <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
                   Syncing as <strong style={{ color: 'var(--text-secondary)' }}>{username}</strong>
+                </div>
+              )}
+              {connected && (
+                <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginTop: 1, opacity: 0.8 }}>
+                  {tokenHealth(expiresAt)}
                 </div>
               )}
               {!connected && reason && (

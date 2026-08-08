@@ -4,8 +4,15 @@ import { useAuth } from '../hooks/useAuth'
 import Footer from '../components/Footer/Footer'
 import { AVATAR_LIST, avatarUrl, defaultAvatar } from '../lib/avatars'
 import { supabase } from '../lib/supabase'
-import { API_BASE } from '../config'
 import { generateSlug } from '../lib/slug'
+import {
+  getSyncStatus,
+  importProviderList,
+  exportProviderList,
+  describeImport,
+  describeExport,
+  PROVIDER_LABELS,
+} from '../lib/sync'
 
 const Profile = () => {
   const { user, profile, loading, signOut, updateProfile } = useAuth()
@@ -18,10 +25,10 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('profile')
   const [bookmarks, setBookmarks] = useState([])
   const [history, setHistory] = useState([])
-  const [anilistUser, setAnilistUser] = useState('')
-  const [malUser, setMalUser] = useState('')
-  const [importing, setImporting] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  const [syncStatus, setSyncStatus] = useState(null)
+  const [syncBusy, setSyncBusy] = useState('') // 'mal-import' | 'mal-export' | ...
+  const [syncResult, setSyncResult] = useState({}) // provider -> { type, text, error }
+  const [confirmExport, setConfirmExport] = useState('') // provider being confirmed
 
   useEffect(() => {
     if (!loading && !user) navigate('/login')
@@ -126,92 +133,53 @@ const Profile = () => {
     }
   }
 
-  const importAniList = async () => {
-    if (!anilistUser.trim()) return
-    setImporting(true)
-    setMessage('')
-    try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-      const res = await fetch(`${API_BASE}/api/v1/import/anilist`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ username: anilistUser.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
-      setMessage(data.message || 'AniList import started. Check favorites after a moment.')
-    } catch (err) {
-      setMessage(err.message || 'Import failed — backend may need auth')
-    }
-    setImporting(false)
+  // ── Library import / export (requires the provider connected in Settings) ──
+  const refreshSyncStatus = () => {
+    if (!user) return
+    getSyncStatus().then((data) => {
+      if (data) setSyncStatus(data)
+    })
   }
 
-  const importMAL = async () => {
-    if (!malUser.trim()) return
-    setImporting(true)
-    setMessage('')
-    try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-      const res = await fetch(`${API_BASE}/api/v1/import/mal`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ username: malUser.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
-      setMessage(data.message || 'MAL import started. Check favorites after a moment.')
-    } catch (err) {
-      setMessage(err.message || 'Import failed — backend may need auth')
+  useEffect(() => {
+    if (activeTab === 'import') refreshSyncStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  const providerConnected = (provider) => {
+    const p = syncStatus?.[provider]
+    return !!(p && p.connected)
+  }
+  const providerUsername = (provider) => syncStatus?.[provider]?.username || ''
+
+  const runImport = async (provider) => {
+    const key = `${provider}-import`
+    if (syncBusy) return
+    setSyncBusy(key)
+    setSyncResult((r) => ({ ...r, [provider]: null }))
+    const data = await importProviderList(provider)
+    setSyncBusy('')
+    if (data.error) {
+      setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text: data.error } }))
+      return
     }
-    setImporting(false)
+    setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text: describeImport(data) } }))
+    refreshSyncStatus()
   }
 
-  const exportList = async (source) => {
-    setExporting(true)
-    setMessage('')
-    try {
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-      const res = await fetch(`${API_BASE}/api/v1/export/${source}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({}),
-      })
-      const contentType = res.headers.get('content-type') || ''
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Export failed')
-      }
-      if (contentType.includes('application/json')) {
-        const data = await res.json()
-        setMessage(data.message || 'Export started')
-        return
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const disposition = res.headers.get('content-disposition') || ''
-      const match = disposition.match(/filename="?([^";]+)"?/)
-      a.download = match ? match[1] : `aniraku-${source}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-      setMessage(`${source === 'mal' ? 'MAL' : 'AniList'} export downloaded`)
-    } catch (err) {
-      setMessage(err.message || 'Export failed — backend may need auth')
+  const runExport = async (provider) => {
+    const key = `${provider}-export`
+    if (syncBusy) return
+    setConfirmExport('')
+    setSyncBusy(key)
+    setSyncResult((r) => ({ ...r, [provider]: null }))
+    const data = await exportProviderList(provider)
+    setSyncBusy('')
+    if (data.error) {
+      setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text: data.error } }))
+      return
     }
-    setExporting(false)
+    setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text: describeExport(data) } }))
   }
 
   if (loading) {
@@ -412,45 +380,116 @@ const Profile = () => {
 
           {activeTab === 'import' && (
             <div className="profile-card" style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
-              <h3 style={{ fontSize: 16, marginBottom: 8 }}>Import from AniList</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                Import your AniList username to sync favorites and list data into Aniraku.
-                Catalog metadata is always live from AniList — this only imports your personal lists.
+              <h3 style={{ fontSize: 16, marginBottom: 8 }}>Library</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+                Move your list between Aniraku and your streaming accounts. Import pulls a
+                provider's library into your Aniraku favorites; export writes your favorites
+                there as <em>Completed</em>. Both use the connection from{' '}
+                <Link to="/profile/settings" style={{ color: 'var(--accent)' }}>Settings → Library Sync</Link>.
               </p>
-              <label style={labelStyle}>AniList username</label>
-              <input type="text" value={anilistUser} onChange={e => setAnilistUser(e.target.value)} placeholder="your_anilist_username" style={inputStyle} />
-              <button onClick={importAniList} disabled={importing || !anilistUser.trim()} style={primaryBtn}>
-                {importing ? 'Importing…' : 'Import AniList'}
-              </button>
 
-              <div style={{ borderTop: '1px solid var(--border)', margin: '24px 0' }} />
+              {['mal', 'anilist'].map(provider => {
+                const connected = providerConnected(provider)
+                const result = syncResult[provider]
+                const busy = syncBusy === `${provider}-import` || syncBusy === `${provider}-export`
+                const confirming = confirmExport === provider
+                return (
+                  <div
+                    key={provider}
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: 10,
+                      padding: 16,
+                      marginBottom: 12,
+                      background: 'var(--bg-elevated)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 800, fontSize: 18,
+                        background: connected ? 'var(--accent)' : 'var(--border)',
+                        color: connected ? 'var(--bg)' : 'var(--text-muted)',
+                      }}>
+                        {provider === 'mal' ? 'M' : 'A'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 15, fontWeight: 600 }}>{PROVIDER_LABELS[provider]}</span>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                            background: connected ? 'rgba(34,197,94,0.15)' : 'rgba(148,163,184,0.12)',
+                            color: connected ? '#34d399' : 'var(--text-muted)',
+                          }}>
+                            {connected ? 'Connected' : 'Off'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
+                          {connected
+                            ? `Ready as ${providerUsername(provider) || 'your account'}`
+                            : 'Connect this account in Settings to import or export'}
+                        </div>
+                      </div>
+                      {connected && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => runImport(provider)}
+                            disabled={busy}
+                            style={smallBtn(true)}
+                          >
+                            {syncBusy === `${provider}-import` ? 'Importing…' : 'Import list'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmExport(provider)}
+                            disabled={busy}
+                            style={smallBtn(false)}
+                          >
+                            {syncBusy === `${provider}-export` ? 'Exporting…' : 'Export'}
+                          </button>
+                        </div>
+                      )}
+                      {!connected && (
+                        <Link to="/profile/settings" style={ghostBtn}>Connect in Settings</Link>
+                      )}
+                    </div>
 
-              <h3 style={{ fontSize: 16, marginBottom: 8 }}>Import from MyAnimeList</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                Enter your MyAnimeList username to import your list. Works for public lists —
-                no MAL account link needed.
-              </p>
-              <label style={labelStyle}>MAL username</label>
-              <input type="text" value={malUser} onChange={e => setMalUser(e.target.value)} placeholder="your_mal_username" style={inputStyle} />
-              <button onClick={importMAL} disabled={importing || !malUser.trim()} style={primaryBtn}>
-                {importing ? 'Importing…' : 'Import MAL'}
-              </button>
+                    {result && (
+                      <div style={{
+                        marginTop: 12, fontSize: 13, lineHeight: 1.5, borderRadius: 8, padding: '8px 12px',
+                        background: result.type === 'error'
+                          ? 'rgba(239,68,68,0.1)'
+                          : 'rgba(34,197,94,0.08)',
+                        border: `1px solid ${result.type === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(34,197,94,0.25)'}`,
+                        color: result.type === 'error' ? '#fca5a5' : '#86efac',
+                      }}>
+                        {result.type === 'error' ? '⚠ ' : '✓ '}{result.text}
+                      </div>
+                    )}
 
-              <div style={{ borderTop: '1px solid var(--border)', margin: '24px 0' }} />
-
-              <h3 style={{ fontSize: 16, marginBottom: 8 }}>Export your list</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                Download your Aniraku favorites and list data in a format you can
-                move to another service.
-              </p>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button onClick={() => exportList('mal')} disabled={exporting} style={primaryBtn}>
-                  {exporting ? 'Exporting…' : 'Export MAL'}
-                </button>
-                <button onClick={() => exportList('anilist')} disabled={exporting} style={primaryBtn}>
-                  {exporting ? 'Exporting…' : 'Export AniList'}
-                </button>
-              </div>
+                    {confirming && (
+                      <div style={{
+                        marginTop: 12, borderRadius: 8, padding: '12px 14px',
+                        background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)',
+                        fontSize: 13, lineHeight: 1.5,
+                      }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: 10 }}>
+                          Add your Aniraku favorites to your {PROVIDER_LABELS[provider]} library as
+                          <strong> Completed</strong>? Already-completed titles are skipped.
+                        </p>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => runExport(provider)} disabled={busy} style={smallBtn(true)}>
+                            {syncBusy === `${provider}-export` ? 'Exporting…' : 'Yes, export'}
+                          </button>
+                          <button onClick={() => setConfirmExport('')} disabled={busy} style={smallBtn(false)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -497,5 +536,13 @@ const ghostBtn = {
   padding: '10px 24px', background: 'var(--bg-elevated)', color: 'var(--text-muted)', border: 'none', borderRadius: 8,
   fontWeight: 600, fontSize: 14, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 }
+const smallBtn = (primary) => ({
+  padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
+  background: primary ? 'var(--accent)' : 'var(--bg-card)',
+  color: primary ? 'var(--bg)' : 'var(--text-secondary)',
+  borderColor: primary ? 'transparent' : '1px solid var(--border)',
+  opacity: 1,
+  ...(primary ? {} : { border: '1px solid var(--border)' }),
+})
 
 export default Profile

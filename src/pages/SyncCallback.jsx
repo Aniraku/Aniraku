@@ -67,6 +67,17 @@ export default function SyncCallback() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // Already connected in this session (e.g. page refresh after success).
+    if (!code && !state && !done) {
+      const provider = sessionStorage.getItem('aniraku-sync-connected')
+      if (provider) {
+        setConnectedProvider(provider)
+        setDone(true)
+      }
+    }
+  }, [code, state, done])
+
+  useEffect(() => {
     if (done) return
     if (!code || !state) {
       setError('This link is incomplete or has expired. Open it from Settings instead.')
@@ -79,6 +90,10 @@ export default function SyncCallback() {
         if (!data.error && data.connected) {
           setConnectedProvider(data.provider || '')
           setDone(true)
+          // Drop the one-time code from the URL and remember the success so
+          // a refresh doesn't re-POST the already-consumed code.
+          sessionStorage.setItem('aniraku-sync-connected', data.provider || '')
+          window.history.replaceState({}, '', '/sync/callback')
         } else {
           setError(data.error || 'The provider rejected the connection. Try again.')
         }

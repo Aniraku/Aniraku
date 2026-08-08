@@ -28,7 +28,7 @@ import { useAuth } from '../hooks/useAuth'
 import { isNsfw, useNsfw } from '../hooks/useNsfw'
 import { setWatchSEO } from '../lib/seo'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
-import { getSyncStatus, updateSyncProgress } from '../lib/sync'
+import { getSyncStatus, updateSyncProgress, PROVIDER_LABELS } from '../lib/sync'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -669,6 +669,8 @@ export default function Watch() {
   const syncProgressRef = useRef(null)
   const syncWatchProgress = useCallback(async () => {
     if (!user) return
+    let synced = []
+    let failed = []
     try {
       if (syncConnectedRef.current === null) {
         const data = await getSyncStatus()
@@ -680,7 +682,7 @@ export default function Watch() {
       const providers = syncConnectedRef.current
       if (providers.length === 0) return
       const art = artInstance.current
-      await Promise.all(
+      const results = await Promise.allSettled(
         providers.map((p) =>
           updateSyncProgress({
             provider: p,
@@ -691,7 +693,19 @@ export default function Watch() {
           })
         )
       )
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value) {
+          synced.push(PROVIDER_LABELS[providers[i]])
+        } else {
+          failed.push(PROVIDER_LABELS[providers[i]])
+        }
+      })
     } catch {}
+    if (synced.length > 0 && failed.length === 0) {
+      showToast(`Progress synced to ${synced.join(' & ')}`, { icon: 'check' })
+    } else if (failed.length > 0) {
+      showToast(`Sync to ${failed.join(', ')} failed — will retry next episode`, { icon: 'warn' })
+    }
   }, [user, animeId, epNumber])
   syncProgressRef.current = syncWatchProgress
 

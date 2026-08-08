@@ -94,3 +94,61 @@ export const PROVIDER_LABELS = {
   mal: 'MyAnimeList',
   anilist: 'AniList',
 }
+
+export const PROVIDER_LOGO = {
+  mal: 'M',
+  anilist: 'A',
+}
+
+// ── Import / Export (provider library ↔ Aniraku favorites) ──
+// These reuse the OAuth tokens stored by the sync feature, so the
+// provider must be connected in Settings first.
+
+export async function importProviderList(provider) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/import/${provider}`, {
+      method: 'POST',
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({}),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: data.error || 'Import failed' }
+    return data
+  } catch {
+    return { error: 'Could not reach the server' }
+  }
+}
+
+export async function exportProviderList(provider) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/export/${provider}`, {
+      method: 'POST',
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({}),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: data.error || 'Export failed' }
+    return data
+  } catch {
+    return { error: 'Could not reach the server' }
+  }
+}
+
+// Human-readable count summary for import/export results.
+export function describeImport(r) {
+  if (!r) return ''
+  const parts = []
+  if (r.imported > 0) parts.push(`${r.imported} imported`)
+  if (r.already > 0) parts.push(`${r.already} already in your library`)
+  return parts.join(' · ') || 'Nothing new to import'
+}
+
+export function describeExport(r) {
+  if (!r) return ''
+  const parts = []
+  if (r.exported > 0) parts.push(`${r.exported} added as completed`)
+  if (r.skipped > 0) parts.push(`${r.skipped} already completed`)
+  if (r.failed > 0) parts.push(`${r.failed} failed`)
+  if (r.limited) parts.push('more titles remain — export again to continue')
+  return parts.join(' · ') || 'Nothing to export'
+}
