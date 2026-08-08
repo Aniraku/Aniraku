@@ -34,6 +34,25 @@ const Profile = () => {
     if (!loading && !user) navigate('/login')
   }, [user, loading, navigate])
 
+  // Load server-side bookmarks (the same table import writes to) and merge
+  // with any local-only bookmarks saved before sign-in.
+  const loadServerBookmarks = () => {
+    if (!user) return
+    supabase.from('bookmarks').select('*').eq('user_id', user.id).then(({ data }) => {
+      if (data?.length) {
+        const mapped = data.map(b => ({
+          id: b.anime_id,
+          title: b.title,
+          image: b.image,
+        }))
+        setBookmarks(prev => {
+          const ids = new Set(mapped.map(m => m.id))
+          return [...mapped, ...prev.filter(p => !ids.has(p.id))]
+        })
+      }
+    }).catch(err => console.error('bookmarks fetch error:', err))
+  }
+
   useEffect(() => {
     if (profile) {
       setUsername(profile.username || '')
@@ -46,19 +65,7 @@ const Profile = () => {
     setHistory(hx)
 
     if (user) {
-      supabase.from('bookmarks').select('*').eq('user_id', user.id).then(({ data }) => {
-        if (data?.length) {
-          const mapped = data.map(b => ({
-            id: b.anime_id,
-            title: b.title,
-            image: b.image,
-          }))
-          setBookmarks(prev => {
-            const ids = new Set(mapped.map(m => m.id))
-            return [...mapped, ...prev.filter(p => !ids.has(p.id))]
-          })
-        }
-      }).catch(err => console.error('bookmarks fetch error:', err))
+      loadServerBookmarks()
 
       supabase.from('watch_history').select('*').eq('user_id', user.id).order('timestamp', { ascending: false }).limit(50).then(({ data }) => {
         if (data?.length) {
@@ -165,6 +172,7 @@ const Profile = () => {
     }
     setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text: describeImport(data) } }))
     refreshSyncStatus()
+    loadServerBookmarks()
   }
 
   const runExport = async (provider) => {
