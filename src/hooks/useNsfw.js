@@ -28,10 +28,15 @@ const publish = (v) => {
 // when signed in; falls back to localStorage for guests so the toggle still
 // works without an account. Default is off.
 export const useNsfw = () => {
-  const { user } = useAuth()
-  const [nsfwEnabled, setNsfwEnabled] = useState(() =>
-    shared.userId === (user?.id || null) && shared.value !== null ? shared.value : readLocal()
-  )
+  const { user, loading } = useAuth()
+  // When a session exists the account value (user_settings) is authoritative,
+  // so never seed from localStorage — a stale key left by a guest session or
+  // another account would flash the wrong state before the DB answers. Guests
+  // (auth resolved, no user) still read the device key.
+  const [nsfwEnabled, setNsfwEnabled] = useState(() => {
+    if (shared.userId === (user?.id || null) && shared.value !== null) return shared.value
+    return !user && !loading ? readLocal() : false
+  })
 
   useEffect(() => {
     const uid = user?.id || null
@@ -46,8 +51,11 @@ export const useNsfw = () => {
       setNsfwEnabled(shared.value)
       return () => { shared.listeners.delete(listener) }
     }
-    if (!user) {
+    if (!user && !loading) {
       publish(readLocal())
+      return () => { shared.listeners.delete(listener) }
+    }
+    if (!user) {
       return () => { shared.listeners.delete(listener) }
     }
     let cancelled = false
@@ -67,16 +75,20 @@ export const useNsfw = () => {
         if (shared.pending === query) shared.pending = null
       })
     return () => { cancelled = true; shared.listeners.delete(listener) }
-  }, [user])
+  }, [user, loading])
 
   const updateNsfw = useCallback(async (enabled) => {
     publish(enabled)
-    try { localStorage.setItem(LOCAL_KEY, String(enabled)) } catch {}
     if (user) {
+      // Account-backed: the DB row is the source of truth, and a stale device
+      // key must never leak into another session, so drop it on save.
+      try { localStorage.removeItem(LOCAL_KEY) } catch {}
       await supabase.from('user_settings').upsert(
         { user_id: user.id, key: 'nsfw_enabled', value: enabled },
         { onConflict: 'user_id,key' },
       )
+    } else {
+      try { localStorage.setItem(LOCAL_KEY, String(enabled)) } catch {}
     }
   }, [user])
 
