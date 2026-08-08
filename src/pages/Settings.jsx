@@ -1,11 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { FaChevronLeft, FaEye, FaEyeSlash, FaTrash, FaSignOutAlt } from 'react-icons/fa'
+import { FaChevronLeft, FaEye, FaEyeSlash, FaTrash, FaSignOutAlt, FaLink, FaUnlink, FaCheck } from 'react-icons/fa'
 import { useAuth } from '../hooks/useAuth'
 import { useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/Footer/Footer'
+import { getSyncStatus, syncAuthorizeUrl, syncDisconnect, PROVIDER_LABELS } from '../lib/sync'
 
 // Clear only this site's data. localStorage.clear() wipes every other app
 // on the same origin scope — and on the deployed site that origin is shared
@@ -195,6 +196,51 @@ const DangerMsg = styled.p`
   margin-top: 10px;
 `
 
+const SyncRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+
+  &:last-child { border-bottom: none; }
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`
+
+const SyncBadge = styled.span`
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: 2px;
+  background: ${({ ok }) => (ok ? 'rgba(34,197,94,0.15)' : 'var(--bg-elevated)')};
+  color: ${({ ok }) => (ok ? '#86efac' : 'var(--text-muted)')};
+`
+
+const SyncBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: ${({ primary }) => (primary ? 'var(--accent)' : 'var(--bg-elevated)')};
+  color: ${({ primary }) => (primary ? 'var(--bg)' : 'var(--text-primary)')};
+  border: 1px solid ${({ primary }) => (primary ? 'var(--accent)' : 'var(--border)')};
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: ${({ $busy }) => ($busy ? 'wait' : 'pointer')};
+  opacity: ${({ $busy }) => ($busy ? 0.6 : 1)};
+  min-height: 44px;
+  justify-content: center;
+`
+
 const Settings = () => {
   const { user, loading, signOut } = useAuth()
   const { nsfwEnabled, updateNsfw } = useNsfw()
@@ -254,6 +300,93 @@ const Settings = () => {
       showToast('Could not sign out — try again')
     }
   }
+
+  // ── MAL / AniList watch-progress sync ───────────────────────
+  const [syncStatus, setSyncStatus] = useState(null)
+  const [syncBusy, setSyncBusy] = useState({})
+  const [syncVersion, setSyncVersion] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getSyncStatus().then((data) => {
+      if (!cancelled && data) setSyncStatus(data)
+    })
+    return () => { cancelled = true }
+  }, [user, syncVersion])
+
+  const syncProviderStatus = (provider) => {
+    const p = syncStatus?.providers?.find((x) => x.provider === provider)
+    return {
+      connected: !!(p && p.connected),
+      username: p?.username || '',
+      reason: p?.reason || '',
+    }
+  }
+
+  const handleConnect = (provider) => {
+    window.location.href = syncAuthorizeUrl(provider)
+  }
+
+  const handleDisconnect = async (provider) => {
+    if (syncBusy[provider]) return
+    setSyncBusy((b) => ({ ...b, [provider]: true }))
+    const ok = await syncDisconnect(provider)
+    setSyncBusy((b) => ({ ...b, [provider]: false }))
+    if (ok) {
+      setSyncVersion((v) => v + 1)
+      showToast(`${PROVIDER_LABELS[provider]} disconnected`)
+    } else {
+      showToast('Could not disconnect — try again')
+    }
+  }
+
+  const renderSyncCard = () => (
+    <Card>
+      <CardTitle>Library Sync</CardTitle>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
+        Keep Aniraku in step with your MyAnimeList and AniList libraries.
+        When you finish an episode here, your progress is pushed to every
+        connected service automatically.
+      </p>
+      {['mal', 'anilist'].map((provider) => {
+        const { connected, username, reason } = syncProviderStatus(provider)
+        const busy = !!syncBusy[provider]
+        return (
+          <SyncRow key={provider}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+              {PROVIDER_LABELS[provider]}
+              <SyncBadge ok={connected}>{connected ? 'Connected' : 'Off'}</SyncBadge>
+              {connected && username && (
+                <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Syncing as <strong style={{ color: 'var(--text-secondary)' }}>{username}</strong>
+                </div>
+              )}
+              {!connected && reason && (
+                <div style={{ fontSize: 12, fontWeight: 400, color: '#fca5a5', marginTop: 2 }}>
+                  {reason}
+                </div>
+              )}
+            </div>
+            {connected ? (
+              <SyncBtn $busy={busy} onClick={() => handleDisconnect(provider)}>
+                <FaUnlink size={13} /> {busy ? 'Disconnecting…' : 'Disconnect'}
+              </SyncBtn>
+            ) : (
+              <SyncBtn primary $busy={busy} onClick={() => handleConnect(provider)}>
+                <FaLink size={13} /> Connect
+              </SyncBtn>
+            )}
+          </SyncRow>
+        )
+      })}
+      <Hint>
+        Connecting opens {`${PROVIDER_LABELS.mal}`} / {`${PROVIDER_LABELS.anilist}`} in a new tab
+        and asks only for permission to update your library list — no password is
+        ever shared with Aniraku.
+      </Hint>
+    </Card>
+  )
 
   if (loading) {
     return (
@@ -339,6 +472,8 @@ const Settings = () => {
               </Hint>
             )}
           </Card>
+
+          {renderSyncCard()}
 
           <Card>
             <CardTitle>Account</CardTitle>

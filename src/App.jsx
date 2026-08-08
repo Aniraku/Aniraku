@@ -76,6 +76,7 @@ const Catalog = lazy(() => import("./pages/Catalog"))
 const Schedule = lazy(() => import("./pages/Schedule"))
 const Admin = lazy(() => import("./pages/Admin"))
 const Random = lazy(() => import("./pages/Random"))
+const SyncCallback = lazy(() => import("./pages/SyncCallback"))
 
 const GenreRedirect = () => {
   const params = new URLSearchParams(window.location.search)
@@ -120,6 +121,7 @@ const App = () => {
             <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
             <Route path="/profile" element={<Suspense fallback={<Skeleton />}><Profile /></Suspense>} />
             <Route path="/profile/settings" element={<Suspense fallback={<Skeleton />}><Settings /></Suspense>} />
+            <Route path="/sync/callback" element={<Suspense fallback={<Skeleton />}><SyncCallback /></Suspense>} />
             <Route path="/settings" element={<Navigate to="/profile/settings" replace />} />
             <Route path="/admin" element={<Suspense fallback={<Skeleton />}><Admin /></Suspense>} />
             {/* Redirect aliases for sidebar nav */}

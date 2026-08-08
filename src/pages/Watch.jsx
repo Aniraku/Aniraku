@@ -603,6 +603,44 @@ export default function Watch() {
   const [retryAttempt, setRetryAttempt] = useState(0)
   const [buffering, setBuffering] = useState(false)
 
+  // Miruro-provided skip segments + live playback position (throttled) so
+  // the manual "Skip Intro / Skip Credits" buttons show only while the
+  // video is inside a segment. Skipping is always user-initiated.
+  const [skipSegments, setSkipSegments] = useState({ intro: null, outro: null })
+  const [currentTime, setCurrentTime] = useState(0)
+  const [hideFillers, setHideFillers] = useState(false)
+
+  // Comments FAB: hide once the comments section is on screen; show a
+  // live count so the button is worth the thumb-tap.
+  const [commentsVisible, setCommentsVisible] = useState(false)
+  const [commentCount, setCommentCount] = useState(null)
+  useEffect(() => {
+    const el = document.getElementById('watch-comments')
+    if (!el || !window.IntersectionObserver) return
+    const obs = new window.IntersectionObserver(
+      (entries) => setCommentsVisible(entries[0]?.isIntersecting || false),
+      { rootMargin: '0px 0px -15% 0px', threshold: 0.05 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [anime?.id, epNumber])
+  useEffect(() => {
+    if (!animeId) return
+    let cancelled = false
+    supabase
+      .from('comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('anime_id', parseInt(animeId, 10))
+      .eq('episode_number', epNumber)
+      .then(({ count }) => {
+        if (!cancelled) setCommentCount(count ?? 0)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [animeId, epNumber])
+
   // Derived
   const slugParts = slugId?.match(/^(.+)-episode-(\d+)$/)
   const baseName = slugParts?.[1] || slugId || ''
@@ -619,6 +657,44 @@ export default function Watch() {
   episodesRef.current = episodes
   const activeSourceRef = useRef(activeSource)
   activeSourceRef.current = activeSource
+
+  // ────────────────────────────────────────────────────────────
+  // MAL / AniList progress sync (fires on episode end)
+  // ────────────────────────────────────────────────────────────
+  const syncConnectedRef = useRef(null) // null = not fetched yet
+  const syncProgressRef = useRef(null)
+  const syncWatchProgress = useCallback(async () => {
+    if (!user) return
+    try {
+      if (syncConnectedRef.current === null) {
+        const res = await fetch(`${API_BASE}/api/v1/sync`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json().catch(() => ({}))
+        syncConnectedRef.current = Array.isArray(data?.providers)
+          ? data.providers.filter((p) => p.connected).map((p) => p.provider)
+          : []
+      }
+      const providers = syncConnectedRef.current
+      if (providers.length === 0) return
+      const art = artInstance.current
+      const payload = {
+        animeId: parseInt(animeId, 10),
+        episode: epNumber,
+        progress: Math.floor(art?.video.duration || 0),
+        status: 'completed',
+      }
+      await Promise.all(
+        providers.map((p) =>
+          fetch(`${API_BASE}/api/v1/sync/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, provider: p }),
+          }).catch(() => {})
+        )
+      )
+    } catch {}
+  }, [user, animeId, epNumber])
+  syncProgressRef.current = syncWatchProgress
 
   // ────────────────────────────────────────────────────────────
   // Online / offline detection
@@ -729,14 +805,23 @@ export default function Watch() {
 
   // Filtered / paged episodes
   const filteredEps = useMemo(() => {
-    if (!epSearch) return episodes
-    const q = epSearch.toLowerCase()
-    return episodes.filter(
-      (ep) =>
-        String(ep.number).includes(q) ||
-        (ep.title && ep.title.toLowerCase().includes(q))
-    )
-  }, [episodes, epSearch])
+    let eps = episodes
+    if (hideFillers) eps = eps.filter((ep) => !ep.filler && !ep.recap)
+    if (epSearch) {
+      const q = epSearch.toLowerCase()
+      eps = eps.filter(
+        (ep) =>
+          String(ep.number).includes(q) ||
+          (ep.title && ep.title.toLowerCase().includes(q))
+      )
+    }
+    return eps
+  }, [episodes, epSearch, hideFillers])
+
+  const hiddenEpCount = useMemo(
+    () => episodes.length - episodes.filter((ep) => !ep.filler && !ep.recap).length,
+    [episodes]
+  )
 
   const [epPage, setEpPage] = useState(0)
   const pagedEps = useMemo(() => {
@@ -1383,6 +1468,8 @@ export default function Watch() {
 
       // Auto next episode
       art.on('video:ended', () => {
+        // Push completion to connected MAL/AniList accounts (fire-and-forget)
+        syncProgressRef.current?.()
         if (!isMovie && epNumber < episodes.length) {
           const slug = generateSlug(
             anime?.title?.english || anime?.title?.romaji || ''
@@ -1407,8 +1494,15 @@ export default function Watch() {
 
       // Save watch history
       let lastSave = 0
+      let lastRender = 0
       art.on('video:timeupdate', () => {
         const now = Date.now()
+        // Throttled re-render so the Skip Intro/Outro buttons track the
+        // playback position without hammering React every second.
+        if (now - lastRender > 500) {
+          lastRender = now
+          setCurrentTime(art.video.currentTime)
+        }
         if (now - lastSave < 10_000) return
         lastSave = now
         const title =
@@ -1530,6 +1624,7 @@ export default function Watch() {
       setErrorType('')
       setRetryAttempt(0)
       setResumePos(null)
+      setSkipSegments({ intro: null, outro: null })
 
       // Stale-while-revalidate: if we have a recent good stream for
       // this source, play it now, then refresh in the background.
@@ -1556,6 +1651,10 @@ export default function Watch() {
               cached.headers,
               onBlocked
             )
+            setSkipSegments({
+              intro: cached.intro || null,
+              outro: cached.outro || null,
+            })
             setStreamLoading(false)
             loadingRef.current = false
             // background refresh
@@ -1686,6 +1785,10 @@ export default function Watch() {
           data.headers,
           onBlocked
         )
+        setSkipSegments({
+          intro: data.intro || null,
+          outro: data.outro || null,
+        })
         setCachedStream(source, data)
         setStreamLoading(false)
         loadingRef.current = false
@@ -1934,6 +2037,8 @@ export default function Watch() {
     touchStartX: 0,
     touchStartY: 0,
     touchStartTime: 0,
+    swipeX: 0,
+    swipeToastShown: false,
   })
   useEffect(() => {
     const container = playerContainerRef.current
@@ -1949,6 +2054,8 @@ export default function Watch() {
       touchState.current.touchStartX = x
       touchState.current.touchStartY = y
       touchState.current.touchStartTime = now
+      touchState.current.swipeX = 0
+      touchState.current.swipeToastShown = false
       const timeSince = now - touchState.current.lastTap
       const distFrom = Math.abs(x - touchState.current.lastTapX)
       if (timeSince < 300 && distFrom < 60) {
@@ -1982,6 +2089,20 @@ export default function Watch() {
       const w = rect.width
       const dx = x - touchState.current.touchStartX
       const dy = y - touchState.current.touchStartY
+      // Horizontal swipe → scrubbing seek (backward/forward)
+      if (Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        e.preventDefault()
+        touchState.current.swipeX = dx
+        if (!touchState.current.swipeToastShown) {
+          touchState.current.swipeToastShown = true
+          const secs = Math.max(
+            10,
+            Math.min(60, Math.round((Math.abs(dx) / w) * 120))
+          )
+          showToast(`${dx < 0 ? '−' : '+'}${secs}s`)
+        }
+        return
+      }
       if (Math.abs(dy) > 30 && Math.abs(dx) < Math.abs(dy) * 0.5) {
         e.preventDefault()
         const art = artInstance.current
@@ -1999,11 +2120,38 @@ export default function Watch() {
         }
       }
     }
+    const onTouchEnd = (e) => {
+      const st = touchState.current
+      if (Math.abs(st.swipeX) > 48) {
+        e.preventDefault()
+        const art = artInstance.current
+        if (art) {
+          const rect = container.getBoundingClientRect()
+          const secs = Math.max(
+            10,
+            Math.min(60, Math.round((Math.abs(st.swipeX) / rect.width) * 120))
+          )
+          if (st.swipeX < 0) {
+            art.video.currentTime = Math.max(0, art.video.currentTime - secs)
+          } else {
+            art.video.currentTime = Math.min(
+              art.video.duration || Infinity,
+              art.video.currentTime + secs
+            )
+          }
+          showToast(`${st.swipeX < 0 ? '−' : '+'}${secs}s`)
+        }
+      }
+      st.swipeX = 0
+      st.swipeToastShown = false
+    }
     container.addEventListener('touchstart', onTouchStart, { passive: false })
     container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd, { passive: false })
     return () => {
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
     }
   }, [showToast])
 
@@ -2119,6 +2267,19 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   // Render
   // ────────────────────────────────────────────────────────────
+  const t = currentTime
+  const intro = skipSegments?.intro
+  const outro = skipSegments?.outro
+  const showSkipIntro = !!intro && t >= intro.start - 2 && t < intro.end - 0.5
+  const showSkipOutro =
+    !!outro && t >= outro.start - 2 && t < outro.end - 0.5
+  const handleSkipSegment = (end) => {
+    const art = artInstance.current
+    if (!art) return
+    const dur = art.video.duration || 0
+    art.video.currentTime = Math.min(end, Math.max(0, dur - 0.5))
+    showToast('Skipped')
+  }
   return (
     <>
       {/* Network banner */}
@@ -2641,6 +2802,74 @@ export default function Watch() {
               </button>
             </div>
           )}
+
+          {/* Skip Intro / Skip Credits — manual, powered by Miruro
+              timestamps from the stream response. Always opt-in. */}
+          {(showSkipIntro || showSkipOutro) && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 16,
+                bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))',
+                zIndex: 6,
+                display: 'flex',
+                gap: 10,
+              }}
+            >
+              {showSkipIntro && (
+                <button
+                  type="button"
+                  className="watch-skip-btn"
+                  onClick={() => handleSkipSegment(intro.end)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 16px',
+                    background: 'rgba(15,23,42,0.92)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 999,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    minHeight: 40,
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  <FaStepForward />
+                  Skip Intro
+                </button>
+              )}
+              {showSkipOutro && (
+                <button
+                  type="button"
+                  className="watch-skip-btn"
+                  onClick={() => handleSkipSegment(outro.end)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 16px',
+                    background: 'rgba(15,23,42,0.92)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 999,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    minHeight: 40,
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  <FaStepForward style={{ transform: 'scaleX(-1)' }} />
+                  Skip Credits
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Source selector */}
@@ -2753,7 +2982,7 @@ export default function Watch() {
               minHeight: 44,
             }}
           >
-            Episodes ({episodes.length}) {showEpSidebar ? '▲' : '▼'}
+            Episodes ({filteredEps.length}{hiddenEpCount > 0 && hideFillers ? ` of ${episodes.length}` : ''}) {showEpSidebar ? '▲' : '▼'}
           </button>
         )}
 
@@ -2905,18 +3134,66 @@ export default function Watch() {
                   !showEpSidebar && IS_MOBILE ? 'none' : 'block',
               }}
             >
-              <h3
+              <div
                 style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: 'var(--text-secondary)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
                   marginBottom: 10,
                 }}
               >
-                Episodes ({episodes.length})
-              </h3>
+                <h3
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Episodes ({filteredEps.length}
+                  {hiddenEpCount > 0 && hideFillers
+                    ? ` of ${episodes.length}`
+                    : ''}
+                  )
+                </h3>
+                {hiddenEpCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHideFillers((p) => !p)
+                      setEpPage(0)
+                    }}
+                    aria-pressed={hideFillers}
+                    title="Hide filler & recap episodes"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '5px 10px',
+                      background: hideFillers
+                        ? 'rgba(99,102,241,0.18)'
+                        : 'var(--bg-elevated)',
+                      color: hideFillers ? '#a5b4fc' : 'var(--text-muted)',
+                      border: `1px solid ${
+                        hideFillers
+                          ? 'rgba(99,102,241,0.45)'
+                          : 'var(--border)'
+                      }`,
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      minHeight: 30,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {hideFillers ? 'Showing canon' : 'Hide fillers'}
+                    {hideFillers && <span>✓</span>}
+                  </button>
+                )}
+              </div>
 
               {episodes.length > EPISODES_PER_PAGE && (
                 <div
@@ -3174,7 +3451,7 @@ export default function Watch() {
       </div>
 
       {/* Comments FAB */}
-      {anime && (
+      {anime && !commentsVisible && (
         <button
           type="button"
           onClick={() =>
@@ -3186,7 +3463,9 @@ export default function Watch() {
           className="watch-comments-fab"
           style={{
             position: 'fixed',
-            bottom: `calc(20px + env(safe-area-inset-bottom, 0px))`,
+            bottom: IS_MOBILE
+              ? `calc(76px + env(safe-area-inset-bottom, 0px))`
+              : `calc(20px + env(safe-area-inset-bottom, 0px))`,
             right: `calc(20px + env(safe-area-inset-right, 0px))`,
             zIndex: 60,
             display: 'flex',
@@ -3204,7 +3483,21 @@ export default function Watch() {
             minHeight: 48,
           }}
         >
-          <FaCommentDots /> Comments
+          <FaCommentDots />
+          Comments
+          {commentCount !== null && (
+            <span
+              style={{
+                background: 'rgba(255,255,255,0.22)',
+                borderRadius: 999,
+                padding: '1px 8px',
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {commentCount}
+            </span>
+          )}
         </button>
       )}
 
