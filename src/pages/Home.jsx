@@ -318,8 +318,9 @@ const Home = () => {
             <h1>Watch anime free, in HD.</h1>
             <p>
               Sub or dub, subtitles, multiple servers — no ads and no account
-              needed to start watching. Sign in to sync your history and
-              bookmarks across every device.
+              needed to start watching. Log in to sync your history and
+              bookmarks across devices and push your progress to MyAnimeList
+              and AniList automatically.
             </p>
             <GuestCTA>
               <GuestCtaLink className="primary" to="/catalog"><FaPlay size={12} /> Start Watching</GuestCtaLink>
@@ -337,8 +338,8 @@ const Home = () => {
               <p>Switch languages and quality without leaving the player.</p>
             </Feature>
             <Feature>
-              <h3><FaStar size={12} /> Syncs everywhere</h3>
-              <p>History, bookmarks and progress follow your account.</p>
+              <h3><FaStar size={12} /> MAL & AniList sync</h3>
+              <p>Finish an episode here, and your MyAnimeList and AniList libraries update themselves.</p>
             </Feature>
           </FeatureGrid>
         </GuestBanner>

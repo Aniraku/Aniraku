@@ -271,6 +271,34 @@ const EpNum = styled.span`
   flex-shrink: 0;
 `
 
+const EpBadge = styled.span`
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: ${({ $type }) => ($type === 'filler' ? 'rgba(234,179,8,0.15)' : 'rgba(99,102,241,0.15)')};
+  color: ${({ $type }) => ($type === 'filler' ? '#fde68a' : '#a5b4fc')};
+`
+
+const FilterBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  margin-bottom: 12px;
+  background: ${({ $active }) => ($active ? 'rgba(99,102,241,0.18)' : 'var(--bg-elevated)')};
+  color: ${({ $active }) => ($active ? '#a5b4fc' : 'var(--text-muted)')};
+  border: 1px solid ${({ $active }) => ($active ? 'rgba(99,102,241,0.45)' : 'var(--border)')};
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 30px;
+  -webkit-tap-highlight-color: transparent;
+  &:hover { border-color: var(--accent); }
+`
+
 const Spinner = styled.div`
   width: 48px;
   height: 48px;
@@ -473,6 +501,7 @@ const AnimeDetail = () => {
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [activeTab, setActiveTab] = useState('episodes')
   const [episodes, setEpisodes] = useState([])
+  const [hideFillers, setHideFillers] = useState(false)
 
   const { data: anime, isLoading } = useAnimeDetails(id)
   const { data: similar } = useSimilar(id)
@@ -600,8 +629,17 @@ const AnimeDetail = () => {
   const isMovie = anime.format === 'MOVIE'
   const hasEpisodes = episodes.length > 0
   const hasRelations = relations.length > 0
+  const hiddenEpCount = episodes.filter(ep => ep.filler || ep.recap).length
+  const visibleEps = hideFillers
+    ? episodes.filter(ep => !ep.filler && !ep.recap)
+    : episodes
   const tabs = []
-  if (hasEpisodes && !isMovie) tabs.push({ key: 'episodes', label: `Episodes (${episodes.length})` })
+  if (hasEpisodes && !isMovie) {
+    tabs.push({
+      key: 'episodes',
+      label: `Episodes (${visibleEps.length}${hideFillers ? ` of ${episodes.length}` : ''})`,
+    })
+  }
   if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
 
   return (
@@ -661,19 +699,33 @@ const AnimeDetail = () => {
             </Tabs>
 
             {activeTab === 'episodes' && hasEpisodes && (
-              <EpisodeList>
-                {episodes.map((ep, i) => {
-                  const num = ep.number || i + 1
-                  return (
-                    <EpisodeRow key={num} to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}>
-                      <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
-                      <EpNum>{num}</EpNum>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title || `Episode ${num}`}</span>
-                      <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    </EpisodeRow>
-                  )
-                })}
-              </EpisodeList>
+              <>
+                {hiddenEpCount > 0 && (
+                  <FilterBtn $active={hideFillers} onClick={() => setHideFillers(p => !p)}>
+                    {hideFillers ? '✓ Showing canon only' : 'Hide filler & recap'}
+                  </FilterBtn>
+                )}
+                <EpisodeList>
+                  {visibleEps.map((ep, i) => {
+                    const num = ep.number || i + 1
+                    return (
+                      <EpisodeRow key={num} to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}>
+                        <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
+                        <EpNum>{num}</EpNum>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title || `Episode ${num}`}</span>
+                        {ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
+                        {ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}
+                        <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      </EpisodeRow>
+                    )
+                  })}
+                </EpisodeList>
+                {visibleEps.length === 0 && (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>
+                    No canon episodes listed. Switch back to see all episodes.
+                  </p>
+                )}
+              </>
             )}
 
             {activeTab === 'relations' && hasRelations && (
