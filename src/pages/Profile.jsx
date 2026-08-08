@@ -225,7 +225,14 @@ const Profile = () => {
           </div>
 
           <div className="profile-tabs" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24, overflowX: 'auto' }}>
-            {['profile', 'avatars', 'bookmarks', 'history', 'badges', 'import'].map(tab => (
+            {[
+              { id: 'profile', label: 'Profile' },
+              { id: 'avatars', label: 'Avatars' },
+              { id: 'bookmarks', label: 'Bookmarks' },
+              { id: 'history', label: 'History' },
+              { id: 'badges', label: 'Badges' },
+              { id: 'import', label: 'Library' },
+            ].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -242,7 +249,7 @@ const Profile = () => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {tab}
+                {tab.label}
               </button>
             ))}
           </div>
