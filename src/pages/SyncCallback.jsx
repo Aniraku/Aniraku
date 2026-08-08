@@ -67,7 +67,8 @@ export default function SyncCallback() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (done || !code || !state) {
+    if (done) return
+    if (!code || !state) {
       setError('This link is incomplete or has expired. Open it from Settings instead.')
       return
     }
