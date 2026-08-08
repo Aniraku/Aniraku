@@ -615,6 +615,26 @@ export default function Watch() {
   // live count so the button is worth the thumb-tap.
   const [commentsVisible, setCommentsVisible] = useState(false)
   const [commentCount, setCommentCount] = useState(null)
+
+  // Derived
+  const slugParts = slugId?.match(/^(.+)-episode-(\d+)$/)
+  const baseName = slugParts?.[1] || slugId || ''
+  const epNumber = parseInt(slugParts?.[2] || '1', 10)
+  const animeId = extractIdFromSlug(baseName)
+  const isMovie = anime?.format === 'MOVIE'
+
+  // Refs to latest values (avoid stale closures)
+  const routeRef = useRef(slugId)
+  routeRef.current = slugId
+  const epNumberRef = useRef(epNumber)
+  epNumberRef.current = epNumber
+  const episodesRef = useRef(episodes)
+  episodesRef.current = episodes
+  const activeSourceRef = useRef(activeSource)
+  activeSourceRef.current = activeSource
+
+  // Comments FAB: hide once the comments section is on screen; show a
+  // live count so the button is worth the thumb-tap.
   useEffect(() => {
     const el = document.getElementById('watch-comments')
     if (!el || !window.IntersectionObserver) return
@@ -641,23 +661,6 @@ export default function Watch() {
       cancelled = true
     }
   }, [animeId, epNumber])
-
-  // Derived
-  const slugParts = slugId?.match(/^(.+)-episode-(\d+)$/)
-  const baseName = slugParts?.[1] || slugId || ''
-  const epNumber = parseInt(slugParts?.[2] || '1', 10)
-  const animeId = extractIdFromSlug(baseName)
-  const isMovie = anime?.format === 'MOVIE'
-
-  // Refs to latest values (avoid stale closures)
-  const routeRef = useRef(slugId)
-  routeRef.current = slugId
-  const epNumberRef = useRef(epNumber)
-  epNumberRef.current = epNumber
-  const episodesRef = useRef(episodes)
-  episodesRef.current = episodes
-  const activeSourceRef = useRef(activeSource)
-  activeSourceRef.current = activeSource
 
   // ────────────────────────────────────────────────────────────
   // MAL / AniList progress sync (fires on episode end)
