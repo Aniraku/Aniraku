@@ -7,6 +7,7 @@ import { useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/Footer/Footer'
 import { getSyncStatus, syncAuthorize, syncDisconnect, PROVIDER_LABELS } from '../lib/sync'
+import ProviderIcon from '../components/ProviderIcon'
 
 // Clear only this site's data. localStorage.clear() wipes every other app
 // on the same origin scope — and on the deployed site that origin is shared
@@ -633,10 +634,14 @@ const Settings = () => {
           const busy = !!syncBusy[provider]
           return (
             <SyncRow key={provider}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {PROVIDER_LABELS[provider]}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ProviderIcon provider={provider} size={16} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {PROVIDER_LABELS[provider]}
+                </span>
                 <Badge ok={connected}>{connected ? 'Connected' : 'Off'}</Badge>
-                {connected && username && (
+              </div>
+              {connected && username && (
                   <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
                     Syncing as <strong style={{ color: 'var(--text-secondary)' }}>{username}</strong>
                   </div>
@@ -651,7 +656,6 @@ const Settings = () => {
                     {reason}
                   </div>
                 )}
-              </div>
               {connected ? (
                 <SyncBtn $busy={busy} onClick={() => handleDisconnect(provider)}>
                   <FaUnlink size={13} /> {busy ? 'Disconnecting…' : 'Disconnect'}

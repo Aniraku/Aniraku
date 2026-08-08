@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaCheckCircle, FaExclamationTriangle, FaSpinner, FaChevronLeft } from 'react-icons/fa'
 import { completeSyncCallback, PROVIDER_LABELS } from '../lib/sync'
+import ProviderIcon from '../components/ProviderIcon'
 import Footer from '../components/Footer/Footer'
 
 const Page = styled.main`
@@ -117,7 +118,11 @@ export default function SyncCallback() {
           )}
           {done && (
             <>
-              <FaCheckCircle size={44} color="#34d399" />
+              {connectedProvider ? (
+                <ProviderIcon provider={connectedProvider} size={46} />
+              ) : (
+                <FaCheckCircle size={44} color="#34d399" />
+              )}
               <State>Connected to {connectedProvider ? PROVIDER_LABELS[connectedProvider] || connectedProvider : 'your library'}</State>
               <Detail>
                 From now on, finishing episodes on Aniraku updates your{' '}
