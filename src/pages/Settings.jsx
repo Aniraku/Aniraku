@@ -99,13 +99,14 @@ const CardTitle = styled.h2`
 `
 
 // ── Toggle switch ──────────────────────────────────────────────────────────
-// 64×44 hit area keeps the tap target comfortable while the visual track
-// stays a crisp 52×30 pill. The thumb rides the track via transform so it
-// slides (not jumps) and stays centered no matter how the pill scales.
+// Monochrome switch: white track with black thumb when on, black track with
+// grey thumb when off. 72×44 hit area keeps the tap target comfortable while
+// the visual track stays a crisp 64×32 pill. The thumb rides the track via
+// transform so it slides (not jumps) and stays centered no matter what.
 const Switch = styled.button`
   position: relative;
   flex: 0 0 auto;
-  width: 64px;
+  width: 72px;
   height: 44px;
   background: transparent;
   border: none;
@@ -118,12 +119,14 @@ const Switch = styled.button`
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 52px;
-    height: 30px;
+    width: 64px;
+    height: 32px;
     transform: translate(-50%, -50%);
     border-radius: 999px;
-    background: ${({ active }) => (active ? 'var(--accent)' : 'var(--border)')};
-    transition: background var(--transition-fast);
+    box-sizing: border-box;
+    background: ${({ active }) => (active ? '#fff' : '#000')};
+    border: 1px solid ${({ active }) => (active ? '#fff' : '#3f3f46')};
+    transition: background var(--transition-normal), border-color var(--transition-normal);
   }
 
   &::after {
@@ -135,10 +138,9 @@ const Switch = styled.button`
     height: 24px;
     margin-top: -12px;
     border-radius: 50%;
-    background: ${({ active }) => (active ? '#000' : '#fff')};
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-    transform: translateX(${({ active }) => (active ? '11px' : '-11px')});
-    transition: transform var(--transition-fast);
+    background: ${({ active }) => (active ? '#000' : '#a1a1aa')};
+    transform: translateX(${({ active }) => (active ? '16px' : '-16px')});
+    transition: transform var(--transition-normal), background var(--transition-normal);
   }
 `
 

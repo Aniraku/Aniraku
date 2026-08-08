@@ -10,6 +10,10 @@
   <meta name="theme-color" content="#000000" />
   <meta name="color-scheme" content="dark" />
 
+  <!-- Paint the app background before the bundled CSS arrives, so the
+       first frame is never a white FOUC flash (desktop included). -->
+  <style>html, body { background-color: #000; }</style>
+
   <!-- PWA -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
