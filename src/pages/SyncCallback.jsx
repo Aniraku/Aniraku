@@ -54,28 +54,29 @@ const BackLink = styled(Link)`
   text-decoration: none;
 `
 
-// Landing page for the OAuth redirect from MAL / AniList. The backend
-// swaps the code for a token (session-cookie based), so the browser is
-// already authenticated once it lands here. A link back to Settings
-// (which re-reads the sync status) completes the loop.
+// Landing page for the OAuth redirect from MAL / AniList. MAL and AniList
+// append only ?code=&state= to the registered redirect URI, so the provider
+// is resolved server-side from the pending OAuth state. A link back to
+// Settings (which re-reads the sync status) completes the loop.
 export default function SyncCallback() {
   const [params] = useSearchParams()
-  const provider = params.get('provider')
   const code = params.get('code')
   const state = params.get('state')
   const [done, setDone] = useState(false)
+  const [connectedProvider, setConnectedProvider] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (done || !provider || !code || !state) {
+    if (done || !code || !state) {
       setError('This link is incomplete or has expired. Open it from Settings instead.')
       return
     }
     let cancelled = false
-    completeSyncCallback(provider, code, state)
+    completeSyncCallback('', code, state)
       .then((data) => {
         if (cancelled) return
         if (!data.error && data.connected) {
+          setConnectedProvider(data.provider || '')
           setDone(true)
         } else {
           setError(data.error || 'The provider rejected the connection. Try again.')
@@ -85,7 +86,7 @@ export default function SyncCallback() {
         if (!cancelled) setError('Could not reach the server. Try again from Settings.')
       })
     return () => { cancelled = true }
-  }, [provider, code, state, done])
+  }, [code, state, done])
 
   return (
     <>
@@ -94,17 +95,17 @@ export default function SyncCallback() {
           {!done && !error && (
             <>
               <FaSpinner size={40} color="var(--accent)" className="sync-spin" />
-              <State>Connecting {provider ? PROVIDER_LABELS[provider] || provider : '…'}…</State>
+              <State>Connecting your library…</State>
               <Detail>Finishing the handshake. This only takes a moment.</Detail>
             </>
           )}
           {done && (
             <>
               <FaCheckCircle size={44} color="#34d399" />
-              <State>Connected to {provider ? PROVIDER_LABELS[provider] || provider : 'your library'}</State>
+              <State>Connected to {connectedProvider ? PROVIDER_LABELS[connectedProvider] || connectedProvider : 'your library'}</State>
               <Detail>
                 From now on, finishing episodes on Aniraku updates your{' '}
-                {provider ? PROVIDER_LABELS[provider] || provider : 'external'} library.
+                {connectedProvider ? PROVIDER_LABELS[connectedProvider] || connectedProvider : 'external'} library.
               </Detail>
             </>
           )}

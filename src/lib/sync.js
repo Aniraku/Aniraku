@@ -45,7 +45,10 @@ export async function syncAuthorize(provider) {
 
 export async function completeSyncCallback(provider, code, state) {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/sync/${provider}/callback`, {
+    // Provider-agnostic callback: MAL / AniList redirect back with only
+    // ?code=&state= (no provider), and the backend resolves the provider
+    // from its pending OAuth state store.
+    const res = await fetch(`${API_BASE}/api/v1/sync/callback`, {
       method: 'POST',
       headers: await authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ code, state }),
