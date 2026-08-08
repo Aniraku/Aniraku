@@ -234,13 +234,13 @@ const Profile = () => {
               { id: 'import', label: 'Library' },
             ].map(tab => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 style={{
                   background: 'none',
                   border: 'none',
-                  borderBottom: `2px solid ${activeTab === tab ? 'var(--accent)' : 'transparent'}`,
-                  color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent)' : 'transparent'}`,
+                  color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
                   padding: '10px 18px',
                   fontSize: 14,
                   fontWeight: 600,
