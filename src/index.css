@@ -88,6 +88,10 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  /* Android Chrome paints overscroll/URL-bar-resize regions with the
+     html background; without this they flash white behind the footer. */
+  background-color: var(--bg);
+  color-scheme: dark;
 }
 
 body {

@@ -3329,38 +3329,62 @@ export default function Watch() {
                         minHeight: 44,
                       }}
                     >
-                      {ep.thumbnail ? (
-                        <img
-                          src={ep.thumbnail}
-                          alt={`Episode ${num}`}
-                          loading="lazy"
-                          style={{
-                            width: 80,
-                            height: 45,
-                            objectFit: 'cover',
-                            borderRadius: 6,
-                            flexShrink: 0,
-                            background: 'var(--bg-elevated)',
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: 80,
-                            height: 45,
-                            borderRadius: 6,
-                            background: 'var(--bg-elevated)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 11,
-                            color: 'var(--text-muted)',
-                            flexShrink: 0,
-                          }}
-                        >
-                          {num}
-                        </div>
-                      )}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        {ep.thumbnail ? (
+                          <img
+                            src={ep.thumbnail}
+                            alt={`Episode ${num}`}
+                            loading="lazy"
+                            style={{
+                              width: 80,
+                              height: 45,
+                              objectFit: 'cover',
+                              borderRadius: 6,
+                              flexShrink: 0,
+                              background: 'var(--bg-elevated)',
+                              display: 'block',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 80,
+                              height: 45,
+                              borderRadius: 6,
+                              background: 'var(--bg-elevated)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 11,
+                              color: 'var(--text-muted)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {num}
+                          </div>
+                        )}
+                        {ep.filler && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              left: 4,
+                              background: 'rgba(234,179,8,0.92)',
+                              color: '#0f172a',
+                              padding: '1px 5px',
+                              borderRadius: 4,
+                              fontSize: 9,
+                              fontWeight: 700,
+                              letterSpacing: 0.3,
+                              lineHeight: 1.5,
+                              zIndex: 2,
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            FILLER
+                          </span>
+                        )}
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
@@ -3384,20 +3408,6 @@ export default function Watch() {
                           }}
                         >
                           EP {num}
-                          {ep.filler && (
-                            <span
-                              style={{
-                                background: 'rgba(234,179,8,0.15)',
-                                color: '#fde68a',
-                                padding: '1px 5px',
-                                borderRadius: 4,
-                                fontSize: 10,
-                                fontWeight: 700,
-                              }}
-                            >
-                              FILLER
-                            </span>
-                          )}
                           {ep.recap && (
                             <span
                               style={{

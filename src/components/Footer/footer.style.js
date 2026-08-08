@@ -4,8 +4,11 @@ import { Link } from 'react-router-dom'
 export const F = {}
 
 F.Footer = styled.footer`
+  /* Literal fallback for WebViews that fail to resolve CSS vars at paint */
+  background: #0a0a0a;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
+  color-scheme: dark;
 
   @media (min-width: 769px) {
     padding: 3rem 1.5rem 1.5rem;
