@@ -99,13 +99,15 @@ const CardTitle = styled.h2`
 `
 
 // ── Toggle switch ──────────────────────────────────────────────────────────
-// Monochrome switch: white track with black thumb when on, black track with
-// grey thumb when off. 72×44 hit area keeps the tap target comfortable while
-// the visual track stays a crisp 64×32 pill. The thumb rides the track via
-// transform so it slides (not jumps) and stays centered no matter what.
+// Real DOM elements (no pseudo-element tricks): a 64×34 track with a 26px
+// thumb that slides. Monochrome: white track / black thumb when on, black
+// track / grey thumb when off. The button wraps a 44px tall hit area so the
+// tap target stays comfortable while the track keeps its crisp size.
 const Switch = styled.button`
-  position: relative;
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 72px;
   height: 44px;
   background: transparent;
@@ -113,35 +115,32 @@ const Switch = styled.button`
   padding: 0;
   cursor: pointer;
   &:disabled { opacity: 0.55; cursor: wait; }
+`
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 64px;
-    height: 32px;
-    transform: translate(-50%, -50%);
-    border-radius: 999px;
-    box-sizing: border-box;
-    background: ${({ active }) => (active ? '#fff' : '#000')};
-    border: 1px solid ${({ active }) => (active ? '#fff' : '#3f3f46')};
-    transition: background var(--transition-normal), border-color var(--transition-normal);
-  }
+const Track = styled.span`
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 34px;
+  border-radius: 999px;
+  box-sizing: border-box;
+  background: ${({ active }) => (active ? '#fff' : '#0c0c0c')};
+  border: 1px solid ${({ active }) => (active ? '#fff' : '#3f3f46')};
+  box-shadow: ${({ active }) => (active ? '0 0 14px rgba(255, 255, 255, 0.25)' : 'none')};
+  transition: background var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal);
+`
 
-  &::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 24px;
-    height: 24px;
-    margin-top: -12px;
-    border-radius: 50%;
-    background: ${({ active }) => (active ? '#000' : '#a1a1aa')};
-    transform: translateX(${({ active }) => (active ? '16px' : '-16px')});
-    transition: transform var(--transition-normal), background var(--transition-normal);
-  }
+const Thumb = styled.span`
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: ${({ active }) => (active ? '#000' : '#71717a')};
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+  transform: translateX(${({ active }) => (active ? '30px' : '0')});
+  transition: transform var(--transition-normal), background var(--transition-normal);
 `
 
 // One toggle bar: icon + title + description on the left, switch on the
@@ -162,7 +161,11 @@ const ToggleRow = ({ icon, title, desc, checked, disabled, onChange }) => (
       aria-label={title}
       role="switch"
       aria-checked={checked}
-    />
+    >
+      <Track active={checked}>
+        <Thumb active={checked} />
+      </Track>
+    </Switch>
   </Row>
 )
 
