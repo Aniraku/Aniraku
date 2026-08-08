@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaCheckCircle, FaExclamationTriangle, FaSpinner, FaChevronLeft } from 'react-icons/fa'
-import { API_BASE } from '../config'
-import { PROVIDER_LABELS } from '../lib/sync'
+import { completeSyncCallback, PROVIDER_LABELS } from '../lib/sync'
 import Footer from '../components/Footer/Footer'
 
 const Page = styled.main`
@@ -73,14 +72,10 @@ export default function SyncCallback() {
       return
     }
     let cancelled = false
-    const q = new URLSearchParams({ code, state })
-    fetch(`${API_BASE}/api/v1/sync/${provider}/callback?${q.toString()}`, {
-      cache: 'no-store',
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
+    completeSyncCallback(provider, code, state)
+      .then((data) => {
         if (cancelled) return
-        if (res.ok && !data.error) {
+        if (!data.error && data.connected) {
           setDone(true)
         } else {
           setError(data.error || 'The provider rejected the connection. Try again.')

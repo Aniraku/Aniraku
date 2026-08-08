@@ -28,6 +28,7 @@ import { useAuth } from '../hooks/useAuth'
 import { isNsfw, useNsfw } from '../hooks/useNsfw'
 import { setWatchSEO } from '../lib/seo'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
+import { getSyncStatus, updateSyncProgress } from '../lib/sync'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -667,29 +668,24 @@ export default function Watch() {
     if (!user) return
     try {
       if (syncConnectedRef.current === null) {
-        const res = await fetch(`${API_BASE}/api/v1/sync`, { cache: 'no-store' })
-        if (!res.ok) return
-        const data = await res.json().catch(() => ({}))
-        syncConnectedRef.current = Array.isArray(data?.providers)
-          ? data.providers.filter((p) => p.connected).map((p) => p.provider)
-          : []
+        const data = await getSyncStatus()
+        if (!data) return
+        syncConnectedRef.current = ['mal', 'anilist'].filter(
+          (p) => data[p]?.configured && data[p]?.connected
+        )
       }
       const providers = syncConnectedRef.current
       if (providers.length === 0) return
       const art = artInstance.current
-      const payload = {
-        animeId: parseInt(animeId, 10),
-        episode: epNumber,
-        progress: Math.floor(art?.video.duration || 0),
-        status: 'completed',
-      }
       await Promise.all(
         providers.map((p) =>
-          fetch(`${API_BASE}/api/v1/sync/update`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...payload, provider: p }),
-          }).catch(() => {})
+          updateSyncProgress({
+            provider: p,
+            animeId: parseInt(animeId, 10),
+            episode: epNumber,
+            progress: Math.floor(art?.video.duration || 0),
+            status: 'completed',
+          })
         )
       )
     } catch {}

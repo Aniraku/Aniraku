@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useNsfw } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/Footer/Footer'
-import { getSyncStatus, syncAuthorizeUrl, syncDisconnect, PROVIDER_LABELS } from '../lib/sync'
+import { getSyncStatus, syncAuthorize, syncDisconnect, PROVIDER_LABELS } from '../lib/sync'
 
 // Clear only this site's data. localStorage.clear() wipes every other app
 // on the same origin scope — and on the deployed site that origin is shared
@@ -316,7 +316,7 @@ const Settings = () => {
   }, [user, syncVersion])
 
   const syncProviderStatus = (provider) => {
-    const p = syncStatus?.providers?.find((x) => x.provider === provider)
+    const p = syncStatus?.[provider]
     return {
       connected: !!(p && p.connected),
       username: p?.username || '',
@@ -324,8 +324,19 @@ const Settings = () => {
     }
   }
 
-  const handleConnect = (provider) => {
-    window.location.href = syncAuthorizeUrl(provider)
+  const handleConnect = async (provider) => {
+    if (syncBusy[provider]) return
+    setSyncBusy((b) => ({ ...b, [provider]: true }))
+    try {
+      const url = await syncAuthorize(provider)
+      if (!url) {
+        showToast('Sync is not set up on the server yet')
+        return
+      }
+      window.location.href = url
+    } finally {
+      setSyncBusy((b) => ({ ...b, [provider]: false }))
+    }
   }
 
   const handleDisconnect = async (provider) => {
