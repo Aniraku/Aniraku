@@ -508,20 +508,33 @@ const AnimeDetail = () => {
   const similarList = useStreamable(filterAdult(similar || [], nsfwEnabled))
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
-  // Merge server-side bookmarks into local state when signed in, so a
-  // bookmark made on another device is visible here immediately.
+  // Bookmarks live in Supabase when signed in (cloud source of truth);
+  // localStorage only mirrors them. On login, push any guest-only local
+  // bookmarks up to the cloud once, then load cloud data as truth.
   React.useEffect(() => {
     if (!user) return
     let cancelled = false
     supabase.from('bookmarks').select('anime_id,title,image').eq('user_id', user.id)
-      .then(({ data }) => {
-        if (cancelled || !data?.length) return
-        setBookmarks(prev => {
-          const mapped = data.map(b => ({ id: b.anime_id, title: b.title, image: b.image }))
-          const ids = new Set(mapped.map(m => m.id))
-          const merged = [...mapped, ...prev.filter(p => !ids.has(p.id))]
-          return merged
-        })
+      .then(async ({ data }) => {
+        if (cancelled) return
+        const mapped = (data || []).map(b => ({ id: b.anime_id, title: b.title, image: b.image }))
+        const cloudIds = new Set(mapped.map(m => m.id))
+        let local = []
+        try {
+          local = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]')
+        } catch {}
+        const localOnly = local.filter(l => !cloudIds.has(l.id))
+        if (localOnly.length) {
+          await supabase.from('bookmarks').upsert(localOnly.map(l => ({
+            user_id: user.id,
+            anime_id: l.id,
+            title: l.title || '',
+            image: l.image || '',
+            added_at: Date.now(),
+          })), { onConflict: 'user_id,anime_id' })
+        }
+        if (cancelled) return
+        setBookmarks([...mapped, ...localOnly])
       })
       .catch(() => {})
     return () => { cancelled = true }

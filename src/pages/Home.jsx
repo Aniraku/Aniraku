@@ -268,43 +268,55 @@ const Home = () => {
   // Check bookmarked anime for new episodes (only notify when Miruro has them)
   React.useEffect(() => {
     if (!user) return
-    const bm = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]')
-    if (!bm.length) return
-    const lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}')
-    const now = Date.now()
-    const api = import.meta.env.VITE_API_URL || ''
+    let cancelled = false
+    const check = async () => {
+      let bm = []
+      try {
+        bm = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]')
+      } catch {}
+      try {
+        const { data } = await supabase.from('bookmarks').select('anime_id,title').eq('user_id', user.id)
+        if (data?.length) bm = data.map(b => ({ id: b.anime_id, title: b.title }))
+      } catch {}
+      if (!bm.length || cancelled) return
+      const lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}')
+      const now = Date.now()
+      const api = import.meta.env.VITE_API_URL || ''
 
-    bm.forEach(b => {
-      if (lastKnown[b.id] && now - lastKnown[b.id].t < 21600000) return
-      anilistQuery(ANIME_DETAIL_QUERY, { id: b.id }).then(({ data }) => {
-        const m = data?.Media
-        if (!m || m.status !== 'RELEASING') return
-        const eps = m.episodes || 0
-        if (eps <= (lastKnown[b.id]?.e || 0)) return
-        // Verify Miruro has this episode before notifying
-        if (api) {
-          fetch(`${api}/api/v1/miruro/episodes/${b.id}`)
-            .then(r => r.ok ? r.json() : Promise.reject())
-            .then(d => {
-              const providers = d?.providers || {}
-              let hasEp = false
-              Object.values(providers).forEach(p => {
-                const subs = p?.episodes?.sub || []
-                subs.forEach(e => { if (e.number === eps) hasEp = true })
+      bm.forEach(b => {
+        if (lastKnown[b.id] && now - lastKnown[b.id].t < 21600000) return
+        anilistQuery(ANIME_DETAIL_QUERY, { id: b.id }).then(({ data }) => {
+          const m = data?.Media
+          if (!m || m.status !== 'RELEASING') return
+          const eps = m.nextAiringEpisode?.episode ? m.nextAiringEpisode.episode - 1 : (m.episodes || 0)
+          if (eps <= (lastKnown[b.id]?.e || 0)) return
+          // Verify Miruro has this episode before notifying
+          if (api) {
+            fetch(`${api}/api/v1/miruro/episodes/${b.id}`)
+              .then(r => r.ok ? r.json() : Promise.reject())
+              .then(d => {
+                const providers = d?.providers || {}
+                let hasEp = false
+                Object.values(providers).forEach(p => {
+                  const subs = p?.episodes?.sub || []
+                  subs.forEach(e => { if (e.number === eps) hasEp = true })
+                })
+                if (!hasEp) return
+                lastKnown[b.id] = { e: eps, t: now }
+                localStorage.setItem('aniraku-episode-track', JSON.stringify(lastKnown))
+                supabase.from('notifications').insert({
+                  user_id: user.id, type: 'new_episode',
+                  message: `Episode ${eps} of ${b.title} is now available`,
+                  anime_id: b.id,
+                }).then()
               })
-              if (!hasEp) return
-              lastKnown[b.id] = { e: eps, t: now }
-              localStorage.setItem('aniraku-episode-track', JSON.stringify(lastKnown))
-              supabase.from('notifications').insert({
-                user_id: user.id, type: 'new_episode',
-                message: `Episode ${eps} of ${b.title} is now available`,
-                anime_id: b.id,
-              }).then()
-            })
-            .catch(() => {})
-        }
-      }).catch(() => {})
-    })
+              .catch(() => {})
+          }
+        }).catch(() => {})
+      })
+    }
+    check()
+    return () => { cancelled = true }
   }, [user])
 
   return (
