@@ -748,6 +748,79 @@ export default function Watch() {
   }, [user, animeId, epNumber, noStreamError])
   syncProgressRef.current = syncWatchProgress
 
+  useEffect(() => {
+    const onOnline = () => {
+      setIsOnline(true)
+      showToast('Back online — resuming…', { icon: 'wifi' })
+      // Verify the backend is actually up after reconnecting; Render may
+      // still be cold-starting while the browser is already back online.
+      checkBackendHealth().then((ok) => {
+        if (!ok && mountedRef.current) {
+          showToast('Backend is still warming up — retrying shortly…', {
+            icon: 'warn',
+            long: true,
+          })
+        }
+      })
+      // If a stream load had been failed, kick it again.
+      if (errorType === 'network' || errorType === 'timeout') {
+        retryLastStream()
+      }
+    }
+    const onOffline = () => {
+      setIsOnline(false)
+      setError('You appear to be offline. Reconnect to continue streaming.')
+      setErrorType('network')
+    }
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [errorType])
+
+  // Page lifecycle — save & pause on hide, resume on show
+  useEffect(() => {
+    const onHide = () => {
+      const art = artInstance.current
+      if (art && !art.video.paused) art.video.pause()
+    }
+    window.addEventListener('pagehide', onHide)
+    return () => window.removeEventListener('pagehide', onHide)
+  }, [])
+
+  // Reset per-episode block tracking
+  useEffect(() => {
+    blockedSourcesRef.current = new Set()
+    lastBlockCycleRef.current = 0
+    forceRefreshUsedRef.current = false
+    recoveryBusyRef.current = false
+    streamRetries.current = {}
+    refreshAttemptedRef.current = new Set()
+  }, [animeId, epNumber])
+
+  // Keep the active episode row visible in the sidebar.
+  useEffect(() => {
+    const list = epSidebarRef.current
+    const active = list?.querySelector('[data-active="true"]')
+    if (active && list) {
+      const elRect = active.getBoundingClientRect()
+      const listRect = list.getBoundingClientRect()
+      if (elRect.top < listRect.top || elRect.bottom > listRect.bottom) {
+        active.scrollIntoView({ block: 'center' })
+      }
+    }
+  }, [epNumber, showEpSidebar])
+
+  // Toast
+  const showToast = useCallback((msg, opts = {}) => {
+    setToast({ msg, ...opts })
+    clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
+  }, [])
+
   // ────────────────────────────────────────────────────────────
   // Episode ratings (own, 1-10) — the average of your episode
   // ratings is pushed to MAL / AniList as the anime score.
@@ -902,79 +975,6 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   // Online / offline detection
   // ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const onOnline = () => {
-      setIsOnline(true)
-      showToast('Back online — resuming…', { icon: 'wifi' })
-      // Verify the backend is actually up after reconnecting; Render may
-      // still be cold-starting while the browser is already back online.
-      checkBackendHealth().then((ok) => {
-        if (!ok && mountedRef.current) {
-          showToast('Backend is still warming up — retrying shortly…', {
-            icon: 'warn',
-            long: true,
-          })
-        }
-      })
-      // If a stream load had been failed, kick it again.
-      if (errorType === 'network' || errorType === 'timeout') {
-        retryLastStream()
-      }
-    }
-    const onOffline = () => {
-      setIsOnline(false)
-      setError('You appear to be offline. Reconnect to continue streaming.')
-      setErrorType('network')
-    }
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errorType])
-
-  // Page lifecycle — save & pause on hide, resume on show
-  useEffect(() => {
-    const onHide = () => {
-      const art = artInstance.current
-      if (art && !art.video.paused) art.video.pause()
-    }
-    window.addEventListener('pagehide', onHide)
-    return () => window.removeEventListener('pagehide', onHide)
-  }, [])
-
-  // Reset per-episode block tracking
-  useEffect(() => {
-    blockedSourcesRef.current = new Set()
-    lastBlockCycleRef.current = 0
-    forceRefreshUsedRef.current = false
-    recoveryBusyRef.current = false
-    streamRetries.current = {}
-    refreshAttemptedRef.current = new Set()
-  }, [animeId, epNumber])
-
-  // Keep the active episode row visible in the sidebar.
-  useEffect(() => {
-    const list = epSidebarRef.current
-    const active = list?.querySelector('[data-active="true"]')
-    if (active && list) {
-      const elRect = active.getBoundingClientRect()
-      const listRect = list.getBoundingClientRect()
-      if (elRect.top < listRect.top || elRect.bottom > listRect.bottom) {
-        active.scrollIntoView({ block: 'center' })
-      }
-    }
-  }, [epNumber, showEpSidebar])
-
-  // Toast
-  const showToast = useCallback((msg, opts = {}) => {
-    setToast({ msg, ...opts })
-    clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
-  }, [])
-
   // ────────────────────────────────────────────────────────────
   // Sources (deduped)
   // ────────────────────────────────────────────────────────────
