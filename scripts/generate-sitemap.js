@@ -2,7 +2,17 @@ import fs from 'fs'
 import path from 'path'
 import { generateSlug } from '../src/lib/slug.js'
 
-const API_BASE = 'https://aniraku-backend-fhyy.onrender.com/api/v1'
+// Prefer the build-time env var (Vercel injects VITE_API_URL), fall back to
+// the local .env, then to the production Railway backend.
+const readEnv = (key) => {
+  if (process.env[key]) return process.env[key]
+  try {
+    const env = fs.readFileSync(path.resolve('.env'), 'utf8')
+    const m = env.match(new RegExp(`^${key}=(.*)$`, 'm'))
+    return m ? m[1].trim() : ''
+  } catch { return '' }
+}
+const API_BASE = `${readEnv('VITE_API_URL') || 'https://aniraku-backend-production.up.railway.app'}/api/v1`
 const ANILIST_PROXY = `${API_BASE}/anilist`
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
