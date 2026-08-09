@@ -21,7 +21,6 @@ import {
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
-import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
@@ -2556,7 +2555,6 @@ export default function Watch() {
             }
           }
         `}</style>
-        <Footer />
       </>
     )
   }
@@ -2595,7 +2593,6 @@ export default function Watch() {
             Open Settings
           </Link>
         </div>
-        <Footer />
       </>
     )
   }
@@ -3717,8 +3714,6 @@ export default function Watch() {
           )}
         </button>
       )}
-
-      <Footer />
 
       {/* Inject keyframes (only once, via global CSS this duplicates
           only when the user navigates back; harmless either way) */}
