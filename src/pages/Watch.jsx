@@ -696,18 +696,22 @@ export default function Watch() {
   }, [animeId, epNumber])
 
   // ────────────────────────────────────────────────────────────
-  // MAL / AniList progress sync (fires on episode end)
+  // MAL / AniList progress sync
   // ────────────────────────────────────────────────────────────
   const syncConnectedRef = useRef(null) // null = not fetched yet
   const syncProgressRef = useRef(null)
-  const syncWatchProgress = useCallback(async () => {
+  const skipSwitchSyncRef = useRef(false) // episode already synced on 'ended'
+  const syncWatchProgress = useCallback(async (mode = 'completed') => {
     if (!user) return
     // Only sync when something actually played: no player, no stream, or a
     // 0-duration source (empty/upcoming episodes) must never mark progress.
     const art = artInstance.current
     if (!art?.video) return
-    const dur = Math.floor(art.video.duration || 0)
+    const el = art.video
+    const dur = Math.floor(el.duration || 0)
     if (noStreamError || dur <= 0) return
+    const played = Math.floor(el.currentTime || 0)
+    if (played <= 0) return
     let synced = []
     let failed = []
     try {
@@ -726,23 +730,29 @@ export default function Watch() {
             provider: p,
             animeId: parseInt(animeId, 10),
             episode: epNumber,
-            progress: dur,
-            status: 'completed',
+            progress: mode === 'completed' ? dur : played,
+            status: mode === 'completed' ? 'completed' : 'watching',
           })
         )
       )
       results.forEach((r, i) => {
-        if (r.status === 'fulfilled' && r.value) {
+        if (r.status === 'fulfilled' && r.value?.ok) {
           synced.push(PROVIDER_LABELS[providers[i]])
         } else {
-          failed.push(PROVIDER_LABELS[providers[i]])
+          failed.push(
+            PROVIDER_LABELS[providers[i]] +
+              (r.status === 'fulfilled' && r.value?.error ? ` (${r.value.error})` : '')
+          )
         }
       })
     } catch {}
     if (synced.length > 0 && failed.length === 0) {
       showToast(`Progress synced to ${synced.join(' & ')}`, { icon: 'check' })
     } else if (failed.length > 0) {
-      showToast(`Sync to ${failed.join(', ')} failed — will retry next episode`, { icon: 'warn' })
+      showToast(`Sync to ${failed.join(', ')} failed — will retry next episode`, {
+        icon: 'warn',
+        long: true,
+      })
     }
   }, [user, animeId, epNumber, noStreamError])
   syncProgressRef.current = syncWatchProgress
@@ -1711,6 +1721,9 @@ export default function Watch() {
       art.on('video:ended', () => {
         // Push completion to connected MAL/AniList accounts (fire-and-forget)
         syncProgressRef.current?.()
+        // The ended event already synced this episode; the upcoming
+        // episode-change sync must not send it again as 'watching'.
+        skipSwitchSyncRef.current = true
         if (autoNextRef.current && !isMovie && epNumber < episodes.length) {
           const slug = generateSlug(
             anime?.title?.english || anime?.title?.romaji || ''
@@ -1881,6 +1894,9 @@ export default function Watch() {
   )
   const loadStream = useCallback(
     async (sourceId, forceRefresh = false, quiet = false) => {
+      // A fresh stream load means any 'ended' sync flag from a previous
+      // player is stale (e.g. the user replayed the same episode).
+      skipSwitchSyncRef.current = false
       if (streamAbortRef.current) {
         try {
           streamAbortRef.current.abort()
@@ -2285,6 +2301,22 @@ export default function Watch() {
     const epChanged = epNumber !== prevEpisodeRef.current
     prevEpisodeRef.current = epNumber
     if (epChanged) {
+      // Push partial progress to connected MAL/AniList accounts before
+      // leaving the episode, so switching mid-watch still counts — but only
+      // when a decent chunk was actually seen and the episode wasn't already
+      // synced by the 'ended' event.
+      const art = artInstance.current
+      const el = art?.video
+      const skipSync = skipSwitchSyncRef.current
+      skipSwitchSyncRef.current = false
+      if (
+        !skipSync &&
+        el &&
+        el.duration > 0 &&
+        el.currentTime >= el.duration * 0.6
+      ) {
+        syncProgressRef.current?.('watching')
+      }
       // New episode: kill the current player FIRST so the old video can
       // never keep playing, then load the stream for the new episode.
       destroyPlayer()

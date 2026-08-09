@@ -84,9 +84,11 @@ export async function updateSyncProgress({
       headers: await authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ provider, animeId, episode, progress, status }),
     })
-    return res.ok
-  } catch {
-    return false
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, error: data?.error || `HTTP ${res.status}` }
+  } catch (err) {
+    return { ok: false, error: err?.message || 'network error' }
   }
 }
 
@@ -100,9 +102,11 @@ export async function updateSyncScore({ provider, animeId, score }) {
       headers: await authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ provider, animeId, score }),
     })
-    return res.ok
-  } catch {
-    return false
+    if (res.ok) return { ok: true }
+    const data = await res.json().catch(() => ({}))
+    return { ok: false, error: data?.error || `HTTP ${res.status}` }
+  } catch (err) {
+    return { ok: false, error: err?.message || 'network error' }
   }
 }
 
