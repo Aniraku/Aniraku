@@ -9,7 +9,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   FaStepForward,
   FaStepBackward,
-  FaSearch,
   FaCommentDots,
   FaWifi,
   FaExclamationTriangle,
@@ -18,17 +17,26 @@ import {
   FaSpinner,
   FaSignal,
   FaUndo,
+  FaStar,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
+import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { isNsfw, useNsfw } from '../hooks/useNsfw'
 import { setWatchSEO } from '../lib/seo'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
-import { getSyncStatus, updateSyncProgress, PROVIDER_LABELS } from '../lib/sync'
+import {
+  getSyncStatus,
+  updateSyncProgress,
+  updateSyncScore,
+  fetchEpisodeRatings,
+  saveEpisodeRating,
+  PROVIDER_LABELS,
+} from '../lib/sync'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -41,6 +49,7 @@ const PLAYER_RECONNECT_MAX = 8           // ArtPlayer built-in retries
 const MAX_SERVER_RETRIES = 3             // refresh cap per source per ep
 const HEALTH_CHECK_TIMEOUT = 4_000
 const STREAM_FETCH_TIMEOUT = 60_000
+const EPISODE_RATINGS_LS_KEY = 'aniraku-episode-ratings'
 
 // ────────────────────────────────────────────────────────────────
 // Device / environment detection
@@ -567,10 +576,12 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
+  const epSidebarRef = useRef(null)
   const buildIdRef = useRef(0)              // bumped on every buildPlayer
   const mountedRef = useRef(true)
   const toastTimerRef = useRef(null)
   const streamAbortRef = useRef(null)
+  const prevEpisodeRef = useRef(null)
   const recoveryBusyRef = useRef(false)
   const streamRetries = useRef({})
   const blockedSourcesRef = useRef(new Set())
@@ -610,6 +621,29 @@ export default function Watch() {
   const [skipSegments, setSkipSegments] = useState({ intro: null, outro: null })
   const [currentTime, setCurrentTime] = useState(0)
   const [hideFillers, setHideFillers] = useState(false)
+
+  // Auto-play next episode when the current one ends (user-toggleable).
+  const [autoNext, setAutoNext] = useState(() => {
+    try {
+      return localStorage.getItem('aniraku-auto-next') !== 'off'
+    } catch {
+      return true
+    }
+  })
+  const autoNextRef = useRef(autoNext)
+  autoNextRef.current = autoNext
+  const toggleAutoNext = useCallback(() => {
+    setAutoNext((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('aniraku-auto-next', next ? 'on' : 'off')
+      } catch {}
+      return next
+    })
+  }, [])
+
+  // "Episode finished" overlay — shown when auto-next is off.
+  const [showEndedOverlay, setShowEndedOverlay] = useState(false)
 
   // Comments FAB: hide once the comments section is on screen; show a
   // live count so the button is worth the thumb-tap.
@@ -715,6 +749,157 @@ export default function Watch() {
   syncProgressRef.current = syncWatchProgress
 
   // ────────────────────────────────────────────────────────────
+  // Episode ratings (own, 1-10) — the average of your episode
+  // ratings is pushed to MAL / AniList as the anime score.
+  // ────────────────────────────────────────────────────────────
+  const [epRatings, setEpRatings] = useState({})
+  const [epRatingSaving, setEpRatingSaving] = useState(false)
+  const [epRatingSaved, setEpRatingSaved] = useState(false)
+  const epRatingSaveTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (!animeId) return
+    let cancelled = false
+    setEpRatings({})
+    if (user) {
+      fetchEpisodeRatings(animeId).then((ratings) => {
+        if (cancelled) return
+        setEpRatings(ratings || {})
+      })
+    } else {
+      try {
+        const stored = JSON.parse(
+          localStorage.getItem(`${EPISODE_RATINGS_LS_KEY}-${animeId}`) || '{}'
+        )
+        if (!cancelled) setEpRatings(stored)
+      } catch {}
+    }
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animeId, user])
+
+  const saveRating = useCallback(
+    async (score) => {
+      if (epRatingSaving || !animeId || !epNumber) return
+      setEpRatingSaving(true)
+      setEpRatingSaved(false)
+      const next = { ...epRatings, [epNumber]: score }
+      setEpRatings(next)
+      let ok = false
+      if (user) {
+        ok = await saveEpisodeRating(animeId, epNumber, score)
+      } else {
+        try {
+          localStorage.setItem(
+            `${EPISODE_RATINGS_LS_KEY}-${animeId}`,
+            JSON.stringify(next)
+          )
+          ok = true
+        } catch {}
+      }
+      if (ok) {
+        const scores = Object.values(next).filter((s) => typeof s === 'number')
+        const avg = scores.length
+          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+          : 0
+        if (avg >= 1 && avg <= 10) {
+          if (syncConnectedRef.current === null) {
+            const data = await getSyncStatus()
+            if (data) {
+              syncConnectedRef.current = ['mal', 'anilist'].filter(
+                (p) => data[p]?.configured && data[p]?.connected
+              )
+            }
+          }
+          const providers = syncConnectedRef.current || []
+          if (providers.length > 0) {
+            Promise.allSettled(
+              providers.map((p) =>
+                updateSyncScore({
+                  provider: p,
+                  animeId: parseInt(animeId, 10),
+                  score: avg,
+                })
+              )
+            ).then((results) => {
+              const done = results.filter(
+                (r) => r.status === 'fulfilled' && r.value
+              ).length
+              if (done > 0) {
+                showToast(
+                  `Score ${avg}/10 synced to ${providers
+                    .map((p) => PROVIDER_LABELS[p])
+                    .join(' & ')}`,
+                  { icon: 'check' }
+                )
+              }
+            })
+          }
+        }
+      }
+      setEpRatingSaving(false)
+      setEpRatingSaved(true)
+      clearTimeout(epRatingSaveTimerRef.current)
+      epRatingSaveTimerRef.current = setTimeout(
+        () => setEpRatingSaved(false),
+        2000
+      )
+    },
+    [epRatingSaving, epRatings, user, animeId, epNumber, showToast]
+  )
+
+  // ────────────────────────────────────────────────────────────
+  // Watched episodes (per-anime) — merged from local history and
+  // the cloud watch_history so the sidebar can show checkmarks.
+  // ────────────────────────────────────────────────────────────
+  const [watchedEps, setWatchedEps] = useState(() => new Set())
+  useEffect(() => {
+    if (!animeId) return
+    let cancelled = false
+    const localEps = []
+    try {
+      localEps.push(
+        ...JSON.parse(
+          localStorage.getItem('aniraku-watch-history') || '[]'
+        ).filter((h) => String(h.animeId) === String(animeId))
+      )
+    } catch {}
+    const merge = (rows) => {
+      if (cancelled) return
+      const eps = new Set(localEps.map((h) => h.episode))
+      rows.forEach((r) => eps.add(r.episode_number))
+      setWatchedEps(eps)
+    }
+    if (user) {
+      supabase
+        .from('watch_history')
+        .select('episode_number')
+        .eq('user_id', user.id)
+        .eq('anime_id', parseInt(animeId, 10))
+        .then(({ data }) => merge(data || []))
+        .catch(() => merge([]))
+    } else {
+      merge([])
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [animeId, user])
+
+  // Mark the current episode watched so the sidebar updates live.
+  useEffect(() => {
+    if (!epNumber) return
+    setWatchedEps((prev) => {
+      if (prev.has(epNumber)) return prev
+      const next = new Set(prev)
+      next.add(epNumber)
+      return next
+    })
+  }, [epNumber])
+
+  // ────────────────────────────────────────────────────────────
   // Online / offline detection
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -769,6 +954,19 @@ export default function Watch() {
     streamRetries.current = {}
     refreshAttemptedRef.current = new Set()
   }, [animeId, epNumber])
+
+  // Keep the active episode row visible in the sidebar.
+  useEffect(() => {
+    const list = epSidebarRef.current
+    const active = list?.querySelector('[data-active="true"]')
+    if (active && list) {
+      const elRect = active.getBoundingClientRect()
+      const listRect = list.getBoundingClientRect()
+      if (elRect.top < listRect.top || elRect.bottom > listRect.bottom) {
+        active.scrollIntoView({ block: 'center' })
+      }
+    }
+  }, [epNumber, showEpSidebar])
 
   // Toast
   const showToast = useCallback((msg, opts = {}) => {
@@ -850,7 +1048,8 @@ export default function Watch() {
 
   // Prev/next
   const goNext = useCallback(() => {
-    if (epNumber < episodes.length) {
+    const total = episodes.length || anime?.episodes || 0
+    if (epNumber < total) {
       const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
       navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
     }
@@ -862,6 +1061,17 @@ export default function Watch() {
       navigate(`/watch/${slug}-${animeId}-episode-${epNumber - 1}`)
     }
   }, [epNumber, anime, animeId, navigate])
+
+  // Replay the finished episode from the start (used by the
+  // "episode ended" overlay when auto-next is off).
+  const replayEpisode = useCallback(() => {
+    const art = artInstance.current
+    if (art?.video) {
+      art.video.currentTime = 0
+      art.play()
+    }
+    setShowEndedOverlay(false)
+  }, [])
 
   // Global keyboard shortcuts
   useKeyboardShortcuts(artInstance, null, {
@@ -1020,9 +1230,15 @@ export default function Watch() {
     }
   }, [animeId, epNumber, user?.id])
 
+  const pendingResumeRef = useRef(null)
   const handleResume = useCallback(() => {
     const art = artInstance.current
-    if (art && resumePos) art.video.currentTime = resumePos
+    if (art && resumePos) {
+      art.video.currentTime = resumePos
+    } else if (resumePos && !art) {
+      // Player not built yet — apply the position once it can play.
+      pendingResumeRef.current = resumePos
+    }
     setResumePos(null)
     setResumeCountdown(0)
   }, [resumePos])
@@ -1468,6 +1684,10 @@ export default function Watch() {
       art.on('video:canplay', () => {
         reconnectCount = 0
         setBuffering(false)
+        if (pendingResumeRef.current) {
+          art.video.currentTime = pendingResumeRef.current
+          pendingResumeRef.current = null
+        }
       })
       art.on('video:waiting', () => setBuffering(true))
       art.on('video:playing', () => setBuffering(false))
@@ -1484,15 +1704,19 @@ export default function Watch() {
         art._anirakuSubtitles = subtitles
       }
 
-      // Auto next episode
+      // Auto next episode (only when the user hasn't turned it off)
       art.on('video:ended', () => {
         // Push completion to connected MAL/AniList accounts (fire-and-forget)
         syncProgressRef.current?.()
-        if (!isMovie && epNumber < episodes.length) {
+        if (autoNextRef.current && !isMovie && epNumber < episodes.length) {
           const slug = generateSlug(
             anime?.title?.english || anime?.title?.romaji || ''
           )
           navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
+        } else if (!autoNextRef.current && !isMovie) {
+          // Auto-next off: show the "ended" overlay instead of a black
+          // screen so the user knows to press Next or Replay.
+          setShowEndedOverlay(true)
         }
       })
 
@@ -1617,8 +1841,43 @@ export default function Watch() {
   // Load stream
   // ────────────────────────────────────────────────────────────
   const lastStreamAttemptRef = useRef(null)
+
+  // Warm the other providers for the current episode into the short-TTL
+  // cache so switching servers is instant (the backend shares one Miruro
+  // fetch per anime, so these requests are cheap).
+  const prefetchOtherSources = useCallback(
+    (current) => {
+      const all = [...SOURCES.sub, ...SOURCES.dub]
+      const others = all.filter((s) => s.id !== current?.id)
+      const ep = epNumberRef.current
+      if (!ep) return
+      others.forEach((s) => {
+        fetch(`${API_BASE}/api/v1/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            animeId: parseInt(animeId, 10),
+            episode: ep,
+            provider: s.provider,
+            lang: s.lang,
+            quality: 'auto',
+            refresh: false,
+          }),
+          cache: 'no-store',
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (!d?.sources?.[0]?.url) return
+            if (epNumberRef.current !== ep) return
+            setCachedStream(s, d)
+          })
+          .catch(() => {})
+      })
+    },
+    [SOURCES, animeId, setCachedStream]
+  )
   const loadStream = useCallback(
-    async (sourceId, forceRefresh = false) => {
+    async (sourceId, forceRefresh = false, quiet = false) => {
       if (streamAbortRef.current) {
         try {
           streamAbortRef.current.abort()
@@ -1628,6 +1887,12 @@ export default function Watch() {
       loadingRef.current = false
       if (loadingRef.current && !forceRefresh) return
 
+      // Capture the target episode NOW. If the user navigates while the
+      // request is in flight, the stale response must never touch the
+      // player (would replay the old episode and look like the click
+      // "did nothing").
+      const targetEpisode = epNumber
+
       const source = [...SOURCES.sub, ...SOURCES.dub].find(
         (s) => s.id === sourceId
       )
@@ -1636,19 +1901,27 @@ export default function Watch() {
       }
       loadingRef.current = true
       lastStreamAttemptRef.current = { sourceId, forceRefresh }
-      setStreamLoading(true)
+      // Quiet mode (provider switch with a live player): keep the old
+      // video playing and only swap once the new stream is ready. No
+      // loading overlay, no error takeover on failure.
+      if (!quiet) {
+        setStreamLoading(true)
+      }
       setError('')
       setNoStreamError(false)
       setErrorType('')
       setRetryAttempt(0)
       setResumePos(null)
+      pendingResumeRef.current = null
       setSkipSegments({ intro: null, outro: null })
+      setShowEndedOverlay(false)
 
       // Stale-while-revalidate: if we have a recent good stream for
       // this source, play it now, then refresh in the background.
       if (!forceRefresh) {
         const cached = getCachedStream(source)
         if (cached && cached.sources?.[0]?.url) {
+          if (targetEpisode !== epNumberRef.current) return
           const firstSource = cached.sources[0]
           const mediaSources = cached.sources.filter(
             (src) => src.type !== 'embed'
@@ -1738,6 +2011,12 @@ export default function Watch() {
 
         if (res.status >= 500) {
           // Backend explicitly says "no upstream response".
+          if (quiet) {
+            setStreamLoading(false)
+            loadingRef.current = false
+            showToast('Could not switch server right now — try again', { icon: 'warn' })
+            return
+          }
           setErrorType('backend')
           setError(
             "Backend is having trouble reaching an upstream source. Retrying automatically…"
@@ -1758,8 +2037,17 @@ export default function Watch() {
 
         const data = await res.json().catch(() => ({}))
         if (!mountedRef.current) return
+        // Navigation may have happened while the stream was fetching —
+        // never build a player for an episode the user has left.
+        if (targetEpisode !== epNumberRef.current) return
 
         if (data.error || !data.sources?.[0]?.url) {
+          if (quiet) {
+            setStreamLoading(false)
+            loadingRef.current = false
+            showToast('No stream on that server — staying on the current one', { icon: 'warn' })
+            return
+          }
           const cls = classifyStreamError(null, data)
           setErrorType(cls.type)
           setNoStreamError(cls.type === 'no-source' || !data.sources?.[0]?.url)
@@ -1780,6 +2068,12 @@ export default function Watch() {
         const firstSource = data.sources[0]
         const mediaSources = data.sources.filter((src) => src.type !== 'embed')
         if (mediaSources.length === 0) {
+          if (quiet) {
+            setStreamLoading(false)
+            loadingRef.current = false
+            showToast('No stream on that server — staying on the current one', { icon: 'warn' })
+            return
+          }
           setNoStreamError(true)
           setErrorType('no-source')
           setError('No video source found for this server.')
@@ -1811,12 +2105,22 @@ export default function Watch() {
         setStreamLoading(false)
         loadingRef.current = false
         setRetryAttempt(0)
+        // Warm the other providers for this episode in the background so
+        // switching servers is instant (they all share the backend's
+        // 5-minute Miruro cache).
+        prefetchOtherSources(source)
         return
       } catch (err) {
         const superseded = streamAbortRef.current !== controller
         if (streamAbortRef.current === controller) streamAbortRef.current = null
         if (superseded) return
         if (!mountedRef.current) return
+        if (quiet) {
+          setStreamLoading(false)
+          loadingRef.current = false
+          showToast('Could not switch server right now — try again', { icon: 'warn' })
+          return
+        }
         const cls = classifyStreamError(err, null)
         setErrorType(cls.type)
         if (err.name === 'AbortError') {
@@ -1897,10 +2201,10 @@ export default function Watch() {
         if (cancelled) return
         const subs = Array.isArray(subServers) ? subServers : []
         const dubs = Array.isArray(dubServers) ? dubServers : []
-        setServers((prev) => ({
-          sub: subs.length > 0 ? subs : prev.sub,
-          dub: dubs.length > 0 ? dubs : prev.dub,
-        }))
+        // Providers are per-episode: a successful fetch always reflects
+        // the CURRENT episode's servers (even when empty), so switching
+        // episodes never shows stale providers from the previous one.
+        setServers({ sub: subs, dub: dubs })
         if (subs.length === 0 && dubs.length === 0) {
           setNoStreamError(true)
           setErrorType('no-source')
@@ -1975,8 +2279,19 @@ export default function Watch() {
 
   useEffect(() => {
     if (!activeSource) return
-    loadStreamRef.current(activeSource)
-  }, [activeSource, epNumber])
+    const epChanged = epNumber !== prevEpisodeRef.current
+    prevEpisodeRef.current = epNumber
+    if (epChanged) {
+      // New episode: kill the current player FIRST so the old video can
+      // never keep playing, then load the stream for the new episode.
+      destroyPlayer()
+      loadStreamRef.current(activeSource)
+      return
+    }
+    // Same episode, server switch: keep the old video playing and only
+    // swap when the new stream is ready.
+    loadStreamRef.current(activeSource, false, Boolean(artInstance.current))
+  }, [activeSource, epNumber, destroyPlayer])
 
   const handleSourceSwitch = useCallback(
     (sourceId) => {
@@ -2022,8 +2337,11 @@ export default function Watch() {
   }, [])
   const startSeekHold = useCallback(
     (dir) => {
+      // Seek once immediately on press — mobile browsers sometimes skip
+      // the synthesized click, so the seek must not depend on it.
+      seekBy(dir)
       stopSeekHold()
-      // Repeat only after holding 350ms — a plain tap still seeks once.
+      // Repeat only after holding 350ms.
       seekHoldTimerRef.current = setTimeout(() => {
         seekHoldTimerRef.current = setInterval(() => {
           const art = artInstance.current
@@ -2390,9 +2708,28 @@ export default function Watch() {
         </div>
       )}
 
+      {/* Banner backdrop ambiance */}
+      {anime?.bannerImage && (
+        <div
+          aria-hidden="true"
+          className="watch-backdrop"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 0,
+            pointerEvents: 'none',
+            backgroundImage: `linear-gradient(to bottom, rgba(5,8,16,0.45) 0%, rgba(5,8,16,0.85) 60%, var(--bg) 92%), url(${anime.bannerImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 30%',
+          }}
+        />
+      )}
+
       <div
         className={`watch-page ${theaterMode ? 'theater' : ''}`}
         style={{
+          position: 'relative',
+          zIndex: 1,
           maxWidth: theaterMode ? '100%' : 1280,
           margin: '0 auto',
           padding: theaterMode ? '0' : '16px',
@@ -2431,7 +2768,6 @@ export default function Watch() {
             type="button"
             aria-label="Seek backward 10 seconds"
             title="Seek backward 10 seconds"
-            onClick={() => seekBy(-1)}
             onPointerDown={() => startSeekHold(-1)}
             onPointerUp={stopSeekHold}
             onPointerLeave={stopSeekHold}
@@ -2445,7 +2781,6 @@ export default function Watch() {
             type="button"
             aria-label="Seek forward 10 seconds"
             title="Seek forward 10 seconds"
-            onClick={() => seekBy(1)}
             onPointerDown={() => startSeekHold(1)}
             onPointerUp={stopSeekHold}
             onPointerLeave={stopSeekHold}
@@ -2821,6 +3156,75 @@ export default function Watch() {
             </div>
           )}
 
+          {/* Episode ended (auto-next off): Replay / Next instead of a
+              black screen */}
+          {showEndedOverlay && !streamLoading && !error && (
+            <div
+              className="watch-ended"
+              role="dialog"
+              aria-label="Episode finished"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 7,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 18,
+                background: 'rgba(0,0,0,0.82)',
+                backdropFilter: 'blur(4px)',
+                textAlign: 'center',
+                padding: 24,
+              }}
+            >
+              <FaCheckCircle
+                size={44}
+                color="#22c55e"
+                style={{ opacity: 0.9 }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: '#f1f5f9',
+                    marginBottom: 6,
+                  }}
+                >
+                  Episode {epNumber} finished
+                </div>
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>
+                  {epNumber < (episodes.length || 0) || isMovie
+                    ? 'Auto-next is off — press Next to continue watching.'
+                    : "You've watched every released episode."}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={replayEpisode}
+                  style={{ ...navBtnStyle, background: 'var(--accent)', color: '#fff' }}
+                >
+                  <FaRedo /> Replay
+                </button>
+                {!isMovie && epNumber < episodes.length && (
+                  <button type="button" onClick={goNext} style={navBtnStyle}>
+                    Next <FaStepForward />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowEndedOverlay(false)}
+                  style={{ ...navBtnStyle }}
+                  aria-label="Close"
+                >
+                  <FaUndo /> Continue
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Skip Intro / Skip Credits — manual, powered by Miruro
               timestamps from the stream response. Always opt-in. */}
           {(showSkipIntro || showSkipOutro) && (
@@ -3042,6 +3446,55 @@ export default function Watch() {
             </div>
 
             <div
+              className="watch-rating"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+                marginBottom: 12,
+              }}
+            >
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {epRatings[epNumber]
+                  ? `Rated ${epRatings[epNumber]}/10`
+                  : 'Rate this episode'}
+              </span>
+              <span style={{ display: 'inline-flex', gap: 3 }}>
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    disabled={epRatingSaving}
+                    aria-label={`Rate ${n} out of 10`}
+                    title={`Rate ${n} out of 10`}
+                    onClick={() => saveRating(n)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color:
+                        (epRatings[epNumber] || 0) >= n
+                          ? '#fbbf24'
+                          : 'var(--text-muted)',
+                      opacity: (epRatings[epNumber] || 0) >= n ? 1 : 0.35,
+                      fontSize: 14,
+                    }}
+                  >
+                    <FaStar size={14} />
+                  </button>
+                ))}
+              </span>
+              {epRatingSaving && (
+                <FaSpinner size={12} className="watch-spin" />
+              )}
+              {epRatingSaved && (
+                <span style={{ fontSize: 12, color: '#86efac' }}>Saved</span>
+              )}
+            </div>
+
+            <div
               className="watch-nav"
               style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}
             >
@@ -3063,6 +3516,44 @@ export default function Watch() {
                   aria-label="Next episode"
                 >
                   Next <FaStepForward />
+                </button>
+              )}
+              {animeId && (
+                <Link
+                  to={`/anime/${generateSlug(
+                    anime?.title?.english || anime?.title?.romaji || ''
+                  )}-${animeId}`}
+                  style={{
+                    ...navBtnStyle,
+                    textDecoration: 'none',
+                    background: 'var(--accent)',
+                    color: '#fff',
+                  }}
+                  aria-label="Go to anime page"
+                >
+                  <FaSignal /> Anime Page
+                </Link>
+              )}
+              {!isMovie && (
+                <button
+                  type="button"
+                  onClick={toggleAutoNext}
+                  style={{
+                    ...navBtnStyle,
+                    background: autoNext
+                      ? 'rgba(34,197,94,0.15)'
+                      : 'rgba(255,255,255,0.08)',
+                    color: autoNext ? '#86efac' : 'var(--text-secondary)',
+                    border: `1px solid ${
+                      autoNext
+                        ? 'rgba(34,197,94,0.4)'
+                        : 'rgba(255,255,255,0.15)'
+                    }`,
+                  }}
+                  aria-pressed={autoNext}
+                  title="Automatically play the next episode when this one ends"
+                >
+                  <FaCheckCircle size={13} /> Auto-next {autoNext ? 'ON' : 'OFF'}
                 </button>
               )}
             </div>
@@ -3136,344 +3627,42 @@ export default function Watch() {
             )}
           </div>
 
-          {/* Episode sidebar */}
+          {/* Episode sidebar (memoized component: watched checkmarks,
+              per-episode ratings, filler/recap badges, search & pages) */}
           {!isMovie && (
-            <aside
-              className="watch-episodes"
-              aria-label="Episode list"
+            <div
               style={{
-                background: 'var(--bg-card)',
-                borderRadius: 12,
-                padding: 14,
-                position: 'sticky',
-                top: 16,
-                overflowY: 'auto',
-                display:
-                  !showEpSidebar && IS_MOBILE ? 'none' : 'block',
+                display: !showEpSidebar && IS_MOBILE ? 'none' : 'block',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  marginBottom: 10,
+              <EpisodeSidebar
+                filteredEps={filteredEps}
+                pagedEps={pagedEps}
+                epPage={epPage}
+                totalEpPages={totalEpPages}
+                epSearch={epSearch}
+                hideFillers={hideFillers}
+                hiddenEpCount={hiddenEpCount}
+                episodeCount={episodes.length}
+                epNumber={epNumber}
+                animeId={animeId}
+                animeTitle={
+                  anime?.title?.english || anime?.title?.romaji || ''
+                }
+                watchedEps={watchedEps}
+                epRatings={epRatings}
+                onSearch={(e) => {
+                  setEpSearch(e.target.value)
+                  setEpPage(0)
                 }}
-              >
-                <h3
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Episodes ({filteredEps.length}
-                  {hiddenEpCount > 0 && hideFillers
-                    ? ` of ${episodes.length}`
-                    : ''}
-                  )
-                </h3>
-                {hiddenEpCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHideFillers((p) => !p)
-                      setEpPage(0)
-                    }}
-                    aria-pressed={hideFillers}
-                    title="Hide filler & recap episodes"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '5px 10px',
-                      background: hideFillers
-                        ? 'rgba(99,102,241,0.18)'
-                        : 'var(--bg-elevated)',
-                      color: hideFillers ? '#a5b4fc' : 'var(--text-muted)',
-                      border: `1px solid ${
-                        hideFillers
-                          ? 'rgba(99,102,241,0.45)'
-                          : 'var(--border)'
-                      }`,
-                      borderRadius: 999,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      minHeight: 30,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {hideFillers ? 'Showing canon' : 'Hide fillers'}
-                    {hideFillers && <span>✓</span>}
-                  </button>
-                )}
-              </div>
-
-              {episodes.length > EPISODES_PER_PAGE && (
-                <div
-                  className="watch-ep-search"
-                  style={{ position: 'relative', marginBottom: 8 }}
-                >
-                  <FaSearch
-                    style={{
-                      position: 'absolute',
-                      left: 10,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--text-muted)',
-                      fontSize: 12,
-                    }}
-                    aria-hidden="true"
-                  />
-                  <input
-                    type="text"
-                    value={epSearch}
-                    onChange={(e) => {
-                      setEpSearch(e.target.value)
-                      setEpPage(0)
-                    }}
-                    placeholder="Search episodes…"
-                    aria-label="Search episodes"
-                    style={{
-                      width: '100%',
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      padding: '8px 10px 8px 30px',
-                      color: 'var(--text-primary)',
-                      fontSize: 12,
-                      boxSizing: 'border-box',
-                      outline: 'none',
-                      minHeight: 36,
-                    }}
-                  />
-                </div>
-              )}
-
-              {totalEpPages > 1 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 8,
-                    fontSize: 11,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setEpPage((p) => Math.max(0, p - 1))}
-                    disabled={epPage === 0}
-                    aria-label="Previous page"
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '6px 10px',
-                      color: 'var(--text-secondary)',
-                      fontSize: 11,
-                      cursor: epPage === 0 ? 'default' : 'pointer',
-                      opacity: epPage === 0 ? 0.4 : 1,
-                      minHeight: 32,
-                    }}
-                  >
-                    ←
-                  </button>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    {epPage + 1}/{totalEpPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEpPage((p) => Math.min(totalEpPages - 1, p + 1))
-                    }
-                    disabled={epPage >= totalEpPages - 1}
-                    aria-label="Next page"
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '6px 10px',
-                      color: 'var(--text-secondary)',
-                      fontSize: 11,
-                      cursor:
-                        epPage >= totalEpPages - 1 ? 'default' : 'pointer',
-                      opacity: epPage >= totalEpPages - 1 ? 0.4 : 1,
-                      minHeight: 32,
-                    }}
-                  >
-                    →
-                  </button>
-                </div>
-              )}
-
-              <div className="watch-ep-list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {pagedEps.map((ep, i) => {
-                  const num = ep.number || i + 1
-                  const isActive = num === epNumber
-                  const slug = generateSlug(
-                    anime?.title?.english || anime?.title?.romaji || ''
-                  )
-                  return (
-                    <Link
-                      key={num}
-                      to={`/watch/${slug}-${animeId}-episode-${num}`}
-                      aria-current={isActive ? 'true' : 'false'}
-                      onMouseEnter={(e) => {
-                        if (!isActive)
-                          e.currentTarget.style.background = 'rgba(226,232,240,0.05)'
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive)
-                          e.currentTarget.style.background = 'transparent'
-                      }}
-                      style={{
-                        display: 'flex',
-                        gap: 10,
-                        alignItems: 'center',
-                        padding: 8,
-                        borderRadius: 8,
-                        textDecoration: 'none',
-                        color: 'var(--text-primary)',
-                        background: isActive
-                          ? 'rgba(99,102,241,0.12)'
-                          : 'transparent',
-                        border: isActive
-                          ? '1px solid rgba(99,102,241,0.35)'
-                          : '1px solid transparent',
-                        minHeight: 44,
-                      }}
-                    >
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        {ep.thumbnail ? (
-                          <img
-                            src={ep.thumbnail}
-                            alt={`Episode ${num}`}
-                            loading="lazy"
-                            style={{
-                              width: 80,
-                              height: 45,
-                              objectFit: 'cover',
-                              borderRadius: 6,
-                              flexShrink: 0,
-                              background: 'var(--bg-elevated)',
-                              display: 'block',
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 80,
-                              height: 45,
-                              borderRadius: 6,
-                              background: 'var(--bg-elevated)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 11,
-                              color: 'var(--text-muted)',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {num}
-                          </div>
-                        )}
-                        {ep.filler && (
-                          <span
-                            style={{
-                              position: 'absolute',
-                              top: 4,
-                              left: 4,
-                              background: 'rgba(234,179,8,0.92)',
-                              color: '#0f172a',
-                              padding: '1px 5px',
-                              borderRadius: 4,
-                              fontSize: 9,
-                              fontWeight: 700,
-                              letterSpacing: 0.3,
-                              lineHeight: 1.5,
-                              zIndex: 2,
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            FILLER
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {ep.title || `Episode ${num}`}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--text-muted)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            marginTop: 2,
-                          }}
-                        >
-                          EP {num}
-                          {ep.recap && (
-                            <span
-                              style={{
-                                background: 'rgba(99,102,241,0.15)',
-                                color: '#a5b4fc',
-                                padding: '1px 5px',
-                                borderRadius: 4,
-                                fontSize: 10,
-                                fontWeight: 700,
-                              }}
-                            >
-                              RECAP
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isActive && (
-                        <span
-                          aria-hidden="true"
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 99,
-                            background: '#a5b4fc',
-                            flexShrink: 0,
-                          }}
-                        />
-                      )}
-                    </Link>
-                  )
-                })}
-                {pagedEps.length === 0 && (
-                  <div
-                    style={{
-                      color: 'var(--text-muted)',
-                      textAlign: 'center',
-                      padding: 16,
-                      fontSize: 12,
-                    }}
-                  >
-                    {epSearch
-                      ? 'No episodes match your search'
-                      : 'No episodes listed'}
-                  </div>
-                )}
-              </div>
-            </aside>
+                onPageChange={setEpPage}
+                onToggleFillers={() => {
+                  setHideFillers((p) => !p)
+                  setEpPage(0)
+                }}
+                sidebarRef={epSidebarRef}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -3546,6 +3735,7 @@ export default function Watch() {
           50%      { text-shadow: 0 0 22px rgba(34,197,94,0.75); }
         }
         .spin-anim { animation: watch-spin 1s linear infinite; }
+        .watch-spin { animation: watch-spin 1s linear infinite; }
         @media (prefers-reduced-motion: reduce) {
           .spin-anim, [style*="watch-toast-in"], [style*="watch-spin"],
           [style*="watch-count-glow"] {
