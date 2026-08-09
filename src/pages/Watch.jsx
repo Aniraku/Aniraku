@@ -1340,8 +1340,13 @@ export default function Watch() {
       const headersParam = headers
         ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
         : ''
+      // Per-build nonce: every playback session gets fresh proxy URLs, so
+      // stale edge-cache variants can never be served to the browser.
+      // The backend strips "rn" before dialing the CDN.
+      const nonce =
+        Math.random().toString(36).slice(2) + Date.now().toString(36)
       const proxied = (u) =>
-        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
+        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
 
       // MP4 playback — proxy first, direct as fallback
       const playAsMp4 = (video, url, art) => {
@@ -1498,8 +1503,7 @@ export default function Watch() {
         customType: {
           mp4: (video, url, art) => playAsMp4(video, url, art),
           m3u8: async (video, url, art) => {
-            const proxiedH = (u) =>
-              `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}`
+            const proxiedH = proxied
             const referer = (headers && headers.Referer) || ''
             // iOS Safari has native HLS support — use it directly.
             if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -1647,7 +1651,7 @@ export default function Watch() {
       if (subtitles && subtitles.length > 0 && subtitles[0].url) {
         const subtitleUrl = subtitles[0].url
         playerConfig.subtitle = {
-          url: `${PROXY_BASE}/proxy?url=${encodeURIComponent(subtitleUrl)}${headersParam}`,
+          url: proxied(subtitleUrl),
           type: 'srt',
           encoding: 'utf-8',
           style: {
