@@ -669,6 +669,12 @@ export default function Watch() {
   const syncProgressRef = useRef(null)
   const syncWatchProgress = useCallback(async () => {
     if (!user) return
+    // Only sync when something actually played: no player, no stream, or a
+    // 0-duration source (empty/upcoming episodes) must never mark progress.
+    const art = artInstance.current
+    if (!art?.video) return
+    const dur = Math.floor(art.video.duration || 0)
+    if (noStreamError || dur <= 0) return
     let synced = []
     let failed = []
     try {
@@ -681,14 +687,13 @@ export default function Watch() {
       }
       const providers = syncConnectedRef.current
       if (providers.length === 0) return
-      const art = artInstance.current
       const results = await Promise.allSettled(
         providers.map((p) =>
           updateSyncProgress({
             provider: p,
             animeId: parseInt(animeId, 10),
             episode: epNumber,
-            progress: Math.floor(art?.video.duration || 0),
+            progress: dur,
             status: 'completed',
           })
         )
@@ -706,7 +711,7 @@ export default function Watch() {
     } else if (failed.length > 0) {
       showToast(`Sync to ${failed.join(', ')} failed — will retry next episode`, { icon: 'warn' })
     }
-  }, [user, animeId, epNumber])
+  }, [user, animeId, epNumber, noStreamError])
   syncProgressRef.current = syncWatchProgress
 
   // ────────────────────────────────────────────────────────────
