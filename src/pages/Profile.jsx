@@ -35,23 +35,39 @@ const Profile = () => {
     if (!loading && !user) navigate('/login')
   }, [user, loading, navigate])
 
-  // Load server-side bookmarks (the same table import writes to) and merge
-  // with any local-only bookmarks saved before sign-in.
-  const loadServerBookmarks = () => {
+  // Load server-side bookmarks (the same table import writes to) as the
+  // source of truth, migrating any guest-only local bookmarks up first and
+  // keeping localStorage as a mirror.
+  const loadServerBookmarks = async () => {
     if (!user) return
-    supabase.from('bookmarks').select('*').eq('user_id', user.id).then(({ data }) => {
-      if (data?.length) {
-        const mapped = data.map(b => ({
-          id: b.anime_id,
-          title: b.title,
-          image: b.image,
-        }))
-        setBookmarks(prev => {
-          const ids = new Set(mapped.map(m => m.id))
-          return [...mapped, ...prev.filter(p => !ids.has(p.id))]
-        })
+    try {
+      const { data } = await supabase.from('bookmarks').select('*').eq('user_id', user.id)
+      const mapped = (data || []).map(b => ({
+        id: b.anime_id,
+        title: b.title,
+        image: b.image,
+      }))
+      const cloudIds = new Set(mapped.map(m => m.id))
+      let local = []
+      try {
+        local = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]')
+      } catch {}
+      const localOnly = local.filter(l => !cloudIds.has(l.id))
+      if (localOnly.length) {
+        await supabase.from('bookmarks').upsert(localOnly.map(l => ({
+          user_id: user.id,
+          anime_id: l.id,
+          title: l.title || '',
+          image: l.image || '',
+          added_at: Date.now(),
+        })), { onConflict: 'user_id,anime_id' })
       }
-    }).catch(err => console.error('bookmarks fetch error:', err))
+      const merged = [...mapped, ...localOnly]
+      setBookmarks(merged)
+      localStorage.setItem('aniraku-bookmarks', JSON.stringify(merged))
+    } catch (err) {
+      console.error('bookmarks fetch error:', err)
+    }
   }
 
   useEffect(() => {
