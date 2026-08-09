@@ -90,6 +90,57 @@ export async function updateSyncProgress({
   }
 }
 
+// Push a 1-10 anime score (aggregated from episode ratings) to a
+// connected provider. Both MAL and AniList only support an anime-level
+// score, so the average of the user's episode ratings becomes the score.
+export async function updateSyncScore({ provider, animeId, score }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/sync/score`, {
+      method: 'PUT',
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ provider, animeId, score }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+// Episode ratings (own ratings for one anime). Logged-in users store
+// them in Supabase via the backend; guests keep them locally.
+export async function fetchEpisodeRatings(animeId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/anime/${animeId}/ratings`, {
+      cache: 'no-store',
+      headers: await authHeaders(),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data?.ratings) return null
+    return Object.fromEntries(
+      data.ratings.map((r) => [r.episode_number, r.score])
+    )
+  } catch {
+    return null
+  }
+}
+
+export async function saveEpisodeRating(animeId, episode, score) {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/anime/${animeId}/episode/${episode}/rating`,
+      {
+        method: 'POST',
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ score }),
+      }
+    )
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export const PROVIDER_LABELS = {
   mal: 'MyAnimeList',
   anilist: 'AniList',
