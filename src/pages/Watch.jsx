@@ -3804,6 +3804,9 @@ export default function Watch() {
           .watch-page { padding: 0 !important; }
           .watch-nav { gap: 8px !important; }
           .watch-nav button { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 8px 12px; }
+          .watch-rating { gap: 6px !important; }
+          .watch-rating span:last-child { gap: 2px !important; }
+          .watch-rating span:last-child svg { width: 12px !important; height: 12px !important; }
         }
         @media (max-width: 480px) {
           .watch-nav { gap: 6px !important; }
