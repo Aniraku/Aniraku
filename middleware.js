@@ -2,7 +2,7 @@ const BACKEND = 'https://aniraku-backend-production.up.railway.app'
 const SITE = 'https://www.aniraku.tech'
 const FALLBACK_IMAGE = `${SITE}/og-image.png`
 
-const BOT_RE = /bot|crawler|spider|googlebot|bingbot|yandex|facebookexternalhit|twitterbot|whatsapp|linkedin|slack|telegram|discord|pinterest|slurp|duckduckbot|baiduspider|youtube|embedly|preview|headless|ia_archiver|applebot|curl|wget|validator|facebook|twitter/i
+const BOT_RE = /bot|crawler|spider|googlebot|bingbot|yandex|facebookexternalhit|twitterbot|whatsapp|linkedin|slack|telegram|discord|pinterest|slurp|duckduckbot|baiduspider|youtube|embedly|preview|headless|ia_archiver|applebot|facebook|twitter/i
 
 function escape(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, ' ')
@@ -74,58 +74,70 @@ async function fetchAnime(id) {
 
 export default async function middleware(request) {
   try {
-    const ua = request.headers.get('user-agent') || ''
-    if (!BOT_RE.test(ua)) return
-
     const url = new URL(request.url)
     const path = url.pathname
 
-    // /anime/:slug-:id
-    const m = path.match(/^\/anime\/(.+)-(\d+)$/)
-    if (m) {
-    const anime = await fetchAnime(m[2])
-    if (anime) {
-      const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m[2]}`)
-      const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
-      const desc = escape(rawDesc || `Watch ${title} online — Sub & Dub available.`)
-      const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
-      const animeType = getAnimeType(anime.format)
-      const animeUrl = `${SITE}/anime/${m[0].slice(1)}`
-      return new Response(htmlShell({
-        title: `${title} — Watch Online Free | Aniraku`,
-        description: desc,
-        image,
-        url: animeUrl,
-        type: 'video.tv_show',
-        animeType,
-        score: anime.averageScore,
-        episodes: anime.episodes,
-        genres: anime.genres || [],
-        startDate: anime.startDate?.year || '',
-      }), {
-        headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
-      })
+    // Heal historically broken doubled-path URLs: an old canonical bug made
+    // every anime/watch URL self-canonicalize to /anime/anime/... (and
+    // /watch/watch/...) which itself returned 200. 301 them to the real
+    // path so crawlers collapse those URLs instead of chasing canonicals.
+    const doubled = path.match(/^\/(anime|watch)\/\1\//)
+    if (doubled) {
+      return Response.redirect(`${SITE}/${doubled[1]}/${path.replace(doubled[0], '')}`, 301)
     }
-  }
 
-  // /watch/:slug-:id-episode-:ep
-  const m2 = path.match(/^\/watch\/(.+)-(\d+)-episode-(\d+)$/)
-  if (m2) {
-    const anime = await fetchAnime(m2[2])
-    if (anime) {
-      const ep = m2[3]
-      const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m2[2]}`)
-      const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
-      const desc = escape(rawDesc || `Watch ${title} Episode ${ep} online — Sub & Dub available.`)
-      const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
-      const watchUrl = `${SITE}/watch/${m2[0].slice(1)}`
+    const ua = request.headers.get('user-agent') || ''
+    if (!BOT_RE.test(ua)) return
 
-      // VideoObject JSON-LD
-      const videoJsonld = `{"@context":"https://schema.org","@type":"VideoObject","name":"${title} - Episode ${ep}","description":"${desc}","thumbnailUrl":"${image}","contentUrl":"${watchUrl}","embedUrl":"${watchUrl}","duration":"PT24M","uploadDate":"${new Date().toISOString().split('T')[0]}","provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"},"isPartOf":{"@type":"TVSeries","name":"${title}","url":"${SITE}/anime/${m2[0].slice(1).replace(/-episode-\d+$/, '')}"}}`
+    // /anime/:slug-:id  (slug never contains "/" — this also guarantees a
+    // doubled /anime/anime/... path can never match the prerender branch)
+    const m = path.match(/^\/anime\/([^/]+)-(\d+)$/)
+    if (m) {
+      const anime = await fetchAnime(m[2])
+      if (anime) {
+        const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m[2]}`)
+        const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
+        const desc = escape(rawDesc || `Watch ${title} online — Sub & Dub available.`)
+        const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
+        const animeType = getAnimeType(anime.format)
+        const animeUrl = `${SITE}${path}`
+        return new Response(htmlShell({
+          title: `${title} — Watch Online Free | Aniraku`,
+          description: desc,
+          image,
+          url: animeUrl,
+          type: 'video.tv_show',
+          animeType,
+          score: anime.averageScore,
+          episodes: anime.episodes,
+          genres: anime.genres || [],
+          startDate: anime.startDate?.year || '',
+        }), {
+          headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
+        })
+      }
+    }
 
-      const watchBreadcrumb = `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE}/"},{"@type":"ListItem","position":2,"name":"Catalog","item":"${SITE}/catalog"},{"@type":"ListItem","position":3,"name":"${title}","item":"${SITE}/anime/${m2[0].slice(1).replace(/-episode-\d+$/, '')}"},{"@type":"ListItem","position":4,"name":"Episode ${ep}"}]}`
+    // /watch/:slug-:id-episode-:ep  (slug never contains "/")
+    const m2 = path.match(/^\/watch\/([^/]+)-(\d+)-episode-(\d+)$/)
+    if (m2) {
+      const anime = await fetchAnime(m2[2])
+      if (anime) {
+        const ep = m2[3]
+        const title = escape(anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || `Anime #${m2[2]}`)
+        const rawDesc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 320)
+        const desc = escape(rawDesc || `Watch ${title} Episode ${ep} online — Sub & Dub available.`)
+        const image = escape(anime.coverImage?.large || anime.coverImage?.extraLarge || FALLBACK_IMAGE)
+        const watchUrl = `${SITE}${path}`
+        const animeUrl = `${SITE}/anime/${m2[1]}-${m2[2]}`
 
-      return new Response(`<!DOCTYPE html><html lang="en"><head>
+        // VideoObject JSON-LD (no fake duration/uploadDate — misleading
+        // values can trigger structured-data spam warnings)
+        const videoJsonld = `{"@context":"https://schema.org","@type":"VideoObject","name":"${title} - Episode ${ep}","description":"${desc}","thumbnailUrl":"${image}","contentUrl":"${watchUrl}","embedUrl":"${watchUrl}","provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"},"isPartOf":{"@type":"TVSeries","name":"${title}","url":"${animeUrl}"}}`
+
+        const watchBreadcrumb = `{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE}/"},{"@type":"ListItem","position":2,"name":"Catalog","item":"${SITE}/catalog"},{"@type":"ListItem","position":3,"name":"${title}","item":"${animeUrl}"},{"@type":"ListItem","position":4,"name":"Episode ${ep}"}]}`
+
+        return new Response(`<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>${title} — Episode ${ep} | Aniraku</title>
@@ -154,10 +166,10 @@ export default async function middleware(request) {
 <script type="application/ld+json">${watchBreadcrumb}</script>
 
 </head><body><h1>${title} — Episode ${ep}</h1><p>${desc}</p></body></html>`, {
-        headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
-      })
+          headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'public,max-age=3600,s-maxage=3600' }
+        })
+      }
     }
-  }
   } catch (err) {
     console.error('[middleware] bot prerender failed, falling through to SPA:', err)
     return
