@@ -2765,10 +2765,13 @@ export default function Watch() {
           zIndex: 1,
           maxWidth: theaterMode ? '100%' : 1280,
           margin: '0 auto',
-          padding: theaterMode ? '0' : '16px',
+          padding: theaterMode ? '0' : 'clamp(8px, 2vw, 16px)',
           transition: PREFERS_REDUCED_MOTION
             ? 'none'
             : 'max-width 250ms ease, padding 250ms ease',
+          boxSizing: 'border-box',
+          width: '100%',
+          overflow: 'hidden',
         }}
       >
         {/* Player container */}
@@ -3419,23 +3422,24 @@ export default function Watch() {
             onClick={() => setShowEpSidebar((p) => !p)}
             className="watch-ep-toggle"
             aria-expanded={showEpSidebar}
-            style={{
-              display: IS_MOBILE ? 'flex' : 'none',
-              width: '100%',
-              padding: '12px 14px',
-              margin: '12px auto 0',
-              maxWidth: 1200,
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              borderRadius: 10,
-              color: 'var(--text-primary)',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              minHeight: 44,
-            }}
+          style={{
+            display: IS_MOBILE ? 'flex' : 'none',
+            width: 'calc(100% - 16px)',
+            padding: '12px 14px',
+            margin: '12px auto 0',
+            maxWidth: 'calc(1200px - 16px)',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            color: 'var(--text-primary)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            minHeight: 44,
+            boxSizing: 'border-box',
+          }}
           >
             Episodes ({filteredEps.length}{hiddenEpCount > 0 && hideFillers ? ` of ${episodes.length}` : ''}) {showEpSidebar ? '▲' : '▼'}
           </button>
@@ -3447,12 +3451,13 @@ export default function Watch() {
           style={{
             display: 'grid',
             gridTemplateColumns: showEpSidebar && !isMovie ? '1fr 320px' : '1fr',
-            gap: 24,
+            gap: 'clamp(12px, 3vw, 24px)',
             marginTop: 16,
             alignItems: 'flex-start',
+            minWidth: 0,
           }}
         >
-          <div className="watch-info">
+          <div className="watch-info" style={{ minWidth: 0 }}>
             <h1
               style={{
                 fontSize: 'clamp(20px, 4vw, 28px)',
@@ -3529,7 +3534,7 @@ export default function Watch() {
 
             <div
               className="watch-nav"
-              style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}
+              style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, minWidth: 0 }}
             >
               {!isMovie && epNumber > 1 && (
                 <button
@@ -3716,7 +3721,9 @@ export default function Watch() {
             bottom: IS_MOBILE
               ? `calc(76px + env(safe-area-inset-bottom, 0px))`
               : `calc(20px + env(safe-area-inset-bottom, 0px))`,
-            right: `calc(20px + env(safe-area-inset-right, 0px))`,
+            right: IS_MOBILE
+              ? `calc(10px + env(safe-area-inset-right, 0px))`
+              : `calc(20px + env(safe-area-inset-right, 0px))`,
             zIndex: 60,
             display: 'flex',
             alignItems: 'center',
@@ -3725,12 +3732,13 @@ export default function Watch() {
             color: 'var(--bg)',
             border: 'none',
             borderRadius: 999,
-            padding: '12px 18px',
-            fontSize: 13,
+            padding: IS_MOBILE ? '10px 14px' : '12px 18px',
+            fontSize: IS_MOBILE ? 12 : 13,
             fontWeight: 600,
             cursor: 'pointer',
             boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
-            minHeight: 48,
+            minHeight: 44,
+            maxWidth: 'calc(100vw - 20px)',
           }}
         >
           <FaCommentDots />
@@ -3791,8 +3799,15 @@ export default function Watch() {
           user-select: none;
         }
         @media (max-width: 768px) {
-          .watch-grid { grid-template-columns: 1fr !important; }
+          .watch-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
           .watch-episodes { width: 100% !important; }
+          .watch-page { padding: 0 !important; }
+          .watch-nav { gap: 8px !important; }
+          .watch-nav button { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 8px 12px; }
+        }
+        @media (max-width: 480px) {
+          .watch-nav { gap: 6px !important; }
+          .watch-nav button { padding: 8px 10px; font-size: 11px; }
         }
         /* Touch seek buttons: only on touch screens (phones + tablets).
            iPads whose UA reports as desktop (iPad Pro) are caught by the
