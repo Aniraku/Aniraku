@@ -1,4 +1,4 @@
-const VERSION = 'aniraku-shell-v2'
+const VERSION = 'aniraku-shell-v3'
 const CORE_ASSETS = [
   '/',
   '/manifest.json',

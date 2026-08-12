@@ -444,7 +444,18 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
         style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
       >
         {pagedEps.map((ep, i) => {
-          const num = ep.number || i + 1
+          const absoluteIndex = epPage * EPISODES_PER_PAGE + i
+          const sourceNumber = Number(ep?.number)
+          // Keep the sidebar correct even when an older API/cache response
+          // reaches this component before Watch.jsx can normalize it.
+          const legacyTens =
+            filteredEps.length > 1 &&
+            filteredEps.every((item, index) => Number(item?.number) === (index + 1) * 10)
+          const num = legacyTens
+            ? absoluteIndex + 1
+            : (Number.isFinite(sourceNumber) && sourceNumber > 0
+              ? sourceNumber
+              : absoluteIndex + 1)
           return (
             <EpisodeRow
               key={num}
