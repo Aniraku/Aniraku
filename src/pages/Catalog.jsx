@@ -1,44 +1,45 @@
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
-import { FaChevronDown, FaTimes, FaSlidersH } from 'react-icons/fa'
+import { FaChevronDown, FaTimes, FaSearch, FaFilter, FaSortAmountDown, FaLayerGroup, FaCheckCircle, FaCalendarDay } from 'react-icons/fa'
+import { AnimeCardSkeleton } from '../components/Skeletons/Skeletons'
 
 const PER_PAGE = 24
-const SEARCH_DEBOUNCE_MS = 400
+const SEARCH_DEBOUNCE_MS = 500
 const CURRENT_YEAR = new Date().getFullYear()
 
 const fmt = v => v.replace(/_/g, ' ')
 
 const SORT_OPTIONS = [
-  { value: 'POPULARITY_DESC', label: 'Most popular' },
-  { value: 'SCORE_DESC', label: 'Top rated' },
-  { value: 'START_DATE_DESC', label: 'Newest' },
-  { value: 'TITLE_ROMAJI', label: 'A–Z' },
+  { value: 'POPULARITY_DESC', label: 'Popularity', icon: FaSortAmountDown },
+  { value: 'SCORE_DESC', label: 'Top Rated', icon: FaCheckCircle },
+  { value: 'START_DATE_DESC', label: 'Newest', icon: FaCalendarDay },
+  { value: 'TITLE_ROMAJI', label: 'A–Z', icon: FaLayerGroup },
 ]
 
 const FORMAT_OPTIONS = [
-  { value: '', label: 'Any format' },
-  { value: 'TV', label: 'TV' },
-  { value: 'MOVIE', label: 'Movie' },
+  { value: '', label: 'All Formats' },
+  { value: 'TV', label: 'TV Series' },
+  { value: 'MOVIE', label: 'Movies' },
   { value: 'OVA', label: 'OVA' },
   { value: 'ONA', label: 'ONA' },
-  { value: 'SPECIAL', label: 'Special' },
+  { value: 'SPECIAL', label: 'Specials' },
 ]
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Any status' },
+  { value: '', label: 'All Status' },
   { value: 'RELEASING', label: 'Releasing' },
   { value: 'FINISHED', label: 'Finished' },
   { value: 'NOT_YET_RELEASED', label: 'Upcoming' },
 ]
 
 const GENRE_OPTIONS = [
-  { value: '', label: 'Any genre' },
+  { value: '', label: 'All Genres' },
   ...[
     'Action', 'Adventure', 'Comedy', 'Drama', 'Ecchi', 'Fantasy', 'Horror',
     'Mahou Shoujo', 'Mecha', 'Music', 'Mystery', 'Psychological', 'Romance',
@@ -47,8 +48,8 @@ const GENRE_OPTIONS = [
 ]
 
 const YEAR_OPTIONS = [
-  { value: '', label: 'Any year' },
-  ...Array.from({ length: 15 }, (_, i) => {
+  { value: '', label: 'All Years' },
+  ...Array.from({ length: 20 }, (_, i) => {
     const y = CURRENT_YEAR - i
     return { value: String(y), label: String(y) }
   }),
@@ -81,37 +82,49 @@ const Card = memo(function Card({ a }) {
           <div className="card-noimg">No image</div>
         )}
         <div className="card-scrim" />
-        {typeof a.averageScore === 'number' && (
-          <span className={`card-chip card-chip-score${highScore ? ' is-high' : ''}`}>{a.averageScore}%</span>
-        )}
-        {a.format && <span className="card-chip card-chip-format">{fmt(a.format)}</span>}
+        <div className="card-badges">
+          {typeof a.averageScore === 'number' && (
+            <span className={`card-badge card-badge-score${highScore ? ' is-high' : ''}`}>
+              {a.averageScore}%
+            </span>
+          )}
+          {a.format && <span className="card-badge card-badge-format">{fmt(a.format)}</span>}
+        </div>
       </div>
       <div className="card-info">
-        <p className="card-title">{title}</p>
-        {a.episodes && <p className="card-meta">{a.episodes} ep</p>}
+        <h3 className="card-title">{title}</h3>
+        <div className="card-meta">
+          {a.episodes && <span>{a.episodes} Episodes</span>}
+          {a.seasonYear && <span>{a.seasonYear}</span>}
+        </div>
       </div>
     </Link>
   )
 })
 
-function FilterSelect({ options, value, onChange, ariaLabel }) {
+function FilterSelect({ options, value, onChange, ariaLabel, icon: Icon }) {
   return (
-    <select
-      className="filter-select"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      aria-label={ariaLabel}
-    >
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <div className="filter-select-wrapper">
+      {Icon && <Icon className="filter-icon" size={12} />}
+      <select
+        className="filter-select"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        aria-label={ariaLabel}
+      >
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <FaChevronDown className="filter-chevron" size={10} />
+    </div>
   )
 }
 
 export default function Catalog() {
-  const [sp, ss] = useSearchParams()
+  const [sp] = useSearchParams()
   const navigate = useNavigate()
   const [searchInput, setSearchInput] = useState(sp.get('search') || '')
   const [debouncedSearch, setDebouncedSearch] = useState(sp.get('search') || '')
+  const [showFilters, setShowFilters] = useState(false)
   const searchRef = useRef(null)
   const didMount = useRef(false)
 
@@ -131,7 +144,6 @@ export default function Catalog() {
   const total = data?.pageInfo?.total || 0
   const last = data?.pageInfo?.lastPage || 1
 
-  // Dynamic SEO metadata for catalog/search pages
   useEffect(() => {
     setCatalogSEO(sp)
   }, [sp])
@@ -170,10 +182,8 @@ export default function Catalog() {
       navigate(`/catalog?${n.toString()}`, { replace: true })
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchInput])
+  }, [searchInput, sp, navigate])
 
-  // Cmd/Ctrl+K focuses the search field
   useEffect(() => {
     const handler = e => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchRef.current?.focus() }
@@ -182,76 +192,111 @@ export default function Catalog() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  // Focus search when arriving via the nav Search button (/catalog?search=)
   useEffect(() => {
     if (sp.get('search') === '') searchRef.current?.focus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sp])
 
   const hasActiveFilters = !!(f.search || f.format || f.status || f.genre || f.year)
 
-
   return (
     <div className="catalog-page">
+      <div className="catalog-hero">
+        <div className="catalog-hero-bg" />
+        <div className="catalog-container">
+          <header className="catalog-header">
+            <div>
+              <h1 className="catalog-title">Explore Catalog</h1>
+              <p className="catalog-subtitle">Discover thousands of anime titles, movies, and specials.</p>
+            </div>
+            {total > 0 && <div className="catalog-count-pill">{total.toLocaleString()} Titles</div>}
+          </header>
 
-      <div className="catalog-container">
-        <header className="catalog-header">
-          <h1 className="catalog-title">Browse</h1>
-          {total > 0 && <span className="catalog-count">{total.toLocaleString()} title{total !== 1 ? 's' : ''}</span>}
-        </header>
+          <div className="search-section">
+            <div className="search-bar-modern">
+              <FaSearch className="search-icon" size={18} />
+              <input
+                ref={searchRef}
+                className="search-input"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                placeholder="Search anime titles, genres, years..."
+                aria-label="Search anime"
+              />
+              {searchInput ? (
+                <button className="search-clear" onClick={() => setSearchInput('')} aria-label="Clear search">
+                  <FaTimes size={14} />
+                </button>
+              ) : (
+                <div className="search-kbd">⌘K</div>
+              )}
+            </div>
+            
+            <button 
+              className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <FaFilter size={14} />
+              <span>Filters</span>
+            </button>
+          </div>
 
-        <div className="search-bar">
-          <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="7" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            ref={searchRef}
-            className="search-input"
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            placeholder="Search anime..."
-            aria-label="Search anime"
-          />
-          {searchInput ? (
-            <button className="search-clear" onClick={() => setSearchInput('')} aria-label="Clear search">×</button>
-          ) : (
-            <kbd className="search-kbd">⌘K</kbd>
-          )}
+          <div className={`filter-grid ${showFilters ? 'show' : ''}`}>
+            <FilterSelect ariaLabel="Sort by" options={SORT_OPTIONS} value={f.sort} onChange={v => set('sort', v)} icon={FaSortAmountDown} />
+            <FilterSelect ariaLabel="Filter by genre" options={GENRE_OPTIONS} value={f.genre} onChange={v => set('genre', v)} />
+            <FilterSelect ariaLabel="Filter by format" options={FORMAT_OPTIONS} value={f.format} onChange={v => set('format', v)} />
+            <FilterSelect ariaLabel="Filter by status" options={STATUS_OPTIONS} value={f.status} onChange={v => set('status', v)} />
+            <FilterSelect ariaLabel="Filter by year" options={YEAR_OPTIONS} value={f.year} onChange={v => set('year', v)} />
+            {hasActiveFilters && (
+              <button className="clear-filters-btn" onClick={clr}>
+                <FaTimes size={10} /> Clear All
+              </button>
+            )}
+          </div>
         </div>
+      </div>
 
-        <div className="filter-bar">
-          <FilterSelect ariaLabel="Sort by" options={SORT_OPTIONS} value={f.sort} onChange={v => set('sort', v)} />
-          <FilterSelect ariaLabel="Filter by format" options={FORMAT_OPTIONS} value={f.format} onChange={v => set('format', v)} />
-          <FilterSelect ariaLabel="Filter by status" options={STATUS_OPTIONS} value={f.status} onChange={v => set('status', v)} />
-          <FilterSelect ariaLabel="Filter by genre" options={GENRE_OPTIONS} value={f.genre} onChange={v => set('genre', v)} />
-          <FilterSelect ariaLabel="Filter by year" options={YEAR_OPTIONS} value={f.year} onChange={v => set('year', v)} />
-          {hasActiveFilters && <button className="clear-filters" onClick={clr}>Clear all</button>}
-        </div>
-
+      <div className="catalog-container content-section">
         {isLoading && pg === 1 ? (
-          <div className="grid">
-            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="skeleton-card" />)}
+          <div className="anime-grid">
+            {Array.from({ length: 12 }).map((_, i) => <AnimeCardSkeleton key={i} />)}
           </div>
         ) : media.length > 0 ? (
           <>
-            <div className={`grid${isFetching ? ' is-fetching' : ''}`}>
+            <div className={`anime-grid ${isFetching ? 'is-fetching' : ''}`}>
               {media.map(a => <Card key={a.id} a={a} />)}
             </div>
 
             {last > 1 && (
-              <nav className="pagination" aria-label="Pagination">
-                <button className="page-btn" disabled={pg <= 1} onClick={() => go(pg - 1)} aria-label="Previous page">‹ Prev</button>
-                <span className="page-label">Page {pg} of {last.toLocaleString()}</span>
-                <button className="page-btn" disabled={pg >= last} onClick={() => go(pg + 1)} aria-label="Next page">Next ›</button>
+              <nav className="pagination-modern" aria-label="Pagination">
+                <button 
+                  className="page-nav-btn" 
+                  disabled={pg <= 1} 
+                  onClick={() => go(pg - 1)}
+                >
+                  Previous
+                </button>
+                <div className="page-indicator">
+                  <span>Page</span>
+                  <span className="current">{pg}</span>
+                  <span>of</span>
+                  <span>{last.toLocaleString()}</span>
+                </div>
+                <button 
+                  className="page-nav-btn" 
+                  disabled={pg >= last} 
+                  onClick={() => go(pg + 1)}
+                >
+                  Next
+                </button>
               </nav>
             )}
           </>
         ) : (
-          <div className="empty-state">
-            <p className="empty-title">Nothing matches those filters</p>
-            <p className="empty-body">Try a different search term or clear your filters.</p>
-            <button className="empty-clear" onClick={clr}>Clear all</button>
+          <div className="empty-catalog">
+            <div className="empty-icon"><FaSearch size={48} /></div>
+            <h2>No results found</h2>
+            <p>We couldn't find any anime matching your current filters.</p>
+            <button className="reset-btn" onClick={clr}>Reset all filters</button>
           </div>
         )}
       </div>
@@ -261,85 +306,365 @@ export default function Catalog() {
 
       <style>{`
         .catalog-page { min-height: 100vh; background: var(--bg); }
+        .catalog-container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+        
+        .catalog-hero {
+          position: relative;
+          padding: 40px 0 30px;
+          background: linear-gradient(to bottom, rgba(20,20,20,0.8), var(--bg));
+          border-bottom: 1px solid var(--border);
+          overflow: hidden;
+        }
+        
+        .catalog-hero-bg {
+          position: absolute;
+          top: -100px;
+          right: -100px;
+          width: 400px;
+          height: 400px;
+          background: var(--accent);
+          filter: blur(150px);
+          opacity: 0.05;
+          pointer-events: none;
+        }
 
-        .catalog-container { max-width: 1320px; margin: 0 auto; padding: 16px 16px 88px; }
+        .catalog-header { 
+          display: flex; 
+          align-items: flex-start; 
+          justify-content: space-between; 
+          gap: 20px; 
+          margin-bottom: 30px; 
+        }
+        
+        .catalog-title { 
+          font-size: 32px; 
+          font-weight: 800; 
+          color: var(--text-primary); 
+          margin: 0 0 8px; 
+          letter-spacing: -0.02em; 
+        }
+        
+        .catalog-subtitle {
+          font-size: 15px;
+          color: var(--text-secondary);
+          margin: 0;
+        }
 
-        .catalog-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-        .catalog-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; letter-spacing: -0.01em; }
-        .catalog-count { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+        .catalog-count-pill {
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          padding: 6px 14px;
+          border-radius: 99px;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          white-space: nowrap;
+        }
 
-        .search-bar { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-elevated); margin-bottom: 12px; transition: border-color .15s; }
-        .search-bar:focus-within { border-color: var(--accent); }
+        .search-section {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        .search-bar-modern { 
+          flex: 1;
+          display: flex; 
+          align-items: center; 
+          gap: 12px; 
+          height: 52px; 
+          padding: 0 18px; 
+          border-radius: 14px; 
+          border: 1px solid var(--border); 
+          background: var(--bg-elevated); 
+          transition: all 0.2s ease; 
+        }
+        
+        .search-bar-modern:focus-within { 
+          border-color: var(--accent); 
+          box-shadow: 0 0 0 3px rgba(226, 232, 240, 0.1);
+          background: var(--bg-card);
+        }
+        
         .search-icon { color: var(--text-muted); flex-shrink: 0; }
-        .search-input { flex: 1; min-width: 0; height: 100%; border: none; background: none; outline: none; color: var(--text-primary); font-size: 16px; }
-        .search-input::placeholder { color: var(--text-muted); }
-        .search-clear { flex-shrink: 0; width: 24px; height: 24px; border: none; background: var(--bg-card); color: var(--text-muted); border-radius: 50%; font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-        .search-kbd { flex-shrink: 0; font-size: 11px; color: var(--text-muted); background: var(--bg-card); padding: 3px 7px; border-radius: 5px; border: 1px solid var(--border); }
+        
+        .search-input { 
+          flex: 1; 
+          min-width: 0; 
+          height: 100%; 
+          border: none; 
+          background: none; 
+          outline: none; 
+          color: var(--text-primary); 
+          font-size: 16px; 
+          font-weight: 500;
+        }
+        
+        .search-input::placeholder { color: var(--text-muted); font-weight: 400; }
+        
+        .search-clear { 
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px;
+          border-radius: 50%;
+        }
+        
+        .search-clear:hover { color: var(--text-primary); background: rgba(255,255,255,0.1); }
+        
+        .search-kbd { 
+          font-size: 11px; 
+          color: var(--text-muted); 
+          background: var(--bg-card); 
+          padding: 3px 8px; 
+          border-radius: 6px; 
+          border: 1px solid var(--border); 
+          font-weight: 600;
+        }
 
-        .filter-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+        .filter-toggle-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 0 20px;
+          height: 52px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          color: var(--text-primary);
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .filter-toggle-btn:hover { border-color: var(--text-muted); }
+        .filter-toggle-btn.active { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); }
+
+        .filter-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+          gap: 12px;
+          max-height: 0;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          opacity: 0;
+        }
+
+        .filter-grid.show {
+          max-height: 300px;
+          opacity: 1;
+          margin-top: 20px;
+          padding-bottom: 10px;
+        }
+
+        .filter-select-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .filter-icon {
+          position: absolute;
+          left: 12px;
+          color: var(--text-muted);
+          pointer-events: none;
+        }
+
         .filter-select {
-          appearance: none; -webkit-appearance: none;
-          width: 100%; height: 40px; padding: 0 30px 0 12px;
-          border-radius: 10px; border: 1px solid var(--border);
-          background: var(--bg-elevated) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
-          color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .filter-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-        .clear-filters { grid-column: 1 / -1; justify-self: start; background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 0; }
-
-        @media (min-width: 640px) {
-          .catalog-container { padding: 24px 24px 96px; }
-          .clear-filters { grid-column: auto; }
-        }
-        @media (min-width: 640px) and (max-width: 1023px) {
-          .filter-bar { grid-template-columns: repeat(3, minmax(0,1fr)); align-items: center; }
-        }
-        @media (min-width: 1024px) {
-          .catalog-container { padding: 32px 32px 100px; }
-          .catalog-title { font-size: 24px; }
-          .filter-bar { grid-template-columns: repeat(5, minmax(0,1fr)) auto; align-items: center; }
+          appearance: none;
+          width: 100%;
+          height: 44px;
+          padding: 0 32px 0 32px;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+          background: var(--bg-elevated);
+          color: var(--text-secondary);
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
         }
 
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; transition: opacity .15s; }
-        .grid.is-fetching { opacity: .6; }
-        @media (min-width: 640px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; } }
-        @media (min-width: 1024px) { .grid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 18px; } }
+        .filter-select:hover { border-color: var(--text-muted); }
+        .filter-select:focus { outline: none; border-color: var(--accent); color: var(--text-primary); }
 
-        .catalog-card { display: block; text-decoration: none; -webkit-tap-highlight-color: transparent; }
-        .card-media { position: relative; aspect-ratio: 2/3; background: var(--bg-card); border-radius: 10px; overflow: hidden; transition: transform .2s, box-shadow .2s; }
-        .card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .card-noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 11px; }
-        .card-scrim { position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(transparent, rgba(0,0,0,.75)); pointer-events: none; }
-        .card-chip { position: absolute; top: 6px; font-size: 10px; font-weight: 700; letter-spacing: .02em; padding: 3px 7px; border-radius: 6px; background: rgba(0,0,0,.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; }
-        .card-chip-score { right: 6px; }
-        .card-chip-score.is-high { color: var(--accent); }
-        .card-chip-format { left: 6px; }
-
-        @media (hover: hover) and (pointer: fine) {
-          .catalog-card:hover .card-media { transform: translateY(-4px); box-shadow: 0 10px 26px rgba(0,0,0,.45); }
+        .filter-chevron {
+          position: absolute;
+          right: 12px;
+          color: var(--text-muted);
+          pointer-events: none;
         }
-        .catalog-card:active .card-media { transform: scale(.98); }
 
-        .card-info { padding: 8px 2px 4px; }
-        .card-title { font-size: 12px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
-        .card-meta { font-size: 10px; color: var(--text-muted); margin: 2px 0 0; }
+        .clear-filters-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          background: none;
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          color: var(--danger);
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          padding: 0 16px;
+          height: 44px;
+          transition: all 0.2s;
+        }
+        .clear-filters-btn:hover { background: rgba(229, 9, 20, 0.1); border-color: var(--danger); }
 
-        .skeleton-card { border-radius: 10px; background: var(--bg-card); aspect-ratio: 2/3; animation: shimmer 1.5s ease-in-out infinite; }
-        @keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+        .content-section { padding-top: 40px; padding-bottom: 80px; }
 
-        .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 28px 0 8px; }
-        .page-btn { height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .page-btn:disabled { color: var(--text-muted); opacity: .5; cursor: default; }
-        .page-label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+        .anime-grid { 
+          display: grid; 
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+          gap: 20px; 
+          transition: opacity 0.3s ease; 
+        }
+        
+        .anime-grid.is-fetching { opacity: 0.6; pointer-events: none; }
 
-        .empty-state { text-align: center; padding: 4rem 1rem; }
-        .empty-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px; }
-        .empty-body { font-size: 13px; color: var(--text-muted); margin: 0 0 16px; }
-        .empty-clear { background: var(--accent); color: #000; border: none; border-radius: 999px; padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .catalog-card { 
+          display: flex;
+          flex-direction: column;
+          text-decoration: none; 
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .card-media { 
+          position: relative; 
+          aspect-ratio: 2/3; 
+          background: var(--bg-card); 
+          border-radius: 16px; 
+          overflow: hidden; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .card-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
+        
+        .card-scrim { 
+          position: absolute; 
+          inset: 0; 
+          background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 50%); 
+          opacity: 0;
+          transition: opacity 0.3s;
+        }
+        
+        .card-badges {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          right: 10px;
+          display: flex;
+          justify-content: space-between;
+          pointer-events: none;
+        }
 
-        @media (prefers-reduced-motion: reduce) {
-          .card-media, .catalog-card, .grid, .search-bar { transition: none !important; }
+        .card-badge {
+          padding: 4px 8px;
+          border-radius: 8px;
+          background: rgba(0,0,0,0.7);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          color: #fff;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+        }
+
+        .card-badge-score.is-high { color: #22c55e; }
+
+        .card-info { padding: 12px 4px 0; }
+        
+        .card-title { 
+          font-size: 14px; 
+          font-weight: 700; 
+          color: var(--text-primary); 
+          margin: 0 0 4px; 
+          overflow: hidden; 
+          text-overflow: ellipsis; 
+          white-space: nowrap; 
+        }
+        
+        .card-meta { 
+          display: flex;
+          gap: 8px;
+          font-size: 12px; 
+          color: var(--text-secondary); 
+          font-weight: 500;
+        }
+
+        .catalog-card:hover { transform: translateY(-8px); }
+        .catalog-card:hover .card-media img { transform: scale(1.1); }
+        .catalog-card:hover .card-scrim { opacity: 1; }
+
+        .pagination-modern {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 24px;
+          margin-top: 60px;
+        }
+
+        .page-nav-btn {
+          padding: 10px 24px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          color: var(--text-primary);
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .page-nav-btn:hover:not(:disabled) { border-color: var(--text-muted); background: var(--bg-card); }
+        .page-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .page-indicator {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 14px;
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+
+        .page-indicator .current {
+          color: var(--text-primary);
+          font-weight: 800;
+        }
+
+        .empty-catalog {
+          text-align: center;
+          padding: 80px 20px;
+          color: var(--text-secondary);
+        }
+
+        .empty-icon { color: var(--border); margin-bottom: 20px; }
+        .empty-catalog h2 { color: var(--text-primary); margin-bottom: 10px; }
+        .reset-btn {
+          margin-top: 20px;
+          padding: 12px 24px;
+          background: var(--accent);
+          color: #000;
+          border-radius: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+          .catalog-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+          .catalog-title { font-size: 26px; }
+          .search-section { flex-direction: column; }
+          .filter-toggle-btn { width: 100%; justify-content: center; }
+          .anime-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+          .catalog-hero { padding: 30px 0 20px; }
         }
       `}</style>
     </div>

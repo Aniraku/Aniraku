@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser, FaArrowLeft, FaSearch, FaBell } from 'react-icons/fa'
+import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser, FaArrowLeft } from 'react-icons/fa'
 import styled from 'styled-components'
 
 const Bar = styled.nav`
@@ -109,10 +109,6 @@ const MobileBottomNav = () => {
           <FaThLarge size={16} />
           <span>Catalog</span>
         </Item>
-        <Item onClick={() => setSearchOpen(true)} aria-label="Search">
-          <FaSearch size={16} />
-          <span>Search</span>
-        </Item>
       </Bar>
     )
   }
@@ -120,7 +116,6 @@ const MobileBottomNav = () => {
   const items = [
     { icon: FaHome, label: 'Home', to: '/home' },
     { icon: FaThLarge, label: 'Catalog', to: '/catalog' },
-    { icon: FaSearch, label: 'Search', action: () => setSearchOpen(true) },
     { icon: FaCalendarAlt, label: 'Schedule', to: '/schedule' },
     { icon: FaRandom, label: 'Random', to: '/random' },
     { icon: FaUser, label: 'Profile', to: '/profile' },
