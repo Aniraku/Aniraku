@@ -241,11 +241,13 @@ function buildQualityList(sources) {
 }
 
 function seekControlHtml(direction) {
+  // Deliberately use a familiar replay-10 / forward-10 silhouette instead
+  // of a generic undo/redo arrow. The visible label sits on a dark chip so
+  // it remains legible over the circular stroke at every player size.
   const path = direction < 0
-    ? 'M10 3 4 9l6 6M4 9h10a6 6 0 0 1 6 6v1'
-    : 'm14 3 6 6-6 6m6-6H10a6 6 0 0 0-6 6v1'
-  const label = direction < 0 ? '−10' : '+10'
-  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${label}</span></span>`
+    ? 'M10.5 3.5 5 9l5.5 5.5M5.5 9H12a7 7 0 1 1-6.3 4.1'
+    : 'm13.5 3.5 5.5 5-5.5 5.5M18.5 9H12a7 7 0 1 0 6.3 4.1'
+  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="watch-art-seek-label">10</span></span>`
 }
 
 function formatAiringDate(unixTimestamp) {
@@ -3987,21 +3989,30 @@ export default function Watch() {
           align-items: center;
           justify-content: center;
           position: relative;
-          width: 34px;
-          height: 34px;
-          font-size: 9px;
-          font-weight: 800;
-          letter-spacing: -0.03em;
+          width: 36px;
+          height: 36px;
+          line-height: 1;
+          pointer-events: none;
         }
         .watch-art-seek-icon svg {
           position: absolute;
-          inset: 2px;
-          width: 30px;
-          height: 30px;
+          inset: 1px;
+          width: 34px;
+          height: 34px;
         }
-        .watch-art-seek-icon span {
+        .watch-art-seek-label {
           position: relative;
-          top: 1px;
+          z-index: 1;
+          min-width: 14px;
+          padding: 1px 2px;
+          border-radius: 4px;
+          background: rgba(8, 12, 20, 0.76);
+          color: #fff;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0;
+          text-align: center;
+          font-variant-numeric: tabular-nums;
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
