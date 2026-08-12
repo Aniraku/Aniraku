@@ -241,13 +241,13 @@ function buildQualityList(sources) {
 }
 
 function seekControlHtml(direction) {
-  // Deliberately use a familiar replay-10 / forward-10 silhouette instead
-  // of a generic undo/redo arrow. The visible label sits on a dark chip so
-  // it remains legible over the circular stroke at every player size.
+  // Material-style replay-10 / forward-10 artwork: a single bold loop and
+  // arrow with the number set directly inside, avoiding the previous
+  // overlapping text chip that made the control look like undo/redo.
   const path = direction < 0
-    ? 'M10.5 3.5 5 9l5.5 5.5M5.5 9H12a7 7 0 1 1-6.3 4.1'
-    : 'm13.5 3.5 5.5 5-5.5 5.5M18.5 9H12a7 7 0 1 0 6.3 4.1'
-  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="watch-art-seek-label">10</span></span>`
+    ? 'M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8'
+    : 'M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8z'
+  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="currentColor"/><text x="12" y="15.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="5.6" font-weight="800" fill="currentColor">10</text></svg></span>`
 }
 
 function formatAiringDate(unixTimestamp) {
@@ -4000,19 +4000,11 @@ export default function Watch() {
           width: 34px;
           height: 34px;
         }
-        .watch-art-seek-label {
-          position: relative;
-          z-index: 1;
-          min-width: 14px;
-          padding: 1px 2px;
-          border-radius: 4px;
-          background: rgba(8, 12, 20, 0.76);
-          color: #fff;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0;
-          text-align: center;
-          font-variant-numeric: tabular-nums;
+        .watch-art-seek-icon text {
+          pointer-events: none;
+          paint-order: stroke;
+          stroke: rgba(8, 12, 20, 0.24);
+          stroke-width: 0.35px;
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
