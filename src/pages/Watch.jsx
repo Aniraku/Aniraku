@@ -132,19 +132,27 @@ const SEEK_SECONDS = 10
 // episode numbers such as 10, 11, 12 remain unchanged.
 function normalizeEpisodeList(list) {
   const rows = Array.isArray(list) ? list.filter(Boolean) : []
-  const parsedNumbers = rows.map((ep) => {
-    const value = Number(ep?.number)
-    return Number.isFinite(value) && value > 0 ? value : null
-  })
-  const isLegacyTensSequence =
-    rows.length > 1 &&
-    parsedNumbers.every((value, index) => value === (index + 1) * 10)
+  if (rows.length === 0) return []
 
-  return rows.map((ep, index) => ({
+  const getNum = (ep) => {
+    const n = Number(ep?.number)
+    return Number.isFinite(n) ? n : null
+  }
+
+  // Detect the 10x bug:
+  // - All episodes are multiples of 10 and increasing (10, 20, 30...)
+  // - OR the first episode is 10 and the second is 20
+  const firstNum = getNum(rows[0])
+  const secondNum = rows.length > 1 ? getNum(rows[1]) : null
+
+  const is10xBug =
+    (firstNum === 10 && (rows.length === 1 || secondNum === 20)) ||
+    (rows.length > 1 &&
+      rows.every((ep, i) => getNum(ep) === (i + 1) * 10))
+
+  return rows.map((ep, i) => ({
     ...ep,
-    number: isLegacyTensSequence
-      ? index + 1
-      : parsedNumbers[index] || index + 1,
+    number: is10xBug ? i + 1 : getNum(ep) || i + 1,
   }))
 }
 
