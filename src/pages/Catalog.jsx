@@ -9,7 +9,7 @@ import { generateSlug } from '../lib/slug'
 import { 
   FaSearch, FaFilter, FaSortAmountDown, FaLayerGroup, 
   FaCheckCircle, FaCalendarDay, FaTimes, FaChevronDown,
-  FaThLarge, FaSlidersH, FaSyncAlt
+  FaThLarge, FaSlidersH, FaSyncAlt, FaPlay, FaEye, FaChevronRight
 } from 'react-icons/fa'
 import { AnimeCardSkeleton } from '../components/Skeletons/Skeletons'
 import styled, { keyframes, css } from 'styled-components'
@@ -75,10 +75,25 @@ const PageWrapper = styled.div`
 
 const HeroSection = styled.div`
   position: relative;
-  padding: 80px 0 40px;
-  background: linear-gradient(180deg, rgba(20,20,20,0.9) 0%, var(--bg) 100%);
-  border-bottom: 1px solid var(--border);
+  padding: 86px 0 42px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(56,189,248,0.12), transparent 28%),
+    radial-gradient(circle at 86% 4%, rgba(167,139,250,0.15), transparent 30%),
+    linear-gradient(180deg, rgba(10,12,28,0.96) 0%, var(--bg) 100%);
+  border-bottom: 1px solid rgba(167,139,250,0.14);
   overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.13;
+    pointer-events: none;
+    background-image: linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+  }
+
 
   @media (max-width: 768px) {
     padding: 60px 0 30px;
@@ -126,12 +141,12 @@ const HeaderContent = styled.div`
 `
 
 const TitleGroup = styled.div`
-  h1 {
-    font-size: 42px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 0 0 8px;
-    background: linear-gradient(to right, #fff, #888);
+    h1 {
+    font-size: clamp(34px, 5vw, 56px);
+    font-weight: 850;
+    letter-spacing: -0.045em;
+    margin: 0 0 10px;
+    background: linear-gradient(105deg, #f8fafc 18%, #b7a6ff 66%, #75e6ff 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
@@ -326,23 +341,31 @@ const MainContent = styled.div`
 
 const AnimeGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: 24px;
   animation: ${fadeIn} 0.5s ease-out;
 
   @media (max-width: 640px) {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  @media (min-width: 641px) and (max-width: 980px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
   }
 `
 
-const CatalogCard = styled(Link)`
+const CatalogCard = styled.article`
+  position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   text-decoration: none;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.28s cubic-bezier(0.23, 1, 0.32, 1);
 
-  &:hover { transform: translateY(-10px); }
+  &:hover, &:focus-within { transform: translateY(-8px); }
+  @media (hover: none) { &:active { transform: scale(0.985); } }
 `
 
 const CardMedia = styled.div`
@@ -351,31 +374,113 @@ const CardMedia = styled.div`
   background: var(--bg-card);
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: ${({ $preview }) => ($preview
+    ? '0 18px 46px rgba(0,0,0,0.5), 0 0 30px rgba(124,58,237,0.18)'
+    : '0 10px 30px rgba(0,0,0,0.3)')};
+  transition: box-shadow 0.28s ease, border-color 0.28s ease;
+  border: 1px solid ${({ $preview }) => ($preview ? 'rgba(167,139,250,0.58)' : 'transparent')};
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.6s ease;
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), filter 0.28s ease;
+    ${({ $preview }) => $preview && 'transform: scale(1.06); filter: brightness(0.72) saturate(1.15);'}
   }
 
-  ${CatalogCard}:hover & img { transform: scale(1.1); }
+  ${CatalogCard}:hover & img { transform: scale(1.06); }
 `
 
 const CardOverlay = styled.div`
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity 0.3s;
+  background: linear-gradient(to top, rgba(2,3,13,0.94) 0%, rgba(2,3,13,0.32) 58%, transparent 100%);
+  opacity: ${({ $preview }) => ($preview ? 1 : 0)};
+  transition: opacity 0.22s ease;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   padding: 16px;
+  pointer-events: ${({ $preview }) => ($preview ? 'auto' : 'none')};
 
-  ${CatalogCard}:hover & { opacity: 1; }
+  ${CatalogCard}:hover &, ${CatalogCard}:focus-within & { opacity: 1; pointer-events: auto; }
+  @media (hover: none) { opacity: ${({ $preview }) => ($preview ? 1 : 0)}; }
 `
+
+const PreviewEyebrow = styled.span`
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  color: #b9a8ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+`
+
+const PreviewText = styled.p`
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin: 0 0 14px;
+  color: rgba(241,245,249,0.82);
+  font-size: 11px;
+  line-height: 1.5;
+`
+
+const PreviewActions = styled.div`
+  display: flex;
+  gap: 7px;
+  align-items: center;
+`
+
+const PreviewAction = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #0b0d1c;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+  &:hover { background: #c4b5fd; }
+`
+
+const PreviewToggle = styled.button`
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 999px;
+  background: rgba(8,10,26,0.72);
+  color: #f8fafc;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+  &:hover { background: rgba(124,58,237,0.8); }
+  &:active { transform: scale(0.96); }
+  @media (hover: hover) and (pointer: fine) {
+    opacity: 0;
+    ${CatalogCard}:hover &, ${CatalogCard}:focus-within & { opacity: 1; }
+  }
+`
+
 
 const CardBadges = styled.div`
   position: absolute;
@@ -466,15 +571,28 @@ const Spinner = styled(FaSyncAlt)`
 // --- Components ---
 
 const CardMemo = memo(function Card({ a }) {
+  const [previewOpen, setPreviewOpen] = useState(false)
   const title = a.title?.english || a.title?.romaji || a.title?.userPreferred || 'Unknown'
   const img = a.coverImage?.extraLarge || a.coverImage?.large || a.coverImage?.medium
+  const previewImg = a.bannerImage || img
   const highScore = typeof a.averageScore === 'number' && a.averageScore >= 75
+  const detailHref = `/anime/${generateSlug(title)}-${a.id}`
+  const synopsis = (a.description || 'A quick look at this title, its format, and where your next watch could begin.')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const handleMediaPointerUp = (event) => {
+    if (event.pointerType === 'touch') setPreviewOpen((open) => !open)
+  }
 
   return (
-    <CatalogCard to={`/anime/${generateSlug(title)}-${a.id}`}>
-      <CardMedia>
-        {img ? (
-          <img src={img} alt={title} loading="lazy" />
+    <CatalogCard>
+      <CardMedia
+        $preview={previewOpen}
+        onPointerUp={handleMediaPointerUp}
+        aria-label={`${previewOpen ? 'Close' : 'Open'} preview for ${title}`}
+      >
+        {previewImg ? (
+          <img src={previewOpen ? previewImg : img} alt={title} loading="lazy" />
         ) : (
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>No image</div>
         )}
@@ -486,16 +604,54 @@ const CardMemo = memo(function Card({ a }) {
           )}
           {a.format && <Badge>{fmt(a.format)}</Badge>}
         </CardBadges>
-        <CardOverlay>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff' }}>Watch Now</div>
+        <PreviewToggle
+          type="button"
+          aria-expanded={previewOpen}
+          aria-label={`${previewOpen ? 'Close' : 'Open'} preview for ${title}`}
+          onPointerUp={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            setPreviewOpen((open) => !open)
+          }}
+        >
+          <FaEye size={12} /> {previewOpen ? 'Close' : 'Preview'}
+        </PreviewToggle>
+        <CardOverlay $preview={previewOpen}>
+          <PreviewEyebrow><FaEye size={10} /> Quick preview</PreviewEyebrow>
+          <PreviewText>{synopsis}</PreviewText>
+          <PreviewActions>
+            <PreviewAction
+              to={detailHref}
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <FaPlay size={10} /> Open title
+            </PreviewAction>
+            <PreviewAction
+              as="button"
+              type="button"
+              onPointerUp={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                setPreviewOpen(false)
+              }}
+              style={{ background: 'rgba(255,255,255,0.12)', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.18)' }}
+            >
+              Close <FaChevronRight size={9} style={{ transform: 'rotate(90deg)' }} />
+            </PreviewAction>
+          </PreviewActions>
         </CardOverlay>
       </CardMedia>
       <CardInfo>
-        <h3>{title}</h3>
+        <Link to={detailHref} style={{ textDecoration: 'none' }}>
+          <h3>{title}</h3>
+        </Link>
         <CardMeta>
           {a.episodes && <span>{a.episodes} Ep</span>}
           {a.episodes && a.seasonYear && <span className="dot" />}
           {a.seasonYear && <span>{a.seasonYear}</span>}
+          {a.trailer?.site === 'youtube' && <span className="dot" />}
+          {a.trailer?.site === 'youtube' && <span>Trailer</span>}
         </CardMeta>
       </CardInfo>
     </CatalogCard>
