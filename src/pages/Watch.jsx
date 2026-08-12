@@ -253,6 +253,19 @@ function writeSkipCache(malId, episode, segments, notFound = false) {
   }
 }
 
+function upsertLocalWatchHistory(entry) {
+  try {
+    const raw = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
+    const filtered = raw.filter(
+      (item) => !(String(item.animeId) === String(entry.animeId) && Number(item.episode) === Number(entry.episode))
+    )
+    filtered.unshift(entry)
+    localStorage.setItem('aniraku-watch-history', JSON.stringify(filtered.slice(0, 100)))
+  } catch {
+    // Playback must continue if local storage is unavailable.
+  }
+}
+
 function formatTime(s) {
   if (typeof s !== 'number' || !isFinite(s) || s < 0) return '0:00'
   const m = Math.floor(s / 60)
@@ -2180,6 +2193,36 @@ export default function Watch() {
 
       // Auto next episode (only when the user hasn't turned it off)
       art.on('video:ended', () => {
+        const completedAt = Date.now()
+        const completedDuration = Math.floor(art.video.duration || 0)
+        const completedTitle = anime?.title?.english || anime?.title?.romaji || animeId
+        upsertLocalWatchHistory({
+          animeId,
+          title: completedTitle,
+          episode: epNumber,
+          time: completedDuration,
+          duration: completedDuration,
+          completed: true,
+          timestamp: completedAt,
+          image: anime?.coverImage?.large || '',
+        })
+        if (user) {
+          Promise.resolve(
+            supabase.from('watch_history').upsert(
+              {
+                user_id: user.id,
+                anime_id: parseInt(animeId, 10),
+                anime_title: completedTitle,
+                anime_image: anime?.coverImage?.large || '',
+                episode_number: epNumber,
+                progress: completedDuration,
+                duration: completedDuration,
+                timestamp: completedAt,
+              },
+              { onConflict: 'user_id,anime_id,episode_number' }
+            )
+          ).catch(() => {})
+        }
         // Push completion to connected MAL/AniList accounts (fire-and-forget)
         syncProgressRef.current?.()
         // The ended event already synced this episode; the upcoming
@@ -2252,28 +2295,16 @@ export default function Watch() {
         lastSave = now
         const title =
           anime?.title?.english || anime?.title?.romaji || animeId
-        try {
-          const entry = {
-            animeId,
-            title,
-            episode: epNumber,
-            time: Math.floor(art.video.currentTime),
-            timestamp: now,
-            image: anime?.coverImage?.large || '',
-          }
-          const raw = JSON.parse(
-            localStorage.getItem('aniraku-watch-history') || '[]'
-          )
-          const filtered = raw.filter(
-            (h) =>
-              !(String(h.animeId) === String(animeId) && h.episode === epNumber)
-          )
-          filtered.unshift(entry)
-          localStorage.setItem(
-            'aniraku-watch-history',
-            JSON.stringify(filtered.slice(0, 100))
-          )
-        } catch {}
+        upsertLocalWatchHistory({
+          animeId,
+          title,
+          episode: epNumber,
+          time: Math.floor(art.video.currentTime),
+          duration: Math.floor(art.video.duration || 0),
+          completed: false,
+          timestamp: now,
+          image: anime?.coverImage?.large || '',
+        })
         if (user) {
           Promise.resolve(
             supabase.from('watch_history').upsert(
@@ -2303,6 +2334,7 @@ export default function Watch() {
       epNumber,
       episodes,
       anime,
+      user,
       navigate,
       destroyPlayer,
       showToast,

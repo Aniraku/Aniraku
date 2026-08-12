@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { FaPlay, FaStar, FaBookmark, FaRegBookmark } from 'react-icons/fa'
+import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
@@ -10,6 +10,7 @@ import { filterAdult, isNsfw, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import { API_BASE } from '../config'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
+import { fetchEpisodeRatings } from '../lib/sync'
 import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 
@@ -23,18 +24,23 @@ const Page = styled.div`
 
 const PageBackground = styled.div`
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.15;
-  background-image: url(${p => p.$src});
+  opacity: 0.34;
+  background-image:
+    linear-gradient(to bottom, rgba(4, 7, 14, 0.16) 0%, rgba(4, 7, 14, 0.72) 58%, var(--bg) 94%),
+    url(${p => p.$src});
   background-size: cover;
-  background-position: center;
-  filter: blur(60px) brightness(0.5);
-  transform: scale(1.1);
+  background-position: center 18%;
+  filter: blur(28px) saturate(1.18) brightness(0.72);
+  transform: scale(1.08);
+  transition: opacity 240ms ease, filter 240ms ease;
+  @media (max-width: 768px) {
+    opacity: 0.27;
+    background-position: center top;
+    filter: blur(22px) saturate(1.1) brightness(0.68);
+  }
 `
 
 const Banner = styled.div`
@@ -160,6 +166,55 @@ const BookmarkBtn = styled.button`
   @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; min-height: 40px; }
 `
 
+const ProgressHint = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+`
+
+const EpisodeState = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: ${({ $rated }) => ($rated ? '#fbbf24' : '#86efac')};
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+`
+
+const EpisodeProgress = styled.div`
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.14);
+  span {
+    display: block;
+    height: 100%;
+    width: ${({ $value }) => `${Math.max(0, Math.min(100, $value || 0))}%`};
+    background: ${({ $complete }) => ($complete ? '#4ade80' : 'var(--accent)')};
+  }
+`
+
+const RatingBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(251,191,36,0.15);
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+`
+
 const Content = styled.div`
   max-width: 1100px;
   margin: 0 auto;
@@ -254,6 +309,7 @@ const EpisodeList = styled.div`
 `
 
 const EpisodeRow = styled(Link)`
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -335,6 +391,43 @@ const Center = styled.div`
   align-items: center;
   justify-content: center;
 `
+
+const EPISODE_RATINGS_LS_KEY = 'aniraku-episode-ratings'
+
+function normalizeActivityRow(row) {
+  const rawEpisode = row?.episode ?? row?.episode_number
+  const episode = Number(rawEpisode)
+  if (!Number.isInteger(episode) || episode < 1) return null
+  const rawTime = row?.time ?? row?.progress ?? 0
+  const rawDuration = row?.duration ?? 0
+  const time = Math.max(0, Number(rawTime) || 0)
+  const duration = Math.max(0, Number(rawDuration) || 0)
+  const timestampValue = row?.timestamp
+  const timestamp = typeof timestampValue === 'number'
+    ? timestampValue
+    : Number(timestampValue) || Date.parse(timestampValue || '') || 0
+  return {
+    animeId: row?.animeId ?? row?.anime_id,
+    episode,
+    time,
+    duration,
+    timestamp,
+    completed: row?.completed === true || row?.status === 'completed' || duration <= 0 || (duration > 0 && time >= Math.max(duration - 5, duration * 0.9)),
+  }
+}
+
+function mergeActivityRows(rows) {
+  const byEpisode = new Map()
+  rows.forEach((row) => {
+    const normalized = normalizeActivityRow(row)
+    if (!normalized) return
+    const previous = byEpisode.get(normalized.episode)
+    if (!previous || normalized.timestamp >= previous.timestamp) {
+      byEpisode.set(normalized.episode, normalized)
+    }
+  })
+  return [...byEpisode.values()].sort((a, b) => b.timestamp - a.timestamp)
+}
 
 const RELATION_LABELS = {
   PREQUEL: 'Prequel', SEQUEL: 'Sequel', SIDE_STORY: 'Side Story',
@@ -522,6 +615,8 @@ const AnimeDetail = () => {
   const [episodes, setEpisodes] = useState([])
   const [episodesFallback, setEpisodesFallback] = useState(false)
   const [hideFillers, setHideFillers] = useState(false)
+  const [watchHistory, setWatchHistory] = useState([])
+  const [episodeRatings, setEpisodeRatings] = useState({})
 
   const { data: anime, isLoading } = useAnimeDetails(id)
   const { data: similar } = useSimilar(id)
@@ -560,6 +655,53 @@ const AnimeDetail = () => {
     return () => { cancelled = true }
   }, [user, setBookmarks])
 
+  React.useEffect(() => {
+    if (!id) return undefined
+    let cancelled = false
+    let localRows = []
+    try {
+      localRows = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
+        .filter((row) => String(row.animeId ?? row.anime_id) === String(id))
+    } catch {}
+
+    const loadHistory = async () => {
+      let cloudRows = []
+      if (user) {
+        try {
+          const { data } = await supabase
+            .from('watch_history')
+            .select('episode_number, progress, duration, timestamp')
+            .eq('user_id', user.id)
+            .eq('anime_id', parseInt(id, 10))
+          cloudRows = data || []
+        } catch {}
+      }
+      if (!cancelled) setWatchHistory(mergeActivityRows([...localRows, ...cloudRows]))
+    }
+
+    loadHistory()
+    return () => { cancelled = true }
+  }, [id, user])
+
+  React.useEffect(() => {
+    if (!id) return undefined
+    let cancelled = false
+    setEpisodeRatings({})
+    if (user) {
+      fetchEpisodeRatings(id).then((ratings) => {
+        if (!cancelled) setEpisodeRatings(ratings || {})
+      })
+    } else {
+      try {
+        const stored = JSON.parse(localStorage.getItem(`${EPISODE_RATINGS_LS_KEY}-${id}`) || '{}')
+        if (!cancelled) setEpisodeRatings(stored || {})
+      } catch {
+        if (!cancelled) setEpisodeRatings({})
+      }
+    }
+    return () => { cancelled = true }
+  }, [id, user])
+
   const relations = React.useMemo(() => {
     if (!anime?.relations?.edges) return []
     return anime.relations.edges
@@ -586,6 +728,14 @@ const AnimeDetail = () => {
             url: ep.url,
           }
         })
+      }
+      // Movies are one playable item even when AniList omits `episodes`.
+      if (!anime?.episodes && anime?.format === 'MOVIE') {
+        return [{
+          number: 1,
+          title: title || 'Movie',
+          thumbnail: anime.coverImage?.medium || anime.coverImage?.large || '',
+        }]
       }
       // Absolute last resort: generic list if AniList also has no metadata
       if (!anime?.episodes) return []
@@ -713,25 +863,65 @@ const AnimeDetail = () => {
   const isMovie = anime.format === 'MOVIE'
   const hasEpisodes = episodes.length > 0
   const hasRelations = relations.length > 0
+  const activityByEpisode = new Map(watchHistory.map((row) => [row.episode, row]))
+  const watchedEpisodes = new Set(watchHistory.map((row) => row.episode))
+  const completedEpisodes = new Set(
+    watchHistory.filter((row) => row.completed).map((row) => row.episode)
+  )
+  const hasProgress = watchHistory.some((row) => row.time > 0)
+  const hasWatchActivity = hasProgress || watchedEpisodes.size > 0
+  const expectedEpisodeCount = isMovie ? 1 : Number(anime.episodes) || episodes.length
+  const nextUnwatched = episodes.find((ep) => !watchedEpisodes.has(Number(ep.number)))
+  const highestWatched = Math.max(0, ...[...watchedEpisodes].map(Number))
+  const highestCompleted = Math.max(0, ...[...completedEpisodes].map(Number))
+  const latestPartial = Math.max(
+    0,
+    ...watchHistory.filter((row) => !row.completed && row.time > 0).map((row) => row.episode)
+  )
+  const firstEpisodeNumber = nextUnwatched?.number || 1
+  const nextEpisodeNumber = highestCompleted > 0
+    ? highestCompleted + 1
+    : (highestWatched > 0 ? highestWatched + 1 : firstEpisodeNumber)
+  const resumeEpisode = latestPartial > highestCompleted ? latestPartial : nextEpisodeNumber
+  const partialEpisode = watchHistory.find((row) => row.episode === resumeEpisode && !row.completed && row.time > 0)
+  const allEpisodesComplete = hasEpisodes && episodes.length >= expectedEpisodeCount && episodes.every((ep) => completedEpisodes.has(Number(ep.number)))
+  const actionMode = allEpisodesComplete ? 'rewatch' : hasWatchActivity ? 'continue' : 'watch'
+  const actionEpisode = actionMode === 'continue'
+    ? resumeEpisode
+    : actionMode === 'rewatch'
+      ? 1
+      : firstEpisodeNumber
+  const actionLabel = actionMode === 'rewatch'
+    ? 'Rewatch'
+    : actionMode === 'continue'
+      ? `Continue Episode ${actionEpisode}`
+      : 'Watch Now'
+  const actionHint = actionMode === 'rewatch'
+    ? 'You completed this title. Start again from Episode 1.'
+    : actionMode === 'continue'
+      ? `Resume from Episode ${actionEpisode}${partialEpisode?.time ? ` at ${Math.floor(partialEpisode.time / 60)}:${String(Math.floor(partialEpisode.time % 60)).padStart(2, '0')}` : ''}.`
+      : ''
   const hiddenEpCount = episodes.filter(ep => ep.filler || ep.recap).length
   const visibleEps = hideFillers
     ? episodes.filter(ep => !ep.filler && !ep.recap)
     : episodes
   const tabs = []
-  if (hasEpisodes && !isMovie) {
+  if (hasEpisodes) {
     tabs.push({
       key: 'episodes',
-      label: `Episodes (${visibleEps.length}${hideFillers ? ` of ${episodes.length}` : ''})`,
+      label: isMovie
+        ? 'Movie'
+        : `Episodes (${visibleEps.length}${hideFillers ? ` of ${episodes.length}` : ''})`,
     })
   }
   if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
 
   return (
     <Page className="anime-detail-page">
-      <PageBackground $src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} />
+      <PageBackground $src={anime.bannerImage || anime.coverImage?.extraLarge || anime.coverImage?.large || ''} />
       <main style={{ position: 'relative', zIndex: 1 }}>
       <Banner>
-        <BannerImg src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} alt="" />
+        <BannerImg src={anime.bannerImage || anime.coverImage?.extraLarge || anime.coverImage?.large || ''} alt="" />
         <BannerOverlay />
         <BannerContent>
           <Cover src={anime.coverImage?.large || ''} alt={title} />
@@ -745,11 +935,14 @@ const AnimeDetail = () => {
             </Meta>
             <Actions>
               {hasEpisodes && (
-                <WatchBtn to={`/watch/${generateSlug(title)}-${id}-episode-1`}><FaPlay /> Watch Now</WatchBtn>
+                <WatchBtn to={`/watch/${generateSlug(title)}-${id}-episode-${actionEpisode}`}>
+                  <FaPlay /> {actionLabel}
+                </WatchBtn>
               )}
               <BookmarkBtn $active={isBookmarked} onClick={toggleBookmark}>
                 {isBookmarked ? <FaBookmark /> : <FaRegBookmark />} {isBookmarked ? 'Bookmarked' : 'Bookmark'}
               </BookmarkBtn>
+              {actionHint && <ProgressHint>{actionHint}</ProgressHint>}
             </Actions>
           </Info>
         </BannerContent>
@@ -797,17 +990,33 @@ const AnimeDetail = () => {
                 )}
                 <EpisodeList>
                   {visibleEps.map((ep, i) => {
-                    // Canonical episode numbering: derive number from position in the list
-                    // to permanently fix the "10x" multiplication bug from providers.
-                    const num = i + 1
+                    // Preserve the episode's canonical source position even when
+                    // filler/recap filtering hides earlier rows.
+                    const num = Number(ep.number) || episodes.indexOf(ep) + 1 || i + 1
+                    const activity = activityByEpisode.get(num)
+                    const rated = Number(episodeRatings[num]) || 0
+                    const progress = activity
+                      ? activity.duration > 0
+                        ? Math.min(100, (activity.time / activity.duration) * 100)
+                        : activity.completed ? 100 : 0
+                      : 0
                     return (
-                      <EpisodeRow key={num} to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}>
+                      <EpisodeRow
+                        key={num}
+                        to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}
+                        data-watched={activity ? 'true' : 'false'}
+                      >
                         <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
                         <EpNum>{num}</EpNum>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title || `Episode ${num}`}</span>
+                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ep.title || `Episode ${num}`}
+                        </span>
                         {!!ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
                         {!!ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}
+                        {activity && <EpisodeState title={activity.completed ? 'Completed' : 'In progress'}><FaCheck size={9} /> {activity.completed ? 'Watched' : 'In progress'}</EpisodeState>}
+                        {rated > 0 && <RatingBadge title={`You rated this episode ${rated}/10`}><FaStar size={8} /> {rated}/10</RatingBadge>}
                         <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        {activity && <EpisodeProgress $value={progress} $complete={activity.completed}><span /></EpisodeProgress>}
                       </EpisodeRow>
                     )
                   })}
