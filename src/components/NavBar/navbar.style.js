@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 export const N = {}
 
 N.Nav = styled.nav`
-  position: ${({ isHome }) => (isHome ? 'fixed' : 'sticky')};
+  position: ${({ $isHome }) => ($isHome ? 'fixed' : 'sticky')};
   top: 0;
   left: 0;
   right: 0;
@@ -13,16 +13,16 @@ N.Nav = styled.nav`
   justify-content: space-between;
   height: calc(var(--header-h) + env(safe-area-inset-top, 0));
   padding: env(safe-area-inset-top, 0) 1.5rem 0;
-  background: ${({ isScrolled, isHome }) =>
-    isHome
-      ? isScrolled
+  background: ${({ $isScrolled, $isHome }) =>
+    $isHome
+      ? $isScrolled
         ? 'rgba(0,0,0,0.85)'
         : 'transparent'
       : 'rgba(0,0,0,0.95)'};
-  backdrop-filter: ${({ isScrolled, isHome }) => (isHome && isScrolled) ? 'blur(12px)' : 'none'};
-  -webkit-backdrop-filter: ${({ isScrolled, isHome }) => (isHome && isScrolled) ? 'blur(12px)' : 'none'};
-  border-bottom: 1px solid ${({ isScrolled, isHome }) =>
-    isHome && isScrolled ? 'rgba(255,255,255,0.06)' : 'transparent'};
+  backdrop-filter: ${({ $isScrolled, $isHome }) => ($isHome && $isScrolled) ? 'blur(12px)' : 'none'};
+  -webkit-backdrop-filter: ${({ $isScrolled, $isHome }) => ($isHome && $isScrolled) ? 'blur(12px)' : 'none'};
+  border-bottom: 1px solid ${({ $isScrolled, $isHome }) =>
+    $isHome && $isScrolled ? 'rgba(255,255,255,0.06)' : 'transparent'};
   transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s;
   z-index: 100;
   gap: 1rem;

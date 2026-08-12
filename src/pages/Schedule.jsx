@@ -101,7 +101,7 @@ const Schedule = () => {
         {isLoading ? (
           <List>
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} style={{ height: 94, borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', animation: 'pulse 1.5s infinite' }} />
+              <div key={i} className="schedule-skeleton" style={{ height: 94, borderRadius: 'var(--radius-md)' }} />
             ))}
           </List>
         ) : error ? (

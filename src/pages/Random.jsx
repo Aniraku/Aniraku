@@ -5,6 +5,7 @@ import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import Footer from '../components/Footer/Footer'
 import { generateSlug } from '../lib/slug'
 import styled from 'styled-components'
+import { PageLoader } from '../components/Skeletons/Skeletons'
 
 const Page = styled.main`min-height:100vh;background:var(--bg);`
 const Container = styled.div`max-width:600px;margin:0 auto;padding:4rem 1rem;text-align:center;`
@@ -59,12 +60,7 @@ export default function Random() {
           </div>
         )}
 
-        {loading && (
-          <div style={{ padding: '3rem 0' }}>
-            <Spinner />
-            <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Finding a surprise...</p>
-          </div>
-        )}
+        {loading && <PageLoader label="Finding a surprise" />}
 
         {error && (
           <div style={{ padding: '2rem 0' }}>

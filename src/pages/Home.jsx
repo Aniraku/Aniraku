@@ -13,6 +13,7 @@ import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
+import { AnimeCardSkeleton } from '../components/Skeletons/Skeletons'
 
 const Section = styled.section`
   max-width: 1400px;
@@ -377,10 +378,7 @@ const Home = () => {
           {homeDone ? airingList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-            <div key={`sk-air-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
-              <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
-              <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
-            </div>
+            <AnimeCardSkeleton key={`sk-air-${i}`} className="home-card-skeleton" />
           ))}
         </ScrollRow>
       </Section>
@@ -395,10 +393,7 @@ const Home = () => {
           {homeDone ? moviesList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-            <div key={`sk-mov-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
-              <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
-              <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
-            </div>
+            <AnimeCardSkeleton key={`sk-mov-${i}`} className="home-card-skeleton" />
           ))}
         </ScrollRow>
       </Section>
@@ -413,10 +408,7 @@ const Home = () => {
           {homeDone ? tvList.slice(0, 15).map(item => (
             <Card key={item.id} data={item} />
           )) : skeletonRow.map(i => (
-            <div key={`sk-tv-${i}`} className="card-skeleton" style={{ width: 150, flex: '0 0 auto' }}>
-              <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--bg-card)', borderRadius: 8 }} />
-              <div style={{ height: 12, background: 'var(--bg-card)', borderRadius: 4, marginTop: 8, width: '70%' }} />
-            </div>
+            <AnimeCardSkeleton key={`sk-tv-${i}`} className="home-card-skeleton" />
           ))}
         </ScrollRow>
       </Section>

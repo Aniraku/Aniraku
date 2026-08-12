@@ -36,6 +36,7 @@ import {
   saveEpisodeRating,
   PROVIDER_LABELS,
 } from '../lib/sync'
+import { WatchPageSkeleton } from '../components/Skeletons/Skeletons'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -1606,7 +1607,7 @@ export default function Watch() {
           (navigator.language || 'en').toLowerCase() === 'zh-cn' ? 'zh-cn' : 'en',
         moreVideoAttr: {
           crossOrigin: 'anonymous',
-          preload: 'auto',
+          preload: 'metadata',
           playsInline: true,
           'webkit-playsinline': 'true',
           'x5-playsinline': 'true',
@@ -1724,16 +1725,16 @@ export default function Watch() {
             }
             const hls = new Hls({
               enableWorker: false,
-              // Buffer budget follows the connection hint: keep the buffer
-              // modest on slow/unknown links so the player starts faster,
-              // larger on fast links so stalls are rare.
-              maxBufferLength: netHintRef.current.effectiveType === '4g' ? 30 : 12,
-              maxMaxBufferLength: 60,
-              startFragPrefetch: true,
+              // Keep the initial buffer deliberately small so the first frame
+              // appears quickly. HLS will continue filling in the background.
+              maxBufferLength: netHintRef.current.effectiveType === '4g' ? 12 : 6,
+              maxMaxBufferLength: 24,
+              startFragPrefetch: false,
               lowLatencyMode: false,
-              backBufferLength: 5,
+              backBufferLength: 3,
               appendInSequenceGaps: true,
-              maxBufferHole: 1.0,
+              maxBufferHole: 0.5,
+
               forceKeyFrameOnDiscontinuity: true,
               maxRecoveryAttempts: 3,
               manifestLoadingMaxRetry: 2,
@@ -2091,6 +2092,30 @@ export default function Watch() {
       if (!source) {
         return
       }
+
+      // Initial playback must not depend on the user discovering a working
+      // provider manually. If a provider has no usable source, move to the
+      // next provider automatically, preferring the same language first.
+      const failoverToNextSource = () => {
+        if (quiet || !mountedRef.current) return false
+        const allSources = [...SOURCES.sub, ...SOURCES.dub]
+        blockedSourcesRef.current.add(sourceId)
+        const sameLanguage = allSources.filter(
+          (candidate) => candidate.lang === source.lang
+        )
+        const next = [...sameLanguage, ...allSources].find(
+          (candidate) =>
+            candidate.id !== sourceId &&
+            !blockedSourcesRef.current.has(candidate.id)
+        )
+        if (!next) return false
+        setActiveSource(next.id)
+        showToast(`Trying ${next.label} automatically…`, { icon: 'signal' })
+        loadingRef.current = false
+        setStreamLoading(true)
+        return true
+      }
+
       loadingRef.current = true
       lastStreamAttemptRef.current = { sourceId, forceRefresh }
       // Quiet mode (provider switch with a live player): keep the old
@@ -2217,6 +2242,7 @@ export default function Watch() {
               return
             }
           }
+          if (failoverToNextSource()) return
           setStreamLoading(false)
           loadingRef.current = false
           return
@@ -2247,6 +2273,7 @@ export default function Watch() {
               ? 'This server is blocked in your region. Try a different server.'
               : data.error || 'No video source found'
           )
+          if (failoverToNextSource()) return
           setStreamLoading(false)
           loadingRef.current = false
           return
@@ -2261,6 +2288,7 @@ export default function Watch() {
             showToast('No stream on that server — staying on the current one', { icon: 'warn' })
             return
           }
+          if (failoverToNextSource()) return
           setNoStreamError(true)
           setErrorType('no-source')
           setError('No video source found for this server.')
@@ -2332,6 +2360,7 @@ export default function Watch() {
             }
           }
         }
+        if (failoverToNextSource()) return
         setStreamLoading(false)
         loadingRef.current = false
         return
@@ -2678,69 +2707,7 @@ export default function Watch() {
   // Loading / NSFW gates
   // ────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <>
-        <div
-          className="watch-skeleton"
-          role="status"
-          aria-label="Loading watch page"
-          style={{ padding: '16px', maxWidth: 1280, margin: '0 auto' }}
-        >
-          <div className="watch-skel-player" />
-          <div className="watch-skel-row">
-            <div className="watch-skel-line w70" />
-            <div className="watch-skel-line w40" />
-          </div>
-          <div className="watch-skel-row" style={{ gap: 12 }}>
-            <div className="watch-skel-pill" />
-            <div className="watch-skel-pill" />
-            <div className="watch-skel-pill" />
-          </div>
-        </div>
-        <style>{`
-          .watch-skel-player {
-            aspect-ratio: 16 / 9;
-            border-radius: 12px;
-            margin-bottom: 16px;
-            background: linear-gradient(
-              100deg,
-              var(--bg-card) 40%,
-              rgba(226,232,240,0.08) 50%,
-              var(--bg-card) 60%
-            );
-            background-size: 200% 100%;
-            animation: watch-shimmer 1.6s ease-in-out infinite;
-          }
-          .watch-skel-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
-          .watch-skel-line {
-            height: 14px;
-            border-radius: 6px;
-            background: linear-gradient(100deg, var(--bg-card) 40%, rgba(226,232,240,0.08) 50%, var(--bg-card) 60%);
-            background-size: 200% 100%;
-            animation: watch-shimmer 1.6s ease-in-out infinite;
-          }
-          .watch-skel-line.w70 { width: 70%; }
-          .watch-skel-line.w40 { width: 40%; }
-          .watch-skel-pill {
-            width: 84px;
-            height: 32px;
-            border-radius: 999px;
-            background: linear-gradient(100deg, var(--bg-card) 40%, rgba(226,232,240,0.08) 50%, var(--bg-card) 60%);
-            background-size: 200% 100%;
-            animation: watch-shimmer 1.6s ease-in-out infinite;
-          }
-          @keyframes watch-shimmer {
-            from { background-position: 200% 0; }
-            to   { background-position: -200% 0; }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .watch-skel-player, .watch-skel-line, .watch-skel-pill {
-              animation: none !important;
-            }
-          }
-        `}</style>
-      </>
-    )
+    return <WatchPageSkeleton />
   }
 
   if (isNsfw(anime) && !nsfwEnabled) {

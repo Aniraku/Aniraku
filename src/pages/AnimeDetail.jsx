@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import { API_BASE } from '../config'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 import styled from 'styled-components'
+import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 
 const Page = styled.div`
   min-height: 100vh;
@@ -668,11 +669,7 @@ const AnimeDetail = () => {
     }
   }
 
-  if (isLoading) return (
-    <>
-      <Center><Spinner /></Center>
-    </>
-  )
+  if (isLoading) return <AnimeDetailSkeleton />
 
   if (!anime) return (
     <>
@@ -796,7 +793,7 @@ const AnimeDetail = () => {
                   {visibleEps.map((ep, i) => {
                     // Canonical episode numbering: derive number from position in the list
                     // to permanently fix the "10x" multiplication bug from providers.
-                    const num = ep.number || i + 1
+                    const num = i + 1
                     return (
                       <EpisodeRow key={num} to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}>
                         <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
