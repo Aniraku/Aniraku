@@ -352,6 +352,10 @@ function buildQualityList(sources) {
     }))
 }
 
+function playbackMenuHtml() {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10M4 17h16M4 12h16M17 5v4M7 10v4M14 15v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
+}
+
 function seekControlHtml(direction) {
   // Material-style replay-10 / forward-10 artwork: a single bold loop and
   // arrow with the number set directly inside, avoiding the previous
@@ -871,14 +875,14 @@ export default function Watch() {
   })
   const autoNextRef = useRef(autoNext)
   autoNextRef.current = autoNext
-  const toggleAutoNext = useCallback(() => {
-    setAutoNext((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem('aniraku-auto-next', next ? 'on' : 'off')
-      } catch {}
-      return next
-    })
+  const setAutoNextPreference = useCallback((value) => {
+    const next = Boolean(value)
+    autoNextRef.current = next
+    setAutoNext(next)
+    try {
+      localStorage.setItem('aniraku-auto-next', next ? 'on' : 'off')
+    } catch {}
+    return next
   }, [])
 
   const applySkipSegments = useCallback((incoming) => {
@@ -888,16 +892,15 @@ export default function Watch() {
     return merged
   }, [])
 
-  const toggleAutoSkip = useCallback(() => {
-    setAutoSkip((prev) => {
-      const next = !prev
-      autoSkipRef.current = next
-      autoSkippedRef.current = { intro: false, outro: false }
-      try {
-        localStorage.setItem('aniraku-auto-skip', next ? 'on' : 'off')
-      } catch {}
-      return next
-    })
+  const setAutoSkipPreference = useCallback((value) => {
+    const next = Boolean(value)
+    autoSkipRef.current = next
+    autoSkippedRef.current = { intro: false, outro: false }
+    setAutoSkip(next)
+    try {
+      localStorage.setItem('aniraku-auto-skip', next ? 'on' : 'off')
+    } catch {}
+    return next
   }, [])
 
   // "Episode finished" overlay — shown when auto-next is off.
@@ -1088,6 +1091,21 @@ export default function Watch() {
     clearTimeout(toastTimerRef.current)
     toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
   }, [])
+
+  const skipSegmentNow = useCallback((type) => {
+    const segment = skipSegmentsRef.current[type]
+    const art = artInstance.current
+    if (!segment || !art?.video) {
+      showToast(type === 'intro' ? 'Intro skip data is unavailable' : 'Outro skip data is unavailable', { icon: 'warn' })
+      return false
+    }
+    const duration = Number(art.video.duration) || 0
+    const target = Math.min(segment.end, Math.max(0, duration > 0 ? duration - 0.5 : segment.end))
+    art.video.currentTime = target
+    autoSkippedRef.current[type] = true
+    showToast(type === 'intro' ? 'Intro skipped' : 'Outro skipped', { icon: 'ok' })
+    return true
+  }, [showToast])
 
   // ────────────────────────────────────────────────────────────
   // Episode ratings (own, 1-10) — the average of your episode
@@ -1787,6 +1805,7 @@ export default function Watch() {
         // locked so Android TV never flips it.
         autoOrientation: !IS_TV,
         airplay: true,
+        setting: true,
         hotkey: false,
         theme: '#e2e8f0',
         volume: 0.7,
@@ -1804,6 +1823,17 @@ export default function Watch() {
         // volume control uses index 20). They remain visible on desktop,
         // keyboard-accessible, and use the same seek helper as touch UI.
         controls: [
+          {
+            name: 'playbackMenu',
+            position: 'right',
+            index: 9,
+            html: playbackMenuHtml(),
+            tooltip: 'Playback options',
+            style: { width: '40px', margin: '0 1px' },
+            click: function () {
+              this.setting.show = !this.setting.show
+            },
+          },
           {
             name: 'seekBackward10',
             position: 'left',
@@ -1834,6 +1864,51 @@ export default function Watch() {
           },
         ],
         settings: [
+          {
+            name: 'playbackOptions',
+            width: 250,
+            html: 'Playback',
+            icon: playbackMenuHtml(),
+            selector: [
+              {
+                name: 'autoSkip',
+                html: 'Auto-skip intro & outro',
+                switch: autoSkipRef.current,
+                onSwitch: (item) => {
+                  const next = setAutoSkipPreference(!autoSkipRef.current)
+                  item.switch = next
+                  return next
+                },
+              },
+              {
+                name: 'autoNext',
+                html: 'Auto-next episode',
+                switch: autoNextRef.current,
+                onSwitch: (item) => {
+                  const next = setAutoNextPreference(!autoNextRef.current)
+                  item.switch = next
+                  return next
+                },
+              },
+              {
+                name: 'skipIntro',
+                html: 'Skip intro now',
+                onSelect: () => {
+                  skipSegmentNow('intro')
+                  return 'Skip intro now'
+                },
+              },
+              {
+                name: 'skipOutro',
+                html: 'Skip outro now',
+                onSelect: () => {
+                  skipSegmentNow('outro')
+                  return 'Skip outro now'
+                },
+              },
+            ],
+            onSelect: (item) => item.html,
+          },
           {
             width: 200,
             html: 'Subtitle Size',
@@ -2208,6 +2283,9 @@ export default function Watch() {
       destroyPlayer,
       showToast,
       applySkipSegments,
+      setAutoNextPreference,
+      setAutoSkipPreference,
+      skipSegmentNow,
     ]
   )
 
@@ -2968,12 +3046,8 @@ export default function Watch() {
   const showSkipIntro = !!intro && t >= intro.start - 2 && t < intro.end - 0.5
   const showSkipOutro =
     !!outro && t >= outro.start - 2 && t < outro.end - 0.5
-  const handleSkipSegment = (end) => {
-    const art = artInstance.current
-    if (!art) return
-    const dur = art.video.duration || 0
-    art.video.currentTime = Math.min(end, Math.max(0, dur - 0.5))
-    showToast('Skipped')
+  const handleSkipSegment = (type) => {
+    skipSegmentNow(type)
   }
   return (
     <>
@@ -3607,7 +3681,7 @@ export default function Watch() {
                 <button
                   type="button"
                   className="watch-skip-btn"
-                  onClick={() => handleSkipSegment(intro.end)}
+                  onClick={() => handleSkipSegment('intro')}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3633,7 +3707,7 @@ export default function Watch() {
                 <button
                   type="button"
                   className="watch-skip-btn"
-                  onClick={() => handleSkipSegment(outro.end)}
+                  onClick={() => handleSkipSegment('outro')}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3902,48 +3976,6 @@ export default function Watch() {
                 >
                   <FaSignal /> Anime Page
                 </Link>
-              )}
-              <button
-                type="button"
-                onClick={toggleAutoSkip}
-                style={{
-                  ...navBtnStyle,
-                  background: autoSkip
-                    ? 'rgba(99,102,241,0.15)'
-                    : 'rgba(255,255,255,0.08)',
-                  color: autoSkip ? '#a5b4fc' : 'var(--text-secondary)',
-                  border: `1px solid ${
-                    autoSkip
-                      ? 'rgba(99,102,241,0.4)'
-                      : 'rgba(255,255,255,0.15)'
-                  }`,
-                }}
-                aria-pressed={autoSkip}
-                title="Automatically skip verified opening and ending segments"
-              >
-                <FaCheckCircle size={13} /> Auto-skip {autoSkip ? 'ON' : 'OFF'}
-              </button>
-              {!isMovie && (
-                <button
-                  type="button"
-                  onClick={toggleAutoNext}
-                  style={{
-                    ...navBtnStyle,
-                    background: autoNext
-                      ? 'rgba(34,197,94,0.15)'
-                      : 'rgba(255,255,255,0.08)',
-                    color: autoNext ? '#86efac' : 'var(--text-secondary)',
-                    border: `1px solid ${
-                      autoNext
-                        ? 'rgba(34,197,94,0.4)'
-                        : 'rgba(255,255,255,0.15)'
-                    }`,
-                  }}
-                  aria-pressed={autoNext}
-                  title="Automatically play the next episode when this one ends"
-                >
-                  <FaCheckCircle size={13} /> Auto-next {autoNext ? 'ON' : 'OFF'}
-                </button>
               )}
             </div>
 
