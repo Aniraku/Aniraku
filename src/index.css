@@ -671,3 +671,270 @@ video {
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
   }
 }
+
+
+/* ============================================
+   CROSS-PLATFORM RECONSTRUCTION LAYER
+   iOS / Android / tablet / desktop / landscape
+   ============================================ */
+
+:root {
+  --content-max: 1440px;
+  --page-gutter: clamp(12px, 3vw, 32px);
+  --mobile-nav-height: 68px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100dvh;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
+}
+
+main,
+[role='main'] {
+  width: 100%;
+  min-width: 0;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Shared fluid containers and grids used by pages with inline layouts. */
+.catalog-container,
+.profile-page > div,
+.page-section,
+.container-responsive {
+  width: min(100%, var(--content-max));
+  margin-inline: auto;
+}
+
+.catalog-page,
+.profile-page,
+.watch-page,
+.anime-detail-page {
+  min-height: calc(100dvh - var(--header-h));
+  padding-bottom: calc(var(--mobile-nav-height) + var(--safe-bottom));
+}
+
+/* Improve cards and content density on compact mobile screens. */
+@media (max-width: 600px) {
+  .catalog-container,
+  .page-section,
+  .container-responsive {
+    padding-inline: 12px !important;
+  }
+
+  .catalog-header {
+    align-items: flex-start !important;
+    gap: 10px !important;
+    flex-wrap: wrap;
+  }
+
+  .catalog-title {
+    font-size: 1.45rem !important;
+  }
+
+  .filter-bar {
+    display: flex !important;
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .filter-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-select,
+  .search-input {
+    min-height: 44px !important;
+  }
+
+  .pagination {
+    gap: 8px !important;
+    flex-wrap: wrap;
+  }
+
+  .page-label {
+    order: -1;
+    width: 100%;
+    text-align: center;
+  }
+
+  .profile-page {
+    padding-inline: 12px !important;
+  }
+
+  .profile-header {
+    align-items: flex-start !important;
+    gap: 14px !important;
+  }
+
+  .profile-tabs {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
+
+  .profile-history-item {
+    min-width: 0;
+    padding-inline: 10px !important;
+  }
+
+  .profile-history-item img {
+    width: 44px !important;
+    height: 60px !important;
+  }
+
+  .watch-nav,
+  .watch-sources,
+  .watch-source-group {
+    width: 100%;
+  }
+
+  .watch-nav > button,
+  .watch-nav > a,
+  .watch-source-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .watch-comments-fab {
+    right: 12px !important;
+    bottom: calc(76px + var(--safe-bottom)) !important;
+  }
+}
+
+/* Tablet portrait and landscape: use two-column content when possible while
+   keeping controls reachable and avoiding desktop-sized gutters. */
+@media (min-width: 601px) and (max-width: 1024px) {
+  .catalog-container,
+  .page-section,
+  .container-responsive {
+    padding-inline: 20px !important;
+  }
+
+  .watch-page {
+    padding-inline: 16px !important;
+  }
+
+  .watch-grid {
+    grid-template-columns: minmax(0, 1fr) 280px !important;
+  }
+
+  .profile-page {
+    padding-inline: 24px !important;
+  }
+
+  .profile-bookmark-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Desktop: preserve a comfortable reading width and avoid oversized text. */
+@media (min-width: 1025px) {
+  .catalog-container,
+  .page-section,
+  .container-responsive {
+    padding-inline: 28px !important;
+  }
+
+  .watch-page {
+    padding-inline: 24px !important;
+  }
+}
+
+/* Landscape phones and short tablet windows need vertical economy. */
+@media (max-height: 520px) and (orientation: landscape) {
+  :root { --header-h: 52px; }
+
+  .bottom-nav-spacer {
+    height: calc(56px + var(--safe-bottom));
+  }
+
+  .watch-player {
+    max-height: calc(100svh - var(--header-h) - 12px);
+  }
+
+  .watch-comments-fab {
+    bottom: calc(12px + var(--safe-bottom)) !important;
+  }
+}
+
+/* iOS Safari dynamic viewport and home-indicator spacing. */
+@supports (-webkit-touch-callout: none) {
+  body {
+    min-height: -webkit-fill-available;
+  }
+
+  .mobile-bottom-nav,
+  .bottom-nav-spacer {
+    padding-bottom: var(--safe-bottom);
+  }
+
+  input,
+  textarea,
+  select {
+    border-radius: 8px;
+  }
+}
+
+/* Android Chrome and touch devices: prevent accidental double taps and keep
+   controls comfortably tappable without making desktop buttons oversized. */
+@media (hover: none) and (pointer: coarse) {
+  .catalog-card,
+  .profile-history-item,
+  .profile-card,
+  .watch-source-btn,
+  .watch-ep-toggle {
+    min-height: 44px;
+  }
+
+  .card-scrim,
+  .card-media img,
+  .catalog-card img {
+    transition: none !important;
+  }
+}
+
+/* Respect user font scaling and prevent long titles from forcing horizontal
+   overflow on every supported viewport. */
+:is(h1, h2, h3, h4, p, a, span, button) {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-backdrop,
+  .PageBackground,
+  .skeleton,
+  .glow {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -3728,8 +3728,10 @@ export default function Watch() {
                   style={{
                     ...navBtnStyle,
                     textDecoration: 'none',
-                    background: 'var(--accent)',
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                     color: '#fff',
+                    border: '1px solid rgba(165,180,252,0.45)',
+                    boxShadow: '0 6px 18px rgba(99,102,241,0.24)',
                   }}
                   aria-label="Go to anime page"
                 >
