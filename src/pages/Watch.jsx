@@ -148,6 +148,97 @@ function normalizeEpisodeList(list) {
   }))
 }
 
+const ANISKIP_API_BASE = 'https://api.aniskip.com/v2'
+const ANISKIP_TIMEOUT_MS = 8_000
+const SKIP_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+function normalizeSkipInterval(value, type, source = 'unknown') {
+  const interval = value?.interval || value
+  const start = Number(interval?.startTime ?? interval?.start_time ?? interval?.start)
+  const end = Number(interval?.endTime ?? interval?.end_time ?? interval?.end)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+  if (start < 0 || end <= start + 1) return null
+  return {
+    start,
+    end,
+    type,
+    source,
+  }
+}
+
+function normalizeProviderSkipSegments(payload) {
+  if (!payload || typeof payload !== 'object') return { intro: null, outro: null }
+  const intro = normalizeSkipInterval(
+    payload.intro || payload.opening || payload.op || payload.skipIntro,
+    'intro',
+    'provider'
+  )
+  const outro = normalizeSkipInterval(
+    payload.outro || payload.ending || payload.ed || payload.skipOutro || payload.credits,
+    'outro',
+    'provider'
+  )
+  return { intro, outro }
+}
+
+function normalizeAniSkipSegments(payload) {
+  const results = Array.isArray(payload?.results) ? payload.results : []
+  const segments = { intro: null, outro: null }
+  for (const result of results) {
+    const skipType = String(result?.skipType || '').toLowerCase()
+    const type = skipType === 'op' || skipType === 'mixed_op'
+      ? 'intro'
+      : skipType === 'ed' || skipType === 'mixed_ed'
+        ? 'outro'
+        : null
+    if (!type || segments[type]) continue
+    segments[type] = normalizeSkipInterval(result, type, 'aniskip')
+  }
+  return segments
+}
+
+function getMalId(meta) {
+  const value = meta?.idMal ?? meta?.malId ?? meta?.mal_id ?? meta?.myAnimeListId
+  const malId = Number(value)
+  return Number.isInteger(malId) && malId > 0 ? malId : null
+}
+
+function mergeSkipSegments(current, incoming) {
+  const pick = (existing, next) => {
+    if (next?.source === 'provider') return next
+    if (existing?.source === 'provider') return existing
+    return next || existing || null
+  }
+  return {
+    intro: pick(current?.intro, incoming?.intro),
+    outro: pick(current?.outro, incoming?.outro),
+  }
+}
+
+function skipCacheKey(malId, episode) {
+  return `aniraku-skip-v2:${malId}:${episode}`
+}
+
+function readSkipCache(malId, episode) {
+  try {
+    const raw = localStorage.getItem(skipCacheKey(malId, episode))
+    if (!raw) return null
+    const cached = JSON.parse(raw)
+    if (!cached?.savedAt || Date.now() - cached.savedAt > SKIP_CACHE_TTL_MS) return null
+    return cached.segments || null
+  } catch {
+    return null
+  }
+}
+
+function writeSkipCache(malId, episode, segments) {
+  try {
+    localStorage.setItem(skipCacheKey(malId, episode), JSON.stringify({ savedAt: Date.now(), segments }))
+  } catch {
+    // Storage can be disabled in private browsing; playback must continue.
+  }
+}
+
 function formatTime(s) {
   if (typeof s !== 'number' || !isFinite(s) || s < 0) return '0:00'
   const m = Math.floor(s / 60)
@@ -753,11 +844,21 @@ export default function Watch() {
   const [retryAttempt, setRetryAttempt] = useState(0)
   const [buffering, setBuffering] = useState(false)
 
-  // Miruro-provided skip segments + live playback position (throttled) so
-  // the manual "Skip Intro / Skip Credits" buttons show only while the
-  // video is inside a segment. Skipping is always user-initiated.
+  // Verified skip intervals from the provider and AniSkip. Provider data
+  // wins when present; AniSkip supplies anime-wide coverage by MAL ID.
   const [skipSegments, setSkipSegments] = useState({ intro: null, outro: null })
+  const skipSegmentsRef = useRef({ intro: null, outro: null })
   const [currentTime, setCurrentTime] = useState(0)
+  const [autoSkip, setAutoSkip] = useState(() => {
+    try {
+      return localStorage.getItem('aniraku-auto-skip') !== 'off'
+    } catch {
+      return true
+    }
+  })
+  const autoSkipRef = useRef(autoSkip)
+  autoSkipRef.current = autoSkip
+  const autoSkippedRef = useRef({ intro: false, outro: false })
   const [hideFillers, setHideFillers] = useState(false)
 
   // Auto-play next episode when the current one ends (user-toggleable).
@@ -775,6 +876,25 @@ export default function Watch() {
       const next = !prev
       try {
         localStorage.setItem('aniraku-auto-next', next ? 'on' : 'off')
+      } catch {}
+      return next
+    })
+  }, [])
+
+  const applySkipSegments = useCallback((incoming) => {
+    const merged = mergeSkipSegments(skipSegmentsRef.current, incoming)
+    skipSegmentsRef.current = merged
+    setSkipSegments(merged)
+    return merged
+  }, [])
+
+  const toggleAutoSkip = useCallback(() => {
+    setAutoSkip((prev) => {
+      const next = !prev
+      autoSkipRef.current = next
+      autoSkippedRef.current = { intro: false, outro: false }
+      try {
+        localStorage.setItem('aniraku-auto-skip', next ? 'on' : 'off')
       } catch {}
       return next
     })
@@ -1298,6 +1418,70 @@ export default function Watch() {
       cancelled = true
     }
   }, [animeId])
+
+  // The stream backend may omit the MAL mapping. Hydrate it from AniList so
+  // AniSkip can still serve timestamps for the same title.
+  const malId = getMalId(anime)
+  useEffect(() => {
+    if (!animeId || !anime || malId) return
+    let cancelled = false
+    anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(animeId, 10) })
+      .then(({ data }) => {
+        const nextMalId = getMalId(data?.Media)
+        if (!cancelled && nextMalId) {
+          setAnime((prev) => prev ? { ...prev, idMal: nextMalId } : prev)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [animeId, anime, malId])
+
+  useEffect(() => {
+    skipSegmentsRef.current = { intro: null, outro: null }
+    setSkipSegments(skipSegmentsRef.current)
+    autoSkippedRef.current = { intro: false, outro: false }
+  }, [animeId, epNumber])
+
+  // AniSkip is the anime-specific, verified timestamp source. It requires a
+  // MAL ID and episode length; `0` is accepted and lets the lookup start
+  // before media metadata is available. Provider timestamps remain higher
+  // priority through applySkipSegments().
+  useEffect(() => {
+    if (!malId || !epNumber) return
+    let cancelled = false
+    const controller = new AbortController()
+    const load = async () => {
+      const cached = readSkipCache(malId, epNumber)
+      if (cached) {
+        if (!cancelled) applySkipSegments(cached)
+        return
+      }
+      const params = new URLSearchParams()
+      ;['op', 'ed'].forEach((type) => params.append('types[]', type))
+      const duration = Number(artInstance.current?.video?.duration)
+      params.set('episodeLength', String(Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0))
+      try {
+        const response = await fetch(`${ANISKIP_API_BASE}/skip-times/${malId}/${epNumber}?${params.toString()}`, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        })
+        if (!response.ok) return
+        const payload = await response.json()
+        const segments = normalizeAniSkipSegments(payload)
+        if (cancelled || (!segments.intro && !segments.outro)) return
+        writeSkipCache(malId, epNumber, segments)
+        applySkipSegments(segments)
+      } catch (error) {
+        if (error?.name !== 'AbortError') console.warn('AniSkip lookup failed:', error)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [malId, epNumber, applySkipSegments])
 
   // SEO metadata. Reset immediately on URL changes so a previous episode
   // title cannot remain in the browser tab while the next anime is loading.
@@ -1933,11 +2117,37 @@ export default function Watch() {
       let lastRender = 0
       art.on('video:timeupdate', () => {
         const now = Date.now()
+        const position = Number(art.video.currentTime) || 0
+        const latestSegments = skipSegmentsRef.current
+
+        // Auto-skip only once per segment and only when playback is actually
+        // inside a verified interval. This prevents repeated jumps, false
+        // positives at the beginning of an episode, and seek-loop behavior.
+        if (autoSkipRef.current) {
+          for (const type of ['intro', 'outro']) {
+            const segment = latestSegments[type]
+            if (!segment) continue
+            if (position < segment.start - 3) autoSkippedRef.current[type] = false
+            if (
+              !autoSkippedRef.current[type] &&
+              position >= Math.max(0, segment.start - 0.5) &&
+              position < segment.end - 0.5
+            ) {
+              const duration = Number(art.video.duration) || 0
+              const target = Math.min(segment.end, Math.max(0, duration > 0 ? duration - 0.5 : segment.end))
+              autoSkippedRef.current[type] = true
+              art.video.currentTime = target
+              showToast(type === 'intro' ? 'Intro skipped' : 'Outro skipped', { icon: 'check' })
+              break
+            }
+          }
+        }
+
         // Throttled re-render so the Skip Intro/Outro buttons track the
         // playback position without hammering React every second.
         if (now - lastRender > 500) {
           lastRender = now
-          setCurrentTime(art.video.currentTime)
+          setCurrentTime(position)
         }
         if (now - lastSave < 10_000) return
         lastSave = now
@@ -1997,6 +2207,7 @@ export default function Watch() {
       navigate,
       destroyPlayer,
       showToast,
+      applySkipSegments,
     ]
   )
 
@@ -2134,7 +2345,8 @@ export default function Watch() {
       setRetryAttempt(0)
       setResumePos(null)
       pendingResumeRef.current = null
-      setSkipSegments({ intro: null, outro: null })
+      // Keep verified intervals while switching servers for the same episode;
+      // the episode-change effect above owns the reset lifecycle.
       setShowEndedOverlay(false)
 
       // Stale-while-revalidate: if we have a recent good stream for
@@ -2158,10 +2370,7 @@ export default function Watch() {
               cached.headers,
               onBlocked
             )
-            setSkipSegments({
-              intro: cached.intro || null,
-              outro: cached.outro || null,
-            })
+            applySkipSegments(normalizeProviderSkipSegments(cached))
             setStreamLoading(false)
             loadingRef.current = false
             // background refresh
@@ -2311,10 +2520,7 @@ export default function Watch() {
           data.headers,
           onBlocked
         )
-        setSkipSegments({
-          intro: data.intro || null,
-          outro: data.outro || null,
-        })
+        applySkipSegments(normalizeProviderSkipSegments(data))
         setCachedStream(source, data)
         setStreamLoading(false)
         loadingRef.current = false
@@ -2376,6 +2582,7 @@ export default function Watch() {
       SOURCES,
       showToast,
       buildPlayer,
+      applySkipSegments,
     ]
   )
 
@@ -3696,6 +3903,26 @@ export default function Watch() {
                   <FaSignal /> Anime Page
                 </Link>
               )}
+              <button
+                type="button"
+                onClick={toggleAutoSkip}
+                style={{
+                  ...navBtnStyle,
+                  background: autoSkip
+                    ? 'rgba(99,102,241,0.15)'
+                    : 'rgba(255,255,255,0.08)',
+                  color: autoSkip ? '#a5b4fc' : 'var(--text-secondary)',
+                  border: `1px solid ${
+                    autoSkip
+                      ? 'rgba(99,102,241,0.4)'
+                      : 'rgba(255,255,255,0.15)'
+                  }`,
+                }}
+                aria-pressed={autoSkip}
+                title="Automatically skip verified opening and ending segments"
+              >
+                <FaCheckCircle size={13} /> Auto-skip {autoSkip ? 'ON' : 'OFF'}
+              </button>
               {!isMovie && (
                 <button
                   type="button"

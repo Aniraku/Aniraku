@@ -71,7 +71,7 @@ export const TRENDING_QUERY = `
 export const ANIME_DETAIL_QUERY = `
   query ($id: Int) {
     Media(id: $id, type: ANIME) {
-      id title { romaji english native userPreferred }
+      id idMal title { romaji english native userPreferred }
       coverImage { extraLarge large medium color }
       bannerImage format status episodes duration genres averageScore popularity description season seasonYear
       nextAiringEpisode { episode airingAt }
