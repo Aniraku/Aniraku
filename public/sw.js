@@ -1,3 +1,4 @@
+/* global self, caches */
 const VERSION = 'aniraku-shell-v3'
 const CORE_ASSETS = [
   '/',
