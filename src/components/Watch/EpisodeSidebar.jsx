@@ -99,7 +99,7 @@ const EpisodeRow = memo(function EpisodeRow({
             <FaCheck size={9} />
           </span>
         )}
-        {ep.filler && (
+        {!!ep.filler && (
           <span
             style={{
               position: 'absolute',
@@ -144,7 +144,7 @@ const EpisodeRow = memo(function EpisodeRow({
           }}
         >
           EP {num}
-          {ep.recap && (
+          {!!ep.recap && (
             <span
               style={{
                 background: 'rgba(99,102,241,0.15)',

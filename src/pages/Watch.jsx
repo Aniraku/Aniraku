@@ -140,7 +140,11 @@ function normalizeEpisodeList(list) {
     // Permanent fix: always use the 1-based index as the canonical episode number.
     // This prevents provider-level "10, 20, 30" bugs from reaching the UI.
     number: i + 1,
-    originalNumber: ep.number, // Keep original just in case, but never render it.
+    originalNumber: ep.number,
+    // If the title is just "Episode X" and X is the bugged number, fix it too.
+    title: (ep.title && ep.title.toLowerCase() === `episode ${ep.number}`) 
+      ? `Episode ${i + 1}` 
+      : ep.title,
   }))
 }
 

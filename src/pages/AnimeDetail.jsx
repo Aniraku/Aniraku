@@ -619,10 +619,16 @@ const AnimeDetail = () => {
         if (!response?.ok) throw lastError || new Error('Episode API unavailable')
         const epData = await response.json()
         const eps = Array.isArray(epData?.episodes)
-          ? epData.episodes.filter(Boolean).map((ep, index) => ({
-            ...ep,
-            number: Number(ep.number) > 0 ? Number(ep.number) : index + 1,
-          }))
+          ? epData.episodes.filter(Boolean).map((ep, index) => {
+            const num = index + 1
+            return {
+              ...ep,
+              number: num,
+              title: (ep.title && ep.title.toLowerCase() === `episode ${ep.number}`) 
+                ? `Episode ${num}` 
+                : ep.title,
+            }
+          })
           : []
         if (!cancelled) {
           setEpisodes(eps.length > 0 ? eps : fallbackEpisodes())
@@ -732,10 +738,10 @@ const AnimeDetail = () => {
           <Info>
             <Title>{title}</Title>
             <Meta>
-              {anime.averageScore && <Score><FaStar /> {anime.averageScore}%</Score>}
-              {anime.format && <span>{anime.format}</span>}
-              {!isMovie && anime.episodes && <span>{anime.episodes} episodes</span>}
-              {anime.status && <span>{anime.status}</span>}
+              {!!anime.averageScore && <Score><FaStar /> {anime.averageScore}%</Score>}
+              {!!anime.format && <span>{anime.format}</span>}
+              {!isMovie && !!anime.episodes && <span>{anime.episodes} episodes</span>}
+              {!!anime.status && <span>{anime.status}</span>}
             </Meta>
             <Actions>
               {hasEpisodes && (
@@ -799,8 +805,8 @@ const AnimeDetail = () => {
                         <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
                         <EpNum>{num}</EpNum>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title || `Episode ${num}`}</span>
-                        {ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
-                        {ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}
+                        {!!ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
+                        {!!ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}
                         <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                       </EpisodeRow>
                     )
