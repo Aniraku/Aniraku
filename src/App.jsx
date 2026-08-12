@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"
 import { AuthProvider } from "./hooks/useAuth"
+import { setTitle } from "./lib/seo"
 import NavBar from "./components/NavBar/NavBar"
 import MobileBottomNav from "./components/MobileBottomNav"
 import Error from "./pages/Error"
@@ -86,13 +87,37 @@ const GenreRedirect = () => {
 
 // ScrollToTop + SEO meta reset on route change
 const ScrollToTop = () => {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   useEffect(() => {
     window.scrollTo(0, 0)
     // Remove any previous structured data scripts added by page components
     const existing = document.querySelectorAll('script[data-aniraku-seo="true"]')
     existing.forEach(el => el.remove())
   }, [pathname])
+
+  // Give routes without their own async SEO metadata a deterministic title.
+  // Watch/anime/catalog and the dedicated SEO pages overwrite this in their
+  // own effects once their data is ready.
+  useEffect(() => {
+    if (pathname.startsWith('/watch/') || pathname.startsWith('/anime/') || pathname === '/catalog' || pathname === '/schedule') return
+    if (pathname === '/' || pathname === '/home') return
+
+    const routeTitles = {
+      '/profile': 'Profile — Aniraku',
+      '/profile/settings': 'Settings — Aniraku',
+      '/login': 'Sign In — Aniraku',
+      '/signup': 'Create Account — Aniraku',
+      '/admin': 'Admin — Aniraku',
+      '/random': 'Random Anime — Aniraku',
+      '/sync/callback': 'Library Sync — Aniraku',
+      '/dmca': 'DMCA — Aniraku',
+      '/privacy': 'Privacy Policy — Aniraku',
+      '/license': 'AGPL-3.0 License — Aniraku',
+      '/terms': 'Terms of Service — Aniraku',
+    }
+    setTitle(routeTitles[pathname] || (search ? 'Aniraku' : 'Aniraku — Free Anime Streaming'))
+  }, [pathname, search])
+
   return null
 }
 

@@ -26,7 +26,7 @@ import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { isNsfw, useNsfw } from '../hooks/useNsfw'
-import { setWatchSEO } from '../lib/seo'
+import { setTitle, setWatchSEO } from '../lib/seo'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 import {
   getSyncStatus,
@@ -125,11 +125,127 @@ function classifyStreamError(err, data) {
 // ────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────
+const SEEK_SECONDS = 10
+
 function formatTime(s) {
   if (typeof s !== 'number' || !isFinite(s) || s < 0) return '0:00'
   const m = Math.floor(s / 60)
   const sec = Math.floor(s % 60)
   return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+function seekVideoBy(art, seconds) {
+  const video = art?.video
+  if (!video) return null
+  const duration = Number.isFinite(video.duration) && video.duration > 0
+    ? video.duration
+    : Infinity
+  const nextTime = Math.min(
+    duration,
+    Math.max(0, (video.currentTime || 0) + seconds)
+  )
+  video.currentTime = nextTime
+  return nextTime
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function getQualityPresentation(value) {
+  const raw = String(value || '').trim()
+  const normalized = raw.toLowerCase()
+  if (/2160|4k|uhd/.test(normalized)) {
+    return { label: '4K', badge: 'Ultra HD', rank: 2160, key: '2160p', isAuto: false }
+  }
+  if (/1440|2k|qhd/.test(normalized)) {
+    return { label: '1440p', badge: 'QHD', rank: 1440, key: '1440p', isAuto: false }
+  }
+  if (/1080|full.?hd|fhd/.test(normalized)) {
+    return { label: '1080p', badge: 'Full HD', rank: 1080, key: '1080p', isAuto: false }
+  }
+  if (/720|hd/.test(normalized)) {
+    return { label: '720p', badge: 'HD', rank: 720, key: '720p', isAuto: false }
+  }
+  if (/480/.test(normalized)) {
+    return { label: '480p', badge: 'SD', rank: 480, key: '480p', isAuto: false }
+  }
+  if (/360/.test(normalized)) {
+    return { label: '360p', badge: 'Low', rank: 360, key: '360p', isAuto: false }
+  }
+  if (/auto|adaptive|master|original|default/.test(normalized) || !raw) {
+    return { label: 'Auto', badge: 'Adaptive', rank: 0, key: 'auto', isAuto: true }
+  }
+  return {
+    label: raw.length > 12 ? `${raw.slice(0, 12)}…` : raw,
+    badge: 'Source',
+    rank: 0,
+    key: normalized,
+    isAuto: false,
+  }
+}
+
+function qualityOptionHtml(presentation) {
+  const badge = presentation.badge
+    ? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
+    : ''
+  return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
+}
+
+function buildQualityList(sources) {
+  const seenUrls = new Set()
+  return (Array.isArray(sources) ? sources : [])
+    .filter((src) => src?.type !== 'embed' && src?.url)
+    .map((src, sourceIndex) => {
+      const presentation = getQualityPresentation(src.quality)
+      return {
+        src,
+        sourceIndex,
+        presentation,
+        html: qualityOptionHtml(presentation),
+        url: src.url,
+        type: src.type || 'hls',
+      }
+    })
+    .filter((entry) => {
+      if (seenUrls.has(entry.url)) return false
+      seenUrls.add(entry.url)
+      return true
+    })
+    // Prefer the provider's own Auto/adaptive URL. If the provider does not
+    // expose one, fall back to its highest numeric quality instead of making
+    // up a URL that the source did not provide.
+    .sort((a, b) => {
+      if (a.presentation.isAuto !== b.presentation.isAuto) {
+        return a.presentation.isAuto ? -1 : 1
+      }
+      if (a.presentation.rank !== b.presentation.rank) {
+        return b.presentation.rank - a.presentation.rank
+      }
+      return a.sourceIndex - b.sourceIndex
+    })
+    .map((entry, index) => ({
+      default: index === 0,
+      html: entry.html,
+      url: entry.url,
+      type: entry.type,
+      qualityKey: entry.presentation.key,
+      qualityRank: entry.presentation.rank,
+      isAuto: entry.presentation.isAuto,
+    }))
+}
+
+function seekControlHtml(direction) {
+  const path = direction < 0
+    ? 'M10 3 4 9l6 6M4 9h10a6 6 0 0 1 6 6v1'
+    : 'm14 3 6 6-6 6m6-6H10a6 6 0 0 0-6 6v1'
+  const label = direction < 0 ? '−10' : '+10'
+  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${label}</span></span>`
 }
 
 function formatAiringDate(unixTimestamp) {
@@ -1160,10 +1276,16 @@ export default function Watch() {
     }
   }, [animeId])
 
-  // SEO metadata
+  // SEO metadata. Reset immediately on URL changes so a previous episode
+  // title cannot remain in the browser tab while the next anime is loading.
   useEffect(() => {
-    if (anime) setWatchSEO(anime, epNumber)
-  }, [anime?.id, epNumber])
+    const isCurrentAnime = anime && String(anime.id) === String(animeId)
+    if (isCurrentAnime) {
+      setWatchSEO(anime, epNumber)
+    } else {
+      setTitle(`Watch Episode ${epNumber || 1} Online Free — Aniraku`)
+    }
+  }, [anime?.id, animeId, epNumber, slugId])
 
   // ────────────────────────────────────────────────────────────
   // Resume position
@@ -1471,6 +1593,39 @@ export default function Watch() {
           'webkit-playsinline': 'true',
           'x5-playsinline': 'true',
         },
+        // Artplayer inserts these between Play and Sound (the built-in
+        // volume control uses index 20). They remain visible on desktop,
+        // keyboard-accessible, and use the same seek helper as touch UI.
+        controls: [
+          {
+            name: 'seekBackward10',
+            position: 'left',
+            index: 15,
+            html: seekControlHtml(-1),
+            tooltip: 'Back 10 seconds',
+            style: { width: '42px', margin: '0 1px' },
+            click: function () {
+              const nextTime = seekVideoBy(this, -SEEK_SECONDS)
+              if (nextTime !== null) {
+                showToast(`−10s · ${formatTime(nextTime)}`)
+              }
+            },
+          },
+          {
+            name: 'seekForward10',
+            position: 'left',
+            index: 16,
+            html: seekControlHtml(1),
+            tooltip: 'Forward 10 seconds',
+            style: { width: '42px', margin: '0 1px' },
+            click: function () {
+              const nextTime = seekVideoBy(this, SEEK_SECONDS)
+              if (nextTime !== null) {
+                showToast(`+10s · ${formatTime(nextTime)}`)
+              }
+            },
+          },
+        ],
         settings: [
           {
             width: 200,
@@ -1946,12 +2101,7 @@ export default function Watch() {
             (src) => src.type !== 'embed'
           )
           if (mediaSources.length > 0) {
-            const qualityList = mediaSources.map((src, idx) => ({
-              default: idx === 0,
-              html: src.quality || 'Auto',
-              url: src.url,
-              type: src.type || 'hls',
-            }))
+            const qualityList = buildQualityList(mediaSources)
             const onBlocked = () => handleProviderBlockedRef.current?.()
             buildPlayer(
               qualityList[0].url,
@@ -2100,12 +2250,7 @@ export default function Watch() {
           loadingRef.current = false
           return
         }
-        const qualityList = mediaSources.map((src, idx) => ({
-          default: idx === 0,
-          html: src.quality || 'Auto',
-          url: src.url,
-          type: src.type || 'hls',
-        }))
+        const qualityList = buildQualityList(mediaSources)
         const subs = firstSource.subtitles || []
         const onBlocked = () => handleProviderBlockedRef.current?.()
         buildPlayer(
@@ -2350,23 +2495,16 @@ export default function Watch() {
   const seekHoldTimerRef = useRef(null)
   const seekBy = useCallback(
     (dir) => {
-      const art = artInstance.current
-      if (!art) return
-      if (dir < 0) {
-        art.video.currentTime = Math.max(0, art.video.currentTime - 10)
-      } else {
-        art.video.currentTime = Math.min(
-          art.video.duration || Infinity,
-          art.video.currentTime + 10
-        )
-      }
-      showToast(dir < 0 ? '−10s' : '+10s')
+      const nextTime = seekVideoBy(artInstance.current, dir * SEEK_SECONDS)
+      if (nextTime === null) return
+      showToast(`${dir < 0 ? '−10s' : '+10s'} · ${formatTime(nextTime)}`)
     },
     [showToast]
   )
   const stopSeekHold = useCallback(() => {
     if (seekHoldTimerRef.current) {
       clearTimeout(seekHoldTimerRef.current)
+      clearInterval(seekHoldTimerRef.current)
       seekHoldTimerRef.current = null
     }
   }, [])
@@ -2379,23 +2517,15 @@ export default function Watch() {
       // Repeat only after holding 350ms.
       seekHoldTimerRef.current = setTimeout(() => {
         seekHoldTimerRef.current = setInterval(() => {
-          const art = artInstance.current
-          if (!art) {
-            stopSeekHold()
-            return
-          }
-          if (dir < 0) {
-            art.video.currentTime = Math.max(0, art.video.currentTime - 10)
-          } else {
-            art.video.currentTime = Math.min(
-              art.video.duration || Infinity,
-              art.video.currentTime + 10
-            )
-          }
+          const nextTime = seekVideoBy(
+            artInstance.current,
+            dir * SEEK_SECONDS
+          )
+          if (nextTime === null) stopSeekHold()
         }, 250)
       }, 350)
     },
-    [stopSeekHold]
+    [seekBy, stopSeekHold]
   )
   useEffect(() => () => stopSeekHold(), [stopSeekHold])
 
@@ -3787,6 +3917,91 @@ export default function Watch() {
         .watch-page { word-break: break-word; }
         .watch-art-mount video {
           background: #000;
+        }
+        /* Quality selector: make the current mode obvious and give every
+           option a compact resolution badge instead of a raw source label. */
+        .watch-art-mount .art-controls-quality {
+          min-width: 78px;
+        }
+        .watch-art-mount .art-controls-quality .art-selector-value,
+        .watch-art-mount .art-controls-quality .art-selector-item {
+          font-variant-numeric: tabular-nums;
+        }
+        .watch-art-mount .watch-quality-option {
+          display: inline-flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          width: 100%;
+          min-width: 92px;
+        }
+        .watch-art-mount .watch-quality-name {
+          font-weight: 700;
+          letter-spacing: 0.01em;
+        }
+        .watch-art-mount .watch-quality-badge {
+          color: rgba(226, 232, 240, 0.62);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+        .watch-art-mount .art-selector-list {
+          min-width: 170px;
+          padding: 6px;
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 10px;
+          background: rgba(10, 14, 24, 0.96);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.42);
+        }
+        .watch-art-mount .art-selector-item {
+          border-radius: 7px;
+          padding: 8px 10px;
+          transition: background 160ms ease, color 160ms ease;
+        }
+        .watch-art-mount .art-selector-item:hover,
+        .watch-art-mount .art-selector-item.art-current {
+          background: rgba(226,232,240,0.14);
+          color: #fff;
+        }
+        .watch-art-mount .art-selector-item.art-current .watch-quality-badge {
+          color: #cbd5e1;
+        }
+        .watch-art-mount .art-controls-seekBackward10,
+        .watch-art-mount .art-controls-seekForward10 {
+          color: #e2e8f0;
+          opacity: 0.82;
+          transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+        .watch-art-mount .art-controls-seekBackward10:hover,
+        .watch-art-mount .art-controls-seekForward10:hover {
+          opacity: 1;
+          background: rgba(255,255,255,0.1);
+        }
+        .watch-art-mount .art-controls-seekBackward10:active,
+        .watch-art-mount .art-controls-seekForward10:active {
+          transform: scale(0.94);
+        }
+        .watch-art-seek-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          width: 34px;
+          height: 34px;
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: -0.03em;
+        }
+        .watch-art-seek-icon svg {
+          position: absolute;
+          inset: 2px;
+          width: 30px;
+          height: 30px;
+        }
+        .watch-art-seek-icon span {
+          position: relative;
+          top: 1px;
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
