@@ -352,10 +352,6 @@ function buildQualityList(sources) {
     }))
 }
 
-function playbackMenuHtml() {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10M4 17h16M4 12h16M17 5v4M7 10v4M14 15v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
-}
-
 function seekControlHtml(direction) {
   // Material-style replay-10 / forward-10 artwork: a single bold loop and
   // arrow with the number set directly inside, avoiding the previous
@@ -1824,17 +1820,6 @@ export default function Watch() {
         // keyboard-accessible, and use the same seek helper as touch UI.
         controls: [
           {
-            name: 'playbackMenu',
-            position: 'right',
-            index: 9,
-            html: playbackMenuHtml(),
-            tooltip: 'Playback options',
-            style: { width: '40px', margin: '0 1px' },
-            click: function () {
-              this.setting.show = !this.setting.show
-            },
-          },
-          {
             name: 'seekBackward10',
             position: 'left',
             index: 15,
@@ -1865,49 +1850,66 @@ export default function Watch() {
         ],
         settings: [
           {
-            name: 'playbackOptions',
-            width: 250,
-            html: 'Playback',
-            icon: playbackMenuHtml(),
+            name: 'autoSkip',
+            width: 220,
+            html: 'Auto-skip intro & outro',
+            switch: autoSkipRef.current,
+            onSwitch: (item) => {
+              const next = setAutoSkipPreference(!autoSkipRef.current)
+              item.switch = next
+              return next
+            },
+          },
+          {
+            name: 'autoNext',
+            width: 220,
+            html: 'Auto-next episode',
+            switch: autoNextRef.current,
+            onSwitch: (item) => {
+              const next = setAutoNextPreference(!autoNextRef.current)
+              item.switch = next
+              return next
+            },
+          },
+          {
+            name: 'skipIntro',
+            width: 220,
+            html: 'Skip intro now',
+            onSelect: () => {
+              skipSegmentNow('intro')
+              return 'Skip intro now'
+            },
+          },
+          {
+            name: 'skipOutro',
+            width: 220,
+            html: 'Skip outro now',
+            onSelect: () => {
+              skipSegmentNow('outro')
+              return 'Skip outro now'
+            },
+          },
+          {
+            name: 'playbackSpeed',
+            width: 180,
+            html: 'Playback speed',
             selector: [
-              {
-                name: 'autoSkip',
-                html: 'Auto-skip intro & outro',
-                switch: autoSkipRef.current,
-                onSwitch: (item) => {
-                  const next = setAutoSkipPreference(!autoSkipRef.current)
-                  item.switch = next
-                  return next
-                },
-              },
-              {
-                name: 'autoNext',
-                html: 'Auto-next episode',
-                switch: autoNextRef.current,
-                onSwitch: (item) => {
-                  const next = setAutoNextPreference(!autoNextRef.current)
-                  item.switch = next
-                  return next
-                },
-              },
-              {
-                name: 'skipIntro',
-                html: 'Skip intro now',
-                onSelect: () => {
-                  skipSegmentNow('intro')
-                  return 'Skip intro now'
-                },
-              },
-              {
-                name: 'skipOutro',
-                html: 'Skip outro now',
-                onSelect: () => {
-                  skipSegmentNow('outro')
-                  return 'Skip outro now'
-                },
-              },
+              { html: '0.5×', value: 0.5 },
+              { html: '0.75×', value: 0.75 },
+              { default: true, html: 'Normal (1×)', value: 1 },
+              { html: '1.25×', value: 1.25 },
+              { html: '1.5×', value: 1.5 },
+              { html: '1.75×', value: 1.75 },
+              { html: '2×', value: 2 },
             ],
-            onSelect: (item) => item.html,
+            onSelect: (item) => {
+              const video = artInstance.current?.video
+              if (video && Number.isFinite(Number(item.value))) {
+                video.playbackRate = Number(item.value)
+                showToast(`Speed ${item.value}x`, { icon: 'ok' })
+              }
+              return item.html
+            },
           },
           {
             width: 200,
@@ -1945,7 +1947,6 @@ export default function Watch() {
             onSelect: (item) => item.html,
           },
         ],
-        playbackRate: true,
         quality: qualityList,
         customType: {
           mp4: (video, url, art) => playAsMp4(video, url, art),
@@ -3664,17 +3665,30 @@ export default function Watch() {
             </div>
           )}
 
-          {/* Skip Intro / Skip Credits — manual, powered by Miruro
-              timestamps from the stream response. Always opt-in. */}
+          {/* Manual skip overlay: positioned above the bottom-right
+              Artplayer controls, matching the marked player location. */}
           {(showSkipIntro || showSkipOutro) && (
             <div
+              className="watch-skip-overlay"
+              aria-label="Episode skip controls"
               style={{
                 position: 'absolute',
-                right: 16,
-                bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))',
-                zIndex: 6,
+                right: 'clamp(8px, 2.2vw, 18px)',
+                bottom: 'calc(42px + env(safe-area-inset-bottom, 0px))',
+                zIndex: 8,
                 display: 'flex',
-                gap: 10,
+                alignItems: 'center',
+                gap: 6,
+                flexWrap: 'wrap',
+                maxWidth: 'calc(100% - 16px)',
+                padding: 5,
+                background: 'rgba(6,10,20,0.38)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.28)',
+                pointerEvents: 'auto',
               }}
             >
               {showSkipIntro && (
@@ -3686,11 +3700,11 @@ export default function Watch() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
-                    padding: '10px 16px',
-                    background: 'rgba(15,23,42,0.92)',
-                    color: '#e2e8f0',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 999,
+                    padding: '8px 12px',
+                    background: 'rgba(255,255,255,0.12)',
+                    color: '#f8fafc',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: 9,
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -3712,11 +3726,11 @@ export default function Watch() {
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
-                    padding: '10px 16px',
-                    background: 'rgba(15,23,42,0.92)',
-                    color: '#e2e8f0',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: 999,
+                    padding: '8px 12px',
+                    background: 'rgba(255,255,255,0.12)',
+                    color: '#f8fafc',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: 9,
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -3726,7 +3740,7 @@ export default function Watch() {
                   }}
                 >
                   <FaStepForward style={{ transform: 'scaleX(-1)' }} />
-                  Skip Credits
+                  Skip Outro
                 </button>
               )}
             </div>
