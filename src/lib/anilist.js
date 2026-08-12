@@ -49,7 +49,7 @@ export const BROWSE_QUERY = `
       media(search: $search, genre: $genre, format: $format, status: $status, season: $season, seasonYear: $year, type: ANIME, sort: $sort) {
         id title { romaji english native userPreferred }
         coverImage { extraLarge large medium color }
-        bannerImage format status episodes averageScore popularity season seasonYear genres isAdult
+        bannerImage description(asHtml: false) trailer { id site thumbnail } format status episodes averageScore popularity season seasonYear genres isAdult
         nextAiringEpisode { episode airingAt }
       }
     }

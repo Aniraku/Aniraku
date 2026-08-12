@@ -48,28 +48,44 @@ const GifPicker = styled.div`
   position: absolute;
   bottom: 100%;
   left: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #7c3aed 6%);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
   padding: 12px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 8px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.55), 0 0 28px rgba(124,58,237,0.14);
   z-index: 100;
-  width: 300px;
-  @media (max-width: 480px) { width: 260px; }
+  width: 312px;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  @media (max-width: 480px) {
+    width: min(292px, calc(100vw - 32px));
+    grid-template-columns: repeat(3, 1fr);
+  }
 `
 
 const GifThumb = styled.img`
   width: 100%;
   height: 60px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 7px;
   cursor: pointer;
-  transition: transform 0.2s;
-  &:hover { transform: scale(1.05); }
+  display: block;
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: transform 0.18s ease, border-color 0.18s ease, filter 0.18s ease;
+  touch-action: manipulation;
+  &:hover, &:focus-visible {
+    transform: scale(1.05);
+    border-color: var(--accent);
+    filter: brightness(1.12) saturate(1.08);
+    outline: none;
+  }
+  &:active { transform: scale(0.97); }
 `
 
 const SelectedGif = styled.div`
@@ -124,12 +140,6 @@ const InitialAvatar = styled.div`
   font-weight: 700;
   flex-shrink: 0;
   text-transform: uppercase;
-`
-
-const ComposerName = styled.span`
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
 `
 
 const ErrorMsg = styled.p`
@@ -296,12 +306,19 @@ const AvatarBlock = ({ url, name }) => url
   : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
 const ANIME_GIFS = [
-  { id: '9w9Z2ZOxcbs1a', url: 'https://media.giphy.com/media/9w9Z2ZOxcbs1a/giphy.gif' },
-  { id: 'zAViC51fevRTi', url: 'https://media.giphy.com/media/zAViC51fevRTi/giphy.gif' },
-  { id: 'yaGwXC64r5Rzd77vnN', url: 'https://media.giphy.com/media/yaGwXC64r5Rzd77vnN/giphy.gif' },
-  { id: '6Aw9RGkNOmla5PTC0z', url: 'https://media.giphy.com/media/6Aw9RGkNOmla5PTC0z/giphy.gif' },
-  { id: '7wBXYfLh1sVjUT8HBm', url: 'https://media.giphy.com/media/7wBXYfLh1sVjUT8HBm/giphy.gif' },
-  { id: 'AS6BaG1P1PAhilKFON', url: 'https://media.giphy.com/media/AS6BaG1P1PAhilKFON/giphy.gif' }
+  { id: '9w9Z2ZOxcbs1a', label: 'Umaru reaction', url: 'https://media.giphy.com/media/9w9Z2ZOxcbs1a/giphy.gif' },
+  { id: 'zAViC51fevRTi', label: 'Konosuba reaction', url: 'https://media.giphy.com/media/zAViC51fevRTi/giphy.gif' },
+  { id: 'yaGwXC64r5Rzd77vnN', label: 'Nervous reaction', url: 'https://media.giphy.com/media/yaGwXC64r5Rzd77vnN/giphy.gif' },
+  { id: '6Aw9RGkNOmla5PTC0z', label: 'Classroom of the Elite reaction', url: 'https://media.giphy.com/media/6Aw9RGkNOmla5PTC0z/giphy.gif' },
+  { id: '7wBXYfLh1sVjUT8HBm', label: 'Jujutsu Kaisen reaction', url: 'https://media.giphy.com/media/7wBXYfLh1sVjUT8HBm/giphy.gif' },
+  { id: 'AS6BaG1P1PAhilKFON', label: 'Fullmetal Alchemist shock', url: 'https://media.giphy.com/media/AS6BaG1P1PAhilKFON/giphy.gif' },
+  { id: 'fiT1wYi2rGEtLVWs9f', label: 'Parasyte laugh', url: 'https://media.giphy.com/media/fiT1wYi2rGEtLVWs9f/giphy.gif' },
+  { id: 'DK0JvB4lELa9u8S9qK', label: 'Anime trailer reaction', url: 'https://media.giphy.com/media/DK0JvB4lELa9u8S9qK/giphy.gif' },
+  { id: 'pf9aov3NFDYwvL7fZN', label: 'Jujutsu Kaisen laugh', url: 'https://media.giphy.com/media/pf9aov3NFDYwvL7fZN/giphy.gif' },
+  { id: 'pNP6FpP5iczjxv80pq', label: 'Uma Musume reaction', url: 'https://media.giphy.com/media/pNP6FpP5iczjxv80pq/giphy.gif' },
+  { id: 'DdXeghz17NWAMVa00H', label: 'Frieren reaction', url: 'https://media.giphy.com/media/DdXeghz17NWAMVa00H/giphy.gif' },
+  { id: 'UUjkoeNhnn0K4', label: 'Sailor Moon reaction', url: 'https://media.giphy.com/media/UUjkoeNhnn0K4/giphy.gif' },
+  { id: 'hiFDKrrP0PaeI', label: 'Soul Eater reaction', url: 'https://media.giphy.com/media/hiFDKrrP0PaeI/giphy.gif' }
 ]
 
 const renderItem = (c, reply, {
@@ -365,7 +382,7 @@ const renderItem = (c, reply, {
             {showReplyGif && (
               <GifPicker style={{ left: 'auto', right: 0 }}>
                 {ANIME_GIFS.map(g => (
-                  <GifThumb key={g.id} src={g.url} onClick={() => { setReplyGif(g.url); setShowReplyGif(false) }} />
+                  <GifThumb key={g.id} src={g.url} alt={g.label} title={g.label} loading="lazy" onClick={() => { setReplyGif(g.url); setShowReplyGif(false) }} />
                 ))}
               </GifPicker>
             )}
@@ -586,7 +603,7 @@ const Comments = ({ animeId, episodeNumber, label }) => {
             {showGifPicker && (
               <GifPicker>
                 {ANIME_GIFS.map(g => (
-                  <GifThumb key={g.id} src={g.url} onClick={() => { setGif(g.url); setShowGifPicker(false) }} />
+                  <GifThumb key={g.id} src={g.url} alt={g.label} title={g.label} loading="lazy" onClick={() => { setGif(g.url); setShowGifPicker(false) }} />
                 ))}
               </GifPicker>
             )}
