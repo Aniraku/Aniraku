@@ -3,7 +3,7 @@ import path from 'path'
 import { generateSlug } from '../src/lib/slug.js'
 
 // Prefer the build-time env var (Vercel injects VITE_API_URL), fall back to
-// the local .env, then to the production Railway backend.
+// the local .env, then to the production Azure API.
 const readEnv = (key) => {
   if (process.env[key]) return process.env[key]
   try {
@@ -12,7 +12,7 @@ const readEnv = (key) => {
     return m ? m[1].trim() : ''
   } catch { return '' }
 }
-const API_BASE = `${readEnv('VITE_API_URL') || 'https://aniraku-backend-production.up.railway.app'}/api/v1`
+const API_BASE = `${readEnv('VITE_API_URL') || 'https://api.aniraku.tech'}/api/v1`
 const ANILIST_PROXY = `${API_BASE}/anilist`
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')

@@ -1,4 +1,4 @@
-const BACKEND = 'https://aniraku-backend-production.up.railway.app'
+const BACKEND = 'https://api.aniraku.tech'
 const SITE = 'https://www.aniraku.tech'
 const FALLBACK_IMAGE = `${SITE}/og-image.png`
 
