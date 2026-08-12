@@ -1,7 +1,12 @@
-# Anime GIF picker research
+# Anime GIF picker integration
 
-The existing and expanded reaction set uses direct public GIPHY media URLs. The additional IDs were selected from GIPHY’s official anime reaction collection: https://giphy.com/explore/anime-reaction
+The comment and reply composers now use the public [OtakuGIFs API](https://otakugifs.xyz/api) instead of a static third-party GIF list. This provides a larger, anime-specific reaction catalogue without embedding media assets in the repository.
 
-Added reactions include Parasyte laugh (`fiT1wYi2rGEtLVWs9f`), anime trailer reaction (`DK0JvB4lELa9u8S9qK`), Jujutsu Kaisen laugh (`pf9aov3NFDYwvL7fZN`), Uma Musume reaction (`pNP6FpP5iczjxv80pq`), Frieren reaction (`DdXeghz17NWAMVa00H`), Sailor Moon reaction (`UUjkoeNhnn0K4`), and Soul Eater reaction (`hiFDKrrP0PaeI`).
+| API endpoint | Purpose | Integration behavior |
+| --- | --- | --- |
+| `GET https://api.otakugifs.xyz/gif/allreactions` | Returns the full list of supported reactions. | Powers client-side reaction search. |
+| `GET https://api.otakugifs.xyz/gif?reaction={reaction}&format=GIF` | Returns one randomized GIF URL for the requested reaction. | Populates reaction previews and selects a GIF for a comment. |
 
-The picker now lazy-loads thumbnails, provides alt text and titles, uses a scrollable responsive grid, and adds touch feedback without bundling media into the repository.
+The picker presents eighteen popular reactions by default, including happy, hug, laugh, blush, smug, cry, wink, celebrate, dance, pat, pout, stare, shy, and airkiss. Users can search the full API catalogue for additional reactions such as `headbang`, `facepalm`, `thumbsup`, `sweat`, and `surprised`.
+
+The implementation lazily obtains preview URLs, caches fetched reaction URLs for the active session, includes accessible labels, remains scrollable within a mobile-safe popover, and keeps touch feedback on each tile. Vercel’s Content Security Policy explicitly permits `https://api.otakugifs.xyz`; returned image URLs are already covered by the existing HTTPS image policy.

@@ -56,6 +56,56 @@ export const BROWSE_QUERY = `
   }
 `
 
+export const CATALOG_SHELVES_QUERY = `
+  query {
+    trending: Page(page: 1, perPage: 18) {
+      media(type: ANIME, sort: TRENDING_DESC) {
+        id title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        bannerImage description(asHtml: false) trailer { id site thumbnail }
+        format status episodes averageScore popularity season seasonYear genres isAdult
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+    airing: Page(page: 1, perPage: 18) {
+      media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
+        id title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        bannerImage description(asHtml: false) trailer { id site thumbnail }
+        format status episodes averageScore popularity season seasonYear genres isAdult
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+    popular: Page(page: 1, perPage: 18) {
+      media(type: ANIME, sort: POPULARITY_DESC) {
+        id title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        bannerImage description(asHtml: false) trailer { id site thumbnail }
+        format status episodes averageScore popularity season seasonYear genres isAdult
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+    movies: Page(page: 1, perPage: 18) {
+      media(type: ANIME, format: MOVIE, sort: POPULARITY_DESC) {
+        id title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        bannerImage description(asHtml: false) trailer { id site thumbnail }
+        format status episodes averageScore popularity season seasonYear genres isAdult
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+    topRated: Page(page: 1, perPage: 18) {
+      media(type: ANIME, sort: SCORE_DESC) {
+        id title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        bannerImage description(asHtml: false) trailer { id site thumbnail }
+        format status episodes averageScore popularity season seasonYear genres isAdult
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+  }
+`
+
 export const TRENDING_QUERY = `
   query ($page: Int, $perPage: Int) {
     Page(page: $page, perPage: $perPage) {

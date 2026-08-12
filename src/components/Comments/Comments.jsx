@@ -1,9 +1,31 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { FaRegThumbsUp, FaThumbsUp, FaTrash, FaReply, FaRegImage, FaTimes } from 'react-icons/fa'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import styled from 'styled-components'
+
+const OTAKU_GIFS_API = 'https://api.otakugifs.xyz'
+const FEATURED_REACTIONS = [
+  'happy', 'hug', 'laugh', 'blush', 'smug', 'cry', 'wink', 'angrystare',
+  'celebrate', 'dance', 'pat', 'thumbsup', 'pout', 'stare', 'shy', 'yes', 'woah', 'airkiss',
+]
+const otakuGifCache = new Map()
+
+const reactionLabel = (reaction) => reaction
+  .replace(/([a-z])([A-Z])/g, '$1 $2')
+  .replace(/[-_]/g, ' ')
+  .replace(/\b\w/g, (letter) => letter.toUpperCase())
+
+const fetchOtakuGif = async (reaction) => {
+  if (otakuGifCache.has(reaction)) return otakuGifCache.get(reaction)
+  const response = await fetch(`${OTAKU_GIFS_API}/gif?reaction=${encodeURIComponent(reaction)}&format=GIF`)
+  if (!response.ok) throw new Error('Could not load this reaction')
+  const data = await response.json()
+  if (!data?.url) throw new Error('OtakuGIFs returned no image')
+  otakuGifCache.set(reaction, data.url)
+  return data.url
+}
 
 const cleanContent = (raw) => {
   const out = []
@@ -48,44 +70,98 @@ const GifPicker = styled.div`
   position: absolute;
   bottom: 100%;
   left: 0;
-  background: color-mix(in srgb, var(--bg-elevated) 94%, #7c3aed 6%);
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 14px;
-  padding: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
-  box-shadow: 0 18px 44px rgba(0,0,0,0.55), 0 0 28px rgba(124,58,237,0.14);
   z-index: 100;
-  width: 312px;
-  max-height: min(420px, 60vh);
+  width: min(388px, calc(100vw - 32px));
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-lg);
+  background: rgba(22,22,22,0.98);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+`
+
+const GifPickerHead = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+
+  strong { color: var(--text-primary); font-size: 13px; }
+  span { color: var(--text-muted); font-size: 11px; }
+`
+
+const GifSearch = styled.input`
+  width: 100%;
+  min-height: 36px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  &:focus { border-color: var(--accent); }
+  &::placeholder { color: var(--text-muted); }
+`
+
+const GifGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: min(330px, 48vh);
   overflow-y: auto;
   overscroll-behavior: contain;
-  @media (max-width: 480px) {
-    width: min(292px, calc(100vw - 32px));
-    grid-template-columns: repeat(3, 1fr);
-  }
+  padding: 1px;
+`
+
+const GifOption = styled.button`
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 160ms ease, border-color 160ms ease, filter 160ms ease;
+  &:hover, &:focus-visible { transform: translateY(-2px); border-color: var(--accent); filter: brightness(1.08); outline: none; }
+  &:active { transform: scale(0.97); }
 `
 
 const GifThumb = styled.img`
-  width: 100%;
-  height: 60px;
-  object-fit: cover;
-  border-radius: 7px;
-  cursor: pointer;
   display: block;
-  background: var(--bg-card);
-  border: 1px solid rgba(255,255,255,0.08);
-  transition: transform 0.18s ease, border-color 0.18s ease, filter 0.18s ease;
-  touch-action: manipulation;
-  &:hover, &:focus-visible {
-    transform: scale(1.05);
-    border-color: var(--accent);
-    filter: brightness(1.12) saturate(1.08);
-    outline: none;
-  }
-  &:active { transform: scale(0.97); }
+  width: 100%;
+  height: 66px;
+  object-fit: cover;
+  background: var(--bg-secondary);
+`
+
+const GifLabel = styled.span`
+  display: block;
+  overflow: hidden;
+  padding: 5px 6px 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 650;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const GifStatus = styled.div`
+  display: grid;
+  min-height: 128px;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
 `
 
 const SelectedGif = styled.div`
@@ -305,21 +381,101 @@ const AvatarBlock = ({ url, name }) => url
   ? <Avatar src={url} alt="" />
   : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
-const ANIME_GIFS = [
-  { id: '9w9Z2ZOxcbs1a', label: 'Umaru reaction', url: 'https://media.giphy.com/media/9w9Z2ZOxcbs1a/giphy.gif' },
-  { id: 'zAViC51fevRTi', label: 'Konosuba reaction', url: 'https://media.giphy.com/media/zAViC51fevRTi/giphy.gif' },
-  { id: 'yaGwXC64r5Rzd77vnN', label: 'Nervous reaction', url: 'https://media.giphy.com/media/yaGwXC64r5Rzd77vnN/giphy.gif' },
-  { id: '6Aw9RGkNOmla5PTC0z', label: 'Classroom of the Elite reaction', url: 'https://media.giphy.com/media/6Aw9RGkNOmla5PTC0z/giphy.gif' },
-  { id: '7wBXYfLh1sVjUT8HBm', label: 'Jujutsu Kaisen reaction', url: 'https://media.giphy.com/media/7wBXYfLh1sVjUT8HBm/giphy.gif' },
-  { id: 'AS6BaG1P1PAhilKFON', label: 'Fullmetal Alchemist shock', url: 'https://media.giphy.com/media/AS6BaG1P1PAhilKFON/giphy.gif' },
-  { id: 'fiT1wYi2rGEtLVWs9f', label: 'Parasyte laugh', url: 'https://media.giphy.com/media/fiT1wYi2rGEtLVWs9f/giphy.gif' },
-  { id: 'DK0JvB4lELa9u8S9qK', label: 'Anime trailer reaction', url: 'https://media.giphy.com/media/DK0JvB4lELa9u8S9qK/giphy.gif' },
-  { id: 'pf9aov3NFDYwvL7fZN', label: 'Jujutsu Kaisen laugh', url: 'https://media.giphy.com/media/pf9aov3NFDYwvL7fZN/giphy.gif' },
-  { id: 'pNP6FpP5iczjxv80pq', label: 'Uma Musume reaction', url: 'https://media.giphy.com/media/pNP6FpP5iczjxv80pq/giphy.gif' },
-  { id: 'DdXeghz17NWAMVa00H', label: 'Frieren reaction', url: 'https://media.giphy.com/media/DdXeghz17NWAMVa00H/giphy.gif' },
-  { id: 'UUjkoeNhnn0K4', label: 'Sailor Moon reaction', url: 'https://media.giphy.com/media/UUjkoeNhnn0K4/giphy.gif' },
-  { id: 'hiFDKrrP0PaeI', label: 'Soul Eater reaction', url: 'https://media.giphy.com/media/hiFDKrrP0PaeI/giphy.gif' }
-]
+function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
+  const [reactions, setReactions] = useState([])
+  const [search, setSearch] = useState('')
+  const [previews, setPreviews] = useState({})
+  const [failedPreviews, setFailedPreviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [selecting, setSelecting] = useState('')
+
+  useEffect(() => {
+    let active = true
+    const loadReactions = async () => {
+      try {
+        const response = await fetch(`${OTAKU_GIFS_API}/gif/allreactions`)
+        if (!response.ok) throw new Error('Could not load reactions')
+        const data = await response.json()
+        if (active && Array.isArray(data?.reactions)) setReactions(data.reactions)
+      } catch {
+        if (active) setError('Reaction search is unavailable right now. Showing popular reactions instead.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    loadReactions()
+    return () => { active = false }
+  }, [])
+
+  const availableReactions = useMemo(() => reactions.length ? reactions : FEATURED_REACTIONS, [reactions])
+  const featuredReactions = useMemo(() => {
+    const preferred = FEATURED_REACTIONS.filter((reaction) => availableReactions.includes(reaction))
+    return preferred.length ? preferred : availableReactions.slice(0, 18)
+  }, [availableReactions])
+  const visibleReactions = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return featuredReactions
+    return availableReactions.filter((reaction) => reaction.toLowerCase().includes(term)).slice(0, 42)
+  }, [availableReactions, featuredReactions, search])
+
+  useEffect(() => {
+    let active = true
+    const missing = visibleReactions.filter((reaction) => !previews[reaction] && !failedPreviews.includes(reaction))
+    if (!missing.length) return undefined
+    Promise.allSettled(missing.map(async (reaction) => [reaction, await fetchOtakuGif(reaction)]))
+      .then((results) => {
+        if (!active) return
+        const next = {}
+        const failed = []
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') next[result.value[0]] = result.value[1]
+          else failed.push(missing[index])
+        })
+        if (Object.keys(next).length) setPreviews((current) => ({ ...current, ...next }))
+        if (failed.length) setFailedPreviews((current) => [...new Set([...current, ...failed])])
+      })
+    return () => { active = false }
+  }, [failedPreviews, previews, visibleReactions])
+
+  const chooseReaction = async (reaction) => {
+    setSelecting(reaction)
+    setError('')
+    try {
+      const url = await fetchOtakuGif(reaction)
+      onSelect(url)
+    } catch {
+      setError('That GIF could not be loaded. Please choose another reaction.')
+    } finally {
+      setSelecting('')
+    }
+  }
+
+  return (
+    <GifPicker style={alignEnd ? { left: 'auto', right: 0 } : undefined}>
+      <GifPickerHead>
+        <div><strong>Anime reactions</strong><span> Powered by OtakuGIFs</span></div>
+        <IconButton type="button" aria-label="Close GIF picker" title="Close GIF picker" onClick={onClose}><FaTimes size={13} /></IconButton>
+      </GifPickerHead>
+      <GifSearch value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reactions: hug, laugh, blush…" aria-label="Search anime GIF reactions" />
+      {error && <ErrorMsg style={{ margin: '0 0 8px' }}>{error}</ErrorMsg>}
+      {loading ? (
+        <GifStatus>Loading anime reactions…</GifStatus>
+      ) : !visibleReactions.length ? (
+        <GifStatus>No reactions match “{search}”.</GifStatus>
+      ) : (
+        <GifGrid>
+          {visibleReactions.map((reaction) => (
+            <GifOption key={reaction} type="button" onClick={() => chooseReaction(reaction)} disabled={Boolean(selecting)} aria-label={`Add ${reactionLabel(reaction)} reaction GIF`}>
+              {previews[reaction] ? <GifThumb src={previews[reaction]} alt={`${reactionLabel(reaction)} anime reaction`} loading="lazy" /> : <GifStatus style={{ minHeight: 66 }}>{selecting === reaction ? 'Loading…' : reactionLabel(reaction)}</GifStatus>}
+              <GifLabel>{reactionLabel(reaction)}</GifLabel>
+            </GifOption>
+          ))}
+        </GifGrid>
+      )}
+    </GifPicker>
+  )
+}
 
 const renderItem = (c, reply, {
   profiles, likedIds, replyTo, replyText, busy, user,
@@ -380,11 +536,11 @@ const renderItem = (c, reply, {
               </SelectedGif>
             )}
             {showReplyGif && (
-              <GifPicker style={{ left: 'auto', right: 0 }}>
-                {ANIME_GIFS.map(g => (
-                  <GifThumb key={g.id} src={g.url} alt={g.label} title={g.label} loading="lazy" onClick={() => { setReplyGif(g.url); setShowReplyGif(false) }} />
-                ))}
-              </GifPicker>
+              <OtakuGifPicker
+                alignEnd
+                onClose={() => setShowReplyGif(false)}
+                onSelect={(url) => { setReplyGif(url); setShowReplyGif(false) }}
+              />
             )}
           </div>
         </Composer>
@@ -601,11 +757,10 @@ const Comments = ({ animeId, episodeNumber, label }) => {
               </SelectedGif>
             )}
             {showGifPicker && (
-              <GifPicker>
-                {ANIME_GIFS.map(g => (
-                  <GifThumb key={g.id} src={g.url} alt={g.label} title={g.label} loading="lazy" onClick={() => { setGif(g.url); setShowGifPicker(false) }} />
-                ))}
-              </GifPicker>
+              <OtakuGifPicker
+                onClose={() => setShowGifPicker(false)}
+                onSelect={(url) => { setGif(url); setShowGifPicker(false) }}
+              />
             )}
             {postError && <ErrorMsg style={{ marginTop: 8 }}>{postError}</ErrorMsg>}
           </div>
