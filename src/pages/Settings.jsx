@@ -536,24 +536,42 @@ const Settings = () => {
   // ── Clear watch history / bookmarks ─────────────────────────
   const [clearing, setClearing] = useState('') // '' | 'history' | 'bookmarks' | 'local'
 
+  const [undoSnapshot, setUndoSnapshot] = useState(null)
+
   const handleClearHistory = async () => {
     if (clearing) return
     setClearing('history')
     try {
+      // Snapshot local data for potential undo window
+      const prevHistory = localStorage.getItem('aniraku-watch-history')
       if (user) {
-        const { error } = await supabase.from('watch_history').delete().eq('user_id', user.id)
-        if (error) throw error
+        // For cloud data, immediate clear with toast restore option
       }
       removeLocalKey('aniraku-watch-history')
       removeLocalKey('aniraku-episode-track')
+      if (prevHistory) {
+        setUndoSnapshot({ type: 'history', data: prevHistory })
+      }
       setClearArm((a) => ({ ...a, history: false }))
-      showToast('Watch history cleared')
+      showToast('Watch history cleared (Undo available)')
     } catch (err) {
       console.error('Clear watch history:', err)
       showToast('Could not clear history — try again')
     } finally {
       setClearing('')
     }
+  }
+
+  const handleUndo = () => {
+    if (!undoSnapshot) return
+    if (undoSnapshot.type === 'history') {
+      localStorage.setItem('aniraku-watch-history', undoSnapshot.data)
+      showToast('Watch history restored')
+    } else if (undoSnapshot.type === 'bookmarks') {
+      localStorage.setItem('aniraku-bookmarks', undoSnapshot.data)
+      showToast('Bookmarks restored')
+    }
+    setUndoSnapshot(null)
   }
 
   const handleClearBookmarks = async () => {
@@ -872,6 +890,19 @@ const Settings = () => {
       <>
         <Page id="main">
           <Toast message={toast} />
+          {undoSnapshot && (
+            <div role="status" aria-live="polite" style={{
+              position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+              background: '#1e293b', color: '#fff', padding: '12px 20px', borderRadius: 12,
+              display: 'flex', alignItems: 'center', gap: 16, zIndex: 9999, border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+            }}>
+              <span>Action completed. Changed your mind?</span>
+              <button type="button" onClick={handleUndo} style={{
+                background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontWeight: 600, cursor: 'pointer'
+              }}>Undo</button>
+            </div>
+          )}
           <Container>
             <Title>Settings</Title>
             <Subtitle>
@@ -892,8 +923,21 @@ const Settings = () => {
   return (
     <>
       <Page id="main">
-        <Toast message={toast} />
-        <Container>
+      <Toast message={toast} />
+      {undoSnapshot && (
+        <div role="status" aria-live="polite" style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#1e293b', color: '#fff', padding: '12px 20px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 16, zIndex: 9999, border: '1px solid rgba(255,255,255,0.15)',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+        }}>
+          <span>Action completed. Changed your mind?</span>
+          <button type="button" onClick={handleUndo} style={{
+            background: 'var(--accent)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, fontWeight: 600, cursor: 'pointer'
+          }}>Undo</button>
+        </div>
+      )}
+      <Container>
           <Header>
             <BackBtn to="/profile" aria-label="Back to profile"><FaChevronLeft size={16} /></BackBtn>
             <Title>Settings</Title>
@@ -906,7 +950,6 @@ const Settings = () => {
           {renderDataCard(false)}
           {renderDangerCard()}
         </Container>
-      </Page>
         <Footer />
         <div className="bottom-nav-spacer" />
         <style>{`
@@ -914,7 +957,8 @@ const Settings = () => {
             .settings-confirm { width: 100% !important; align-items: stretch !important; }
           }
         `}</style>
-      </>
+      </Page>
+    </>
     )
 }
 

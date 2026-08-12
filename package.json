@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test:bots": "node scripts/bot-smoke-test.mjs",
+    "test:e2e": "playwright test",
     "generate-sitemap": "node scripts/generate-sitemap.js",
     "postbuild": "echo 'SEO files generated successfully'"
   },
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
