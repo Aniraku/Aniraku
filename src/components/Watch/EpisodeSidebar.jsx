@@ -1,13 +1,9 @@
-import React, { memo } from 'react'
+import React, { memo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FaSearch, FaStar, FaCheck } from 'react-icons/fa'
+import { FaSearch, FaStar, FaCheck, FaFastForward } from 'react-icons/fa'
 import { generateSlug } from '../../lib/slug'
 
 const EPISODES_PER_PAGE = 50
-
-// Memoized episode list: its props change only when the underlying data
-// changes, so the 500ms playback re-renders of the watch page never
-// rebuild the (potentially hundreds of) episode rows.
 
 const EpisodeRow = memo(function EpisodeRow({
   ep, num, isActive, animeId, animeTitle, watched, rated,
@@ -218,6 +214,18 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
   onToggleFillers,
   sidebarRef,
 }) {
+  const [jumpEp, setJumpEp] = useState('')
+
+  const handleJump = (e) => {
+    e.preventDefault()
+    const num = parseInt(jumpEp, 10)
+    if (!isNaN(num) && num >= 1 && num <= episodeCount) {
+      const targetPage = Math.floor((num - 1) / EPISODES_PER_PAGE)
+      onPageChange(targetPage)
+      setJumpEp('')
+    }
+  }
+
   return (
     <aside
       ref={sidebarRef}
@@ -286,38 +294,95 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
       </div>
 
       {episodeCount > EPISODES_PER_PAGE && (
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <FaSearch
-            style={{
-              position: 'absolute',
-              left: 10,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-              fontSize: 12,
-            }}
-            aria-hidden="true"
-          />
-          <input
-            type="text"
-            value={epSearch}
-            onChange={onSearch}
-            placeholder="Search episodes…"
-            aria-label="Search episodes"
-            style={{
-              width: '100%',
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: '8px 10px 8px 30px',
-              color: 'var(--text-primary)',
-              fontSize: 12,
-              boxSizing: 'border-box',
-              outline: 'none',
-              minHeight: 36,
-            }}
-          />
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <FaSearch
+                style={{
+                  position: 'absolute',
+                  left: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                }}
+                aria-hidden="true"
+              />
+              <input
+                type="text"
+                value={epSearch}
+                onChange={onSearch}
+                placeholder="Search episodes…"
+                aria-label="Search episodes"
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: '8px 10px 8px 30px',
+                  color: 'var(--text-primary)',
+                  fontSize: 12,
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  minHeight: 36,
+                }}
+              />
+            </div>
+            <form onSubmit={handleJump} style={{ display: 'flex', gap: 4, width: 90 }}>
+              <input
+                type="number"
+                min="1"
+                max={episodeCount}
+                value={jumpEp}
+                onChange={(e) => setJumpEp(e.target.value)}
+                placeholder="Jump#"
+                aria-label="Jump to episode number"
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: '8px 6px',
+                  color: 'var(--text-primary)',
+                  fontSize: 11,
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  minHeight: 36,
+                  textAlign: 'center',
+                }}
+              />
+            </form>
+          </div>
+          {episodeCount > 100 && (
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 6, marginBottom: 6 }} aria-label="Episode range selector">
+              {Array.from({ length: Math.ceil(episodeCount / 100) }, (_, i) => {
+                const start = i * 100 + 1
+                const end = Math.min(episodeCount, (i + 1) * 100)
+                const isCurrentRange = epPage >= i * 2 && epPage < (i + 1) * 2
+                return (
+                  <button
+                    key={start}
+                    type="button"
+                    onClick={() => onPageChange(i * 2)}
+                    style={{
+                      background: isCurrentRange ? 'rgba(99,102,241,0.2)' : 'var(--bg-elevated)',
+                      border: `1px solid ${isCurrentRange ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`,
+                      color: isCurrentRange ? '#a5b4fc' : 'var(--text-muted)',
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {start}–{end}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {totalEpPages > 1 && (
@@ -350,7 +415,7 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
             ←
           </button>
           <span style={{ color: 'var(--text-muted)' }}>
-            {epPage + 1}/{totalEpPages}
+            Page {epPage + 1} of {totalEpPages} ({episodeCount} eps)
           </span>
           <button
             type="button"

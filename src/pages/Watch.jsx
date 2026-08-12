@@ -2890,12 +2890,15 @@ export default function Watch() {
                   marginBottom: 12,
                 }}
               />
-              <div style={{ fontSize: 14, fontWeight: 500 }}>
-                Loading stream…
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
+                {slowStream ? 'Stream taking longer than expected…' : 'Preparing playback and finding available servers…'}
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>
+                {slowStream ? 'Server is waking up or network is congested.' : 'Establishing secure stream connection.'}
               </div>
               {slowStream && (
-                <div style={{ marginTop: 12, fontSize: 12, opacity: 0.8 }}>
-                  Stream is taking a while — try switching to another server.
+                <div style={{ marginTop: 4, fontSize: 12, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '6px 12px', borderRadius: 8 }}>
+                  Tip: Switch servers or use the recovery options below if playback does not start.
                 </div>
               )}
               {slowStream && (
