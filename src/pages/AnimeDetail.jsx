@@ -825,10 +825,12 @@ const AnimeDetail = () => {
                 {relations.map(r => <RelationCard key={r.id} r={{ node: r, relationType: r.relationType || '' }} />)}
               </Grid>
             )}
-
-            <Comments animeId={anime.id} />
           </Section>
         )}
+
+        <Section>
+          <Comments animeId={anime.id} />
+        </Section>
 
         {similarList?.length > 0 && (
           <Section>
