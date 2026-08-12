@@ -1871,24 +1871,7 @@ export default function Watch() {
               return next
             },
           },
-          {
-            name: 'skipIntro',
-            width: 220,
-            html: 'Skip intro now',
-            onSelect: () => {
-              skipSegmentNow('intro')
-              return 'Skip intro now'
-            },
-          },
-          {
-            name: 'skipOutro',
-            width: 220,
-            html: 'Skip outro now',
-            onSelect: () => {
-              skipSegmentNow('outro')
-              return 'Skip outro now'
-            },
-          },
+
           {
             name: 'playbackSpeed',
             width: 180,
@@ -3739,7 +3722,7 @@ export default function Watch() {
                     backdropFilter: 'blur(4px)',
                   }}
                 >
-                  <FaStepForward style={{ transform: 'scaleX(-1)' }} />
+                  <FaStepForward />
                   Skip Outro
                 </button>
               )}
