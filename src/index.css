@@ -938,3 +938,298 @@ select {
     transition: none !important;
   }
 }
+
+
+/* ============================================
+   CONSISTENT CONTENT SKELETONS
+   ============================================ */
+
+.ui-skeleton,
+.skeleton-card,
+.card-skeleton,
+.schedule-skeleton {
+  background: linear-gradient(110deg, #14161c 8%, #252936 18%, #14161c 33%);
+  background-size: 220% 100%;
+  animation: ui-skeleton-shimmer 1.35s linear infinite;
+}
+
+@keyframes ui-skeleton-shimmer {
+  to { background-position-x: -220%; }
+}
+
+.anime-card-skeleton {
+  min-width: 0;
+}
+
+.anime-card-skeleton-media {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-md);
+}
+
+.anime-card-skeleton-title {
+  width: 82%;
+  height: 13px;
+  margin-top: 10px;
+  border-radius: 5px;
+}
+
+.anime-card-skeleton-meta {
+  width: 48%;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 5px;
+}
+
+.watch-page-skeleton,
+.anime-detail-skeleton {
+  width: min(100%, 1280px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: clamp(12px, 3vw, 28px);
+}
+
+.watch-page-skeleton-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: clamp(0px, 1vw, 12px);
+}
+
+.watch-page-skeleton-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.watch-page-skeleton-line {
+  width: 55%;
+  height: 13px;
+  border-radius: 5px;
+}
+
+.watch-page-skeleton-line-wide { width: 76%; }
+.watch-page-skeleton-line-medium { width: 62%; }
+.watch-page-skeleton-line-short { width: 32%; }
+
+.watch-page-skeleton-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.watch-page-skeleton-pill {
+  width: 84px;
+  height: 36px;
+  border-radius: var(--radius-full);
+}
+
+.watch-page-skeleton-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+}
+
+.watch-page-skeleton-heading {
+  width: 48%;
+  height: 24px;
+  margin-bottom: 18px;
+  border-radius: 6px;
+}
+
+.watch-page-skeleton-sidebar {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(17,17,17,0.7);
+}
+
+.watch-page-skeleton-sidebar-heading {
+  width: 42%;
+  height: 16px;
+  margin-bottom: 14px;
+  border-radius: 5px;
+}
+
+.watch-page-skeleton-episode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.watch-page-skeleton-thumb {
+  width: 80px;
+  height: 45px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+
+.watch-page-skeleton-episode-title {
+  width: 130px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.watch-page-skeleton-episode-meta {
+  width: 54px;
+  height: 9px;
+  margin-top: 7px;
+  border-radius: 4px;
+}
+
+.anime-detail-skeleton-banner {
+  width: 100%;
+  height: clamp(180px, 28vw, 360px);
+  border-radius: var(--radius-xl);
+}
+
+.anime-detail-skeleton-content {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  margin-top: -72px;
+  padding: 0 clamp(14px, 4vw, 48px);
+  position: relative;
+}
+
+.anime-detail-skeleton-cover {
+  width: clamp(130px, 18vw, 220px);
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
+  flex: 0 0 auto;
+}
+
+.anime-detail-skeleton-info {
+  flex: 1;
+  padding-bottom: 10px;
+}
+
+.anime-detail-skeleton-title {
+  width: min(70%, 560px);
+  height: 28px;
+  border-radius: 7px;
+}
+
+.anime-detail-skeleton-meta {
+  width: 42%;
+  height: 13px;
+  margin-top: 14px;
+  border-radius: 5px;
+}
+
+.anime-detail-skeleton-description {
+  width: 92%;
+  height: 12px;
+  margin-top: 20px;
+  border-radius: 5px;
+}
+
+.anime-detail-skeleton-description-short { width: 68%; margin-top: 8px; }
+
+.anime-detail-skeleton-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.anime-detail-skeleton-button {
+  width: 112px;
+  height: 42px;
+  border-radius: 10px;
+}
+
+.anime-detail-skeleton-episodes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 30px;
+  padding: 0 clamp(14px, 4vw, 48px);
+}
+
+.anime-detail-skeleton-episode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.anime-detail-skeleton-episode-thumb {
+  width: 82px;
+  height: 46px;
+  border-radius: 6px;
+}
+
+.anime-detail-skeleton-episode-line {
+  width: 62%;
+  height: 12px;
+  border-radius: 5px;
+}
+
+.page-loader {
+  min-height: min(70dvh, 520px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.page-loader-ring {
+  width: 38px;
+  height: 38px;
+  border: 3px solid var(--border);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: page-loader-spin 800ms linear infinite;
+}
+
+@keyframes page-loader-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+  .watch-page-skeleton-grid { grid-template-columns: 1fr; }
+  .watch-page-skeleton-sidebar { display: none; }
+  .anime-detail-skeleton-content {
+    align-items: flex-start;
+    margin-top: -44px;
+    padding-inline: 12px;
+  }
+  .anime-detail-skeleton-cover { width: 112px; }
+  .anime-detail-skeleton-title { width: 100%; height: 22px; }
+  .anime-detail-skeleton-meta { width: 72%; }
+  .anime-detail-skeleton-episodes {
+    grid-template-columns: 1fr;
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .anime-detail-skeleton-content { gap: 14px; }
+  .anime-detail-skeleton-cover { width: 88px; }
+  .anime-detail-skeleton-description { width: 100%; }
+  .anime-detail-skeleton-actions { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton,
+  .skeleton-card,
+  .card-skeleton,
+  .schedule-skeleton,
+  .page-loader-ring {
+    animation: none !important;
+  }
+}
+
+.home-card-skeleton {
+  width: 150px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 480px) {
+  .home-card-skeleton { width: 130px; }
+}

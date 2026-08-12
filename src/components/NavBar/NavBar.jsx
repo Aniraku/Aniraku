@@ -107,7 +107,7 @@ const NavBar = () => {
   }
 
   return (
-    <N.Nav isScrolled={isScrolled} isHome={isHome}>
+    <N.Nav $isScrolled={isScrolled} $isHome={isHome}>
       <N.LayoutBg open={open} onClick={() => setOpen(false)} />
       <N.Left>
         <N.MenuBtn onClick={() => setOpen(true)} aria-expanded={open} aria-controls="sidebar-menu">

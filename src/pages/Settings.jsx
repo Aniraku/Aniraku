@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import Footer from '../components/Footer/Footer'
 import { getSyncStatus, syncAuthorize, syncDisconnect, PROVIDER_LABELS } from '../lib/sync'
 import ProviderIcon from '../components/ProviderIcon'
+import { PageLoader } from '../components/Skeletons/Skeletons'
 
 // Clear only this site's data. localStorage.clear() wipes every other app
 // on the same origin scope — and on the deployed site that origin is shared
@@ -877,13 +878,7 @@ const Settings = () => {
     </Card>
   )
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 40, height: 40, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      </div>
-    )
-  }
+  if (loading) return <PageLoader label="Loading settings" />
 
   if (!user) {
     return (

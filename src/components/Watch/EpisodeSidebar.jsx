@@ -158,7 +158,7 @@ const EpisodeRow = memo(function EpisodeRow({
               RECAP
             </span>
           )}
-          {rated && (
+          {Number(rated) > 0 && (
             <span
               title={`You rated this episode ${rated}/10`}
               style={{
@@ -447,7 +447,7 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
           // Canonical episode numbering: derive number from position in the list
           // to permanently fix the "10x" multiplication bug from providers.
           const absoluteIndex = epPage * EPISODES_PER_PAGE + i
-          const num = ep.number || absoluteIndex + 1
+          const num = absoluteIndex + 1
           return (
             <EpisodeRow
               key={num}
