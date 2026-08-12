@@ -16,43 +16,61 @@ const Page = styled.div`
   min-height: 100vh;
   background: var(--bg);
   color: var(--text-primary);
+  position: relative;
+  overflow-x: hidden;
+`
+
+const PageBackground = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.15;
+  background-image: url(${p => p.$src});
+  background-size: cover;
+  background-position: center;
+  filter: blur(60px) brightness(0.5);
+  transform: scale(1.1);
 `
 
 const Banner = styled.div`
   position: relative;
-  height: 350px;
+  height: 400px;
   overflow: hidden;
-  @media (max-width: 768px) { height: 260px; }
-  @media (max-width: 480px) { height: 220px; }
+  z-index: 1;
+  @media (max-width: 768px) { height: 300px; }
+  @media (max-width: 480px) { height: 260px; }
 `
 
 const BannerImg = styled.img`
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(20px) brightness(0.3);
-  transform: scale(1.2);
+  filter: brightness(0.5);
 `
 
 const BannerOverlay = styled.div`
   position: absolute;
   inset: 0;
-  background: linear-gradient(transparent 0%, var(--bg) 100%);
+  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 50%, var(--bg) 100%);
 `
 
 const BannerContent = styled.div`
   position: absolute;
-  bottom: 20px;
+  bottom: 30px;
   left: 0;
   right: 0;
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 32px;
   display: flex;
-  gap: 24px;
+  gap: 32px;
   align-items: flex-end;
-  @media (max-width: 768px) { gap: 16px; padding: 0 16px; }
-  @media (max-width: 480px) { gap: 12px; padding: 0 12px; }
+  @media (max-width: 768px) { gap: 20px; padding: 0 20px; bottom: 20px; }
+  @media (max-width: 480px) { gap: 16px; padding: 0 16px; bottom: 16px; }
 `
 
 const Cover = styled.img`
@@ -142,11 +160,11 @@ const BookmarkBtn = styled.button`
 `
 
 const Content = styled.div`
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 20px;
-  @media (max-width: 768px) { padding: 20px 16px; }
-  @media (max-width: 480px) { padding: 16px 12px; }
+  padding: 32px 32px;
+  @media (max-width: 768px) { padding: 24px 20px; }
+  @media (max-width: 480px) { padding: 20px 16px; }
 `
 
 const Section = styled.section`
@@ -657,7 +675,8 @@ const AnimeDetail = () => {
 
   return (
     <Page>
-      <main>
+      <PageBackground $src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} />
+      <main style={{ position: 'relative', zIndex: 1 }}>
       <Banner>
         <BannerImg src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} alt="" />
         <BannerOverlay />
