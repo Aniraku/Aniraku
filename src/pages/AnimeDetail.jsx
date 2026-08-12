@@ -519,6 +519,7 @@ const AnimeDetail = () => {
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [activeTab, setActiveTab] = useState('episodes')
   const [episodes, setEpisodes] = useState([])
+  const [episodesFallback, setEpisodesFallback] = useState(false)
   const [hideFillers, setHideFillers] = useState(false)
 
   const { data: anime, isLoading } = useAnimeDetails(id)
@@ -566,31 +567,65 @@ const AnimeDetail = () => {
   }, [anime])
 
   React.useEffect(() => {
-    if (!anime) return
-    fetch(`${API_BASE}/api/v1/anime/${id}/episodes`)
-      .then(r => r.ok ? r.json() : { episodes: [] })
-      .then(epData => {
-        const eps = epData?.episodes
-        if (eps?.length > 0) {
-          setEpisodes(eps)
-        } else if (anime?.episodes) {
-          setEpisodes(Array.from({ length: anime.episodes }, (_, i) => ({
-            number: i + 1,
-            title: `Episode ${i + 1}`,
-            thumbnail: anime.coverImage?.medium || '',
-          })))
+    if (!anime) return undefined
+    const controller = new AbortController()
+    let cancelled = false
+
+    const fallbackEpisodes = () => {
+      if (!anime?.episodes) return []
+      return Array.from({ length: anime.episodes }, (_, i) => ({
+        number: i + 1,
+        title: `Episode ${i + 1}`,
+        thumbnail: anime.coverImage?.medium || anime.coverImage?.large || '',
+      }))
+    }
+
+    const loadEpisodes = async () => {
+      setEpisodesFallback(false)
+      try {
+        let response
+        let lastError
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            response = await fetch(`${API_BASE}/api/v1/anime/${id}/episodes`, {
+              signal: controller.signal,
+              headers: { Accept: 'application/json' },
+            })
+            if (response.ok) break
+            lastError = new Error(`Episode API returned ${response.status}`)
+          } catch (error) {
+            if (error?.name === 'AbortError') return
+            lastError = error
+          }
+          if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350))
         }
-      })
-      .catch(() => {
-        if (anime?.episodes) {
-          setEpisodes(Array.from({ length: anime.episodes }, (_, i) => ({
-            number: i + 1,
-            title: `Episode ${i + 1}`,
-            thumbnail: anime.coverImage?.medium || '',
-          })))
+
+        if (!response?.ok) throw lastError || new Error('Episode API unavailable')
+        const epData = await response.json()
+        const eps = Array.isArray(epData?.episodes)
+          ? epData.episodes.filter(Boolean).map((ep, index) => ({
+            ...ep,
+            number: Number(ep.number) > 0 ? Number(ep.number) : index + 1,
+          }))
+          : []
+        if (!cancelled) {
+          setEpisodes(eps.length > 0 ? eps : fallbackEpisodes())
+          setEpisodesFallback(eps.length === 0)
         }
-      })
+      } catch (error) {
+        if (error?.name === 'AbortError' || cancelled) return
+        const fallback = fallbackEpisodes()
+        setEpisodes(fallback)
+        setEpisodesFallback(fallback.length > 0)
+      }
+    }
+
+    loadEpisodes()
     setActiveTab('episodes')
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [anime, id])
 
   const toggleBookmark = () => {
@@ -674,7 +709,7 @@ const AnimeDetail = () => {
   if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
 
   return (
-    <Page>
+    <Page className="anime-detail-page">
       <PageBackground $src={anime.coverImage?.extraLarge || anime.coverImage?.large || ''} />
       <main style={{ position: 'relative', zIndex: 1 }}>
       <Banner>
@@ -732,6 +767,11 @@ const AnimeDetail = () => {
 
             {activeTab === 'episodes' && hasEpisodes && (
               <>
+                {episodesFallback && (
+                  <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
+                    Episode details are temporarily unavailable, so the standard episode list is being shown.
+                  </div>
+                )}
                 {hiddenEpCount > 0 && (
                   <FilterBtn $active={hideFillers} onClick={() => setHideFillers(p => !p)}>
                     {hideFillers ? '✓ Showing canon only' : 'Hide filler & recap'}
