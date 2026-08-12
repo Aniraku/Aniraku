@@ -64,6 +64,14 @@ const IS_MOBILE =
   /webOS|BlackBerry|IEMobile|Opera Mini|Mobile Safari/i.test(UA)
 const IS_TV =
   /Smart-TV|Apple-TV|GoogleTV|AndroidTV|HbbTV|NetCast|VIERA|SMART-TV/i.test(UA)
+
+function getCompactWatchLayout() {
+  if (typeof window === 'undefined') return IS_MOBILE
+  const narrow = window.matchMedia?.('(max-width: 768px)')?.matches
+  const touch = window.matchMedia?.('(hover: none) and (pointer: coarse)')?.matches
+  return Boolean(narrow || touch || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024))
+}
+
 const PREFERS_REDUCED_MOTION =
   typeof window !== 'undefined' &&
   window.matchMedia &&
@@ -804,6 +812,24 @@ export default function Watch() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
+  const [compactWatchLayout, setCompactWatchLayout] = useState(getCompactWatchLayout)
+  const compactWatchLayoutRef = useRef(compactWatchLayout)
+  compactWatchLayoutRef.current = compactWatchLayout
+
+  useEffect(() => {
+    const updateLayout = () => setCompactWatchLayout(getCompactWatchLayout())
+    updateLayout()
+    window.addEventListener('resize', updateLayout, { passive: true })
+    const mediaQueries = [
+      window.matchMedia?.('(max-width: 768px)'),
+      window.matchMedia?.('(hover: none) and (pointer: coarse)'),
+    ].filter(Boolean)
+    mediaQueries.forEach((query) => query.addEventListener?.('change', updateLayout))
+    return () => {
+      window.removeEventListener('resize', updateLayout)
+      mediaQueries.forEach((query) => query.removeEventListener?.('change', updateLayout))
+    }
+  }, [])
 
   // Refs
   const artRef = useRef(null)
@@ -1804,7 +1830,7 @@ export default function Watch() {
         autoSize: false,
         // Minimizing into a floating corner fights the mobile UI (and iOS
         // scroll-locking); on desktop it is a nice touch.
-        autoMini: !IS_MOBILE,
+        autoMini: !IS_MOBILE && !compactWatchLayoutRef.current,
         fullscreen: true,
         fullscreenWeb: true,
         mutex: true,
@@ -2203,7 +2229,7 @@ export default function Watch() {
             if (position < segment.start - 3) autoSkippedRef.current[type] = false
             if (
               !autoSkippedRef.current[type] &&
-              position >= Math.max(0, segment.start - 0.5) &&
+              position >= segment.start + 1 &&
               position < segment.end - 0.5
             ) {
               const duration = Number(art.video.duration) || 0
@@ -3672,7 +3698,7 @@ export default function Watch() {
                 position: 'absolute',
                 right: 'clamp(8px, 2.2vw, 18px)',
                 bottom: 'calc(42px + env(safe-area-inset-bottom, 0px))',
-                zIndex: 8,
+                zIndex: 100,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
@@ -3837,7 +3863,7 @@ export default function Watch() {
             className="watch-ep-toggle"
             aria-expanded={showEpSidebar}
           style={{
-            display: IS_MOBILE ? 'flex' : 'none',
+            display: compactWatchLayout ? 'flex' : 'none',
             width: 'calc(100% - 16px)',
             padding: '12px 14px',
             margin: '12px auto 0',
@@ -4064,7 +4090,7 @@ export default function Watch() {
           {!isMovie && (
             <div
               style={{
-                display: !showEpSidebar && IS_MOBILE ? 'none' : 'block',
+                display: !showEpSidebar && compactWatchLayout ? 'none' : 'block',
               }}
             >
               <EpisodeSidebar
@@ -4112,10 +4138,10 @@ export default function Watch() {
           className="watch-comments-fab"
           style={{
             position: 'fixed',
-            bottom: IS_MOBILE
+            bottom: compactWatchLayout
               ? `calc(76px + env(safe-area-inset-bottom, 0px))`
               : `calc(20px + env(safe-area-inset-bottom, 0px))`,
-            right: IS_MOBILE
+            right: compactWatchLayout
               ? `calc(10px + env(safe-area-inset-right, 0px))`
               : `calc(20px + env(safe-area-inset-right, 0px))`,
             zIndex: 60,
@@ -4126,8 +4152,8 @@ export default function Watch() {
             color: 'var(--bg)',
             border: 'none',
             borderRadius: 999,
-            padding: IS_MOBILE ? '10px 14px' : '12px 18px',
-            fontSize: IS_MOBILE ? 12 : 13,
+            padding: compactWatchLayout ? '10px 14px' : '12px 18px',
+            fontSize: compactWatchLayout ? 12 : 13,
             fontWeight: 600,
             cursor: 'pointer',
             boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
@@ -4287,6 +4313,21 @@ export default function Watch() {
           .watch-rating { gap: 6px !important; }
           .watch-rating span:last-child { gap: 2px !important; }
           .watch-rating span:last-child svg { width: 12px !important; height: 12px !important; }
+          .watch-skip-overlay { right: 8px !important; max-width: calc(100% - 16px) !important; }
+          .watch-skip-btn { min-height: 44px !important; padding: 8px 10px !important; font-size: 12px !important; }
+        }
+        @media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+          .watch-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
+          .watch-page { padding: 8px !important; }
+          .watch-episodes { width: 100% !important; max-height: 46dvh; }
+          .watch-art-mount .art-controls { min-height: 42px; }
+          .watch-skip-overlay { bottom: calc(44px + env(safe-area-inset-bottom, 0px)) !important; }
+        }
+        @media (orientation: landscape) and (max-height: 560px) {
+          .watch-player { max-height: calc(100dvh - 12px); }
+          .watch-page { padding: 4px !important; }
+          .watch-comments-fab { bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
+          .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
         }
         @media (max-width: 480px) {
           .watch-nav { gap: 6px !important; }

@@ -16,10 +16,15 @@ const Bar = styled.nav`
   border-radius: 9999px;
   padding: 6px 10px;
   gap: 4px;
-  z-index: 999;
+  z-index: 80;
   box-shadow: 0 6px 28px rgba(0,0,0,0.6);
 
   @media (max-width: 768px) {
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
     display: flex;
     align-items: center;
   }
