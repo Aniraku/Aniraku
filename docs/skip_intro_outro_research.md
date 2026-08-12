@@ -45,3 +45,6 @@ The new local preview exposes the `Auto-skip ON` control on the Watch page. The 
 
 ## Browser Validation Finding
 A direct browser request returned HTTP 400 when the query included `mixed_op` and `mixed_ed`. The current AniSkip endpoint accepts the standard `op` and `ed` types verified by the earlier curl test, so the client request must not include unsupported mixed variants. This is a real integration bug to fix before release.
+
+## Release Verification
+The browser-origin request to AniSkip using only `types[]=op`, `types[]=ed`, and `episodeLength=0` returned HTTP 200 with real `op` and `ed` intervals. The production build completed successfully, and the player-menu update is released in commit `ab2a783` on `origin/main`.
