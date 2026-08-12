@@ -444,22 +444,10 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
         style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
       >
         {pagedEps.map((ep, i) => {
+          // Canonical episode numbering: derive number from position in the list
+          // to permanently fix the "10x" multiplication bug from providers.
           const absoluteIndex = epPage * EPISODES_PER_PAGE + i
-          const getNum = (item) => {
-            const n = Number(item?.number)
-            return Number.isFinite(n) ? n : null
-          }
-
-          // Keep the sidebar correct even when an older API/cache response
-          // reaches this component before Watch.jsx can normalize it.
-          const firstNum = getNum(filteredEps[0])
-          const secondNum = filteredEps.length > 1 ? getNum(filteredEps[1]) : null
-          const is10xBug =
-            (firstNum === 10 && (filteredEps.length === 1 || secondNum === 20)) ||
-            (filteredEps.length > 1 &&
-              filteredEps.every((item, idx) => getNum(item) === (idx + 1) * 10))
-
-          const num = is10xBug ? absoluteIndex + 1 : getNum(ep) || absoluteIndex + 1
+          const num = ep.number || absoluteIndex + 1
           return (
             <EpisodeRow
               key={num}

@@ -130,29 +130,16 @@ const SEEK_SECONDS = 10
 // Some older episode payloads were serialized as 10, 20, 30, ... instead of
 // 1, 2, 3, .... Correct only that unmistakable sequence; valid provider
 // episode numbers such as 10, 11, 12 remain unchanged.
+// Canonical episode numbering: derive number from position in the list
+// to permanently fix the "10x" multiplication bug from providers.
 function normalizeEpisodeList(list) {
   const rows = Array.isArray(list) ? list.filter(Boolean) : []
-  if (rows.length === 0) return []
-
-  const getNum = (ep) => {
-    const n = Number(ep?.number)
-    return Number.isFinite(n) ? n : null
-  }
-
-  // Detect the 10x bug:
-  // - All episodes are multiples of 10 and increasing (10, 20, 30...)
-  // - OR the first episode is 10 and the second is 20
-  const firstNum = getNum(rows[0])
-  const secondNum = rows.length > 1 ? getNum(rows[1]) : null
-
-  const is10xBug =
-    (firstNum === 10 && (rows.length === 1 || secondNum === 20)) ||
-    (rows.length > 1 &&
-      rows.every((ep, i) => getNum(ep) === (i + 1) * 10))
-
   return rows.map((ep, i) => ({
     ...ep,
-    number: is10xBug ? i + 1 : getNum(ep) || i + 1,
+    // Permanent fix: always use the 1-based index as the canonical episode number.
+    // This prevents provider-level "10, 20, 30" bugs from reaching the UI.
+    number: i + 1,
+    originalNumber: ep.number, // Keep original just in case, but never render it.
   }))
 }
 
