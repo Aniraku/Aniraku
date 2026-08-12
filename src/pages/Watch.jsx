@@ -225,15 +225,21 @@ function readSkipCache(malId, episode) {
     if (!raw) return null
     const cached = JSON.parse(raw)
     if (!cached?.savedAt || Date.now() - cached.savedAt > SKIP_CACHE_TTL_MS) return null
-    return cached.segments || null
+    return {
+      segments: cached.segments || null,
+      notFound: cached.notFound === true,
+    }
   } catch {
     return null
   }
 }
 
-function writeSkipCache(malId, episode, segments) {
+function writeSkipCache(malId, episode, segments, notFound = false) {
   try {
-    localStorage.setItem(skipCacheKey(malId, episode), JSON.stringify({ savedAt: Date.now(), segments }))
+    localStorage.setItem(
+      skipCacheKey(malId, episode),
+      JSON.stringify({ savedAt: Date.now(), segments, notFound })
+    )
   } catch {
     // Storage can be disabled in private browsing; playback must continue.
   }
@@ -1467,7 +1473,7 @@ export default function Watch() {
     const load = async () => {
       const cached = readSkipCache(malId, epNumber)
       if (cached) {
-        if (!cancelled) applySkipSegments(cached)
+        if (!cancelled && cached.segments) applySkipSegments(cached.segments)
         return
       }
       const params = new URLSearchParams()
@@ -1480,10 +1486,18 @@ export default function Watch() {
           headers: { Accept: 'application/json' },
           cache: 'no-store',
         })
+        if (response.status === 404) {
+          writeSkipCache(malId, epNumber, null, true)
+          return
+        }
         if (!response.ok) return
         const payload = await response.json()
         const segments = normalizeAniSkipSegments(payload)
-        if (cancelled || (!segments.intro && !segments.outro)) return
+        if (cancelled) return
+        if (!segments.intro && !segments.outro) {
+          writeSkipCache(malId, epNumber, null, true)
+          return
+        }
         writeSkipCache(malId, epNumber, segments)
         applySkipSegments(segments)
       } catch (error) {
