@@ -127,6 +127,27 @@ function classifyStreamError(err, data) {
 // ────────────────────────────────────────────────────────────────
 const SEEK_SECONDS = 10
 
+// Some older episode payloads were serialized as 10, 20, 30, ... instead of
+// 1, 2, 3, .... Correct only that unmistakable sequence; valid provider
+// episode numbers such as 10, 11, 12 remain unchanged.
+function normalizeEpisodeList(list) {
+  const rows = Array.isArray(list) ? list.filter(Boolean) : []
+  const parsedNumbers = rows.map((ep) => {
+    const value = Number(ep?.number)
+    return Number.isFinite(value) && value > 0 ? value : null
+  })
+  const isLegacyTensSequence =
+    rows.length > 1 &&
+    parsedNumbers.every((value, index) => value === (index + 1) * 10)
+
+  return rows.map((ep, index) => ({
+    ...ep,
+    number: isLegacyTensSequence
+      ? index + 1
+      : parsedNumbers[index] || index + 1,
+  }))
+}
+
 function formatTime(s) {
   if (typeof s !== 'number' || !isFinite(s) || s < 0) return '0:00'
   const m = Math.floor(s / 60)
@@ -1263,7 +1284,7 @@ export default function Watch() {
         }
         if (cancelled) return
         setAnime(animeData)
-        setEpisodes(epData?.episodes || [])
+        setEpisodes(normalizeEpisodeList(epData?.episodes))
         setBackendHealthy(true)
       } catch (e) {
         if (cancelled) return
