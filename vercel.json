@@ -25,7 +25,7 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; media-src 'self' blob: data: https:; connect-src 'self' https://*.supabase.co https://api.aniraku.tech https://graphql.anilist.co https://corsproxy.io https://api.allorigins.win https://api.codetabs.com https://*.akirax.buzz https://*.kotocdn.site https://*.norami.top https://*.uwucdn.top https://*.owocdn.top https://*.fast4speed.rsvp https://*.ibyteimg.com https://*.ipstatp.com https://*.anidb.app https://*.allmanga.to https://*.vivibebe.site https://api.aniskip.com https://api.otakugifs.xyz; worker-src 'self' blob:; frame-ancestors 'none'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; media-src 'self' blob: data: https:; connect-src 'self' https://*.supabase.co https://api.aniraku.tech https://graphql.anilist.co https://corsproxy.io https://api.allorigins.win https://api.codetabs.com https://*.akirax.buzz https://*.kotocdn.site https://*.norami.top https://*.uwucdn.top https://*.owocdn.top https://*.fast4speed.rsvp https://*.ibyteimg.com https://*.ipstatp.com https://*.anidb.app https://*.allmanga.to https://*.vivibebe.site https://api.aniskip.com https://api.otakugifs.xyz https://api.gifukai.com; worker-src 'self' blob:; frame-ancestors 'none'; form-action 'self'"
         }
       ]
     },

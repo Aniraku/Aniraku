@@ -1,13 +1,22 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { FaPlay, FaFire, FaStar, FaTv, FaFilm } from 'react-icons/fa'
+import {
+  FaArrowRight,
+  FaBolt,
+  FaCalendarAlt,
+  FaCompass,
+  FaFilm,
+  FaFire,
+  FaPlay,
+  FaStar,
+  FaTv,
+} from 'react-icons/fa'
 import Hero from '../components/Hero/Hero'
 import ContinueWatching from '../components/ContinueWatching'
-import Trending from '../components/Trending/Trending'
 import Card from '../components/Card/Card'
 import Footer from '../components/Footer/Footer'
-import { useAiring, useMovies, useSeries, useHomePageData } from '../hooks/useAnime'
+import { useHomePageData } from '../hooks/useAnime'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
@@ -15,304 +24,384 @@ import { supabase } from '../lib/supabase'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import { AnimeCardSkeleton } from '../components/Skeletons/Skeletons'
 
-const Section = styled.section`
-  max-width: 1400px;
+const Page = styled.main`
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(139,92,246,0.09), transparent 25%),
+    var(--bg);
+`
+
+const Shell = styled.div`
+  width: min(100%, 1480px);
   margin: 0 auto;
-  padding: 0 1rem;
-  margin-bottom: 2rem;
+  padding: 0 clamp(14px, 3vw, 48px) 88px;
 
-  @media (max-width: 480px) {
-    padding: 0 12px;
-    margin-bottom: 1rem;
+  @media (max-width: 640px) {
+    padding: 0 12px 76px;
   }
 `
 
-const SectionTitle = styled.h2`
-  color: var(--text-primary);
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  display: flex;
+const DiscoveryDock = styled.section`
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
-  gap: 0.5rem;
-  &::before {
-    content: '';
-    width: 4px;
-    height: 1.1em;
-    background: var(--accent);
-    border-radius: 2px;
-  }
-  a {
-    margin-left: auto;
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    font-weight: 500;
-    text-decoration: none;
-    transition: color 0.2s;
-    &:hover { color: var(--accent); }
-  }
-  @media (max-width: 480px) {
-    font-size: 1.1rem;
-    margin-bottom: 0.75rem;
-  }
-`
-
-const ScrollRow = styled.div`
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  padding-bottom: 4px;
-  &::-webkit-scrollbar { display: none; }
-  > div { scroll-snap-align: start; flex: 0 0 auto; width: 150px; }
-  @media (max-width: 480px) {
-    gap: 10px;
-    > div { width: 130px; }
-  }
-`
-
-const GenreChip = styled(Link)`
-  background: var(--bg-elevated);
+  margin-top: -25px;
+  padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px 10px;
-  text-decoration: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  min-height: unset !important;
-  min-width: unset !important;
-  transition: all 0.2s;
-  &:hover {
-    border-color: var(--accent);
-    color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: -16px;
   }
-  @media (max-width: 480px) {
-    padding: 2px 8px;
+`
+
+const DockCopy = styled.div`
+  min-width: 0;
+  padding: 3px 6px;
+
+  p {
+    margin: 0 0 4px;
+    color: var(--accent);
     font-size: 10px;
-    border-radius: 6px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
   }
+
+  h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: clamp(16px, 2vw, 20px);
+    letter-spacing: -0.025em;
+  }
+
+  span { color: var(--text-secondary); }
 `
 
-const GenreRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-
-  @media (max-width: 480px) {
-    gap: 4px;
-  }
-`
-
-const QuickLinks = styled.div`
+const DockActions = styled.nav`
   display: flex;
   gap: 8px;
-  margin-bottom: 1.5rem;
   overflow-x: auto;
-  padding: 0 1rem;
-  padding-bottom: 6px;
+  padding: 1px;
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
-  @media (max-width: 480px) {
-    gap: 6px;
-    margin-bottom: 1rem;
-    padding: 0 12px;
-  }
 `
 
-const QuickLink = styled(Link)`
+const DockLink = styled(Link)`
+  display: inline-flex;
+  min-height: 40px;
   flex: 0 0 auto;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  text-decoration: none;
-  color: var(--text-primary);
-  font-size: 0.8rem;
-  font-weight: 500;
-  display: flex;
   align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-  white-space: nowrap;
-  -webkit-tap-highlight-color: transparent;
-  &:active {
-    transform: scale(0.97);
-    background: var(--bg-elevated);
-  }
-  &:hover {
-    border-color: var(--accent);
-    background: var(--bg-elevated);
-  }
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  touch-action: manipulation;
+
   svg { color: var(--accent); }
-  @media (max-width: 480px) {
-    padding: 12px 14px;
-    font-size: 0.8rem;
+  &:hover { border-color: var(--border-hover); background: var(--bg-elevated); color: var(--text-primary); }
+  &:active { transform: scale(0.97); }
+`
+
+const Section = styled.section`
+  margin-top: clamp(36px, 5vw, 64px);
+`
+
+const SectionHead = styled.div`
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+`
+
+const Heading = styled.div`
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+
+  > svg { flex: 0 0 auto; color: var(--accent); }
+
+  h2 {
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: clamp(18px, 2.1vw, 25px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    margin: 3px 0 0;
+    color: var(--text-secondary);
+    font-size: 12px;
   }
 `
 
-const GuestBanner = styled.section`
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2.5rem 1rem;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 2.5rem;
+const ViewAll = styled(Link)`
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+  &:hover { color: var(--text-primary); }
+  @media (max-width: 560px) { font-size: 0; gap: 0; }
+  @media (max-width: 560px) svg { width: 15px; height: 15px; }
+`
 
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-    padding: 1.75rem 1rem;
+const Rail = styled.div`
+  display: flex;
+  gap: clamp(10px, 1.3vw, 16px);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 4px 3px 15px;
+  margin: 0 -3px -15px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+
+  > div, > .home-card-skeleton {
+    width: clamp(140px, 13.8vw, 202px);
+    flex: 0 0 auto;
+    scroll-snap-align: start;
   }
+
+  @media (max-width: 640px) {
+    gap: 10px;
+    > div, > .home-card-skeleton { width: 132px; }
+  }
+`
+
+const GuestPanel = styled.section`
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(250px, 0.75fr);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: center;
+  margin-top: clamp(32px, 5vw, 62px);
+  padding: clamp(22px, 4vw, 46px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 88% 18%, rgba(139,92,246,0.15), transparent 35%),
+    var(--bg-card);
+
+  @media (max-width: 800px) { grid-template-columns: 1fr; }
 `
 
 const GuestCopy = styled.div`
-  h1 {
-    font-size: clamp(1.75rem, 4vw, 2.75rem);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin-bottom: 1rem;
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
+
+  h2 {
+    max-width: 16ch;
+    margin: 0;
+    color: var(--text-primary);
+    font-size: clamp(26px, 4vw, 42px);
+    line-height: 1.04;
+    letter-spacing: -0.05em;
+  }
+
   p {
+    max-width: 58ch;
+    margin: 14px 0 0;
     color: var(--text-secondary);
-    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
-    line-height: 1.6;
-    max-width: 46ch;
+    font-size: 14px;
+    line-height: 1.65;
   }
 `
 
-const GuestCTA = styled.div`
+const GuestCtas = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 1.5rem;
+  gap: 9px;
+  margin-top: 20px;
 `
 
-const GuestCtaLink = styled(Link)`
-  padding: 12px 22px;
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-decoration: none;
+const GuestCta = styled(Link)`
   display: inline-flex;
+  min-height: 43px;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  padding: 0 15px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
   transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+
+  &.primary { background: var(--accent); color: var(--bg); }
+  &.secondary { border: 1px solid var(--border-hover); background: var(--bg-elevated); }
+  &:hover { background: var(--accent-dim); color: var(--bg); border-color: var(--accent-dim); }
   &:active { transform: scale(0.97); }
-
-  &.primary {
-    background: var(--accent);
-    color: #000;
-    &:hover { background: var(--accent-dim); }
-  }
-  &.ghost {
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    &:hover { border-color: var(--border-hover); background: var(--bg-elevated); }
-  }
 `
 
-const FeatureGrid = styled.div`
+const BenefitGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
 
-  @media (max-width: 480px) {
-    grid-template-columns: 1fr;
-  }
+  @media (max-width: 440px) { grid-template-columns: 1fr; }
 `
 
-const Feature = styled.div`
-  background: var(--bg-card);
+const Benefit = styled.div`
+  min-height: 126px;
+  padding: 15px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 16px;
-  h3 {
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  p {
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    line-height: 1.5;
-  }
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+
+  svg { color: var(--accent); }
+  h3 { margin: 12px 0 5px; color: var(--text-primary); font-size: 13px; }
+  p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
 `
 
-const skeletonRow = Array.from({ length: 6 }, (_, i) => i)
+const GenreShelf = styled.div`
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 20px;
+  align-items: center;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+
+  h2 { margin: 0; color: var(--text-primary); font-size: clamp(20px, 2.4vw, 30px); letter-spacing: -0.035em; }
+  p { margin: 8px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+
+  @media (max-width: 760px) { grid-template-columns: 1fr; gap: 16px; }
+`
+
+const GenreGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`
+
+const GenreChip = styled(Link)`
+  display: inline-flex;
+  min-height: 35px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  &:hover { border-color: var(--border-hover); background: var(--bg-secondary); color: var(--text-primary); }
+  &:active { transform: scale(0.97); }
+`
+
+const SkeletonRail = () => (
+  <Rail aria-label="Loading anime titles">
+    {Array.from({ length: 6 }, (_, index) => <AnimeCardSkeleton key={index} className="home-card-skeleton" />)}
+  </Rail>
+)
+
+function AnimeRail({ title, subtitle, icon, href, items, ready }) {
+  const Icon = icon
+  return (
+    <Section>
+      <SectionHead>
+        <Heading>
+          <Icon size={16} />
+          <div><h2>{title}</h2><p>{subtitle}</p></div>
+        </Heading>
+        <ViewAll to={href}>View all <FaArrowRight size={12} /></ViewAll>
+      </SectionHead>
+      {ready ? <Rail>{items.slice(0, 18).map((item) => <Card key={item.id} data={item} />)}</Rail> : <SkeletonRail />}
+    </Section>
+  )
+}
+
+const genres = ['Action', 'Romance', 'Comedy', 'Fantasy', 'Sci-Fi', 'Horror', 'Slice of Life', 'Sports', 'Supernatural', 'Mystery', 'Drama', 'Adventure']
 
 const Home = () => {
-  const genres = [
-    'Action', 'Romance', 'Comedy', 'Sci-Fi', 'Horror',
-    'Slice of Life', 'Sports', 'Supernatural', 'Mystery', 'Drama',
-  ]
-
   const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
   const { trending = [], airing = [], movies = [], topTV = [] } = homeData
-
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
+  const trendingList = useStreamable(filterAdult(trending, nsfwEnabled))
   const airingList = useStreamable(filterAdult(airing, nsfwEnabled))
   const moviesList = useStreamable(filterAdult(movies, nsfwEnabled))
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
 
-  // Set homepage SEO metadata on mount
-  React.useEffect(() => {
-    setHomepageSEO()
-  }, [])
+  useEffect(() => { setHomepageSEO() }, [])
 
-  // Check bookmarked anime for new episodes (only notify when Miruro has them)
-  React.useEffect(() => {
-    if (!user) return
+  useEffect(() => {
+    if (!user) return undefined
     let cancelled = false
     const check = async () => {
-      let bm = []
-      try {
-        bm = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]')
-      } catch {}
+      let bookmarks = []
+      try { bookmarks = JSON.parse(localStorage.getItem('aniraku-bookmarks') || '[]') } catch { /* stale local storage is non-fatal */ }
       try {
         const { data } = await supabase.from('bookmarks').select('anime_id,title').eq('user_id', user.id)
-        if (data?.length) bm = data.map(b => ({ id: b.anime_id, title: b.title }))
-      } catch {}
-      if (!bm.length || cancelled) return
+        if (data?.length) bookmarks = data.map((bookmark) => ({ id: bookmark.anime_id, title: bookmark.title }))
+      } catch { /* server bookmarks are optional for the homepage notice */ }
+      if (!bookmarks.length || cancelled) return
+
       const lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}')
       const now = Date.now()
       const api = import.meta.env.VITE_API_URL || ''
-
-      bm.forEach(b => {
-        if (lastKnown[b.id] && now - lastKnown[b.id].t < 21600000) return
-        anilistQuery(ANIME_DETAIL_QUERY, { id: b.id }).then(({ data }) => {
-          const m = data?.Media
-          if (!m || m.status !== 'RELEASING') return
-          const eps = m.nextAiringEpisode?.episode ? m.nextAiringEpisode.episode - 1 : (m.episodes || 0)
-          if (eps <= (lastKnown[b.id]?.e || 0)) return
-          // Verify Miruro has this episode before notifying
-          if (api) {
-            fetch(`${api}/api/v1/miruro/episodes/${b.id}`)
-              .then(r => r.ok ? r.json() : Promise.reject())
-              .then(d => {
-                const providers = d?.providers || {}
-                let hasEp = false
-                Object.values(providers).forEach(p => {
-                  const subs = p?.episodes?.sub || []
-                  subs.forEach(e => { if (e.number === eps) hasEp = true })
-                })
-                if (!hasEp) return
-                lastKnown[b.id] = { e: eps, t: now }
-                localStorage.setItem('aniraku-episode-track', JSON.stringify(lastKnown))
-                supabase.from('notifications').insert({
-                  user_id: user.id, type: 'new_episode',
-                  message: `Episode ${eps} of ${b.title} is now available`,
-                  anime_id: b.id,
-                }).then()
+      bookmarks.forEach((bookmark) => {
+        if (lastKnown[bookmark.id] && now - lastKnown[bookmark.id].t < 21600000) return
+        anilistQuery(ANIME_DETAIL_QUERY, { id: bookmark.id }).then(({ data }) => {
+          const media = data?.Media
+          if (!media || media.status !== 'RELEASING') return
+          const episode = media.nextAiringEpisode?.episode ? media.nextAiringEpisode.episode - 1 : (media.episodes || 0)
+          if (episode <= (lastKnown[bookmark.id]?.e || 0) || !api) return
+          fetch(`${api}/api/v1/miruro/episodes/${bookmark.id}`)
+            .then((response) => response.ok ? response.json() : Promise.reject())
+            .then((payload) => {
+              const hasEpisode = Object.values(payload?.providers || {}).some((provider) => (provider?.episodes?.sub || []).some((item) => item.number === episode))
+              if (!hasEpisode || cancelled) return
+              lastKnown[bookmark.id] = { e: episode, t: now }
+              localStorage.setItem('aniraku-episode-track', JSON.stringify(lastKnown))
+              return supabase.from('notifications').insert({
+                user_id: user.id,
+                type: 'new_episode',
+                message: `Episode ${episode} of ${bookmark.title} is now available`,
+                anime_id: bookmark.id,
               })
-              .catch(() => {})
-          }
+            })
+            .catch(() => {})
         }).catch(() => {})
       })
     }
@@ -322,110 +411,56 @@ const Home = () => {
 
   return (
     <>
-      <main>
-      <Hero />
+      <Page>
+        <Hero />
+        <Shell>
+          <DiscoveryDock>
+            <DockCopy><p>Start here</p><h2>New stories, <span>one tap away.</span></h2></DockCopy>
+            <DockActions aria-label="Explore anime">
+              <DockLink to="/catalog?status=RELEASING"><FaBolt /> Airing now</DockLink>
+              <DockLink to="/catalog?sort=POPULARITY_DESC"><FaFire /> Most popular</DockLink>
+              <DockLink to="/schedule"><FaCalendarAlt /> Schedule</DockLink>
+              <DockLink to="/catalog?view=all"><FaCompass /> Explore all</DockLink>
+            </DockActions>
+          </DiscoveryDock>
 
-      {!user && (
-        <GuestBanner>
-          <GuestCopy>
-            <h1>Watch anime free, in HD.</h1>
-            <p>
-              Sub or dub, subtitles, multiple servers — no ads and no account
-              needed to start watching. Log in to sync your history and
-              bookmarks across devices and push your progress to MyAnimeList
-              and AniList automatically.
-            </p>
-            <GuestCTA>
-              <GuestCtaLink className="primary" to="/catalog"><FaPlay size={12} /> Start Watching</GuestCtaLink>
-              <GuestCtaLink className="ghost" to="/login">Log In</GuestCtaLink>
-              <GuestCtaLink className="ghost" to="/signup">Create Account</GuestCtaLink>
-            </GuestCTA>
-          </GuestCopy>
-          <FeatureGrid>
-            <Feature>
-              <h3><FaPlay size={12} /> No ads</h3>
-              <p>Watch uninterrupted with no trackers or ad breaks.</p>
-            </Feature>
-            <Feature>
-              <h3><FaTv size={12} /> Sub & dub</h3>
-              <p>Switch languages and quality without leaving the player.</p>
-            </Feature>
-            <Feature>
-              <h3><FaStar size={12} /> MAL & AniList sync</h3>
-              <p>Finish an episode here, and your MyAnimeList and AniList libraries update themselves.</p>
-            </Feature>
-          </FeatureGrid>
-        </GuestBanner>
-      )}
+          {!user && (
+            <GuestPanel>
+              <GuestCopy>
+                <div className="eyebrow"><FaPlay size={11} /> Watch your way</div>
+                <h2>Anime discovery without the clutter.</h2>
+                <p>Start streaming immediately, then create an account only when you want to sync history, ratings, bookmarks, and progress across your devices.</p>
+                <GuestCtas>
+                  <GuestCta className="primary" to="/catalog"><FaPlay size={12} /> Browse anime</GuestCta>
+                  <GuestCta className="secondary" to="/signup">Create free account</GuestCta>
+                </GuestCtas>
+              </GuestCopy>
+              <BenefitGrid>
+                <Benefit><FaPlay size={15} /><h3>No barriers</h3><p>Jump directly into sub and dub streams.</p></Benefit>
+                <Benefit><FaTv size={15} /><h3>Built for choice</h3><p>Providers, subtitles, and quality in one player.</p></Benefit>
+                <Benefit><FaStar size={15} /><h3>Your history</h3><p>Keep progress and episode ratings where you need them.</p></Benefit>
+              </BenefitGrid>
+            </GuestPanel>
+          )}
 
-      <ContinueWatching />
+          <ContinueWatching />
+          <AnimeRail title="Trending now" subtitle="The shows people are watching right now" icon={FaFire} href="/catalog?sort=POPULARITY_DESC" items={trendingList} ready={homeDone} />
+          <AnimeRail title="Fresh episodes" subtitle="Current series with new episodes on the way" icon={FaTv} href="/catalog?status=RELEASING" items={airingList} ready={homeDone} />
+          <AnimeRail title="Movie night" subtitle="Highly rated anime films for your next watch" icon={FaFilm} href="/catalog?format=MOVIE&sort=SCORE_DESC" items={moviesList} ready={homeDone} />
+          <AnimeRail title="Top rated series" subtitle="Fan favourites worth putting on your list" icon={FaStar} href="/catalog?format=TV&sort=SCORE_DESC" items={tvList} ready={homeDone} />
 
-      <QuickLinks>
-        <QuickLink to="/catalog?sort=POPULARITY_DESC"><FaFire /> Most Popular</QuickLink>
-        <QuickLink to="/catalog?status=RELEASING"><FaPlay /> Airing Now</QuickLink>
-        <QuickLink to="/catalog?sort=SCORE_DESC"><FaStar /> Top Rated</QuickLink>
-      </QuickLinks>
-
-      <Trending />
-
-      {/* Airing Now */}
-      <Section>
-        <SectionTitle>
-          <FaTv size={16} /> Airing Now
-          <Link to="/catalog?status=RELEASING">View All</Link>
-        </SectionTitle>
-        <ScrollRow>
-          {homeDone ? airingList.slice(0, 15).map(item => (
-            <Card key={item.id} data={item} />
-          )) : skeletonRow.map(i => (
-            <AnimeCardSkeleton key={`sk-air-${i}`} className="home-card-skeleton" />
-          ))}
-        </ScrollRow>
-      </Section>
-
-      {/* Top Movies */}
-      <Section>
-        <SectionTitle>
-          <FaFilm size={16} /> Top Movies
-          <Link to="/catalog?format=MOVIE&sort=SCORE_DESC">View All</Link>
-        </SectionTitle>
-        <ScrollRow>
-          {homeDone ? moviesList.slice(0, 15).map(item => (
-            <Card key={item.id} data={item} />
-          )) : skeletonRow.map(i => (
-            <AnimeCardSkeleton key={`sk-mov-${i}`} className="home-card-skeleton" />
-          ))}
-        </ScrollRow>
-      </Section>
-
-      {/* Top Rated TV */}
-      <Section>
-        <SectionTitle>
-          <FaStar size={16} /> Top Rated TV
-          <Link to="/catalog?format=TV&sort=SCORE_DESC">View All</Link>
-        </SectionTitle>
-        <ScrollRow>
-          {homeDone ? tvList.slice(0, 15).map(item => (
-            <Card key={item.id} data={item} />
-          )) : skeletonRow.map(i => (
-            <AnimeCardSkeleton key={`sk-tv-${i}`} className="home-card-skeleton" />
-          ))}
-        </ScrollRow>
-      </Section>
-
-      <Section>
-        <SectionTitle>Browse by Tags</SectionTitle>
-        <GenreRow>
-          {genres.map(g => (
-            <GenreChip key={g} to={`/catalog?genre=${encodeURIComponent(g)}`}>{g}</GenreChip>
-          ))}
-        </GenreRow>
-      </Section>
-
-      </main>
+          <Section>
+            <GenreShelf>
+              <div><h2>Find your next genre.</h2><p>Browse a focused collection, then refine it in the full Catalog when you know exactly what you want.</p></div>
+              <GenreGrid>
+                {genres.map((genre) => <GenreChip key={genre} to={`/catalog?genre=${encodeURIComponent(genre)}`}>{genre}</GenreChip>)}
+              </GenreGrid>
+            </GenreShelf>
+          </Section>
+        </Shell>
+      </Page>
       <Footer />
       <div className="bottom-nav-spacer" />
-      <style>{`@media(max-width:480px){.card-skeleton{width:130px!important}}`}</style>
     </>
   )
 }

@@ -5,26 +5,27 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import styled from 'styled-components'
 
-const OTAKU_GIFS_API = 'https://api.otakugifs.xyz'
-const FEATURED_REACTIONS = [
-  'happy', 'hug', 'laugh', 'blush', 'smug', 'cry', 'wink', 'angrystare',
-  'celebrate', 'dance', 'pat', 'thumbsup', 'pout', 'stare', 'shy', 'yes', 'woah', 'airkiss',
+const GIFUKAI_API = 'https://api.gifukai.com/v1'
+const FEATURED_ACTIONS = [
+  'happy', 'hug', 'laugh', 'blush', 'smug', 'cry', 'wink', 'dance', 'pat',
+  'thumbsup', 'pout', 'stare', 'shy', 'yay', 'surprised', 'facepalm', 'wave', 'cuddle',
 ]
-const otakuGifCache = new Map()
+const gifukaiCache = new Map()
 
-const reactionLabel = (reaction) => reaction
+const actionLabel = (action) => action
   .replace(/([a-z])([A-Z])/g, '$1 $2')
   .replace(/[-_]/g, ' ')
   .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
-const fetchOtakuGif = async (reaction) => {
-  if (otakuGifCache.has(reaction)) return otakuGifCache.get(reaction)
-  const response = await fetch(`${OTAKU_GIFS_API}/gif?reaction=${encodeURIComponent(reaction)}&format=GIF`)
+const fetchGifukaiGif = async (action) => {
+  if (gifukaiCache.has(action)) return gifukaiCache.get(action)
+  const response = await fetch(`${GIFUKAI_API}/${encodeURIComponent(action)}`)
   if (!response.ok) throw new Error('Could not load this reaction')
   const data = await response.json()
-  if (!data?.url) throw new Error('OtakuGIFs returned no image')
-  otakuGifCache.set(reaction, data.url)
-  return data.url
+  if (!data?.url || data.content_type !== 'image/gif') throw new Error('Gifukai returned no GIF')
+  const result = { url: data.url, anime: data.anime || 'Anime source', action: data.action || action }
+  gifukaiCache.set(action, result)
+  return result
 }
 
 const cleanContent = (raw) => {
@@ -146,13 +147,21 @@ const GifThumb = styled.img`
 const GifLabel = styled.span`
   display: block;
   overflow: hidden;
+  min-height: 32px;
   padding: 5px 6px 6px;
   color: var(--text-secondary);
   font-size: 10px;
-  font-weight: 650;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
+  strong, small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong { color: var(--text-primary); font-size: 10px; font-weight: 700; }
+  small { margin-top: 2px; color: var(--text-muted); font-size: 9px; }
 `
 
 const GifStatus = styled.div`
@@ -381,8 +390,8 @@ const AvatarBlock = ({ url, name }) => url
   ? <Avatar src={url} alt="" />
   : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
-function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
-  const [reactions, setReactions] = useState([])
+function GifukaiPicker({ onSelect, onClose, alignEnd = false }) {
+  const [actions, setActions] = useState({})
   const [search, setSearch] = useState('')
   const [previews, setPreviews] = useState({})
   const [failedPreviews, setFailedPreviews] = useState([])
@@ -392,38 +401,44 @@ function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
 
   useEffect(() => {
     let active = true
-    const loadReactions = async () => {
+    const loadActions = async () => {
       try {
-        const response = await fetch(`${OTAKU_GIFS_API}/gif/allreactions`)
+        const response = await fetch(`${GIFUKAI_API}/actions`)
         if (!response.ok) throw new Error('Could not load reactions')
         const data = await response.json()
-        if (active && Array.isArray(data?.reactions)) setReactions(data.reactions)
+        if (active && data?.actions && typeof data.actions === 'object') setActions(data.actions)
       } catch {
-        if (active) setError('Reaction search is unavailable right now. Showing popular reactions instead.')
+        if (active) setError('Live reactions are unavailable right now. Showing popular actions instead.')
       } finally {
         if (active) setLoading(false)
       }
     }
-    loadReactions()
+    loadActions()
     return () => { active = false }
   }, [])
 
-  const availableReactions = useMemo(() => reactions.length ? reactions : FEATURED_REACTIONS, [reactions])
-  const featuredReactions = useMemo(() => {
-    const preferred = FEATURED_REACTIONS.filter((reaction) => availableReactions.includes(reaction))
-    return preferred.length ? preferred : availableReactions.slice(0, 18)
-  }, [availableReactions])
-  const visibleReactions = useMemo(() => {
+  const actionNames = useMemo(() => Object.keys(actions), [actions])
+  const availableActions = useMemo(() => actionNames.length ? actionNames : FEATURED_ACTIONS, [actionNames])
+  const featuredActions = useMemo(() => {
+    const preferred = FEATURED_ACTIONS.filter((action) => availableActions.includes(action))
+    return preferred.length ? preferred : availableActions.slice(0, 18)
+  }, [availableActions])
+  const visibleActions = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return featuredReactions
-    return availableReactions.filter((reaction) => reaction.toLowerCase().includes(term)).slice(0, 42)
-  }, [availableReactions, featuredReactions, search])
+    const matches = (action) => {
+      if (action.includes(term)) return true
+      return (actions[action]?.aliases || []).some((item) => item.alias?.toLowerCase().includes(term))
+        || previews[action]?.anime?.toLowerCase().includes(term)
+    }
+    if (!term) return featuredActions
+    return availableActions.filter(matches).slice(0, 42)
+  }, [actions, availableActions, featuredActions, previews, search])
 
   useEffect(() => {
     let active = true
-    const missing = visibleReactions.filter((reaction) => !previews[reaction] && !failedPreviews.includes(reaction))
+    const missing = visibleActions.filter((action) => !previews[action] && !failedPreviews.includes(action)).slice(0, 24)
     if (!missing.length) return undefined
-    Promise.allSettled(missing.map(async (reaction) => [reaction, await fetchOtakuGif(reaction)]))
+    Promise.allSettled(missing.map(async (action) => [action, await fetchGifukaiGif(action)]))
       .then((results) => {
         if (!active) return
         const next = {}
@@ -436,16 +451,16 @@ function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
         if (failed.length) setFailedPreviews((current) => [...new Set([...current, ...failed])])
       })
     return () => { active = false }
-  }, [failedPreviews, previews, visibleReactions])
+  }, [failedPreviews, previews, visibleActions])
 
-  const chooseReaction = async (reaction) => {
-    setSelecting(reaction)
+  const chooseAction = async (action) => {
+    setSelecting(action)
     setError('')
     try {
-      const url = await fetchOtakuGif(reaction)
-      onSelect(url)
+      const gif = await fetchGifukaiGif(action)
+      onSelect(gif.url)
     } catch {
-      setError('That GIF could not be loaded. Please choose another reaction.')
+      setError('That anime GIF could not be loaded. Please choose another action.')
     } finally {
       setSelecting('')
     }
@@ -454,23 +469,26 @@ function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
   return (
     <GifPicker style={alignEnd ? { left: 'auto', right: 0 } : undefined}>
       <GifPickerHead>
-        <div><strong>Anime reactions</strong><span> Powered by OtakuGIFs</span></div>
+        <div><strong>Anime GIFs</strong><span> Live reactions by Gifukai</span></div>
         <IconButton type="button" aria-label="Close GIF picker" title="Close GIF picker" onClick={onClose}><FaTimes size={13} /></IconButton>
       </GifPickerHead>
-      <GifSearch value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reactions: hug, laugh, blush…" aria-label="Search anime GIF reactions" />
+      <GifSearch value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reactions: hug, laugh, headpat…" aria-label="Search anime GIF reactions" />
       {error && <ErrorMsg style={{ margin: '0 0 8px' }}>{error}</ErrorMsg>}
       {loading ? (
-        <GifStatus>Loading anime reactions…</GifStatus>
-      ) : !visibleReactions.length ? (
-        <GifStatus>No reactions match “{search}”.</GifStatus>
+        <GifStatus>Loading the live anime GIF catalogue…</GifStatus>
+      ) : !visibleActions.length ? (
+        <GifStatus>No reaction or loaded source matches “{search}”. Try “hug”, “laugh”, or “headpat”.</GifStatus>
       ) : (
         <GifGrid>
-          {visibleReactions.map((reaction) => (
-            <GifOption key={reaction} type="button" onClick={() => chooseReaction(reaction)} disabled={Boolean(selecting)} aria-label={`Add ${reactionLabel(reaction)} reaction GIF`}>
-              {previews[reaction] ? <GifThumb src={previews[reaction]} alt={`${reactionLabel(reaction)} anime reaction`} loading="lazy" /> : <GifStatus style={{ minHeight: 66 }}>{selecting === reaction ? 'Loading…' : reactionLabel(reaction)}</GifStatus>}
-              <GifLabel>{reactionLabel(reaction)}</GifLabel>
-            </GifOption>
-          ))}
+          {visibleActions.map((action) => {
+            const gif = previews[action]
+            return (
+              <GifOption key={action} type="button" onClick={() => chooseAction(action)} disabled={Boolean(selecting)} aria-label={`Add ${actionLabel(action)} anime reaction GIF`}>
+                {gif ? <GifThumb src={gif.url} alt={`${actionLabel(gif.action)} reaction from ${gif.anime}`} loading="lazy" /> : <GifStatus style={{ minHeight: 66 }}>{selecting === action ? 'Loading…' : actionLabel(action)}</GifStatus>}
+                <GifLabel title={gif ? `${actionLabel(action)} · ${gif.anime}` : actionLabel(action)}><strong>{actionLabel(action)}</strong>{gif && <small>{gif.anime}</small>}</GifLabel>
+              </GifOption>
+            )
+          })}
         </GifGrid>
       )}
     </GifPicker>
@@ -536,7 +554,7 @@ const renderItem = (c, reply, {
               </SelectedGif>
             )}
             {showReplyGif && (
-              <OtakuGifPicker
+              <GifukaiPicker
                 alignEnd
                 onClose={() => setShowReplyGif(false)}
                 onSelect={(url) => { setReplyGif(url); setShowReplyGif(false) }}
@@ -757,7 +775,7 @@ const Comments = ({ animeId, episodeNumber, label }) => {
               </SelectedGif>
             )}
             {showGifPicker && (
-              <OtakuGifPicker
+              <GifukaiPicker
                 onClose={() => setShowGifPicker(false)}
                 onSelect={(url) => { setGif(url); setShowGifPicker(false) }}
               />
