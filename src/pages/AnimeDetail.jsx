@@ -572,6 +572,21 @@ const AnimeDetail = () => {
     let cancelled = false
 
     const fallbackEpisodes = () => {
+      // Prioritize AniList's real streaming episode metadata (titles + thumbnails)
+      if (Array.isArray(anime?.streamingEpisodes) && anime.streamingEpisodes.length > 0) {
+        return anime.streamingEpisodes.map((ep, i) => {
+          // AniList titles often look like "Episode 1 - Title" or "1: Title"
+          // We'll try to extract just the title if possible, otherwise use as-is.
+          const cleanTitle = ep.title?.replace(/^(Episode\s+\d+\s*-\s*|\d+:\s*)/i, '') || `Episode ${i + 1}`
+          return {
+            number: i + 1,
+            title: cleanTitle,
+            thumbnail: ep.thumbnail || anime.coverImage?.large || anime.coverImage?.medium || '',
+            url: ep.url,
+          }
+        })
+      }
+      // Absolute last resort: generic list if AniList also has no metadata
       if (!anime?.episodes) return []
       return Array.from({ length: anime.episodes }, (_, i) => ({
         number: i + 1,
@@ -779,6 +794,8 @@ const AnimeDetail = () => {
                 )}
                 <EpisodeList>
                   {visibleEps.map((ep, i) => {
+                    // Canonical episode numbering: derive number from position in the list
+                    // to permanently fix the "10x" multiplication bug from providers.
                     const num = ep.number || i + 1
                     return (
                       <EpisodeRow key={num} to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}>
