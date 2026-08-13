@@ -1,12 +1,12 @@
 # Anime GIF picker integration
 
-The comment and reply composers use the public [Gifukai API](https://gifukai.com/docs), a browser-compatible anime reaction service that does not require users to sign in or the site owner to configure an API key.
+The comment and reply composers use the public [OtakuGIFs API](https://otakugifs.xyz/api), the verified browser-compatible anime reaction source for Aniraku’s frontend-only architecture. It requires no user login, API key, or backend proxy.
 
 | Endpoint | Purpose | Picker behavior |
 | --- | --- | --- |
-| `GET https://api.gifukai.com/v1/actions` | Returns the live action catalogue and aliases. | Populates searchable reaction actions such as `hug`, `laugh`, `headpat`, `facepalm`, `dance`, and `wink`. |
-| `GET https://api.gifukai.com/v1/{action}` | Returns a random curated anime GIF for an action. | Supplies lazy previews, source-anime metadata, and the GIF selected for a comment or reply. |
+| `GET https://api.otakugifs.xyz/gif/allreactions` | Returns the live reaction catalogue. | Populates about 70 searchable anime reaction categories, including `hug`, `laugh`, `headbang`, `facepalm`, `wink`, `cuddle`, and `thumbsup`. |
+| `GET https://api.otakugifs.xyz/gif?reaction={reaction}&format=GIF` | Returns a selected animated reaction. | Supplies lazy tile previews and the GIF added to a comment or reply. |
 
-The picker loads a curated default set of popular reactions and dynamically expands to the provider’s live catalogue, which contains roughly seventy actions and aliases. It supports aliases such as `headpat`, `lol`, `flustered`, and `meow`, labels each loaded preview with its source anime, preserves keyboard access, and keeps touch targets safely sized for mobile users.
+The picker shows eighteen useful reactions by default, searches the broader live catalogue, caches successful GIF URLs for the active browser session, lazy-loads up to twenty-four visible previews at a time, and keeps accessible touch-safe buttons on smaller screens. If reaction-catalogue discovery is temporarily unavailable, the familiar featured actions remain available as a fallback.
 
-This frontend-only provider is intentionally limited to high-quality anime reactions. It does not advertise unsupported universal character search: a reliable every-title/every-character GIF index requires a provider with a developer credential or a first-party search service. The implementation is no-key, no-user-auth, and resilient: dynamic action discovery falls back to the popular action set if the provider is temporarily unavailable. Vercel’s Content Security Policy permits direct `https://api.gifukai.com` requests; returned CDN GIFs are covered by the existing HTTPS image policy.
+The provider was tested from Aniraku’s own browser preview origin. The catalogue returned HTTP 200 and the `hug` request returned a valid animated CDN URL. A prior Gifukai attempt was removed because it failed cross-origin from Aniraku’s browser origin despite responding from its documentation domain. The picker intentionally does not claim to provide every anime title or character search: no verified no-key, frontend-only provider offers that capability reliably.

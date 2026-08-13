@@ -53,9 +53,16 @@ const HeroCopy = styled.div`
   p { max-width: 58ch; margin: 12px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.58; }
 `
 
+const HeroAside = styled.div`
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  @media (max-width: 680px) { justify-items: start; }
+`
+
 const ScheduleNote = styled.div`
   display: flex;
-  min-height: 46px;
+  min-height: 40px;
   align-items: center;
   gap: 9px;
   padding: 0 13px;
@@ -70,6 +77,25 @@ const ScheduleNote = styled.div`
   @media (max-width: 680px) { width: fit-content; }
 `
 
+const NextUp = styled(Link)`
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  min-width: min(100%, 245px);
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+  color: inherit;
+  text-decoration: none;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  svg { grid-row: span 2; align-self: center; color: var(--accent); }
+  small { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
+  strong { overflow: hidden; color: var(--text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  &:hover { transform: translateY(-1px); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--bg-card)); }
+  &:active { transform: scale(0.98); }
+`
+
 const ControlPanel = styled.section`
   padding: 12px;
   border: 1px solid var(--border);
@@ -78,6 +104,36 @@ const ControlPanel = styled.section`
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+`
+
+const ControlsTop = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+
+  p { margin: 0; color: var(--text-muted); font-size: 11px; font-weight: 650; }
+`
+
+const TodayButton = styled.button`
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  svg { color: var(--accent); }
+  &:hover { border-color: var(--accent); color: var(--text-primary); }
+  &:active { transform: scale(0.96); }
 `
 
 const SearchBox = styled.div`
@@ -137,6 +193,7 @@ const DayTab = styled.button`
 
   strong { font-size: 12px; font-weight: 800; }
   span { font-size: 10px; font-weight: 700; opacity: 0.72; }
+  em { color: inherit; font-size: 8px; font-style: normal; font-weight: 850; letter-spacing: 0.06em; opacity: 0.72; text-transform: uppercase; }
   &:hover { border-color: var(--accent); }
   &:active { transform: scale(0.96); }
 
@@ -211,6 +268,7 @@ const AiringInfo = styled.div`
   h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 14px; font-weight: 760; letter-spacing: -0.015em; text-overflow: ellipsis; white-space: nowrap; }
   p { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; }
   .episode { color: var(--accent); font-weight: 750; }
+  .relative { margin-top: 4px; color: var(--text-muted); font-size: 10px; font-weight: 700; }
 `
 
 const TimeBox = styled.div`
@@ -290,12 +348,22 @@ const Schedule = () => {
 
   useEffect(() => { setScheduleSEO() }, [])
 
-  const dayOptions = useMemo(() => DAYS.map((day, index) => {
-    const date = new Date()
-    const offset = (index - todayIndex + 7) % 7
-    date.setDate(date.getDate() + offset)
-    return { day, label: day.slice(0, 3), date: date.toLocaleDateString([], { day: 'numeric' }) }
-  }), [todayIndex])
+  const dayOptions = useMemo(() => {
+    const weekStart = new Date()
+    weekStart.setHours(0, 0, 0, 0)
+    weekStart.setDate(weekStart.getDate() - todayIndex)
+    return DAYS.map((day, index) => {
+      const date = new Date(weekStart)
+      date.setDate(weekStart.getDate() + index)
+      return {
+        day,
+        label: day.slice(0, 3),
+        date: date.toLocaleDateString([], { day: 'numeric' }),
+        fullDate: date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }),
+        isToday: index === todayIndex,
+      }
+    })
+  }, [todayIndex])
 
   const { nsfwEnabled } = useNsfw()
   const streamed = useStreamable(filterAdult(Array.isArray(data) ? data : [], nsfwEnabled))
@@ -306,8 +374,19 @@ const Schedule = () => {
   })
 
   const formatTime = (timestamp) => new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const relativeTime = (timestamp) => {
+    const diff = timestamp * 1000 - Date.now()
+    const minutes = Math.round(Math.abs(diff) / 60000)
+    if (minutes < 2) return diff >= 0 ? 'Airing now' : 'Aired moments ago'
+    if (minutes < 60) return diff >= 0 ? `In ${minutes} min` : `${minutes} min ago`
+    const hours = Math.round(minutes / 60)
+    if (hours < 24) return diff >= 0 ? `In ${hours}h` : `${hours}h ago`
+    const days = Math.round(hours / 24)
+    return diff >= 0 ? `In ${days}d` : `${days}d ago`
+  }
   const titleFor = (item) => item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Unknown title'
   const activeDate = dayOptions.find((item) => item.day === activeDay)
+  const nextRelease = streamed.find((item) => item.airingAt * 1000 >= Date.now())
 
   return (
     <>
@@ -319,10 +398,17 @@ const Schedule = () => {
               <h1>Never miss an episode.</h1>
               <p>See what is airing next, search the week ahead, and open any show directly when it is time to watch.</p>
             </HeroCopy>
-            <ScheduleNote><FaTv size={14} /> Times shown in your local timezone</ScheduleNote>
+            <HeroAside>
+              <ScheduleNote><FaTv size={14} /> Times shown in your local timezone</ScheduleNote>
+              {nextRelease && <NextUp to={`/anime/${generateSlug(titleFor(nextRelease))}-${nextRelease.id}`} title={`Open ${titleFor(nextRelease)}`}><FaClock size={13} /><small>Next release · {relativeTime(nextRelease.airingAt)}</small><strong>{titleFor(nextRelease)} · Ep {nextRelease.episode}</strong></NextUp>}
+            </HeroAside>
           </Hero>
 
           <ControlPanel>
+            <ControlsTop>
+              <p>Browse the current calendar week, with air times converted for your device.</p>
+              <TodayButton type="button" onClick={() => { setActiveDay(DAYS[todayIndex]); setSearchInput('') }}><FaCalendarAlt size={11} /> Today</TodayButton>
+            </ControlsTop>
             <SearchBox>
               <FaSearch size={14} />
               <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search this week’s releases" aria-label="Search weekly anime schedule" />
@@ -331,7 +417,7 @@ const Schedule = () => {
             <DaysRow aria-label="Select a day of the week">
               {dayOptions.map((option) => (
                 <DayTab key={option.day} type="button" $active={activeDay === option.day} aria-pressed={activeDay === option.day} onClick={() => setActiveDay(option.day)}>
-                  <strong>{option.label}</strong><span>{option.date}</span>
+                  <strong>{option.label}</strong><span>{option.date}</span>{option.isToday && <em>Today</em>}
                 </DayTab>
               ))}
             </DaysRow>
@@ -340,7 +426,7 @@ const Schedule = () => {
           <ScheduleSummary>
             <div>
               <h2>{activeDay} releases</h2>
-              <p>{activeDate ? `${activeDate.label} ${activeDate.date}` : activeDay} · Updated from the current AniList airing data</p>
+              <p>{activeDate?.fullDate || activeDay} · Air times are shown in your device timezone</p>
             </div>
             {!isLoading && !error && <Count>{dayItems.length} {dayItems.length === 1 ? 'release' : 'releases'}</Count>}
           </ScheduleSummary>
@@ -366,6 +452,7 @@ const Schedule = () => {
                     <AiringInfo>
                       <h3>{title}</h3>
                       <p><span className="episode">Episode {item.episode}</span> · {item.format || 'TV'}</p>
+                      <p className="relative">{relativeTime(item.airingAt)}</p>
                       <MobileTime><FaClock size={10} /> {time}</MobileTime>
                     </AiringInfo>
                     <TimeBox><FaClock size={12} /><strong>{time}</strong><span>View details <FaArrowRight size={9} /></span></TimeBox>

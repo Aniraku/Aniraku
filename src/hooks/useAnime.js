@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY, ANIME_DETAIL_QUERY, RECOMMEND_QUERY, TRENDING_QUERY } from '../lib/anilist'
+import { anilistQuery, BROWSE_QUERY, ANIME_DETAIL_QUERY, RECOMMEND_QUERY } from '../lib/anilist'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -10,9 +10,10 @@ async function fetchHomePageData() {
   const { data } = await anilistQuery(`
     query {
       trending: Page(page: 1, perPage: 10) {
-        media(type: ANIME, sort: TRENDING) {
+        media(type: ANIME, sort: TRENDING_DESC) {
           id title { romaji english native userPreferred }
           coverImage { extraLarge large medium color }
+          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
           format status episodes averageScore popularity genres isAdult
         }
       }
@@ -20,6 +21,7 @@ async function fetchHomePageData() {
         media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
           id title { romaji english native userPreferred }
           coverImage { extraLarge large medium color }
+          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
           format status episodes averageScore popularity genres isAdult
         }
       }
@@ -27,6 +29,7 @@ async function fetchHomePageData() {
         media(type: ANIME, format: MOVIE, sort: SCORE_DESC) {
           id title { romaji english native userPreferred }
           coverImage { extraLarge large medium color }
+          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
           format status episodes averageScore popularity genres isAdult
         }
       }
@@ -34,6 +37,7 @@ async function fetchHomePageData() {
         media(type: ANIME, format: TV, sort: SCORE_DESC) {
           id title { romaji english native userPreferred }
           coverImage { extraLarge large medium color }
+          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
           format status episodes averageScore popularity genres isAdult
         }
       }
