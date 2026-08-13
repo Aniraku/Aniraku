@@ -9,6 +9,7 @@ import Footer from '../components/Footer/Footer'
 import { getSyncStatus, syncAuthorize, syncDisconnect, PROVIDER_LABELS } from '../lib/sync'
 import ProviderIcon from '../components/ProviderIcon'
 import { PageLoader } from '../components/Skeletons/Skeletons'
+import { clearWatchHistory } from '../lib/watchHistory'
 
 // Clear only this site's data. localStorage.clear() wipes every other app
 // on the same origin scope — and on the deployed site that origin is shared
@@ -545,10 +546,7 @@ const Settings = () => {
     try {
       // Snapshot local data for potential undo window
       const prevHistory = localStorage.getItem('aniraku-watch-history')
-      if (user) {
-        // For cloud data, immediate clear with toast restore option
-      }
-      removeLocalKey('aniraku-watch-history')
+      await clearWatchHistory({ userId: user?.id })
       removeLocalKey('aniraku-episode-track')
       if (prevHistory) {
         setUndoSnapshot({ type: 'history', data: prevHistory })
@@ -567,6 +565,7 @@ const Settings = () => {
     if (!undoSnapshot) return
     if (undoSnapshot.type === 'history') {
       localStorage.setItem('aniraku-watch-history', undoSnapshot.data)
+      window.dispatchEvent(new CustomEvent('aniraku:watch-history-changed', { detail: { type: 'storage', keys: [] } }))
       showToast('Watch history restored')
     } else if (undoSnapshot.type === 'bookmarks') {
       localStorage.setItem('aniraku-bookmarks', undoSnapshot.data)

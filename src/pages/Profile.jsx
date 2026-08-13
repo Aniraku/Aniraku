@@ -15,6 +15,12 @@ import {
 } from '../lib/sync'
 import ProviderIcon from '../components/ProviderIcon'
 import { PageLoader } from '../components/Skeletons/Skeletons'
+import {
+  clearWatchHistory,
+  historyEntryKey,
+  removeWatchHistoryEntries,
+  subscribeToWatchHistory,
+} from '../lib/watchHistory'
 
 const Profile = () => {
   const { user, profile, loading, signOut, updateProfile } = useAuth()
@@ -27,6 +33,8 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('profile')
   const [bookmarks, setBookmarks] = useState([])
   const [history, setHistory] = useState([])
+  const [selectedHistory, setSelectedHistory] = useState(() => new Set())
+  const [historyBusy, setHistoryBusy] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null)
   const [syncBusy, setSyncBusy] = useState('') // 'mal-import' | 'mal-export' | ...
   const [syncResult, setSyncResult] = useState({}) // provider -> { type, text, error }
@@ -150,13 +158,61 @@ const Profile = () => {
     }
   }
 
-  const clearHistory = () => {
-    setHistory([])
-    localStorage.removeItem('aniraku-watch-history')
-    if (user) {
-      supabase.from('watch_history').delete().eq('user_id', user.id).then()
+  const removeHistoryEntries = async (entries) => {
+    if (!entries.length || historyBusy) return
+    setHistoryBusy(true)
+    const keys = new Set(entries.map(historyEntryKey))
+    setHistory((prev) => prev.filter((entry) => !keys.has(historyEntryKey(entry))))
+    setSelectedHistory((prev) => new Set([...prev].filter((key) => !keys.has(key))))
+    try {
+      await removeWatchHistoryEntries({ entries, userId: user?.id })
+      setMessage(entries.length === 1 ? 'History entry removed' : `${entries.length} history entries removed`)
+    } catch (err) {
+      console.error('watch history delete error:', err)
+      setMessage('Removed from this device; cloud sync will retry when available')
+    } finally {
+      setHistoryBusy(false)
     }
   }
+
+  const clearHistory = async () => {
+    if (historyBusy) return
+    setHistoryBusy(true)
+    setHistory([])
+    setSelectedHistory(new Set())
+    try {
+      await clearWatchHistory({ userId: user?.id })
+      setMessage('Watch history cleared')
+    } catch (err) {
+      console.error('watch history clear error:', err)
+      setMessage('Cleared on this device; cloud sync will retry when available')
+    } finally {
+      setHistoryBusy(false)
+    }
+  }
+
+  const toggleHistorySelection = (entry) => {
+    const key = historyEntryKey(entry)
+    setSelectedHistory((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  useEffect(() => subscribeToWatchHistory((detail) => {
+    if (detail.type === 'clear') {
+      setHistory([])
+      setSelectedHistory(new Set())
+      return
+    }
+    if (detail.type === 'remove' && detail.keys?.length) {
+      const keys = new Set(detail.keys)
+      setHistory((prev) => prev.filter((entry) => !keys.has(historyEntryKey(entry))))
+      setSelectedHistory((prev) => new Set([...prev].filter((key) => !keys.has(key))))
+    }
+  }), [])
 
   // ── Library import / export (requires the provider connected in Settings) ──
   const refreshSyncStatus = () => {
@@ -362,17 +418,59 @@ const Profile = () => {
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                    <button onClick={clearHistory} style={ghostBtn}>Clear History</button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={history.length > 0 && selectedHistory.size === history.length}
+                        onChange={() => setSelectedHistory(selectedHistory.size === history.length ? new Set() : new Set(history.map(historyEntryKey)))}
+                        aria-label="Select all Watch History entries"
+                      />
+                      Select all
+                    </label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {selectedHistory.size > 0 && (
+                        <button
+                          onClick={() => removeHistoryEntries(history.filter((entry) => selectedHistory.has(historyEntryKey(entry))))}
+                          disabled={historyBusy}
+                          style={{ ...ghostBtn, color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)' }}
+                        >
+                          Remove {selectedHistory.size}
+                        </button>
+                      )}
+                      <button onClick={clearHistory} disabled={historyBusy} style={ghostBtn}>Clear History</button>
+                    </div>
                   </div>
-                  {history.map(h => (
-                    <Link key={h.animeId + '-' + h.episode} to={`/watch/${generateSlug(h.title)}-${h.animeId}-episode-${h.episode}`} className="profile-history-item" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 8, textDecoration: 'none', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-                      {h.image && <img src={h.image} alt="" style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 4 }} />}
-                      <span style={{ color: 'var(--text-muted)', fontSize: 13, minWidth: 50 }}>Ep {h.episode}</span>
-                      <span style={{ fontSize: 14, flex: 1 }}>{h.title || `Anime ${h.animeId}`}</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{h.time ? `${Math.floor(h.time / 60)}m` : ''}</span>
-                    </Link>
-                  ))}
+                  {history.map(h => {
+                    const key = historyEntryKey(h)
+                    const selected = selectedHistory.has(key)
+                    return (
+                      <div key={key} className="profile-history-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: selected ? 'rgba(var(--accent-rgb, 226,232,240), 0.09)' : 'var(--bg-card)', borderRadius: 8, marginBottom: 8, color: 'var(--text-primary)', border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}` }}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleHistorySelection(h)}
+                          aria-label={`Select ${h.title || `Anime ${h.animeId}`} episode ${h.episode}`}
+                          style={{ flexShrink: 0 }}
+                        />
+                        <Link to={`/watch/${generateSlug(h.title)}-${h.animeId}-episode-${h.episode}`} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1, textDecoration: 'none', color: 'inherit' }}>
+                          {h.image && <img src={h.image} alt="" style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />}
+                          <span style={{ color: 'var(--text-muted)', fontSize: 13, minWidth: 42, flexShrink: 0 }}>Ep {h.episode}</span>
+                          <span style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.title || `Anime ${h.animeId}`}</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>{h.time ? `${Math.floor(h.time / 60)}m` : ''}</span>
+                        </Link>
+                        <button
+                          onClick={() => removeHistoryEntries([h])}
+                          disabled={historyBusy}
+                          aria-label={`Remove ${h.title || `Anime ${h.animeId}`} episode ${h.episode} from Watch History`}
+                          title="Remove this history entry"
+                          style={{ background: 'none', border: '1px solid rgba(248,113,113,0.28)', borderRadius: 6, color: '#fca5a5', padding: '6px 8px', fontSize: 12, cursor: historyBusy ? 'wait' : 'pointer', flexShrink: 0 }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )
+                  })}
                 </>
               )}
             </div>
