@@ -34,4 +34,11 @@ test.describe('Aniraku Cross-Device Experience', () => {
     await expect(page).toHaveURL(/\/catalog/)
     await expect(page.locator('main:visible').first()).toBeVisible()
   })
+
+  test('Settings keeps account deletion unavailable to an unauthenticated visitor', async ({ page }) => {
+    await page.goto('http://localhost:5173/profile/settings')
+    await expect(page).toHaveURL(/\/profile\/settings/)
+    await expect(page.getByRole('link', { name: /log in/i }).first()).toBeVisible()
+    await expect(page.getByText('Delete account', { exact: true })).toHaveCount(0)
+  })
 })
