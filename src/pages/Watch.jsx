@@ -341,12 +341,10 @@ const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider
 function buildQualityList(sources) {
   const seenUrls = new Set()
   return (Array.isArray(sources) ? sources : [])
-    .filter(
-      (src) =>
-        src?.type !== 'embed' &&
-        src?.verification !== 'dead' &&
-        src?.url
-    )
+    // Backend verification tags are advisory snapshots, not a playback
+    // permission model. Keep every non-embed media URL so providers such as
+    // Kiwi remain playable when their current CDN verdict is stale.
+    .filter((src) => src?.type !== 'embed' && src?.url)
     .map((src, sourceIndex) => {
       const presentation = getQualityPresentation(src.quality)
       const inferredType = /\.m3u8(?:$|[?#])/i.test(src.url)
@@ -1347,23 +1345,6 @@ export default function Watch() {
     return { sub: normalize(servers.sub, 'sub'), dub: normalize(servers.dub, 'dub') }
   }, [servers])
 
-  // The server endpoint already includes playable sources for most providers.
-  // Prime the short-lived stream cache before activeSource is selected so first
-  // playback does not wait for a second, serial /stream request.
-  useEffect(() => {
-    const allSources = [...SOURCES.sub, ...SOURCES.dub]
-    allSources.forEach((source) => {
-      if (source.embedOnly || !source.initialSources.length) return
-      if (buildQualityList(source.initialSources).length === 0) return
-      const key = streamCacheKey(source, epNumber)
-      if (!streamCacheRef.current.has(key)) {
-        streamCacheRef.current.set(key, {
-          data: { sources: source.initialSources, headers: source.headers },
-          t: Date.now(),
-        })
-      }
-    })
-  }, [SOURCES, epNumber])
 
   const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
@@ -1988,41 +1969,6 @@ export default function Watch() {
               return item.html
             },
           },
-          {
-            width: 200,
-            html: 'Subtitle Size',
-            selector: [
-              {
-                default: true,
-                html: 'Small',
-                style: { color: '#fff' },
-                callback: () => {
-                  document
-                    .querySelectorAll('.art-subtitle-wrap span')
-                    .forEach((el) => (el.style.fontSize = '14px'))
-                },
-              },
-              {
-                html: 'Medium',
-                style: { color: '#fff' },
-                callback: () => {
-                  document
-                    .querySelectorAll('.art-subtitle-wrap span')
-                    .forEach((el) => (el.style.fontSize = '18px'))
-                },
-              },
-              {
-                html: 'Large',
-                style: { color: '#fff' },
-                callback: () => {
-                  document
-                    .querySelectorAll('.art-subtitle-wrap span')
-                    .forEach((el) => (el.style.fontSize = '22px'))
-                },
-              },
-            ],
-            onSelect: (item) => item.html,
-          },
         ],
         quality: qualityList,
         customType: {
@@ -2421,45 +2367,6 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   const lastStreamAttemptRef = useRef(null)
 
-  // Warm at most two playable alternatives after first playback has settled.
-  // This keeps server switches fast without competing with the initial stream
-  // request, especially on mobile data or a cold backend.
-  const prefetchOtherSources = useCallback(
-    (current) => {
-      if (typeof navigator !== 'undefined' && navigator.connection?.saveData) return
-      const all = [...SOURCES.sub, ...SOURCES.dub]
-      const others = all
-        .filter((source) => source.id !== current?.id && !source.embedOnly)
-        .sort((a, b) => Number(b.lang === current?.lang) - Number(a.lang === current?.lang))
-        .slice(0, 2)
-      const ep = epNumberRef.current
-      if (!ep || !others.length) return
-      window.setTimeout(() => {
-        others.forEach((source) => {
-          fetch(`${API_BASE}/api/v1/stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              animeId: parseInt(animeId, 10),
-              episode: ep,
-              provider: source.provider,
-              lang: source.lang,
-              quality: 'auto',
-              refresh: false,
-            }),
-            cache: 'no-store',
-          })
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data) => {
-              if (!data?.sources?.[0]?.url || epNumberRef.current !== ep) return
-              setCachedStream(source, data)
-            })
-            .catch(() => {})
-        })
-      }, 1800)
-    },
-    [SOURCES, animeId, setCachedStream]
-  )
   const loadStream = useCallback(
     async (sourceId, forceRefresh = false, quiet = false) => {
       // A fresh stream load means any 'ended' sync flag from a previous
@@ -2549,15 +2456,10 @@ export default function Watch() {
             applySkipSegments(normalizeProviderSkipSegments(cached))
             setStreamLoading(false)
             loadingRef.current = false
-            // background refresh
-            setTimeout(() => {
-              if (
-                activeSourceRef.current === sourceId &&
-                mountedRef.current
-              ) {
-                loadStream(sourceId, true)
-              }
-            }, 5_000)
+            // A playable source is stable until the viewer explicitly changes
+            // it, changes episode, retries, or HLS reports a terminal failure.
+            // Do not refresh a source after playback begins: rebuilding ArtPlayer
+            // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
         }
@@ -2700,10 +2602,6 @@ export default function Watch() {
         setStreamLoading(false)
         loadingRef.current = false
         setRetryAttempt(0)
-        // Warm the other providers for this episode in the background so
-        // switching servers is instant (they all share the backend's
-        // 5-minute Miruro cache).
-        prefetchOtherSources(source)
         return
       } catch (err) {
         const superseded = streamAbortRef.current !== controller
