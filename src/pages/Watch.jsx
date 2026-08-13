@@ -3006,46 +3006,6 @@ export default function Watch() {
   )
 
   // ────────────────────────────────────────────────────────────
-  // Touch seek (tap = ±10s, hold = repeat) for phones & tablets
-  // ────────────────────────────────────────────────────────────
-  const seekHoldTimerRef = useRef(null)
-  const seekBy = useCallback(
-    (dir) => {
-      const nextTime = seekVideoBy(artInstance.current, dir * SEEK_SECONDS)
-      if (nextTime === null) return
-      showToast(`${dir < 0 ? '−10s' : '+10s'} · ${formatTime(nextTime)}`)
-    },
-    [showToast]
-  )
-  const stopSeekHold = useCallback(() => {
-    if (seekHoldTimerRef.current) {
-      clearTimeout(seekHoldTimerRef.current)
-      clearInterval(seekHoldTimerRef.current)
-      seekHoldTimerRef.current = null
-    }
-  }, [])
-  const startSeekHold = useCallback(
-    (dir) => {
-      // Seek once immediately on press — mobile browsers sometimes skip
-      // the synthesized click, so the seek must not depend on it.
-      seekBy(dir)
-      stopSeekHold()
-      // Repeat only after holding 350ms.
-      seekHoldTimerRef.current = setTimeout(() => {
-        seekHoldTimerRef.current = setInterval(() => {
-          const nextTime = seekVideoBy(
-            artInstance.current,
-            dir * SEEK_SECONDS
-          )
-          if (nextTime === null) stopSeekHold()
-        }, 250)
-      }, 350)
-    },
-    [seekBy, stopSeekHold]
-  )
-  useEffect(() => () => stopSeekHold(), [stopSeekHold])
-
-  // ────────────────────────────────────────────────────────────
   // Mobile gestures
   // ────────────────────────────────────────────────────────────
   const touchState = useRef({
@@ -3061,7 +3021,6 @@ export default function Watch() {
     const container = playerContainerRef.current
     if (!container) return
     const onTouchStart = (e) => {
-      if (e.target.closest && e.target.closest('.watch-touch-seek')) return
       const touch = e.touches[0]
       const rect = container.getBoundingClientRect()
       const x = touch.clientX - rect.left
@@ -3382,7 +3341,6 @@ export default function Watch() {
               src={activeEmbedUrl}
               title="Anime embedded player"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              allowFullScreen
               referrerPolicy="no-referrer-when-downgrade"
               style={{
                 position: 'absolute',
@@ -3395,34 +3353,6 @@ export default function Watch() {
             />
           )}
 
-          {/* Touch seek: ±10s (phones + tablets). Tap once or hold to
-              repeat — handy for skipping intros. */}
-          <button
-            type="button"
-            aria-label="Seek backward 10 seconds"
-            title="Seek backward 10 seconds"
-            onPointerDown={() => startSeekHold(-1)}
-            onPointerUp={stopSeekHold}
-            onPointerLeave={stopSeekHold}
-            onPointerCancel={stopSeekHold}
-            className="watch-touch-seek watch-touch-seek-left"
-            style={{ ...touchSeekBtnStyle, left: 8 }}
-          >
-            <FaUndo size={18} />
-          </button>
-          <button
-            type="button"
-            aria-label="Seek forward 10 seconds"
-            title="Seek forward 10 seconds"
-            onPointerDown={() => startSeekHold(1)}
-            onPointerUp={stopSeekHold}
-            onPointerLeave={stopSeekHold}
-            onPointerCancel={stopSeekHold}
-            className="watch-touch-seek watch-touch-seek-right"
-            style={{ ...touchSeekBtnStyle, right: 8 }}
-          >
-            <FaRedo size={18} />
-          </button>
 
           {/* Buffering indicator */}
           {buffering && !streamLoading && (
@@ -4514,14 +4444,6 @@ export default function Watch() {
           .watch-nav { gap: 6px !important; }
           .watch-nav button { padding: 8px 10px; font-size: 11px; }
         }
-        /* Touch seek buttons: only on touch screens (phones + tablets).
-           iPads whose UA reports as desktop (iPad Pro) are caught by the
-           pointer-coarse query, not the UA sniff. */
-        .watch-touch-seek { display: none; }
-        .watch-touch-seek:active { opacity: 0.85; }
-        @media (hover: none) and (pointer: coarse) {
-          .watch-touch-seek { display: flex !important; }
-        }
         /* High-contrast support */
         @media (prefers-contrast: more) {
           .watch-source-btn { border-width: 2px !important; }
@@ -4547,26 +4469,4 @@ const navBtnStyle = {
   border: '1px solid var(--border)',
   transition: 'all 0.15s',
   cursor: 'pointer',
-}
-
-// Floating ±10s seek buttons on the player, touch devices only.
-const touchSeekBtnStyle = {
-  position: 'absolute',
-  top: '50%',
-  transform: 'translateY(-50%)',
-  width: 56,
-  height: 56,
-  borderRadius: '50%',
-  background: 'rgba(0,0,0,0.45)',
-  border: '1px solid rgba(255,255,255,0.18)',
-  color: '#fff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  zIndex: 2,
-  touchAction: 'manipulation',
-  boxShadow: '0 2px 12px rgba(0,0,0,0.35)',
-  WebkitBackdropFilter: 'blur(6px)',
-  backdropFilter: 'blur(6px)',
 }
