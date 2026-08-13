@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
 import TrustStrip from '../components/TrustStrip'
@@ -14,6 +14,8 @@ import { extractIdFromSlug, generateSlug } from '../lib/slug'
 import { fetchEpisodeRatings } from '../lib/sync'
 import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
+import { setAnimeDetailSEO } from '../lib/seo'
+import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 
 const Page = styled.div`
   min-height: 100vh;
@@ -608,6 +610,7 @@ const RecCard = ({ item }) => {
 
 const AnimeDetail = () => {
   const { slugId } = useParams()
+  const navigate = useNavigate()
   const id = extractIdFromSlug(slugId)
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
@@ -655,6 +658,28 @@ const AnimeDetail = () => {
       .catch(() => {})
     return () => { cancelled = true }
   }, [user, setBookmarks])
+
+  React.useEffect(() => {
+    if (!anime) return undefined
+    const title = anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || 'Unknown Anime'
+    const canonicalPath = `/anime/${generateSlug(title)}-${anime.id}`
+    setAnimeDetailSEO(anime)
+    if (window.location.pathname !== canonicalPath) {
+      navigate(canonicalPath, { replace: true })
+    }
+    return undefined
+  }, [anime, navigate])
+
+  React.useEffect(() => subscribeToWatchHistory((detail) => {
+    if (detail.type === 'clear') {
+      setWatchHistory([])
+      return
+    }
+    if (detail.type === 'remove' && detail.keys?.length) {
+      const removed = new Set(detail.keys)
+      setWatchHistory((prev) => prev.filter((row) => !removed.has(historyEntryKey({ animeId: id, episode: row.episode }))))
+    }
+  }), [id])
 
   React.useEffect(() => {
     if (!id) return undefined

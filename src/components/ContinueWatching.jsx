@@ -6,6 +6,7 @@ import { API_BASE } from '../config'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { generateSlug } from '../lib/slug'
+import { subscribeToWatchHistory } from '../lib/watchHistory'
 
 const Section = styled.section`
   max-width: 1400px;
@@ -103,6 +104,7 @@ const Meta = styled.div`
 const ContinueWatching = () => {
   const { user } = useAuth()
   const [serverItems, setServerItems] = useState([])
+  const [historyVersion, setHistoryVersion] = useState(0)
 
   useEffect(() => {
     if (!user) return
@@ -117,6 +119,10 @@ const ContinueWatching = () => {
     })
     return () => { cancelled = true }
   }, [user])
+
+  useEffect(() => subscribeToWatchHistory(() => {
+    setHistoryVersion((version) => version + 1)
+  }), [])
 
   const items = useMemo(() => {
     const local = []
@@ -153,7 +159,7 @@ const ContinueWatching = () => {
     const merged = [...byKey.values()]
     merged.sort((a, b) => b.timestamp - a.timestamp)
     return merged.slice(0, 12)
-  }, [serverItems])
+  }, [serverItems, historyVersion])
 
   if (!items.length) return null
 

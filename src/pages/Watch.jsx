@@ -37,6 +37,7 @@ import {
   PROVIDER_LABELS,
 } from '../lib/sync'
 import { WatchPageSkeleton } from '../components/Skeletons/Skeletons'
+import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '../lib/watchHistory'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -253,18 +254,7 @@ function writeSkipCache(malId, episode, segments, notFound = false) {
   }
 }
 
-function upsertLocalWatchHistory(entry) {
-  try {
-    const raw = JSON.parse(localStorage.getItem('aniraku-watch-history') || '[]')
-    const filtered = raw.filter(
-      (item) => !(String(item.animeId) === String(entry.animeId) && Number(item.episode) === Number(entry.episode))
-    )
-    filtered.unshift(entry)
-    localStorage.setItem('aniraku-watch-history', JSON.stringify(filtered.slice(0, 100)))
-  } catch {
-    // Playback must continue if local storage is unavailable.
-  }
-}
+const upsertLocalWatchHistory = upsertWatchHistory
 
 function formatTime(s) {
   if (typeof s !== 'number' || !isFinite(s) || s < 0) return '0:00'
@@ -1308,6 +1298,17 @@ export default function Watch() {
       return next
     })
   }, [epNumber])
+
+  useEffect(() => subscribeToWatchHistory((detail) => {
+    const currentKey = historyEntryKey({ animeId, episode: epNumber })
+    if (detail.type === 'clear' || (detail.type === 'remove' && detail.keys?.includes(currentKey))) {
+      setWatchedEps((prev) => {
+        const next = new Set(prev)
+        next.delete(epNumber)
+        return next
+      })
+    }
+  }), [animeId, epNumber])
 
   // ────────────────────────────────────────────────────────────
   // Online / offline detection
