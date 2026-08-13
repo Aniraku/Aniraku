@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaBars, FaBell, FaSearch, FaRandom } from 'react-icons/fa'
+import { FaBell, FaSearch, FaRandom } from 'react-icons/fa'
 import { N } from './navbar.style'
-import SideBar from './SideBar'
 import Logo from '../Logo'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
@@ -10,7 +9,6 @@ import { supabase } from '../../lib/supabase'
 import { API_BASE } from '../../config'
 
 const NavBar = () => {
-  const [open, setOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
@@ -24,14 +22,6 @@ const NavBar = () => {
   const isHome = location.pathname === '/' || location.pathname === '/home'
   const focusedRoute = ['/login', '/signup', '/auth/forgot-password', '/auth/new-password', '/privacy', '/terms', '/dmca', '/license', '/community-guidelines'].includes(location.pathname)
   const shortcutOriginRef = useRef(null)
-
-  useEffect(() => {
-    if (open) {
-      document.body.classList.add('body-hidden')
-    } else {
-      document.body.classList.remove('body-hidden')
-    }
-  }, [open])
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20)
@@ -130,12 +120,7 @@ const NavBar = () => {
 
   return (
     <N.Nav $isScrolled={isScrolled} $isHome={isHome} aria-label="Primary navigation">
-      <N.LayoutBg open={open} onClick={() => setOpen(false)} />
       <N.Left>
-        <N.MenuBtn type="button" onClick={() => setOpen(true)} aria-label="Open navigation menu" aria-expanded={open} aria-controls="sidebar-menu">
-          <FaBars size={20} />
-        </N.MenuBtn>
-        <SideBar open={open} setOpen={setOpen} profile={profile} isAdmin={isAdmin} />
         <Logo to="/home" height={36} showText />
         <N.NavLinks>
           <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}>Home</N.NavLink>

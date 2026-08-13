@@ -284,13 +284,13 @@ const Profile = () => {
 
   return (
     <>
-      <div className="profile-page" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text-primary)', padding: '40px 20px' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <div className="profile-header" style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
-            <img src={avatarSrc} alt="" style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent)', flexShrink: 0 }} />
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <h1 style={{ fontSize: 24, fontWeight: 700 }}>{displayName || username || 'User'}</h1>
+      <main className="profile-page" id="main">
+        <div className="profile-shell">
+          <header className="profile-header">
+            <img className="profile-portrait" src={avatarSrc} alt="" />
+            <div className="profile-identity">
+              <div className="profile-name-row">
+                <h1>{displayName || username || 'User'}</h1>
                 {user.email_confirmed_at && (
                   <span style={{ background: 'var(--accent)', color: 'var(--bg)', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>VERIFIED</span>
                 )}
@@ -298,9 +298,9 @@ const Profile = () => {
               <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>@{username}</p>
               <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{user.email}</p>
             </div>
-          </div>
+          </header>
 
-          <div className="profile-tabs" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 24, overflowX: 'auto' }}>
+          <nav className="profile-tabs" aria-label="Profile sections">
             {[
               { id: 'profile', label: 'Profile' },
               { id: 'avatars', label: 'Avatars' },
@@ -312,23 +312,13 @@ const Profile = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent)' : 'transparent'}`,
-                  color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
-                  padding: '10px 18px',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                  whiteSpace: 'nowrap',
-                }}
+                className={activeTab === tab.id ? 'is-active' : undefined}
+                aria-current={activeTab === tab.id ? 'page' : undefined}
               >
                 {tab.label}
               </button>
             ))}
-          </div>
+          </nav>
 
           {message && (
             <div style={{ background: 'rgba(var(--accent-rgb, 226,232,240), 0.1)', border: '1px solid rgba(var(--accent-rgb, 226,232,240), 0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, color: 'var(--accent)', fontSize: 13 }}>
@@ -620,16 +610,73 @@ const Profile = () => {
             </div>
           )}
         </div>
-      </div>
+      </main>
       <Footer />
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        .profile-page {
+          width: 100%;
+          min-height: calc(100dvh - var(--header-h)) !important;
+          padding: clamp(18px, 4vw, 48px) var(--content-pad) clamp(24px, 4vw, 52px) !important;
+          background: var(--bg);
+          color: var(--text-primary);
+          box-sizing: border-box;
+        }
+        .profile-shell { width: min(100%, 920px); margin: 0 auto; }
+        .profile-header {
+          display: grid;
+          grid-template-columns: 88px minmax(0, 1fr);
+          align-items: center;
+          gap: clamp(14px, 2.5vw, 24px);
+          margin: 0 0 24px;
+        }
+        .profile-portrait {
+          width: 88px;
+          height: 88px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 3px solid var(--accent);
+          background: var(--bg-elevated);
+        }
+        .profile-identity { min-width: 0; }
+        .profile-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .profile-name-row h1 { margin: 0; font-size: clamp(1.3rem, 2.8vw, 1.7rem); line-height: 1.15; }
+        .profile-identity p { margin: 4px 0 0; overflow-wrap: anywhere; }
+        .profile-tabs {
+          display: flex;
+          align-items: end;
+          gap: 2px;
+          margin: 0 0 20px;
+          overflow-x: auto;
+          border-bottom: 1px solid var(--border);
+          scrollbar-width: none;
+        }
+        .profile-tabs::-webkit-scrollbar { display: none; }
+        .profile-tabs button {
+          flex: 0 0 auto;
+          min-height: 42px;
+          padding: 10px 15px;
+          border: 0;
+          border-bottom: 2px solid transparent;
+          background: transparent;
+          color: var(--text-muted);
+          font-size: .86rem;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .profile-tabs button:hover, .profile-tabs button:focus-visible { color: var(--text-primary); }
+        .profile-tabs button.is-active { color: var(--text-primary); border-bottom-color: var(--accent); }
+        .profile-card { min-width: 0; }
+
         @media (max-width: 768px) {
-          .profile-header { flex-direction: column; text-align: center; gap: 12px !important; }
-          .profile-header img { width: 64px !important; height: 64px !important; }
-          .profile-header h1 { font-size: 20px !important; }
-          .profile-tabs { gap: 0 !important; }
-          .profile-tabs button { padding: 10px 12px !important; font-size: 13px !important; }
+          .profile-page { padding: 16px 12px 20px !important; }
+          .profile-header { grid-template-columns: 64px minmax(0, 1fr); gap: 13px; margin-bottom: 18px; text-align: left; }
+          .profile-portrait { width: 64px; height: 64px; }
+          .profile-name-row h1 { font-size: 1.25rem; }
+          .profile-tabs { margin-inline: -12px; padding-inline: 12px; margin-bottom: 16px; }
+          .profile-tabs button { padding: 9px 12px; font-size: .8rem; min-height: 40px; }
           .profile-card { padding: 16px !important; }
           .profile-avatar-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)) !important; gap: 8px !important; }
           .profile-bookmark-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 10px !important; }
@@ -639,10 +686,11 @@ const Profile = () => {
           .profile-history-item { padding: 8px 10px !important; gap: 10px !important; }
           .profile-history-item img { width: 32px !important; height: 44px !important; }
           .profile-actions { flex-direction: column; }
-          .profile-actions button { width: 100%; }
+          .profile-actions > * { width: 100%; }
         }
-        @media (max-width: 480px) {
-          .profile-page { padding: 20px 12px !important; }
+        @media (max-width: 380px) {
+          .profile-header { grid-template-columns: 52px minmax(0, 1fr); }
+          .profile-portrait { width: 52px; height: 52px; }
           .profile-avatar-grid { grid-template-columns: repeat(4, 1fr) !important; }
         }
       `}</style>
