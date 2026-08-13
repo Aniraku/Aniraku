@@ -3606,10 +3606,9 @@ export default function Watch() {
                     <FaRedo /> Retry
                   </button>
                 )}
-                {!noStreamError && (
-                  <button
-                    type="button"
-                    onClick={() => loadStream(activeSource, true)}
+                <button
+                  type="button"
+                  onClick={() => loadStream(activeSource, true)}
                     style={{
                       padding: '10px 20px',
                       background: 'rgba(226,232,240,0.12)',
@@ -3622,15 +3621,15 @@ export default function Watch() {
                       minHeight: 44,
                     }}
                   >
-                    Force refresh
+                    {noStreamError ? 'Check availability again' : 'Force refresh'}
                   </button>
-                )}
                 <button
                   type="button"
                   onClick={() => {
                     const sources = [...SOURCES.sub, ...SOURCES.dub]
                     const other = sources.find((s) => s.id !== activeSource)
                     if (other) handleSourceSwitch(other.id)
+                    else loadStream(activeSource, true)
                   }}
                   style={{
                     padding: '10px 20px',
@@ -3644,7 +3643,7 @@ export default function Watch() {
                     minHeight: 44,
                   }}
                 >
-                  Switch Server
+                  Try another server
                 </button>
               </div>
             </div>
@@ -3873,9 +3872,28 @@ export default function Watch() {
           )}
         </div>
 
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 14,
+            color: 'var(--text-secondary)',
+            fontSize: 12,
+            fontWeight: 650,
+          }}
+        >
+          <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: error ? '#f87171' : streamLoading ? '#fbbf24' : '#34d399' }} />
+          {error ? 'Playback needs attention. Choose a recovery option or another server.' : streamLoading ? 'Preparing a stream…' : `Playing on ${currentSource?.label || 'the selected server'}.`}
+        </div>
+
         {/* Source selector */}
         <div
           className="watch-sources"
+          role="group"
+          aria-label="Streaming servers"
           style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -3915,7 +3933,8 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-                      title={`Switch to ${source.label}`}
+                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive

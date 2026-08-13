@@ -4,14 +4,13 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY, CATALOG_SHELVES_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
-import TrustStrip from '../components/TrustStrip'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
 import {
   FaSearch, FaSortAmountDown, FaLayerGroup, FaCheckCircle,
-  FaCalendarDay, FaTimes, FaChevronDown, FaThLarge, FaSlidersH,
+  FaCalendarDay, FaTimes, FaChevronDown, FaSlidersH,
   FaSyncAlt, FaPlay, FaInfoCircle, FaChevronLeft, FaChevronRight,
-  FaFire, FaStar, FaTv, FaFilm, FaCompass,
+  FaFire, FaStar, FaTv, FaCompass,
 } from 'react-icons/fa'
 import { AnimeCardSkeleton } from '../components/Skeletons/Skeletons'
 import styled, { keyframes } from 'styled-components'
@@ -84,7 +83,7 @@ const pulse = keyframes`
 
 const PageWrapper = styled.div`
   min-height: 100vh;
-  overflow: hidden;
+  overflow: clip;
   background: var(--bg);
   color: var(--text-primary);
 `
@@ -92,7 +91,7 @@ const PageWrapper = styled.div`
 const Container = styled.div`
   width: min(100%, 1600px);
   margin: 0 auto;
-  padding: 0 clamp(16px, 3.5vw, 56px);
+  padding: 0 var(--content-pad);
 `
 
 const Hero = styled.section`
@@ -103,6 +102,8 @@ const Hero = styled.section`
   align-items: flex-end;
   overflow: hidden;
   background: var(--bg-secondary);
+
+  @media (max-width: 640px) { min-height: clamp(430px, 126vw, 520px); }
 `
 
 const HeroBackdrop = styled.div`
@@ -228,12 +229,100 @@ const HeroAction = styled(Link)`
   &.primary:hover { background: var(--accent-dim); }
   &.secondary { border: 1px solid var(--border-hover); background: var(--bg-elevated); color: var(--text-primary); }
   &.secondary:hover { background: var(--bg-card); border-color: var(--text-muted); }
+
+  @media (max-width: 480px) { width: 100%; }
+`
+
+const HeroControls = styled.div`
+  position: absolute;
+  right: clamp(18px, 4vw, 56px);
+  bottom: 22px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+
+  @media (max-width: 640px) {
+    right: 16px;
+    bottom: 14px;
+  }
+`
+
+const HeroControl = styled.button`
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: 50%;
+  background: rgba(10,10,12,0.72);
+  color: var(--text-primary);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+  &:hover { border-color: var(--accent); background: rgba(20,20,24,0.94); }
+  &:active { transform: scale(0.93); }
+  &:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+`
+
+const HeroDots = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px;
+`
+
+const HeroDot = styled.button`
+  width: ${({ $active }) => ($active ? '20px' : '7px')};
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: ${({ $active }) => ($active ? 'var(--accent)' : 'rgba(255,255,255,0.45)')};
+  cursor: pointer;
+  transition: width 180ms ease, background 180ms ease;
+  &:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
 `
 
 const DiscoverBar = styled.section`
   position: relative;
   z-index: 2;
   margin-top: -24px;
+`
+
+const QuickBrowse = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px 0;
+
+  > span {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+`
+
+const QuickBrowseButton = styled.button`
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease;
+  &:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, var(--bg-card)); color: var(--text-primary); }
+  &:active { transform: scale(0.97); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 480px) { flex: 1 1 calc(50% - 6px); }
 `
 
 const DiscoverInner = styled.div`
@@ -248,7 +337,11 @@ const DiscoverInner = styled.div`
   box-shadow: 0 16px 44px rgba(0,0,0,0.24);
   backdrop-filter: blur(18px);
 
-  @media (max-width: 680px) { grid-template-columns: 1fr; }
+  @media (max-width: 680px) {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 9px;
+  }
 `
 
 const SearchBox = styled.div`
@@ -323,6 +416,55 @@ const FilterToggle = styled.button`
   transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), background 160ms ease;
   &:active { transform: scale(0.97); }
   &:hover { background: ${({ $open }) => ($open ? 'var(--accent-dim)' : 'var(--bg-elevated)')}; }
+
+  @media (max-width: 680px) { width: 100%; }
+`
+
+const FilterCount = styled.span`
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: ${({ $open }) => ($open ? 'var(--bg)' : 'var(--accent)')};
+  color: ${({ $open }) => ($open ? 'var(--accent)' : 'var(--bg)')};
+  font-size: 11px;
+  font-weight: 850;
+`
+
+const AppliedFilters = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 2px 0;
+`
+
+const AppliedFiltersLabel = styled.span`
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+`
+
+const AppliedFilter = styled.button`
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--border));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--accent) 11%, var(--bg-card));
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+  &:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 17%, var(--bg-card)); }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 `
 
 const FilterPanel = styled.div`
@@ -338,7 +480,11 @@ const FilterPanel = styled.div`
   animation: ${fadeUp} 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
 
   @media (max-width: 1020px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  @media (max-width: 640px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 640px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+  }
 `
 
 const SelectWrapper = styled.label`
@@ -393,38 +539,8 @@ const ClearAllButton = styled.button`
   @media (max-width: 640px) { grid-column: span 2; }
 `
 
-const QuickFilters = styled.nav`
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  margin: 20px 0 0;
-  padding: 0 0 3px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-`
-
-const QuickFilter = styled(Link)`
-  display: inline-flex;
-  min-height: 34px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 7px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: none;
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
-  &:hover { border-color: var(--border-hover); background: var(--bg-elevated); color: var(--text-primary); }
-  &:active { transform: scale(0.97); }
-  svg { color: var(--accent); }
-`
-
 const Main = styled.main`
-  padding: 38px 0 88px;
+  padding: clamp(28px, 4vw, 48px) 0 calc(76px + env(safe-area-inset-bottom));
 `
 
 const ShelfSection = styled.section`
@@ -439,6 +555,12 @@ const ShelfHeader = styled.div`
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 13px;
+
+  @media (max-width: 560px) {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
 `
 
 const ShelfHeading = styled.div`
@@ -461,6 +583,12 @@ const ShelfHeading = styled.div`
   }
 
   p { margin: 2px 0 0; color: var(--text-secondary); font-size: 12px; }
+
+  @media (max-width: 560px) {
+    align-items: flex-start;
+    h2 { white-space: normal; }
+    p { line-height: 1.4; }
+  }
 `
 
 const ShelfTools = styled.div`
@@ -526,7 +654,7 @@ const RailCard = styled(Link)`
     &:active .poster { transform: scale(0.975); }
   }
 
-  @media (max-width: 520px) { width: 128px; }
+  @media (max-width: 520px) { width: clamp(128px, 40vw, 158px); }
 `
 
 const Poster = styled.div`
@@ -604,6 +732,13 @@ const BrowseHeader = styled.div`
 
   h2 { margin: 0; color: var(--text-primary); font-size: clamp(24px, 3vw, 34px); font-weight: 830; letter-spacing: -0.04em; }
   p { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; }
+
+  @media (max-width: 560px) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    p { line-height: 1.45; }
+  }
 `
 
 const ResultCount = styled.div`
@@ -615,6 +750,8 @@ const ResultCount = styled.div`
   background: var(--bg-card);
   font-size: 12px;
   font-weight: 700;
+
+  @media (max-width: 560px) { align-self: flex-start; }
 `
 
 const ResultGrid = styled.div`
@@ -645,7 +782,7 @@ const GridPoster = styled(Poster)`
 
 const GridInfo = styled.div`
   padding: 10px 2px 0;
-  h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+  h3 { display: -webkit-box; min-height: 34px; margin: 0; overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 720; line-height: 1.3; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   p { margin: 5px 0 0; color: var(--text-secondary); font-size: 11px; font-weight: 600; }
 `
 
@@ -867,11 +1004,63 @@ export default function Catalog() {
     }
   }, [shelfData, nsfwEnabled])
 
-  const featured = isBrowseMode ? allMedia[0] : shelves.trending[0] || allMedia[0]
+  const underratedPopular = useMemo(() => {
+    const byId = new Map()
+    ;[...shelves.topRated, ...shelves.popular, ...shelves.trending].forEach((anime) => {
+      if (anime?.id && !byId.has(anime.id)) byId.set(anime.id, anime)
+    })
+    return [...byId.values()]
+      .filter((anime) => Number(anime.averageScore) >= 75)
+      .sort((left, right) => (Number(right.averageScore) || 0) - (Number(left.averageScore) || 0))
+      .slice(0, 14)
+  }, [shelves])
+
+  const featuredPool = useMemo(() => {
+    const unique = new Map()
+    ;[...shelves.trending, ...shelves.popular, ...shelves.airing, ...shelves.topRated].forEach((anime) => {
+      if (anime?.id && !unique.has(anime.id)) unique.set(anime.id, anime)
+    })
+    return [...unique.values()].filter((anime) => anime?.bannerImage || anime?.coverImage?.extraLarge).slice(0, 6)
+  }, [shelves])
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const featured = isBrowseMode ? allMedia[0] : featuredPool[featuredIndex] || shelves.trending[0] || allMedia[0]
   const totalResults = data?.pages?.[0]?.pageInfo?.total || 0
   const hasActiveFilters = Boolean(filters.search || filters.format || filters.status || filters.genre || filters.year || filters.sort !== 'POPULARITY_DESC' || filters.view)
+  const activeFilters = useMemo(() => [
+    filters.search && { key: 'search', label: `Search: ${filters.search}` },
+    filters.genre && { key: 'genre', label: `Genre: ${filters.genre}` },
+    filters.format && { key: 'format', label: `Format: ${FORMAT_OPTIONS.find((option) => option.value === filters.format)?.label || filters.format}` },
+    filters.status && { key: 'status', label: `Status: ${STATUS_OPTIONS.find((option) => option.value === filters.status)?.label || fmt(filters.status)}` },
+    filters.year && { key: 'year', label: `Year: ${filters.year}` },
+    filters.sort !== 'POPULARITY_DESC' && { key: 'sort', label: `Sort: ${SORT_OPTIONS.find((option) => option.value === filters.sort)?.label || fmt(filters.sort)}` },
+    filters.view && { key: 'view', label: 'View: Every title' },
+  ].filter(Boolean), [filters])
+  const activeFilterCount = activeFilters.length
+
+  useEffect(() => {
+    setFeaturedIndex((current) => featuredPool.length ? current % featuredPool.length : 0)
+  }, [featuredPool.length])
+
+  useEffect(() => {
+    if (isBrowseMode || featuredPool.length < 2) return undefined
+    const timer = window.setInterval(() => {
+      setFeaturedIndex((current) => (current + 1) % featuredPool.length)
+    }, 7000)
+    return () => window.clearInterval(timer)
+  }, [featuredPool.length, isBrowseMode])
+
+  const moveFeatured = useCallback((direction) => {
+    if (featuredPool.length < 2) return
+    setFeaturedIndex((current) => (current + direction + featuredPool.length) % featuredPool.length)
+  }, [featuredPool.length])
 
   useEffect(() => { setCatalogSEO(searchParams) }, [searchParams])
+
+  useEffect(() => {
+    const urlSearch = searchParams.get('search') || ''
+    setSearchInput((current) => current === urlSearch ? current : urlSearch)
+    setDebouncedSearch((current) => current === urlSearch ? current : urlSearch)
+  }, [searchParams])
 
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return undefined }
@@ -910,9 +1099,21 @@ export default function Catalog() {
     navigate(`/catalog${next.toString() ? `?${next.toString()}` : ''}`, { replace: true })
   }, [navigate, searchParams])
 
+  const removeFilter = useCallback((key) => {
+    if (key === 'search') {
+      setSearchInput('')
+      setDebouncedSearch('')
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete(key)
+    navigate(`/catalog${next.toString() ? `?${next.toString()}` : ''}`)
+  }, [navigate, searchParams])
+
   useEffect(() => {
     const handler = (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      const target = event.target
+      const editable = target?.closest?.('input, textarea, select, [contenteditable="true"]')
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !editable) {
         event.preventDefault()
         searchRef.current?.focus()
       }
@@ -944,7 +1145,7 @@ export default function Catalog() {
         <HeroFallback />
         {featured?.bannerImage && <HeroBackdrop style={{ backgroundImage: `url(${featured.bannerImage})` }} />}
         <Container>
-          <HeroContent>
+          <HeroContent key={featured?.id || 'catalog-featured'}>
             <HeroKicker><FaFire size={12} /> Featured this week</HeroKicker>
             <HeroTitle>{featured ? titleOf(featured) : 'Find your next obsession.'}</HeroTitle>
             <HeroMeta>
@@ -956,11 +1157,21 @@ export default function Catalog() {
             </HeroMeta>
             <HeroDescription>{featuredDescription}</HeroDescription>
             <HeroActions>
-              {featured && <HeroAction className="primary" to={detailHref(featured)}><FaPlay size={13} /> Play</HeroAction>}
-              {featured && <HeroAction className="secondary" to={detailHref(featured)}><FaInfoCircle size={14} /> More info</HeroAction>}
+              {featured && <HeroAction className="primary" to={detailHref(featured)}><FaInfoCircle size={14} /> Explore title</HeroAction>}
             </HeroActions>
           </HeroContent>
         </Container>
+        {!isBrowseMode && featuredPool.length > 1 && (
+          <HeroControls aria-label="Featured title controls">
+            <HeroControl type="button" onClick={() => moveFeatured(-1)} aria-label="Previous featured title"><FaChevronLeft size={13} /></HeroControl>
+            <HeroDots>
+              {featuredPool.map((anime, index) => (
+                <HeroDot key={anime.id} type="button" $active={index === featuredIndex} onClick={() => setFeaturedIndex(index)} aria-label={`Show featured title ${index + 1}`} aria-current={index === featuredIndex ? 'true' : undefined} />
+              ))}
+            </HeroDots>
+            <HeroControl type="button" onClick={() => moveFeatured(1)} aria-label="Next featured title"><FaChevronRight size={13} /></HeroControl>
+          </HeroControls>
+        )}
       </Hero>
 
       <DiscoverBar>
@@ -977,12 +1188,27 @@ export default function Catalog() {
               />
               {searchInput ? <SearchClear type="button" aria-label="Clear search" onClick={clearSearch}><FaTimes size={13} /></SearchClear> : <SearchHint>⌘ K</SearchHint>}
             </SearchBox>
-            <FilterToggle type="button" $open={showFilters} aria-expanded={showFilters} onClick={() => setShowFilters((open) => !open)}>
+            <FilterToggle
+              type="button"
+              $open={showFilters}
+              aria-expanded={showFilters}
+              aria-controls="catalog-filter-panel"
+              aria-label={`${showFilters ? 'Close filters' : 'Browse filters'}${activeFilterCount ? `, ${activeFilterCount} active` : ''}`}
+              onClick={() => setShowFilters((open) => !open)}
+            >
               <FaSlidersH size={14} /> {showFilters ? 'Close filters' : 'Browse filters'}
+              {activeFilterCount > 0 && <FilterCount $open={showFilters} aria-hidden="true">{activeFilterCount}</FilterCount>}
             </FilterToggle>
           </DiscoverInner>
+          <QuickBrowse aria-label="Popular catalog views">
+            <span>Explore</span>
+            <QuickBrowseButton type="button" onClick={() => setFilter('view', 'all')}>Popular in Aniraku</QuickBrowseButton>
+            <QuickBrowseButton type="button" onClick={() => setFilter('status', 'RELEASING')}>Airing now</QuickBrowseButton>
+            <QuickBrowseButton type="button" onClick={() => setFilter('sort', 'SCORE_DESC')}>Top rated</QuickBrowseButton>
+            <QuickBrowseButton type="button" onClick={() => setFilter('format', 'MOVIE')}>Movie night</QuickBrowseButton>
+          </QuickBrowse>
           {showFilters && (
-            <FilterPanel>
+            <FilterPanel id="catalog-filter-panel" role="region" aria-label="Catalog filters">
               <FilterSelect label="Sort" options={SORT_OPTIONS} value={filters.sort} onChange={(value) => setFilter('sort', value)} />
               <FilterSelect label="Genre" options={GENRE_OPTIONS} value={filters.genre} onChange={(value) => setFilter('genre', value)} />
               <FilterSelect label="Format" options={FORMAT_OPTIONS} value={filters.format} onChange={(value) => setFilter('format', value)} />
@@ -991,33 +1217,35 @@ export default function Catalog() {
               {hasActiveFilters && <ClearAllButton type="button" onClick={clearAll}>Reset all</ClearAllButton>}
             </FilterPanel>
           )}
-          <QuickFilters aria-label="Quick Catalog filters">
-            <QuickFilter to="/catalog?status=RELEASING"><FaTv size={12} /> Airing now</QuickFilter>
-            <QuickFilter to="/catalog?format=MOVIE&sort=POPULARITY_DESC"><FaFilm size={12} /> Movie night</QuickFilter>
-            <QuickFilter to="/catalog?sort=SCORE_DESC"><FaStar size={12} /> Top rated</QuickFilter>
-            <QuickFilter to="/catalog?genre=Action"><FaFire size={12} /> Action</QuickFilter>
-            <QuickFilter to="/catalog?genre=Romance"><FaCompass size={12} /> Romance</QuickFilter>
-            <QuickFilter to="/catalog?view=all"><FaThLarge size={12} /> Browse all</QuickFilter>
-          </QuickFilters>
+          {hasActiveFilters && (
+            <AppliedFilters aria-label="Applied catalog filters">
+              <AppliedFiltersLabel>{activeFilterCount} active</AppliedFiltersLabel>
+              {activeFilters.map((filter) => (
+                <AppliedFilter key={filter.key} type="button" onClick={() => removeFilter(filter.key)} aria-label={`Remove ${filter.label} filter`}>
+                  {filter.label} <FaTimes size={11} aria-hidden="true" />
+                </AppliedFilter>
+              ))}
+              <ClearAllButton type="button" onClick={clearAll}>Reset all</ClearAllButton>
+            </AppliedFilters>
+          )}
         </Container>
       </DiscoverBar>
 
       <Container>
-        <TrustStrip />
         <Main>
           {isBrowseMode ? (
             <>
               <BrowseHeader>
                 <div>
                   <h2>{filters.search ? `Results for “${filters.search}”` : 'Browse every title'}</h2>
-                  <p>Open a title to view its episodes, streaming options, and full details.</p>
+                  <p>{hasActiveFilters ? `Filtered by ${activeFilters.map((filter) => filter.label.replace(/^[^:]+: /, '')).join(' · ')}.` : 'Open a title to view its episodes, streaming options, and full details.'}</p>
                 </div>
                 {totalResults > 0 && <ResultCount>{totalResults.toLocaleString()} titles</ResultCount>}
               </BrowseHeader>
               {isLoading ? (
                 <ResultGrid>{Array.from({ length: 18 }).map((_, index) => <AnimeCardSkeleton key={index} />)}</ResultGrid>
               ) : isError ? (
-                <EmptyState>
+                <EmptyState role="alert">
                   <h2>We could not load the catalog</h2>
                   <p>Please check your connection and try again.</p>
                   <ResetButton type="button" onClick={() => refetch()}>Try again</ResetButton>
@@ -1030,7 +1258,7 @@ export default function Catalog() {
                   </LoadingTrigger>
                 </>
               ) : (
-                <EmptyState>
+                <EmptyState role="status">
                   <h2>No titles found</h2>
                   <p>Try a different search or reset your filters.</p>
                   <ResetButton type="button" onClick={clearAll}>Reset catalog</ResetButton>
@@ -1038,7 +1266,7 @@ export default function Catalog() {
               )}
             </>
           ) : shelvesError && !allMedia.length ? (
-            <EmptyState>
+            <EmptyState role="alert">
               <h2>Catalog is taking longer than usual</h2>
               <p>The anime shelves could not load right now. Please try again.</p>
               <ResetButton type="button" onClick={() => { refetch(); refetchShelves() }}>Try again</ResetButton>
@@ -1047,15 +1275,13 @@ export default function Catalog() {
             <>
               <ShelfLoading title="Trending now" icon={FaFire} />
               <ShelfLoading title="Airing this week" icon={FaTv} />
-              <ShelfLoading title="Popular on Aniraku" icon={FaCompass} />
+              <ShelfLoading title="Popular in Aniraku" icon={FaCompass} />
             </>
           ) : (
             <>
               <Shelf title="Trending now" description="The stories everyone is talking about" icon={FaFire} items={shelves.trending} to="/catalog?sort=POPULARITY_DESC" />
               <Shelf title="Airing this week" description="Fresh episodes from ongoing series" icon={FaTv} items={shelves.airing} to="/catalog?status=RELEASING" />
-              <Shelf title="Popular on Aniraku" description="Big titles, ready when you are" icon={FaCompass} items={shelves.popular} to="/catalog?view=all" />
-              <Shelf title="Movie night" description="Feature-length worlds to get lost in" icon={FaFilm} items={shelves.movies} to="/catalog?format=MOVIE&sort=POPULARITY_DESC" />
-              <Shelf title="Top rated" description="Anime the community keeps coming back to" icon={FaStar} items={shelves.topRated} to="/catalog?sort=SCORE_DESC" />
+              <Shelf title="Popular in Aniraku" description="Underrated, highly rated titles worth adding to your watchlist" icon={FaStar} items={underratedPopular} to="/catalog?sort=SCORE_DESC" />
             </>
           )}
         </Main>

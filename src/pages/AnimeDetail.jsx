@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
-import TrustStrip from '../components/TrustStrip'
 import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
@@ -22,7 +21,7 @@ const Page = styled.div`
   background: var(--bg);
   color: var(--text-primary);
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
 `
 
 const PageBackground = styled.div`
@@ -75,12 +74,12 @@ const BannerContent = styled.div`
   right: 0;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 var(--content-pad);
   display: flex;
   gap: 32px;
   align-items: flex-end;
-  @media (max-width: 768px) { gap: 20px; padding: 0 20px; bottom: 20px; }
-  @media (max-width: 480px) { gap: 16px; padding: 0 16px; bottom: 16px; }
+  @media (max-width: 768px) { gap: 20px; padding: 0 var(--content-pad); bottom: 20px; }
+  @media (max-width: 480px) { gap: 14px; padding: 0 var(--content-pad); bottom: 14px; }
 `
 
 const Cover = styled.img`
@@ -91,7 +90,7 @@ const Cover = styled.img`
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   flex-shrink: 0;
   @media (max-width: 768px) { width: 110px; height: 155px; }
-  @media (max-width: 480px) { width: 90px; height: 127px; border-radius: 6px; }
+  @media (max-width: 480px) { width: 82px; height: 116px; border-radius: 6px; }
 `
 
 const Info = styled.div`
@@ -105,7 +104,7 @@ const Title = styled.h1`
   font-weight: 700;
   line-height: 1.2;
   @media (max-width: 768px) { font-size: 22px; }
-  @media (max-width: 480px) { font-size: 18px; }
+  @media (max-width: 480px) { font-size: clamp(18px, 5.6vw, 22px); line-height: 1.1; }
 `
 
 const Meta = styled.div`
@@ -131,6 +130,12 @@ const Actions = styled.div`
   gap: 8px;
   margin-top: 12px;
   flex-wrap: wrap;
+
+  @media (max-width: 480px) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
 `
 
 const WatchBtn = styled(Link)`
@@ -147,7 +152,7 @@ const WatchBtn = styled(Link)`
   transition: opacity 0.2s;
   min-height: 44px;
   &:hover { opacity: 0.9; }
-  @media (max-width: 480px) { padding: 8px 18px; font-size: 13px; min-height: 40px; }
+  @media (max-width: 480px) { padding: 8px 12px; font-size: 13px; min-height: 42px; width: 100%; justify-content: center; }
 `
 
 const BookmarkBtn = styled.button`
@@ -166,7 +171,7 @@ const BookmarkBtn = styled.button`
   min-height: 44px;
   -webkit-tap-highlight-color: transparent;
   &:hover { border-color: var(--accent); }
-  @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; min-height: 40px; }
+  @media (max-width: 480px) { padding: 8px 14px; font-size: 13px; min-height: 42px; }
 `
 
 const ProgressHint = styled.span`
@@ -177,6 +182,8 @@ const ProgressHint = styled.span`
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.4;
+
+  @media (max-width: 480px) { grid-column: 1 / -1; font-size: 11px; }
 `
 
 const EpisodeState = styled.span`
@@ -221,9 +228,9 @@ const RatingBadge = styled.span`
 const Content = styled.div`
   max-width: 1100px;
   margin: 0 auto;
-  padding: 32px 32px;
-  @media (max-width: 768px) { padding: 24px 20px; }
-  @media (max-width: 480px) { padding: 20px 16px; }
+  padding: clamp(24px, 4vw, 40px) var(--content-pad) calc(68px + env(safe-area-inset-bottom));
+  @media (max-width: 768px) { padding-top: 24px; }
+  @media (max-width: 480px) { padding-top: 20px; }
 `
 
 const Section = styled.section`
@@ -311,6 +318,16 @@ const EpisodeList = styled.div`
   @media (max-width: 480px) { max-height: 400px; border-radius: 6px; }
 `
 
+const EpBadge = styled.span`
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: ${({ $type }) => ($type === 'filler' ? 'rgba(234,179,8,0.15)' : 'rgba(99,102,241,0.15)')};
+  color: ${({ $type }) => ($type === 'filler' ? '#fde68a' : '#a5b4fc')};
+`
+
 const EpisodeRow = styled(Link)`
   position: relative;
   display: flex;
@@ -327,7 +344,17 @@ const EpisodeRow = styled(Link)`
   &:hover { background: rgba(255,255,255,0.03); }
   &:last-child { border-bottom: none; }
   &:active { background: rgba(255,255,255,0.05); }
-  @media (max-width: 480px) { padding: 6px 12px; gap: 10px; font-size: 12px; min-height: 40px; }
+  @media (max-width: 560px) {
+    padding: 9px 10px;
+    gap: 8px;
+    font-size: 12px;
+    min-height: 48px;
+    flex-wrap: wrap;
+    align-content: center;
+    > span:nth-of-type(2) { flex: 1 1 calc(100% - 108px) !important; min-width: 110px !important; }
+    ${EpisodeState}, ${RatingBadge}, ${EpBadge} { margin-left: 54px; }
+    ${EpisodeState} + ${EpisodeState}, ${EpisodeState} + ${RatingBadge}, ${RatingBadge} + ${EpisodeState} { margin-left: 0; }
+  }
 `
 
 const EpThumb = styled.img`
@@ -337,7 +364,7 @@ const EpThumb = styled.img`
   border-radius: 4px;
   flex-shrink: 0;
   background: var(--bg-card);
-  @media (max-width: 480px) { width: 50px; height: 28px; }
+  @media (max-width: 560px) { width: 46px; height: 28px; }
 `
 
 const EpNum = styled.span`
@@ -347,16 +374,6 @@ const EpNum = styled.span`
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
-`
-
-const EpBadge = styled.span`
-  font-size: 9px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
-  flex-shrink: 0;
-  background: ${({ $type }) => ($type === 'filler' ? 'rgba(234,179,8,0.15)' : 'rgba(99,102,241,0.15)')};
-  color: ${({ $type }) => ($type === 'filler' ? '#fde68a' : '#a5b4fc')};
 `
 
 const FilterBtn = styled.button`
@@ -520,9 +537,9 @@ const Grid = styled.div`
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  @media (max-width: 480px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+  @media (max-width: 560px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
   @media (min-width: 768px) and (max-width: 1024px) {
     grid-template-columns: repeat(3, 1fr);
@@ -621,6 +638,7 @@ const AnimeDetail = () => {
   const [hideFillers, setHideFillers] = useState(false)
   const [watchHistory, setWatchHistory] = useState([])
   const [episodeRatings, setEpisodeRatings] = useState({})
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   const { data: anime, isLoading } = useAnimeDetails(id)
   const { data: similar } = useSimilar(id)
@@ -885,7 +903,9 @@ const AnimeDetail = () => {
   )
 
   const title = anime.title?.english || anime.title?.romaji || 'Unknown'
-  const desc = (anime.description || '').replace(/<[^>]*>/g, '').slice(0, 500)
+  const fullDescription = (anime.description || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+  const descriptionIsLong = fullDescription.length > 500
+  const desc = descriptionExpanded || !descriptionIsLong ? fullDescription : `${fullDescription.slice(0, 500).trimEnd()}…`
   const isMovie = anime.format === 'MOVIE'
   const hasEpisodes = episodes.length > 0
   const hasRelations = relations.length > 0
@@ -978,7 +998,27 @@ const AnimeDetail = () => {
         {desc && (
           <Section>
             <SectionTitle>Synopsis</SectionTitle>
-            <Desc>{desc}{(anime.description || '').length > 500 ? '...' : ''}</Desc>
+            <Desc id="synopsis-content">{desc}</Desc>
+            {descriptionIsLong && (
+              <button
+                type="button"
+                aria-expanded={descriptionExpanded}
+                aria-controls="synopsis-content"
+                onClick={() => setDescriptionExpanded((expanded) => !expanded)}
+                style={{
+                  marginTop: 10,
+                  padding: 0,
+                  border: 0,
+                  background: 'transparent',
+                  color: 'var(--accent)',
+                  fontSize: 13,
+                  fontWeight: 750,
+                  cursor: 'pointer',
+                }}
+              >
+                {descriptionExpanded ? 'Show less' : 'Read full synopsis'}
+              </button>
+            )}
           </Section>
         )}
 
@@ -1039,6 +1079,7 @@ const AnimeDetail = () => {
                         </span>
                         {!!ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
                         {!!ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}
+                        {actionMode === 'continue' && num === actionEpisode && <EpisodeState title="Recommended continuation">Up next</EpisodeState>}
                         {activity && <EpisodeState title={activity.completed ? 'Completed' : 'In progress'}><FaCheck size={9} /> {activity.completed ? 'Watched' : 'In progress'}</EpisodeState>}
                         {rated > 0 && <RatingBadge title={`You rated this episode ${rated}/10`}><FaStar size={8} /> {rated}/10</RatingBadge>}
                         <FaPlay size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -1063,7 +1104,6 @@ const AnimeDetail = () => {
           </Section>
         )}
 
-        <TrustStrip />
         <Section>
           <Comments animeId={anime.id} />
         </Section>

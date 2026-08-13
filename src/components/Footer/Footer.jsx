@@ -1,4 +1,5 @@
 import React from 'react'
+import styled from 'styled-components'
 import { F } from './footer.style'
 import { Link } from 'react-router-dom'
 import Logo from '../Logo'
@@ -43,7 +44,40 @@ const resourceLinks = [
   { label: 'Community Guidelines', to: '/community-guidelines' },
 ]
 
-const Footer = () => {
+const CompactContent = styled.div`
+  display: flex;
+  width: min(100%, 920px);
+  margin: 0 auto;
+  padding: 22px clamp(16px, 4vw, 38px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  @media (max-width: 620px) { flex-direction: column; align-items: flex-start; }
+  nav { display: flex; flex-wrap: wrap; gap: 10px; }
+  a { color: var(--text-secondary); text-decoration: none; }
+  a:hover { color: var(--text-primary); }
+`
+
+const Footer = ({ compact = false }) => {
+  if (compact) {
+    return (
+      <F.Footer id="footer">
+        <CompactContent>
+          <Logo to="/home" height={28} showText />
+          <nav aria-label="Legal and support links">
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+            <Link to="/dmca">DMCA</Link>
+            <a href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Support</a>
+          </nav>
+          <span>© 2026 Aniraku</span>
+        </CompactContent>
+      </F.Footer>
+    )
+  }
   return (
     <F.Footer id="footer">
       {/* Desktop grid */}

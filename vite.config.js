@@ -7,6 +7,10 @@ export default defineConfig({
     host: true,
     port: 3000,
   },
+  preview: {
+    host: true,
+    allowedHosts: ['4176-irag0uotfadg17vn3lvv9-e2d1ec02.us4.manus.computer'],
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

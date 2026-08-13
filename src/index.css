@@ -686,7 +686,7 @@ video {
 }
 
 body {
-  min-width: 320px;
+  min-width: 0;
   min-height: 100dvh;
   text-rendering: optimizeLegibility;
 }
@@ -939,6 +939,72 @@ select {
   }
 }
 
+
+/* ============================================
+   SITE-WIDE RESPONSIVE FOUNDATION
+   ============================================ */
+
+:root {
+  --site-max: 1440px;
+  --content-pad: clamp(14px, 3vw, 34px);
+  --mobile-dock-clearance: calc(88px + var(--safe-bottom));
+}
+
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+main > *, section, article, aside, header, footer, nav {
+  min-width: 0;
+}
+
+img, picture, video, iframe, canvas {
+  height: auto;
+  max-inline-size: 100%;
+}
+
+/* Default controls remain legible and usable when browsers apply text zoom. */
+button, input, select, textarea {
+  max-width: 100%;
+  line-height: 1.25;
+}
+
+/* Explicit bottom clearance keeps page content above the phone navigation dock. */
+@media (max-width: 768px) {
+  main {
+    padding-bottom: var(--mobile-dock-clearance);
+  }
+
+  .bottom-nav-spacer {
+    display: none;
+  }
+
+  .catalog-page,
+  .profile-page,
+  .watch-page,
+  .anime-detail-page {
+    padding-bottom: var(--mobile-dock-clearance);
+  }
+}
+
+/* Tablet uses a real header and page gutters rather than the phone dock. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root { --content-pad: 22px; }
+  main { padding-bottom: 0; }
+}
+
+/* Short landscape phones need a compact dock and protected video controls. */
+@media (max-width: 768px) and (orientation: landscape) and (max-height: 520px) {
+  :root { --mobile-dock-clearance: calc(70px + var(--safe-bottom)); }
+}
+
+/* Avoid animation-related jank on lower-power touch devices while preserving
+   the important state changes users rely on. */
+@media (hover: none) and (pointer: coarse) {
+  a, button { -webkit-tap-highlight-color: transparent; }
+}
 
 /* ============================================
    CONSISTENT CONTENT SKELETONS
@@ -1232,4 +1298,316 @@ select {
 
 @media (max-width: 480px) {
   .home-card-skeleton { width: 130px; }
+}
+
+/* ============================================
+   PLAYBACK RESPONSIVE RECONSTRUCTION
+   ============================================ */
+
+.watch-page {
+  width: min(100%, 1280px);
+  margin-inline: auto;
+}
+
+.watch-player {
+  min-width: 0;
+  isolation: isolate;
+}
+
+.watch-grid,
+.watch-info,
+.watch-sources,
+.watch-source-group {
+  min-width: 0;
+}
+
+.watch-sources {
+  align-items: stretch !important;
+}
+
+.watch-source-group {
+  min-width: min(100%, 280px);
+}
+
+.watch-source-btn {
+  white-space: nowrap;
+}
+
+.watch-synopsis {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .watch-page {
+    padding: 8px var(--content-pad) var(--mobile-dock-clearance) !important;
+  }
+
+  .watch-page.theater {
+    padding-inline: 0 !important;
+  }
+
+  .watch-page.theater .watch-player {
+    border-radius: 0 !important;
+  }
+
+  .watch-player {
+    border-radius: 12px !important;
+  }
+
+  .watch-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 18px !important;
+    margin-top: 18px !important;
+  }
+
+  .watch-sources {
+    gap: 9px !important;
+    margin-top: 12px !important;
+  }
+
+  .watch-source-group {
+    display: grid !important;
+    grid-template-columns: auto repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 7px !important;
+    align-items: stretch !important;
+  }
+
+  .watch-source-group > span {
+    align-self: center;
+    justify-self: start;
+  }
+
+  .watch-source-btn {
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 10px !important;
+  }
+
+  .watch-ep-toggle {
+    width: 100% !important;
+    max-width: none !important;
+    margin-inline: 0 !important;
+  }
+
+  .watch-info h1 {
+    font-size: clamp(21px, 6vw, 28px) !important;
+    line-height: 1.14 !important;
+  }
+
+  .watch-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px !important;
+  }
+
+  .watch-nav > * {
+    width: 100%;
+    min-width: 0;
+    justify-content: center !important;
+  }
+
+  .watch-nav > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .watch-error,
+  .watch-loading {
+    padding: 16px !important;
+  }
+
+  .watch-error img {
+    width: clamp(52px, 18vw, 72px) !important;
+    height: auto !important;
+    margin-bottom: 10px !important;
+  }
+
+  .watch-resume {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    max-width: none !important;
+    transform: none !important;
+    justify-content: space-between;
+    gap: 10px !important;
+    padding: 11px 12px !important;
+  }
+
+  .watch-trust-note {
+    margin-top: 14px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .watch-source-group {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+  }
+
+  .watch-source-group > span {
+    grid-column: 1 / -1;
+  }
+
+  .watch-source-btn {
+    min-height: 42px !important;
+  }
+
+  .watch-rating {
+    align-items: flex-start !important;
+  }
+
+  .watch-rating > span:last-of-type {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .watch-details,
+  .watch-synopsis {
+    font-size: 13px !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .watch-page {
+    padding: 12px var(--content-pad) 36px !important;
+  }
+
+  .watch-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 286px) !important;
+  }
+
+  .watch-source-group {
+    min-width: 0;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) and (max-width: 768px) {
+  .watch-page {
+    padding-bottom: 16px !important;
+  }
+
+  .watch-player {
+    max-height: calc(100svh - 20px);
+  }
+}
+
+/* ============================================
+   ACCOUNT, SETTINGS, AND SUPPORTING ROUTES
+   ============================================ */
+
+.profile-page {
+  width: min(100%, var(--content-max));
+  margin-inline: auto;
+  padding-inline: var(--content-pad) !important;
+}
+
+.profile-page .profile-card,
+.profile-page .profile-history-item {
+  min-width: 0;
+}
+
+.profile-tabs {
+  scrollbar-width: none;
+}
+
+.profile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.profile-actions > * {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding-top: calc(var(--header-h) + 12px) !important;
+    padding-bottom: var(--mobile-dock-clearance) !important;
+  }
+
+  .profile-header {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    padding: 16px !important;
+  }
+
+  .profile-header > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .profile-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 8px !important;
+    padding: 4px var(--content-pad) 10px !important;
+    margin-inline: calc(-1 * var(--content-pad)) !important;
+    overscroll-behavior-inline: contain;
+  }
+
+  .profile-tabs > * {
+    flex: 0 0 auto;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .profile-card {
+    padding: 16px !important;
+    border-radius: var(--radius-lg) !important;
+  }
+
+  .profile-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px !important;
+  }
+
+  .profile-actions > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .profile-avatar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
+    gap: 9px !important;
+  }
+
+  .profile-bookmark-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .profile-history-item {
+    padding: 10px !important;
+    gap: 9px !important;
+  }
+
+  .profile-history-item img {
+    width: 40px !important;
+    height: 56px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .profile-header {
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-bookmark-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .profile-page {
+    padding-inline: var(--content-pad) !important;
+  }
+
+  .profile-bookmark-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
 }
