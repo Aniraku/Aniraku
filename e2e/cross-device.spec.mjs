@@ -41,4 +41,19 @@ test.describe('Aniraku Cross-Device Experience', () => {
     await expect(page.getByRole('link', { name: /log in/i }).first()).toBeVisible()
     await expect(page.getByText('Delete account', { exact: true })).toHaveCount(0)
   })
+
+  test('Minimal Random Anime controls remain compact and usable on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 })
+    await page.goto('http://localhost:5173/random')
+
+    await expect(page.getByRole('heading', { name: /what next/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ANY' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ACTION' })).toBeVisible()
+    const movieMode = page.getByRole('button', { name: 'MOVIE' })
+    await expect(movieMode).toBeVisible()
+    await expect(page.getByRole('button', { name: /new pick/i })).toBeVisible()
+
+    await movieMode.click()
+    await expect(movieMode).toHaveAttribute('aria-pressed', 'true')
+  })
 })
