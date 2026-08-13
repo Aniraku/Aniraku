@@ -328,9 +328,37 @@ function qualityOptionHtml(presentation) {
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
 
+// Some upstreams embed UTC expiry stamps such as 20260808014918 in the
+// stream URL. A token whose newest valid timestamp is already in the past is
+// definitively dead; mounting it only creates repeated proxy 401/direct 404
+// noise before the normal provider failover can begin.
+function hasExpiredEmbeddedToken(url) {
+  const matches = String(url || '').matchAll(/(?:^|[^0-9])(20\d{12})(?!\d)/g)
+  let newest = 0
+  for (const match of matches) {
+    const value = match[1]
+    const year = Number(value.slice(0, 4))
+    const month = Number(value.slice(4, 6))
+    const day = Number(value.slice(6, 8))
+    const hour = Number(value.slice(8, 10))
+    const minute = Number(value.slice(10, 12))
+    const second = Number(value.slice(12, 14))
+    const timestamp = Date.UTC(year, month - 1, day, hour, minute, second)
+    if (
+      year >= 2020 && year <= 2100 &&
+      month >= 1 && month <= 12 && day >= 1 && day <= 31 &&
+      hour <= 23 && minute <= 59 && second <= 59 &&
+      Number.isFinite(timestamp)
+    ) newest = Math.max(newest, timestamp)
+  }
+  // The small grace period avoids rejecting a token while a provider clock is
+  // only seconds ahead; multi-day-old URLs such as the reported source fail.
+  return newest > 0 && Date.now() > newest + 30_000
+}
+
 function buildQualityList(sources) {
   const seenUrls = new Set()
-  return (Array.isArray(sources) ? sources : [])
+  const entries = (Array.isArray(sources) ? sources : [])
     // Backend verification tags are advisory snapshots, not a playback
     // permission model. Keep every non-embed media URL so providers such as
     // Kiwi remain playable when their current CDN verdict is stale.
@@ -350,6 +378,7 @@ function buildQualityList(sources) {
         // authoritative here so ArtPlayer/Hls.js receives the correct loader.
         type: inferredType,
         verification: String(src.verification || src.Verification || '').toLowerCase(),
+        expiredToken: hasExpiredEmbeddedToken(src.url),
       }
     })
     .filter((entry) => {
@@ -357,8 +386,13 @@ function buildQualityList(sources) {
       seenUrls.add(entry.url)
       return true
     })
+
+  // Unlike a soft backend verdict, a passed signed-token expiry is definitive.
+  // Omit it entirely so an empty result activates existing server failover.
+  return entries
+    .filter((entry) => !entry.expiredToken)
     // Never auto-select a source the backend already marked dead. Keep dead
-    // options in the menu as a last-resort manual choice because CDN verdicts
+    // non-expired options as a last-resort manual choice because CDN verdicts
     // can differ between the server probe and the viewer's network.
     // Among non-dead entries, prefer the provider's own Auto/adaptive URL and
     // then the highest numeric quality without inventing a new URL.
