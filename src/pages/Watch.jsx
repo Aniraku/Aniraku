@@ -1870,9 +1870,10 @@ export default function Watch() {
             maxBufferLength: netHintRef.current.effectiveType === '4g' ? 12 : 6,
             maxMaxBufferLength: 24,
             startFragPrefetch: false,
-            manifestLoadingMaxRetry: 0,
-            levelLoadingMaxRetry: 1,
-            fragLoadingMaxRetry: 1,
+                          manifestLoadingMaxRetry: 0,
+              levelLoadingMaxRetry: 0,
+              fragLoadingMaxRetry: 0,
+
           })
           hlsInstance.current = hls
           hls.loadSource(proxied(url))
@@ -2179,8 +2180,10 @@ export default function Watch() {
               // source. Do not let hls.js repeat the same failed manifest;
               // the fatal handler below immediately advances to the next server.
               manifestLoadingMaxRetry: 0,
-              levelLoadingMaxRetry: 2,
-              fragLoadingMaxRetry: 2,
+              // A 429 from the shared proxy must never trigger repeated
+              // segment requests. Let the fatal handler rotate providers.
+              levelLoadingMaxRetry: 0,
+              fragLoadingMaxRetry: 0,
               defaultAudioCodec: 'mp4a.40.2',
               fetchSetup: referer
                 ? (context, init) => {
@@ -2196,17 +2199,19 @@ export default function Watch() {
             let mediaRetries = 0
             const fail = (reason) => {
               if (buildIdRef.current !== myBuildId) return
-              const permanentCdnFailure = reason === 'blocked'
+              const terminalProxyFailure = reason === 'blocked' || reason === 'rate-limited'
               // A permanent CDN response is already conclusive. Direct fallback
               // uses the same stale URL and only produces another 401/404/502,
               // so skip it and move straight to the next provider.
-              if (!permanentCdnFailure && !triedDirect) {
+              if (!terminalProxyFailure && !triedDirect) {
                 triedDirect = true
                 showToast('No upstream response — retrying direct…', { long: true })
                 hls.loadSource(url)
                 return
               }
-              if (reason === 'backend' || reason === 'cdn-unreachable') {
+              if (reason === 'rate-limited') {
+                showToast('Playback proxy is busy — switching server…', { long: true })
+              } else if (reason === 'backend' || reason === 'cdn-unreachable') {
                 showToast(
                   'Stream source is unreachable — switching server…',
                   { long: true }
@@ -2214,7 +2219,7 @@ export default function Watch() {
               } else {
                 showToast('Playback error — switching server…')
               }
-              if (onBlocked) onBlocked(permanentCdnFailure ? 'permanent-cdn' : undefined)
+              if (onBlocked) onBlocked(terminalProxyFailure ? 'permanent-cdn' : undefined)
               else setError('Stream playback error. Try a different server.')
             }
             hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -2224,7 +2229,7 @@ export default function Watch() {
               // repaired by hls.startLoad(). Fail over immediately instead of
               // hammering the same expired/blocked URL several more times.
               const httpStatus = Number(data?.response?.code || data?.response?.status || 0)
-              const permanentCdnFailure = [401, 403, 404, 410, 502].includes(httpStatus)
+              const permanentCdnFailure = [401, 403, 404, 410, 429, 502].includes(httpStatus)
               // MP4 mis-classified as HLS
               if (
                 data.type === Hls.ErrorTypes.MANIFEST_ERROR &&
@@ -2256,10 +2261,10 @@ export default function Watch() {
                   } catch {}
                   return
                 }
-                fail(permanentCdnFailure ? 'blocked' : 'backend')
+                fail(httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'backend'))
                 return
               }
-              fail(permanentCdnFailure ? 'blocked' : 'unknown')
+              fail(httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'unknown'))
             })
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
               const p = video.play()
@@ -2770,7 +2775,7 @@ export default function Watch() {
           return
         }
         const subs = firstSource.subtitles || []
-        const onBlocked = () => handleProviderBlockedRef.current?.()
+        const onBlocked = (reason) => handleProviderBlockedRef.current?.(reason)
         buildPlayer(
           qualityList[0].url,
           qualityList[0].type,

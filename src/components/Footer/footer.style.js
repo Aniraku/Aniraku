@@ -4,14 +4,14 @@ import { Link } from 'react-router-dom'
 export const F = {}
 
 F.Footer = styled.footer`
-  margin-top: clamp(32px, 7vw, 88px);
+  margin-top: clamp(16px, 2.5vw, 32px);
   padding: clamp(28px, 5vw, 64px) var(--page-gutter) calc(24px + var(--safe-bottom));
   border-top: 1px solid rgba(255,255,255,.09);
   background: linear-gradient(180deg, rgba(15,15,17,.82), #0a0a0b 60%);
   color-scheme: dark;
 
   @media (max-width: 768px) {
-    margin-top: 32px;
+    margin-top: 20px;
     padding-bottom: calc(96px + var(--safe-bottom));
   }
 `

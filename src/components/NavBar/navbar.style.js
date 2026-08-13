@@ -37,22 +37,6 @@ N.Left = styled.div`
   flex: 1 1 auto;
 `
 
-N.MenuBtn = styled.button`
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  color: var(--text-primary);
-  transition: background var(--transition-fast), color var(--transition-fast);
-
-  &:hover { background: rgba(255,255,255,.08); color: #fff; }
-
-  @media (max-width: 768px) { display: none; }
-  @media (min-width: 769px) and (max-width: 1024px) { width: 38px; height: 38px; }
-`
-
 N.SearchForm = styled.form`
   display: flex;
   align-items: center;
@@ -177,11 +161,3 @@ N.SignIn = styled.span`
   @media (min-width: 769px) and (max-width: 900px) { padding-inline: 11px; }
 `
 
-N.LayoutBg = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 250;
-  display: ${({ open }) => (open ? 'block' : 'none')};
-  background: rgba(0,0,0,.7);
-  backdrop-filter: blur(2px);
-`

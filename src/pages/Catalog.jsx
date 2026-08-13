@@ -21,7 +21,12 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 const fmt = (value = '') => value.replace(/_/g, ' ')
 const titleOf = (anime) => anime?.title?.english || anime?.title?.romaji || anime?.title?.userPreferred || 'Unknown title'
-const imageOf = (anime) => anime?.coverImage?.extraLarge || anime?.coverImage?.large || anime?.coverImage?.medium
+const posterSources = (anime) => [...new Set([
+  anime?.coverImage?.extraLarge,
+  anime?.coverImage?.large,
+  anime?.coverImage?.medium,
+].filter(Boolean))]
+const imageOf = (anime) => posterSources(anime)[0]
 const detailHref = (anime) => `/anime/${generateSlug(titleOf(anime))}-${anime.id}`
 const cleanDescription = (value = '') => value
   .replace(/<[^>]*>/g, ' ')
@@ -231,57 +236,6 @@ const HeroAction = styled(Link)`
   &.secondary:hover { background: var(--bg-card); border-color: var(--text-muted); }
 
   @media (max-width: 480px) { width: 100%; }
-`
-
-const HeroControls = styled.div`
-  position: absolute;
-  right: clamp(18px, 4vw, 56px);
-  bottom: 22px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-
-  @media (max-width: 640px) {
-    right: 16px;
-    bottom: 14px;
-  }
-`
-
-const HeroControl = styled.button`
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: 1px solid rgba(255,255,255,0.28);
-  border-radius: 50%;
-  background: rgba(10,10,12,0.72);
-  color: var(--text-primary);
-  backdrop-filter: blur(12px);
-  cursor: pointer;
-  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
-  &:hover { border-color: var(--accent); background: rgba(20,20,24,0.94); }
-  &:active { transform: scale(0.93); }
-  &:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-`
-
-const HeroDots = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 2px;
-`
-
-const HeroDot = styled.button`
-  width: ${({ $active }) => ($active ? '20px' : '7px')};
-  height: 7px;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: ${({ $active }) => ($active ? 'var(--accent)' : 'rgba(255,255,255,0.45)')};
-  cursor: pointer;
-  transition: width 180ms ease, background 180ms ease;
-  &:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
 `
 
 const DiscoverBar = styled.section`
@@ -686,6 +640,23 @@ const PosterFallback = styled.div`
   background: linear-gradient(135deg, var(--bg-elevated), var(--bg-secondary));
 `
 
+const PosterArtwork = memo(function PosterArtwork({ anime, title }) {
+  const sources = posterSources(anime)
+  const [sourceIndex, setSourceIndex] = useState(0)
+  const source = sources[sourceIndex]
+
+  if (!source) return <PosterFallback aria-label={`${title} poster unavailable`}>No poster</PosterFallback>
+
+  return (
+    <img
+      src={source}
+      alt={title}
+      loading="lazy"
+      onError={() => setSourceIndex((current) => current + 1)}
+    />
+  )
+})
+
 const PosterMeta = styled.div`
   position: absolute;
   z-index: 1;
@@ -842,13 +813,16 @@ function FilterSelect({ label, options, value, onChange }) {
 
 const CatalogRailCard = memo(function CatalogRailCard({ anime }) {
   const title = titleOf(anime)
-  const image = imageOf(anime)
-  const meta = [anime?.episodes ? `${anime.episodes} eps` : null, anime?.seasonYear, anime?.format ? fmt(anime.format) : null].filter(Boolean).join(' • ')
+  const meta = [
+    anime?.episodes ? `${anime.episodes} eps` : (anime?.format === 'MOVIE' ? 'Movie' : (anime?.status ? fmt(anime.status) : 'Details pending')),
+    anime?.seasonYear,
+    anime?.format && anime?.format !== 'MOVIE' ? fmt(anime.format) : null,
+  ].filter(Boolean).join(' • ')
 
   return (
     <RailCard to={detailHref(anime)} aria-label={`Open ${title}`}>
       <Poster className="poster">
-        {image ? <img src={image} alt={title} loading="lazy" /> : <PosterFallback>No image</PosterFallback>}
+        <PosterArtwork anime={anime} title={title} />
         <PosterMeta>
           <span className="score">{anime?.averageScore ? `${anime.averageScore}% match` : 'Explore'}</span>
           <span className="play"><FaPlay size={9} /></span>
@@ -864,13 +838,16 @@ const CatalogRailCard = memo(function CatalogRailCard({ anime }) {
 
 const CatalogGridCard = memo(function CatalogGridCard({ anime }) {
   const title = titleOf(anime)
-  const image = imageOf(anime)
-  const meta = [anime?.episodes ? `${anime.episodes} eps` : null, anime?.seasonYear, anime?.format ? fmt(anime.format) : null].filter(Boolean).join(' • ')
+  const meta = [
+    anime?.episodes ? `${anime.episodes} eps` : (anime?.format === 'MOVIE' ? 'Movie' : (anime?.status ? fmt(anime.status) : 'Details pending')),
+    anime?.seasonYear,
+    anime?.format && anime?.format !== 'MOVIE' ? fmt(anime.format) : null,
+  ].filter(Boolean).join(' • ')
 
   return (
     <GridCard to={detailHref(anime)} aria-label={`Open ${title}`}>
       <GridPoster className="poster">
-        {image ? <img src={image} alt={title} loading="lazy" /> : <PosterFallback>No image</PosterFallback>}
+        <PosterArtwork anime={anime} title={title} />
         <PosterMeta>
           <span className="score">{anime?.averageScore ? `${anime.averageScore}% match` : 'Explore'}</span>
           <span className="play"><FaPlay size={9} /></span>
@@ -1017,10 +994,10 @@ export default function Catalog() {
 
   const featuredPool = useMemo(() => {
     const unique = new Map()
-    ;[...shelves.trending, ...shelves.popular, ...shelves.airing, ...shelves.topRated].forEach((anime) => {
+    ;[...shelves.popular, ...shelves.topRated].forEach((anime) => {
       if (anime?.id && !unique.has(anime.id)) unique.set(anime.id, anime)
     })
-    return [...unique.values()].filter((anime) => anime?.bannerImage || anime?.coverImage?.extraLarge).slice(0, 6)
+    return [...unique.values()].filter((anime) => posterSources(anime).length > 0).slice(0, 10)
   }, [shelves])
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const featured = isBrowseMode ? allMedia[0] : featuredPool[featuredIndex] || shelves.trending[0] || allMedia[0]
@@ -1048,11 +1025,6 @@ export default function Catalog() {
     }, 7000)
     return () => window.clearInterval(timer)
   }, [featuredPool.length, isBrowseMode])
-
-  const moveFeatured = useCallback((direction) => {
-    if (featuredPool.length < 2) return
-    setFeaturedIndex((current) => (current + direction + featuredPool.length) % featuredPool.length)
-  }, [featuredPool.length])
 
   useEffect(() => { setCatalogSEO(searchParams) }, [searchParams])
 
@@ -1131,7 +1103,8 @@ export default function Catalog() {
     return () => observer.disconnect()
   }, [fetchNextPage, hasNextPage, isBrowseMode, isFetchingNextPage, isLoading])
 
-  const featuredDescription = cleanDescription(featured?.description) || 'Browse popular anime, fresh weekly episodes, acclaimed movies, and more — all in one place.'
+  const featuredDescription = cleanDescription(featured?.description) || 'Explore the all-time anime favourites that audiences return to again and again.'
+  const featuredBackdrop = featured?.bannerImage || imageOf(featured)
   const featuredMeta = [
     featured?.averageScore ? `${featured.averageScore}% match` : null,
     featured?.seasonYear,
@@ -1143,10 +1116,10 @@ export default function Catalog() {
     <PageWrapper className="catalog-page">
       <Hero>
         <HeroFallback />
-        {featured?.bannerImage && <HeroBackdrop style={{ backgroundImage: `url(${featured.bannerImage})` }} />}
+        {featuredBackdrop && <HeroBackdrop style={{ backgroundImage: `url(${featuredBackdrop})` }} />}
         <Container>
           <HeroContent key={featured?.id || 'catalog-featured'}>
-            <HeroKicker><FaFire size={12} /> Featured this week</HeroKicker>
+            <HeroKicker><FaFire size={12} /> All-time popular</HeroKicker>
             <HeroTitle>{featured ? titleOf(featured) : 'Find your next obsession.'}</HeroTitle>
             <HeroMeta>
               {featuredMeta.map((meta, index) => (
@@ -1161,17 +1134,6 @@ export default function Catalog() {
             </HeroActions>
           </HeroContent>
         </Container>
-        {!isBrowseMode && featuredPool.length > 1 && (
-          <HeroControls aria-label="Featured title controls">
-            <HeroControl type="button" onClick={() => moveFeatured(-1)} aria-label="Previous featured title"><FaChevronLeft size={13} /></HeroControl>
-            <HeroDots>
-              {featuredPool.map((anime, index) => (
-                <HeroDot key={anime.id} type="button" $active={index === featuredIndex} onClick={() => setFeaturedIndex(index)} aria-label={`Show featured title ${index + 1}`} aria-current={index === featuredIndex ? 'true' : undefined} />
-              ))}
-            </HeroDots>
-            <HeroControl type="button" onClick={() => moveFeatured(1)} aria-label="Next featured title"><FaChevronRight size={13} /></HeroControl>
-          </HeroControls>
-        )}
       </Hero>
 
       <DiscoverBar>
