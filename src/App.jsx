@@ -82,6 +82,7 @@ const CommunityGuidelines = lazy(() => import("./pages/CommunityGuidelines"))
 
 const AnimeDetail = lazy(() => import("./pages/AnimeDetail"))
 const Auth = lazy(() => import("./pages/Auth"))
+const NewPassword = lazy(() => import("./pages/NewPassword"))
 const Profile = lazy(() => import("./pages/Profile"))
 const Settings = lazy(() => import("./pages/Settings"))
 const Catalog = lazy(() => import("./pages/Catalog"))
@@ -118,6 +119,8 @@ const ScrollToTop = () => {
       '/profile/settings': 'Settings — Aniraku',
       '/login': 'Sign In — Aniraku',
       '/signup': 'Create Account — Aniraku',
+      '/auth/forgot-password': 'Reset Password — Aniraku',
+      '/auth/new-password': 'Choose a New Password — Aniraku',
       '/admin': 'Admin — Aniraku',
       '/random': 'Random Anime — Aniraku',
       '/sync/callback': 'Library Sync — Aniraku',
@@ -157,6 +160,8 @@ const App = () => {
 
             <Route path="/login" element={<Suspense fallback={<Skeleton />}><Auth mode="login" /></Suspense>} />
             <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
+            <Route path="/auth/forgot-password" element={<Suspense fallback={<Skeleton />}><Auth mode="forgot" /></Suspense>} />
+            <Route path="/auth/new-password" element={<Suspense fallback={<Skeleton />}><NewPassword /></Suspense>} />
             <Route path="/profile" element={<Suspense fallback={<Skeleton />}><Profile /></Suspense>} />
             <Route path="/profile/settings" element={<Suspense fallback={<Skeleton />}><Settings /></Suspense>} />
             <Route path="/sync/callback" element={<Suspense fallback={<Skeleton />}><SyncCallback /></Suspense>} />
