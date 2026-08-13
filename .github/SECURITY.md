@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest version deployed at [aniraku.vercel.app](https://aniraku.vercel.app) receives security updates.
+Only the latest version deployed at O(https://www.aniraku.tech) receives security updates.
 
 | Version | Supported          |
 | ------- | ------------------ |
