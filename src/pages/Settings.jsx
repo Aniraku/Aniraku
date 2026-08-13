@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaChevronLeft, FaEye, FaEyeSlash, FaTrash, FaSignOutAlt, FaLink, FaUnlink, FaCheck, FaHistory, FaBookmark, FaKey, FaSync, FaLock } from 'react-icons/fa'
@@ -22,11 +22,17 @@ const clearAnirakuStorage = () => {
       if (k && (k.startsWith('aniraku-') || k.startsWith('sb-'))) keys.push(k)
     }
     keys.forEach(k => localStorage.removeItem(k))
-  } catch {}
+  } catch {
+    // Storage may be unavailable in private browsing; cleanup remains best effort.
+  }
 }
 
 const removeLocalKey = (key) => {
-  try { localStorage.removeItem(key) } catch {}
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // Missing storage access should not interrupt the settings action.
+  }
 }
 
 const Page = styled.main`
@@ -417,15 +423,22 @@ const Settings = () => {
     if (!user || confirmText !== 'DELETE' || deleting) return
     setDeleting(true)
     setDeleteErr('')
-    const { error } = await supabase.rpc('delete_my_account')
-    if (error) {
+
+    try {
+      const { error } = await supabase.rpc('delete_my_account')
+      if (error) throw error
+
+      // Delete the local auth session as well as the database account. This keeps
+      // the persistent AuthProvider state from making the deleted user appear
+      // signed in until a later refresh.
+      await signOut()
+      clearAnirakuStorage()
+      navigate('/home')
+    } catch (error) {
       console.error('Delete account:', error)
-      setDeleteErr(error.message || 'Failed to delete account')
+      setDeleteErr(error?.message || 'We could not delete your account. Please try again.')
       setDeleting(false)
-      return
     }
-    clearAnirakuStorage()
-    navigate('/home')
   }
 
   const handleSignOut = async () => {
