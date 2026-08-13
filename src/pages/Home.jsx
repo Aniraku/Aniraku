@@ -264,12 +264,25 @@ const DeckList = styled.div`
   padding: 5px 9px 9px;
 `
 
+const DeckGroupLabel = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 8px 2px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  svg { color: var(--accent); }
+`
+
 const DeckItem = styled(Link)`
   display: grid;
-  grid-template-columns: 33px minmax(0, 1fr) auto;
+  grid-template-columns: 33px minmax(0, 1fr) minmax(78px, auto);
   gap: 10px;
   align-items: center;
-  min-height: 67px;
+  min-height: 70px;
   padding: 8px;
   border-bottom: 1px solid var(--border);
   color: inherit;
@@ -282,8 +295,20 @@ const DeckItem = styled(Link)`
 
   img { width: 33px; height: 46px; border-radius: 5px; object-fit: cover; background: var(--bg-elevated); }
   h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-  p { margin: 5px 0 0; color: var(--text-muted); font-size: 10px; }
-  strong { color: var(--accent); font-size: 11px; font-weight: 800; white-space: nowrap; }
+  p { margin: 4px 0 0; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (max-width: 420px) {
+    grid-template-columns: 30px minmax(0, 1fr) minmax(70px, auto);
+    gap: 8px;
+    img { width: 30px; height: 42px; }
+  }
+`
+
+const DeckTime = styled.div`
+  min-width: 0;
+  text-align: right;
+  strong { display: block; color: var(--accent); font-size: 10px; font-weight: 850; white-space: nowrap; }
+  span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 9px; line-height: 1.2; }
 `
 
 const EmptyDeck = styled.div`
@@ -491,7 +516,17 @@ const imageFor = (item) => item?.bannerImage || item?.coverImage?.extraLarge || 
 const detailHref = (item) => `/anime/${generateSlug(titleFor(item))}-${item.id}`
 const watchHref = (item) => `/watch/${generateSlug(titleFor(item))}-${item.id}-episode-1`
 const stripHtml = (text = '') => text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-const formatTime = (timestamp) => timestamp ? new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Soon'
+const releaseTiming = (timestamp) => {
+  if (!timestamp) return null
+  const release = new Date(timestamp * 1000)
+  const now = new Date()
+  const releaseDay = new Date(release.getFullYear(), release.getMonth(), release.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const daysAway = Math.round((releaseDay - today) / 86400000)
+  const relative = daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : daysAway > 1 ? `In ${daysAway} days` : 'Recently aired'
+  const stamp = `${release.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} · ${release.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  return { relative, stamp }
+}
 
 function Home() {
   const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
@@ -504,9 +539,15 @@ function Home() {
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
 
   const featured = useMemo(() => trendingList[0] || airingList[0] || tvList[0] || moviesList[0] || null, [trendingList, airingList, tvList, moviesList])
-  const onDeck = useMemo(() => [...airingList, ...trendingList]
-    .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
-    .slice(0, 5), [airingList, trendingList, featured])
+  const upcomingReleases = useMemo(() => airingList
+    .filter((item) => item?.id && item.id !== featured?.id && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now())
+    .sort((a, b) => Number(a.nextAiringEpisode.airingAt) - Number(b.nextAiringEpisode.airingAt))
+    .slice(0, 3), [airingList, featured])
+  const upcomingIds = useMemo(() => new Set(upcomingReleases.map((item) => item.id)), [upcomingReleases])
+  const popularUpcoming = useMemo(() => [...trendingList, ...tvList, ...airingList]
+    .filter((item, index, list) => item?.id && item.id !== featured?.id && !upcomingIds.has(item.id) && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now() && list.findIndex((candidate) => candidate.id === item.id) === index)
+    .sort((a, b) => (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0))
+    .slice(0, 2), [trendingList, tvList, airingList, featured, upcomingIds])
   const editorialPicks = useMemo(() => [...trendingList, ...tvList]
     .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
     .slice(0, 6), [trendingList, tvList, featured])
@@ -597,17 +638,32 @@ function Home() {
 
               <OnDeck>
                 <OnDeckHeader>
-                  <div><h2>On deck</h2><p><FaClock size={10} /> Fresh episode signals</p></div>
+                  <div><h2>On deck</h2><p><FaClock size={10} /> Confirmed upcoming times · your local timezone</p></div>
                   <Link to="/schedule">Full schedule</Link>
                 </OnDeckHeader>
                 <DeckList>
-                  {onDeck.length ? onDeck.map((item) => (
-                    <DeckItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`}>
-                      <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
-                      <div><h3>{titleFor(item)}</h3><p>{item.nextAiringEpisode?.episode ? `Episode ${item.nextAiringEpisode.episode} next` : item.format || 'Series'}</p></div>
-                      <strong>{formatTime(item.nextAiringEpisode?.airingAt)}</strong>
-                    </DeckItem>
-                  )) : <EmptyDeck>No release times are available just yet.</EmptyDeck>}
+                  {upcomingReleases.length || popularUpcoming.length ? (
+                    <>
+                      {upcomingReleases.length > 0 && <DeckGroupLabel><FaClock size={9} /> Next episode releases</DeckGroupLabel>}
+                      {upcomingReleases.map((item) => {
+                        const timing = releaseTiming(item.nextAiringEpisode?.airingAt)
+                        return <DeckItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`}>
+                          <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
+                          <div><h3>{titleFor(item)}</h3><p>Episode {item.nextAiringEpisode?.episode || '?'} next</p></div>
+                          <DeckTime><strong>{timing?.relative || 'Upcoming'}</strong><span>{timing?.stamp || 'Time pending'}</span></DeckTime>
+                        </DeckItem>
+                      })}
+                      {popularUpcoming.length > 0 && <DeckGroupLabel><FaStar size={9} /> Popular titles ahead</DeckGroupLabel>}
+                      {popularUpcoming.map((item) => {
+                        const timing = releaseTiming(item.nextAiringEpisode?.airingAt)
+                        return <DeckItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`}>
+                          <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
+                          <div><h3>{titleFor(item)}</h3><p>{item.nextAiringEpisode?.episode ? `Episode ${item.nextAiringEpisode.episode} next` : item.format || 'Series'}{item.averageScore ? ` · ${item.averageScore}%` : ''}</p></div>
+                          <DeckTime><strong>{timing?.relative || 'Upcoming'}</strong><span>{timing?.stamp || 'Time pending'}</span></DeckTime>
+                        </DeckItem>
+                      })}
+                    </>
+                  ) : <EmptyDeck>No confirmed upcoming release times are available right now. Check the weekly schedule for the latest metadata.</EmptyDeck>}
                 </DeckList>
               </OnDeck>
             </SpotlightGrid>

@@ -68,18 +68,27 @@ const Composer = styled.div`
 
 const GifPicker = styled.div`
   position: absolute;
-  bottom: 100%;
+  bottom: calc(100% + 10px);
   left: 0;
   z-index: 100;
-  width: min(388px, calc(100vw - 32px));
-  margin-bottom: 10px;
-  padding: 12px;
+  width: min(412px, calc(100vw - 32px));
+  padding: 14px;
   border: 1px solid var(--border-hover);
-  border-radius: var(--radius-lg);
-  background: rgba(22,22,22,0.98);
-  box-shadow: var(--shadow-lg);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-card) 96%, #09090b);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.46);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+
+  @media (max-width: 560px) {
+    position: fixed;
+    right: auto !important;
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+    left: 50% !important;
+    width: min(420px, calc(100vw - 20px));
+    max-height: min(560px, calc(100dvh - 100px));
+    transform: translateX(-50%);
+  }
 `
 
 const GifPickerHead = styled.div`
@@ -87,10 +96,38 @@ const GifPickerHead = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 
-  strong { color: var(--text-primary); font-size: 13px; }
-  span { color: var(--text-muted); font-size: 11px; }
+  strong { display: block; color: var(--text-primary); font-size: 14px; }
+  span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+`
+
+const QuickReactionRow = styled.div`
+  display: flex;
+  gap: 6px;
+  margin: 0 -2px 10px;
+  padding: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+`
+
+const QuickReaction = styled.button`
+  display: inline-flex;
+  min-height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+  touch-action: manipulation;
+  &:hover, &:focus-visible { border-color: var(--accent); color: var(--text-primary); outline: none; }
+  &:active { transform: scale(0.97); }
 `
 
 const GifSearch = styled.input`
@@ -111,12 +148,13 @@ const GifSearch = styled.input`
 
 const GifGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  max-height: min(330px, 48vh);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  max-height: min(350px, 46vh);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 1px;
+  @media (max-width: 560px) { max-height: min(380px, 44dvh); }
 `
 
 const GifOption = styled.button`
@@ -138,15 +176,16 @@ const GifOption = styled.button`
 const GifThumb = styled.img`
   display: block;
   width: 100%;
-  height: 66px;
+  height: 92px;
   object-fit: cover;
   background: var(--bg-secondary);
+  @media (max-width: 420px) { height: 78px; }
 `
 
 const GifLabel = styled.span`
   display: block;
   overflow: hidden;
-  min-height: 32px;
+  min-height: 28px;
   padding: 5px 6px 6px;
   color: var(--text-secondary);
   font-size: 10px;
@@ -159,7 +198,7 @@ const GifLabel = styled.span`
     white-space: nowrap;
   }
 
-  strong { color: var(--text-primary); font-size: 10px; font-weight: 700; }
+  strong { color: var(--text-primary); font-size: 10px; font-weight: 750; }
   small { margin-top: 2px; color: var(--text-muted); font-size: 9px; }
 `
 
@@ -419,12 +458,12 @@ function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
   const availableReactions = useMemo(() => reactions.length ? reactions : FEATURED_REACTIONS, [reactions])
   const featuredReactions = useMemo(() => {
     const preferred = FEATURED_REACTIONS.filter((reaction) => availableReactions.includes(reaction))
-    return preferred.length ? preferred : availableReactions.slice(0, 18)
+    return preferred.length ? preferred : availableReactions.slice(0, 12)
   }, [availableReactions])
   const visibleReactions = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return featuredReactions
-    return availableReactions.filter((reaction) => reaction.toLowerCase().includes(term)).slice(0, 42)
+    if (!term) return featuredReactions.slice(0, 10)
+    return availableReactions.filter((reaction) => reaction.toLowerCase().includes(term)).slice(0, 24)
   }, [availableReactions, featuredReactions, search])
 
   useEffect(() => {
@@ -462,20 +501,23 @@ function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
   return (
     <GifPicker style={alignEnd ? { left: 'auto', right: 0 } : undefined}>
       <GifPickerHead>
-        <div><strong>Anime reactions</strong><span> 70 live GIF moods</span></div>
+        <div><strong>Pick a reaction</strong><span>Anime GIFs from a live reaction catalogue</span></div>
         <IconButton type="button" aria-label="Close GIF picker" title="Close GIF picker" onClick={onClose}><FaTimes size={13} /></IconButton>
       </GifPickerHead>
-      <GifSearch value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reactions: hug, laugh, blush…" aria-label="Search anime GIF reactions" />
+      <QuickReactionRow aria-label="Quick anime reactions">
+        {featuredReactions.slice(0, 7).map((reaction) => <QuickReaction key={reaction} type="button" onClick={() => chooseReaction(reaction)} disabled={Boolean(selecting)}>{reactionLabel(reaction)}</QuickReaction>)}
+      </QuickReactionRow>
+      <GifSearch value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a reaction: hug, laugh, blush…" aria-label="Search anime GIF reactions" />
       {error && <ErrorMsg style={{ margin: '0 0 8px' }}>{error}</ErrorMsg>}
       {loading ? (
-        <GifStatus>Loading anime reaction GIFs…</GifStatus>
+        <GifStatus>Preparing a small set of anime reactions…</GifStatus>
       ) : !visibleReactions.length ? (
         <GifStatus>No reactions match “{search}”. Try “hug”, “laugh”, or “headpat”.</GifStatus>
       ) : (
         <GifGrid>
           {visibleReactions.map((reaction) => (
             <GifOption key={reaction} type="button" onClick={() => chooseReaction(reaction)} disabled={Boolean(selecting)} aria-label={`Add ${reactionLabel(reaction)} anime reaction GIF`}>
-              {previews[reaction] ? <GifThumb src={previews[reaction]} alt={`${reactionLabel(reaction)} anime reaction`} loading="lazy" /> : <GifStatus style={{ minHeight: 66 }}>{selecting === reaction ? 'Loading…' : reactionLabel(reaction)}</GifStatus>}
+              {previews[reaction] ? <GifThumb src={previews[reaction]} alt={`${reactionLabel(reaction)} anime reaction`} loading="lazy" /> : <GifStatus style={{ minHeight: 92 }}>{selecting === reaction ? 'Adding…' : 'Loading preview…'}</GifStatus>}
               <GifLabel title={reactionLabel(reaction)}><strong>{reactionLabel(reaction)}</strong></GifLabel>
             </GifOption>
           ))}

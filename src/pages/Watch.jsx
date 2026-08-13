@@ -336,19 +336,31 @@ function qualityOptionHtml(presentation) {
   return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
 }
 
+const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
+
 function buildQualityList(sources) {
   const seenUrls = new Set()
   return (Array.isArray(sources) ? sources : [])
-    .filter((src) => src?.type !== 'embed' && src?.url)
+    .filter(
+      (src) =>
+        src?.type !== 'embed' &&
+        src?.verification !== 'dead' &&
+        src?.url
+    )
     .map((src, sourceIndex) => {
       const presentation = getQualityPresentation(src.quality)
+      const inferredType = /\.m3u8(?:$|[?#])/i.test(src.url)
+        ? 'hls'
+        : (src.type || 'mp4')
       return {
         src,
         sourceIndex,
         presentation,
         html: qualityOptionHtml(presentation),
         url: src.url,
-        type: src.type || 'hls',
+        // Some upstream providers mislabel an HLS manifest as MP4. The URL is
+        // authoritative here so ArtPlayer/Hls.js receives the correct loader.
+        type: inferredType,
       }
     })
     .filter((entry) => {
@@ -1306,24 +1318,52 @@ export default function Watch() {
   // Sources (deduped)
   // ────────────────────────────────────────────────────────────
   const SOURCES = useMemo(() => {
-    const dedupe = (arr) => {
+    const normalize = (arr, fallbackLang) => {
       const seen = new Set()
-      return arr
-        .filter((s) => {
-          const key = `${s.name}:${s.lang}`
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-        .map((s) => ({
-          id: `${s.name}-${s.lang}`,
-          label: s.name,
-          provider: s.name,
-          lang: s.lang,
-        }))
+      return (Array.isArray(arr) ? arr : []).map((server, index) => {
+        const family = String(server?.provider || 'miruro')
+        const name = String(server?.name || server?.provider || `source-${index + 1}`)
+        const lang = server?.lang || fallbackLang
+        const key = `${family}:${name}:${lang}`
+        if (seen.has(key)) return null
+        seen.add(key)
+        const initialSources = Array.isArray(server?.sources) ? server.sources : []
+        const hasPlayableSource = buildQualityList(initialSources).length > 0
+        return {
+          id: key,
+          label: name,
+          provider: name,
+          providerFamily: family,
+          lang,
+          initialSources,
+          headers: server?.headers || {},
+          // Keep every backend-advertised server visible. An embed-only response
+          // is shown with an honest availability hint instead of being silently
+          // filtered out or incorrectly marked as a blocked stream.
+          embedOnly: initialSources.length > 0 && !hasPlayableSource,
+        }
+      }).filter(Boolean)
     }
-    return { sub: dedupe(servers.sub), dub: dedupe(servers.dub) }
+    return { sub: normalize(servers.sub, 'sub'), dub: normalize(servers.dub, 'dub') }
   }, [servers])
+
+  // The server endpoint already includes playable sources for most providers.
+  // Prime the short-lived stream cache before activeSource is selected so first
+  // playback does not wait for a second, serial /stream request.
+  useEffect(() => {
+    const allSources = [...SOURCES.sub, ...SOURCES.dub]
+    allSources.forEach((source) => {
+      if (source.embedOnly || !source.initialSources.length) return
+      if (buildQualityList(source.initialSources).length === 0) return
+      const key = streamCacheKey(source, epNumber)
+      if (!streamCacheRef.current.has(key)) {
+        streamCacheRef.current.set(key, {
+          data: { sources: source.initialSources, headers: source.headers },
+          t: Date.now(),
+        })
+      }
+    })
+  }, [SOURCES, epNumber])
 
   const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
@@ -1333,18 +1373,19 @@ export default function Watch() {
   const hasSub = servers.sub.length > 0
   const hasDub = servers.dub.length > 0
 
-  // Auto-select first working SUB source
+  // Auto-select only when there is no valid current choice. SUB remains the
+  // preferred first start, but a user-selected DUB source must stay selected
+  // rather than being reset on the next render.
   useEffect(() => {
-    if (SOURCES.sub.length > 0 && !SOURCES.sub.find((s) => s.id === activeSource)) {
-      setActiveSource(SOURCES.sub[0].id)
-    } else if (
-      SOURCES.sub.length === 0 &&
-      SOURCES.dub.length > 0 &&
-      !SOURCES.dub.find((s) => s.id === activeSource)
-    ) {
-      setActiveSource(SOURCES.dub[0].id)
-    }
-  }, [SOURCES])
+    const allSources = [...SOURCES.sub, ...SOURCES.dub]
+    if (allSources.some((source) => source.id === activeSource)) return
+    const preferred =
+      SOURCES.sub.find((source) => !source.embedOnly) ||
+      SOURCES.dub.find((source) => !source.embedOnly) ||
+      SOURCES.sub[0] ||
+      SOURCES.dub[0]
+    if (preferred) setActiveSource(preferred.id)
+  }, [SOURCES, activeSource])
 
   // Filtered / paged episodes
   const filteredEps = useMemo(() => {
@@ -2359,8 +2400,7 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   // Stream cache
   // ────────────────────────────────────────────────────────────
-  const cacheKey = (source) =>
-    `${source?.provider || ''}-${source?.lang || ''}-${epNumber}`
+  const cacheKey = (source) => streamCacheKey(source, epNumber)
   const getCachedStream = (source) => {
     if (!source) return null
     const e = streamCacheRef.current.get(cacheKey(source))
@@ -2381,37 +2421,42 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   const lastStreamAttemptRef = useRef(null)
 
-  // Warm the other providers for the current episode into the short-TTL
-  // cache so switching servers is instant (the backend shares one Miruro
-  // fetch per anime, so these requests are cheap).
+  // Warm at most two playable alternatives after first playback has settled.
+  // This keeps server switches fast without competing with the initial stream
+  // request, especially on mobile data or a cold backend.
   const prefetchOtherSources = useCallback(
     (current) => {
+      if (typeof navigator !== 'undefined' && navigator.connection?.saveData) return
       const all = [...SOURCES.sub, ...SOURCES.dub]
-      const others = all.filter((s) => s.id !== current?.id)
+      const others = all
+        .filter((source) => source.id !== current?.id && !source.embedOnly)
+        .sort((a, b) => Number(b.lang === current?.lang) - Number(a.lang === current?.lang))
+        .slice(0, 2)
       const ep = epNumberRef.current
-      if (!ep) return
-      others.forEach((s) => {
-        fetch(`${API_BASE}/api/v1/stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            animeId: parseInt(animeId, 10),
-            episode: ep,
-            provider: s.provider,
-            lang: s.lang,
-            quality: 'auto',
-            refresh: false,
-          }),
-          cache: 'no-store',
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
-            if (!d?.sources?.[0]?.url) return
-            if (epNumberRef.current !== ep) return
-            setCachedStream(s, d)
+      if (!ep || !others.length) return
+      window.setTimeout(() => {
+        others.forEach((source) => {
+          fetch(`${API_BASE}/api/v1/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              animeId: parseInt(animeId, 10),
+              episode: ep,
+              provider: source.provider,
+              lang: source.lang,
+              quality: 'auto',
+              refresh: false,
+            }),
+            cache: 'no-store',
           })
-          .catch(() => {})
-      })
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data) => {
+              if (!data?.sources?.[0]?.url || epNumberRef.current !== ep) return
+              setCachedStream(source, data)
+            })
+            .catch(() => {})
+        })
+      }, 1800)
     },
     [SOURCES, animeId, setCachedStream]
   )
@@ -2490,11 +2535,8 @@ export default function Watch() {
         if (cached && cached.sources?.[0]?.url) {
           if (targetEpisode !== epNumberRef.current) return
           const firstSource = cached.sources[0]
-          const mediaSources = cached.sources.filter(
-            (src) => src.type !== 'embed'
-          )
-          if (mediaSources.length > 0) {
-            const qualityList = buildQualityList(mediaSources)
+          const qualityList = buildQualityList(cached.sources)
+          if (qualityList.length > 0) {
             const onBlocked = () => handleProviderBlockedRef.current?.()
             buildPlayer(
               qualityList[0].url,
@@ -2627,8 +2669,8 @@ export default function Watch() {
         }
 
         const firstSource = data.sources[0]
-        const mediaSources = data.sources.filter((src) => src.type !== 'embed')
-        if (mediaSources.length === 0) {
+        const qualityList = buildQualityList(data.sources)
+        if (qualityList.length === 0) {
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
@@ -2643,7 +2685,6 @@ export default function Watch() {
           loadingRef.current = false
           return
         }
-        const qualityList = buildQualityList(mediaSources)
         const subs = firstSource.subtitles || []
         const onBlocked = () => handleProviderBlockedRef.current?.()
         buildPlayer(
@@ -2734,32 +2775,34 @@ export default function Watch() {
     if (!animeId || !epNumber) return
     let cancelled = false
     let retries = 0
+    // Clear both language groups before this episode's parallel requests begin.
+    // A previous episode's DUB list must never remain selectable while its new
+    // SUB response is already available.
+    setServers({ sub: [], dub: [] })
     const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}`
 
     const fetchServers = async () => {
+      const fetchLanguage = async (lang) => {
+        const response = await fetch(`${base}&lang=${lang}`, { cache: 'no-store' })
+        if (!response.ok) throw new Error(`${lang} server list unavailable`)
+        const payload = await response.json()
+        return Array.isArray(payload) ? payload : []
+      }
+
       try {
-        const res = await fetch(`${base}&lang=sub`, { cache: 'no-store' })
+        // Start both requests at once. SUB is committed as soon as it arrives
+        // so the preferred player can begin from the server payload cache;
+        // DUB is added when its parallel request completes.
+        const subTask = fetchLanguage('sub')
+        const dubTask = fetchLanguage('dub')
+        const subs = await subTask.catch(() => [])
         if (cancelled) return
-        if (!res.ok) {
-          if (retries < 2) {
-            retries += 1
-            setTimeout(fetchServers, 12_000)
-          }
-          return
-        }
-        const subServers = await res.json()
+        setServers({ sub: subs, dub: [] })
+
+        const dubs = await dubTask.catch(() => [])
         if (cancelled) return
-        let dubServers = []
-        try {
-          const dubRes = await fetch(`${base}&lang=dub`, { cache: 'no-store' })
-          dubServers = dubRes.ok ? await dubRes.json() : []
-        } catch {}
-        if (cancelled) return
-        const subs = Array.isArray(subServers) ? subServers : []
-        const dubs = Array.isArray(dubServers) ? dubServers : []
-        // Providers are per-episode: a successful fetch always reflects
-        // the CURRENT episode's servers (even when empty), so switching
-        // episodes never shows stale providers from the previous one.
+        // Providers are per-episode: each completed response replaces only its
+        // current episode language list, so stale server buttons never leak in.
         setServers({ sub: subs, dub: dubs })
         if (subs.length === 0 && dubs.length === 0) {
           setNoStreamError(true)
@@ -3833,7 +3876,7 @@ export default function Watch() {
                     borderRadius: 6,
                   }}
                 >
-                  {lang === 'sub' ? 'SUB' : 'DUB'}
+                  {lang === 'sub' ? `SUB · ${SOURCES.sub.length}` : `DUB · ${SOURCES.dub.length}`}
                 </span>
                 {SOURCES[lang].map((source) => {
                   const isActive = activeSource === source.id
@@ -3844,6 +3887,7 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
+                      title={source.embedOnly ? `${source.label} is advertised by the provider but has no direct browser-playable stream yet` : `Switch to ${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -3867,7 +3911,7 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-                      {source.label}
+                      {source.label}{source.embedOnly ? ' · external' : ''}
                       {isActive && (
                         <span
                           aria-hidden="true"
@@ -4028,10 +4072,10 @@ export default function Watch() {
                   Next <FaStepForward />
                 </button>
               )}
-              {animeId && (
+              {animeId && anime && (
                 <Link
                   to={`/anime/${generateSlug(
-                    anime?.title?.english || anime?.title?.romaji || ''
+                    anime.title?.english || anime.title?.romaji || anime.title?.userPreferred || 'anime'
                   )}-${animeId}`}
                   style={{
                     ...navBtnStyle,
