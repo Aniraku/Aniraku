@@ -356,31 +356,49 @@ function hasExpiredEmbeddedToken(url) {
   return newest > 0 && Date.now() > newest + 30_000
 }
 
+function getSourcePlaybackType(source) {
+	const rawType = String(source?.type || source?.mime || '').trim().toLowerCase()
+	const url = String(source?.url || '').toLowerCase()
+	if (rawType === 'embed' || rawType === 'iframe' || rawType === 'page' || rawType.includes('embed')) return 'embed'
+	if (rawType === 'hls' || rawType === 'm3u8' || rawType.includes('mpegurl') || /\.m3u8(?:$|[?#])/.test(url)) return 'hls'
+	if (rawType === 'dash' || rawType === 'mpd' || rawType.includes('dash+xml') || /\.mpd(?:$|[?#])/.test(url)) return 'dash'
+	if (rawType === 'mp4' || rawType === 'm4v' || rawType.includes('video/mp4') || /\.(?:mp4|m4v)(?:$|[?#])/.test(url)) return 'mp4'
+	if (rawType === 'webm' || rawType.includes('video/webm') || /\.webm(?:$|[?#])/.test(url)) return 'webm'
+	if (rawType === 'ogg' || rawType === 'ogv' || rawType.includes('video/ogg') || rawType.includes('audio/ogg') || /\.(?:ogg|ogv)(?:$|[?#])/.test(url)) return 'ogg'
+	if (rawType === 'mpeg' || rawType === 'mpg' || rawType.includes('video/mpeg') || /\.(?:mpeg|mpg)(?:$|[?#])/.test(url)) return 'mpeg'
+	// A live URL with no reliable extension is still attempted through the
+	// browser's native media element; the backend has already probed it.
+	return 'native'
+}
+
+function isVerifiedEmbedSource(source) {
+	if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
+	const verdict = String(source.verification || source.Verification || '').toLowerCase()
+	return verdict === 'embed'
+}
+
 function buildQualityList(sources) {
-  const seenUrls = new Set()
-  const entries = (Array.isArray(sources) ? sources : [])
-    // Backend verification tags are advisory snapshots, not a playback
-    // permission model. Keep every non-embed media URL so providers such as
-    // Kiwi remain playable when their current CDN verdict is stale.
-    .filter((src) => src?.type !== 'embed' && src?.url)
-    .map((src, sourceIndex) => {
-      const presentation = getQualityPresentation(src.quality)
-      const inferredType = /\.m3u8(?:$|[?#])/i.test(src.url)
-        ? 'hls'
-        : (src.type || 'mp4')
-      return {
-        src,
-        sourceIndex,
-        presentation,
-        html: qualityOptionHtml(presentation),
-        url: src.url,
-        // Some upstream providers mislabel an HLS manifest as MP4. The URL is
-        // authoritative here so ArtPlayer/Hls.js receives the correct loader.
-        type: inferredType,
-        verification: String(src.verification || src.Verification || '').toLowerCase(),
-        expiredToken: hasExpiredEmbeddedToken(src.url),
-      }
-    })
+	const seenUrls = new Set()
+	const entries = (Array.isArray(sources) ? sources : [])
+		// Backend verification tags are advisory snapshots, not a playback
+		// permission model. Keep every non-embed media URL so providers such as
+		// Kiwi remain playable when their current CDN verdict is stale.
+		.filter((src) => getSourcePlaybackType(src) !== 'embed' && src?.url)
+		.map((src, sourceIndex) => {
+			const presentation = getQualityPresentation(src.quality)
+			return {
+				src,
+				sourceIndex,
+				presentation,
+				html: qualityOptionHtml(presentation),
+				url: src.url,
+				// Provider metadata and URL classification are both considered so
+				// mislabeled streams use the correct ArtPlayer loader.
+				type: getSourcePlaybackType(src),
+				verification: String(src.verification || src.Verification || '').toLowerCase(),
+				expiredToken: hasExpiredEmbeddedToken(src.url),
+			}
+		})
     .filter((entry) => {
       if (seenUrls.has(entry.url)) return false
       seenUrls.add(entry.url)
@@ -390,16 +408,10 @@ function buildQualityList(sources) {
   // Unlike a soft backend verdict, a passed signed-token expiry is definitive.
   // Omit it entirely so an empty result activates existing server failover.
   return entries
-    .filter((entry) => !entry.expiredToken)
-    // Never auto-select a source the backend already marked dead. Keep dead
-    // non-expired options as a last-resort manual choice because CDN verdicts
-    // can differ between the server probe and the viewer's network.
-    // Among non-dead entries, prefer the provider's own Auto/adaptive URL and
-    // then the highest numeric quality without inventing a new URL.
+    .filter((entry) => !entry.expiredToken && entry.verification !== 'dead')
+    // Among verified non-dead entries, prefer the provider's own Auto/adaptive
+    // URL and then the highest numeric quality without inventing a new URL.
     .sort((a, b) => {
-      const aDead = a.verification === 'dead'
-      const bDead = b.verification === 'dead'
-      if (aDead !== bDead) return aDead ? 1 : -1
       if (a.presentation.isAuto !== b.presentation.isAuto) {
         return a.presentation.isAuto ? -1 : 1
       }
@@ -888,6 +900,7 @@ export default function Watch() {
   const artRef = useRef(null)
   const artInstance = useRef(null)
   const hlsInstance = useRef(null)
+  const dashInstance = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
   const epSidebarRef = useRef(null)
@@ -911,6 +924,7 @@ export default function Watch() {
   const [episodes, setEpisodes] = useState([])
   const [loading, setLoading] = useState(true)
   const [streamLoading, setStreamLoading] = useState(false)
+  const [activeEmbedUrl, setActiveEmbedUrl] = useState('')
   const [error, setError] = useState('')
   const [activeSource, setActiveSource] = useState('')
   const [epSearch, setEpSearch] = useState('')
@@ -1367,19 +1381,21 @@ export default function Watch() {
         if (seen.has(key)) return null
         seen.add(key)
         const initialSources = Array.isArray(server?.sources) ? server.sources : []
-        const hasPlayableSource = buildQualityList(initialSources).length > 0
+        const mediaSources = initialSources.filter((source) => {
+          const verification = String(source?.verification || source?.Verification || '').toLowerCase()
+          return getSourcePlaybackType(source) !== 'embed' && verification !== 'dead' && !hasExpiredEmbeddedToken(source?.url)
+        })
+        const embedSources = initialSources.filter(isVerifiedEmbedSource)
+        const playableSources = [...mediaSources, ...embedSources]
+        if (playableSources.length === 0) return null
         return {
           id: key,
           label: name,
           provider: name,
           providerFamily: family,
           lang,
-          initialSources,
+          initialSources: playableSources,
           headers: server?.headers || {},
-          // Keep every backend-advertised server visible. An embed-only response
-          // is shown with an honest availability hint instead of being silently
-          // filtered out or incorrectly marked as a blocked stream.
-          embedOnly: initialSources.length > 0 && !hasPlayableSource,
         }
       }).filter(Boolean)
     }
@@ -1392,8 +1408,8 @@ export default function Watch() {
     return all.find((s) => s.id === activeSource) || all[0] || null
   }, [SOURCES, activeSource])
 
-  const hasSub = servers.sub.length > 0
-  const hasDub = servers.dub.length > 0
+  const hasSub = SOURCES.sub.length > 0
+  const hasDub = SOURCES.dub.length > 0
 
   // Auto-select only when there is no valid current choice. SUB remains the
   // preferred first start, but a user-selected DUB source must stay selected
@@ -1401,11 +1417,7 @@ export default function Watch() {
   useEffect(() => {
     const allSources = [...SOURCES.sub, ...SOURCES.dub]
     if (allSources.some((source) => source.id === activeSource)) return
-    const preferred =
-      SOURCES.sub.find((source) => !source.embedOnly) ||
-      SOURCES.dub.find((source) => !source.embedOnly) ||
-      SOURCES.sub[0] ||
-      SOURCES.dub[0]
+    const preferred = SOURCES.sub[0] || SOURCES.dub[0]
     if (preferred) setActiveSource(preferred.id)
   }, [SOURCES, activeSource])
 
@@ -1769,6 +1781,12 @@ export default function Watch() {
   // Player build / destroy
   // ────────────────────────────────────────────────────────────
   const destroyPlayer = useCallback(() => {
+    if (dashInstance.current) {
+      try {
+        dashInstance.current.reset()
+      } catch {}
+      dashInstance.current = null
+    }
     if (hlsInstance.current) {
       try {
         hlsInstance.current.destroy()
@@ -1802,6 +1820,7 @@ export default function Watch() {
   const buildPlayer = useCallback(
     async (streamUrl, sourceType, qualityList, subtitles, headers, onBlocked) => {
       destroyPlayer()
+      setActiveEmbedUrl('')
       const container = artRef.current
       if (!container) return
 
@@ -1817,22 +1836,60 @@ export default function Watch() {
       const proxied = (u) =>
         `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
 
-      // MP4 playback — proxy first, direct as fallback
-      const playAsMp4 = (video, url, art) => {
+      // Browser-native media playback — proxy first, direct as fallback.
+      // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
+      // Content-Type is a format the browser can decode.
+      const playAsNative = async (video, url, art) => {
         let directTried = false
+        let hlsTried = false
         const tryUrl = (target, withCors) => {
           try {
-            video.crossOrigin = withCors ? 'anonymous' : null
+            video.crossOrigin = withCors ? 'anonymous' : ''
             video.src = target
             video.load()
             const p = video.play()
             if (p && typeof p.catch === 'function') p.catch(() => {})
+            return true
           } catch {
-            // continue to fallback below
+            return false
           }
         }
+        const tryHls = async () => {
+          if (hlsTried || buildIdRef.current !== myBuildId) return false
+          hlsTried = true
+          let Hls
+          try {
+            const mod = await import('hls.js')
+            Hls = mod.default
+          } catch {
+            return false
+          }
+          if (!Hls?.isSupported?.() || buildIdRef.current !== myBuildId) return false
+          const hls = new Hls({
+            enableWorker: false,
+            maxBufferLength: netHintRef.current.effectiveType === '4g' ? 12 : 6,
+            maxMaxBufferLength: 24,
+            startFragPrefetch: false,
+            manifestLoadingMaxRetry: 0,
+            levelLoadingMaxRetry: 1,
+            fragLoadingMaxRetry: 1,
+          })
+          hlsInstance.current = hls
+          hls.loadSource(proxied(url))
+          hls.attachMedia(video)
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (buildIdRef.current !== myBuildId) return
+            video.play().catch(() => {})
+          })
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (buildIdRef.current !== myBuildId || !data?.fatal) return
+            if (onBlocked) onBlocked('native-hls-error')
+          })
+          return true
+        }
+
         tryUrl(proxied(url), true)
-        video.onerror = () => {
+        video.onerror = async () => {
           if (buildIdRef.current !== myBuildId) return
           if (!directTried) {
             directTried = true
@@ -1840,10 +1897,11 @@ export default function Watch() {
             tryUrl(url, false)
             return
           }
+          if (await tryHls()) return
           showToast('CDN refused playback — trying the next server…', {
             long: true,
           })
-          if (onBlocked) onBlocked()
+          if (onBlocked) onBlocked('native-media-error')
           else setError('Stream playback error. Try a different server.')
         }
       }
@@ -1897,7 +1955,12 @@ export default function Watch() {
       const playerConfig = {
         container,
         url: streamUrl,
-        type: sourceType === 'mp4' ? 'mp4' : 'm3u8',
+        type:
+          sourceType === 'hls'
+            ? 'm3u8'
+            : sourceType === 'dash'
+            ? 'mpd'
+            : 'native',
         autoplay: true,
         // iOS Safari has no requestPictureInPicture — the attempt throws and
         // ArtPlayer logs noise; Android TV / Smart TV apps handle PiP at the
@@ -2013,7 +2076,54 @@ export default function Watch() {
         ],
         quality: qualityList,
         customType: {
-          mp4: (video, url, art) => playAsMp4(video, url, art),
+          native: (video, url, art) => playAsNative(video, url, art),
+          mp4: (video, url, art) => playAsNative(video, url, art),
+          mpd: async (video, url, art) => {
+            let dash
+            try {
+              const mod = await import('dashjs')
+              dash = mod.default || mod
+            } catch {
+              if (buildIdRef.current === myBuildId) {
+                showToast('DASH engine failed to load — trying another server.', { long: true })
+                onBlocked?.('unsupported-format')
+              }
+              return
+            }
+            if (buildIdRef.current !== myBuildId) return
+            try {
+              const player = dash.MediaPlayer().create()
+              player.updateSettings?.({
+                streaming: {
+                  buffer: {
+                    stableBufferTime: 6,
+                    bufferTimeAtTopQuality: 8,
+                    fastSwitchEnabled: true,
+                  },
+                },
+              })
+              const dashProxy = (request) => {
+                if (!request?.url || request.url.startsWith(PROXY_BASE) || request.url.startsWith('data:')) {
+                  return Promise.resolve(request)
+                }
+                request.url = proxied(request.url)
+                return Promise.resolve(request)
+              }
+              if (typeof player.addRequestInterceptor === 'function') {
+                player.addRequestInterceptor(dashProxy)
+                player.initialize(video, url, true)
+              } else {
+                player.initialize(video, proxied(url), true)
+              }
+              dashInstance.current = player
+              player.on?.(dash.MediaPlayer.events.ERROR, (event) => {
+                if (buildIdRef.current !== myBuildId) return
+                if (event?.error || event?.event?.error) onBlocked?.('dash-error')
+              })
+            } catch {
+              if (buildIdRef.current === myBuildId) onBlocked?.('dash-error')
+            }
+          },
           m3u8: async (video, url, art) => {
             const proxiedH = proxied
             const referer = (headers && headers.Referer) || ''
@@ -2124,7 +2234,7 @@ export default function Watch() {
                   hls.destroy()
                 } catch {}
                 art.hls = null
-                playAsMp4(video, url, art)
+                playAsNative(video, url, art)
                 return
               }
               if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -2479,6 +2589,7 @@ export default function Watch() {
       setError('')
       setNoStreamError(false)
       setErrorType('')
+      if (!quiet) setActiveEmbedUrl('')
       setRetryAttempt(0)
       setResumePos(null)
       pendingResumeRef.current = null
@@ -2511,6 +2622,15 @@ export default function Watch() {
             // it, changes episode, retries, or HLS reports a terminal failure.
             // Do not refresh a source after playback begins: rebuilding ArtPlayer
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
+            return
+          }
+          const cachedEmbed = cached.sources.find(isVerifiedEmbedSource)
+          if (cachedEmbed) {
+            destroyPlayer()
+            setActiveEmbedUrl(cachedEmbed.url)
+            applySkipSegments(normalizeProviderSkipSegments(cached))
+            setStreamLoading(false)
+            loadingRef.current = false
             return
           }
         }
@@ -2624,6 +2744,17 @@ export default function Watch() {
         const firstSource = data.sources[0]
         const qualityList = buildQualityList(data.sources)
         if (qualityList.length === 0) {
+          const verifiedEmbed = data.sources.find(isVerifiedEmbedSource)
+          if (verifiedEmbed) {
+            destroyPlayer()
+            setActiveEmbedUrl(verifiedEmbed.url)
+            applySkipSegments(normalizeProviderSkipSegments(data))
+            setCachedStream(source, data)
+            setStreamLoading(false)
+            loadingRef.current = false
+            setRetryAttempt(0)
+            return
+          }
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
@@ -3242,10 +3373,27 @@ export default function Watch() {
           <div
             ref={artRef}
             className="watch-art-mount"
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: '100%', display: activeEmbedUrl ? 'none' : 'block' }}
             aria-label="Anime video player"
             role="region"
           />
+          {activeEmbedUrl && (
+            <iframe
+              src={activeEmbedUrl}
+              title="Anime embedded player"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                border: 0,
+                background: '#000',
+              }}
+            />
+          )}
 
           {/* Touch seek: ±10s (phones + tablets). Tap once or hold to
               repeat — handy for skipping intros. */}
@@ -3837,7 +3985,7 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-                      title={source.embedOnly ? `${source.label} is advertised by the provider but has no direct browser-playable stream yet` : `Switch to ${source.label}`}
+                      title={`Switch to ${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -3861,7 +4009,7 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-                      {source.label}{source.embedOnly ? ' · external' : ''}
+                      {source.label}
                       {isActive && (
                         <span
                           aria-hidden="true"
