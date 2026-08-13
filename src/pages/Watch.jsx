@@ -349,6 +349,7 @@ function buildQualityList(sources) {
         // Some upstream providers mislabel an HLS manifest as MP4. The URL is
         // authoritative here so ArtPlayer/Hls.js receives the correct loader.
         type: inferredType,
+        verification: String(src.verification || src.Verification || '').toLowerCase(),
       }
     })
     .filter((entry) => {
@@ -356,10 +357,15 @@ function buildQualityList(sources) {
       seenUrls.add(entry.url)
       return true
     })
-    // Prefer the provider's own Auto/adaptive URL. If the provider does not
-    // expose one, fall back to its highest numeric quality instead of making
-    // up a URL that the source did not provide.
+    // Never auto-select a source the backend already marked dead. Keep dead
+    // options in the menu as a last-resort manual choice because CDN verdicts
+    // can differ between the server probe and the viewer's network.
+    // Among non-dead entries, prefer the provider's own Auto/adaptive URL and
+    // then the highest numeric quality without inventing a new URL.
     .sort((a, b) => {
+      const aDead = a.verification === 'dead'
+      const bDead = b.verification === 'dead'
+      if (aDead !== bDead) return aDead ? 1 : -1
       if (a.presentation.isAuto !== b.presentation.isAuto) {
         return a.presentation.isAuto ? -1 : 1
       }
@@ -2065,6 +2071,11 @@ export default function Watch() {
             hls.on(Hls.Events.ERROR, (_event, data) => {
               if (buildIdRef.current !== myBuildId) return
               if (!data.fatal) return
+              // A signed CDN URL that returns a permanent HTTP error cannot be
+              // repaired by hls.startLoad(). Fail over immediately instead of
+              // hammering the same expired/blocked URL several more times.
+              const httpStatus = Number(data?.response?.code || data?.response?.status || 0)
+              const permanentCdnFailure = [401, 403, 404, 410, 502].includes(httpStatus)
               // MP4 mis-classified as HLS
               if (
                 data.type === Hls.ErrorTypes.MANIFEST_ERROR &&
@@ -2089,17 +2100,17 @@ export default function Watch() {
                 return
               }
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                if (netRetries < 2) {
+                if (!permanentCdnFailure && netRetries < 2) {
                   netRetries += 1
                   try {
                     hls.startLoad()
                   } catch {}
                   return
                 }
-                fail('backend')
+                fail(permanentCdnFailure ? 'blocked' : 'backend')
                 return
               }
-              fail('unknown')
+              fail(permanentCdnFailure ? 'blocked' : 'unknown')
             })
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
               const p = video.play()
