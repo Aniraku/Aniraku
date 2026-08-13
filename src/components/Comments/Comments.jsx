@@ -1,31 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { FaRegThumbsUp, FaThumbsUp, FaTrash, FaReply, FaRegImage, FaTimes } from 'react-icons/fa'
+import { FaRegThumbsUp, FaThumbsUp, FaTrash, FaReply } from 'react-icons/fa'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import styled from 'styled-components'
-
-const OTAKU_GIFS_API = 'https://api.otakugifs.xyz'
-const FEATURED_REACTIONS = [
-  'happy', 'hug', 'laugh', 'blush', 'smug', 'cry', 'wink', 'dance', 'pat',
-  'thumbsup', 'pout', 'stare', 'shy', 'yay', 'surprised', 'facepalm', 'wave', 'cuddle',
-]
-const otakuGifCache = new Map()
-
-const reactionLabel = (reaction) => reaction
-  .replace(/([a-z])([A-Z])/g, '$1 $2')
-  .replace(/[-_]/g, ' ')
-  .replace(/\b\w/g, (letter) => letter.toUpperCase())
-
-const fetchOtakuGif = async (reaction) => {
-  if (otakuGifCache.has(reaction)) return otakuGifCache.get(reaction)
-  const response = await fetch(`${OTAKU_GIFS_API}/gif?reaction=${encodeURIComponent(reaction)}&format=GIF`)
-  if (!response.ok) throw new Error('Could not load this reaction')
-  const data = await response.json()
-  if (!data?.url) throw new Error('OtakuGIFs returned no image')
-  otakuGifCache.set(reaction, data.url)
-  return data.url
-}
 
 const cleanContent = (raw) => {
   const out = []
@@ -66,179 +44,12 @@ const Composer = styled.div`
   position: relative;
 `
 
-const GifPicker = styled.div`
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 0;
-  z-index: 100;
-  width: min(412px, calc(100vw - 32px));
-  padding: 14px;
-  border: 1px solid var(--border-hover);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-card) 96%, #09090b);
-  box-shadow: 0 20px 48px rgba(0,0,0,0.46);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-
-  @media (max-width: 560px) {
-    position: fixed;
-    right: auto !important;
-    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
-    left: 50% !important;
-    width: min(420px, calc(100vw - 20px));
-    max-height: min(560px, calc(100dvh - 100px));
-    transform: translateX(-50%);
-  }
-`
-
-const GifPickerHead = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-
-  strong { display: block; color: var(--text-primary); font-size: 14px; }
-  span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; }
-`
-
-const QuickReactionRow = styled.div`
-  display: flex;
-  gap: 6px;
-  margin: 0 -2px 10px;
-  padding: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-`
-
-const QuickReaction = styled.button`
-  display: inline-flex;
-  min-height: 30px;
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 750;
-  cursor: pointer;
-  touch-action: manipulation;
-  &:hover, &:focus-visible { border-color: var(--accent); color: var(--text-primary); outline: none; }
-  &:active { transform: scale(0.97); }
-`
-
-const GifSearch = styled.input`
-  width: 100%;
-  min-height: 36px;
-  margin-bottom: 10px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  outline: none;
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12px;
-  &:focus { border-color: var(--accent); }
-  &::placeholder { color: var(--text-muted); }
-`
-
-const GifGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  max-height: min(350px, 46vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 1px;
-  @media (max-width: 560px) { max-height: min(380px, 44dvh); }
-`
-
-const GifOption = styled.button`
-  position: relative;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
-  color: var(--text-primary);
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: transform 160ms ease, border-color 160ms ease, filter 160ms ease;
-  &:hover, &:focus-visible { transform: translateY(-2px); border-color: var(--accent); filter: brightness(1.08); outline: none; }
-  &:active { transform: scale(0.97); }
-`
-
-const GifThumb = styled.img`
-  display: block;
-  width: 100%;
-  height: 92px;
-  object-fit: cover;
-  background: var(--bg-secondary);
-  @media (max-width: 420px) { height: 78px; }
-`
-
-const GifLabel = styled.span`
-  display: block;
-  overflow: hidden;
-  min-height: 28px;
-  padding: 5px 6px 6px;
-  color: var(--text-secondary);
-  font-size: 10px;
-  text-align: left;
-
-  strong, small {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  strong { color: var(--text-primary); font-size: 10px; font-weight: 750; }
-  small { margin-top: 2px; color: var(--text-muted); font-size: 9px; }
-`
-
-const GifStatus = styled.div`
-  display: grid;
-  min-height: 128px;
-  place-items: center;
+/* Removed active GIF picker styles: new GIF composition is intentionally disabled while public no-auth alternatives are evaluated. */
+const LegacyGifFallback = styled.span`
+  display: inline-block;
+  margin-top: 8px;
   color: var(--text-muted);
   font-size: 12px;
-  text-align: center;
-`
-
-const SelectedGif = styled.div`
-  position: relative;
-  margin-top: 8px;
-  width: fit-content;
-`
-
-const GifPreview = styled.img`
-  max-width: 200px;
-  max-height: 150px;
-  border-radius: 8px;
-  display: block;
-`
-
-const RemoveGif = styled.button`
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #ef4444;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 10px;
 `
 
 const Avatar = styled.img`
@@ -297,20 +108,6 @@ const PostBtn = styled.button`
   opacity: ${p => p.$disabled ? 0.6 : 1};
   transition: all 0.2s;
   &:hover { transform: translateY(-1px); }
-`
-
-const IconButton = styled.button`
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  &:hover { background: rgba(255,255,255,0.05); color: var(--accent); }
 `
 
 const List = styled.div`
@@ -428,109 +225,9 @@ const AvatarBlock = ({ url, name }) => url
   ? <Avatar src={url} alt="" />
   : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
-function OtakuGifPicker({ onSelect, onClose, alignEnd = false }) {
-  const [reactions, setReactions] = useState([])
-  const [search, setSearch] = useState('')
-  const [previews, setPreviews] = useState({})
-  const [failedPreviews, setFailedPreviews] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [selecting, setSelecting] = useState('')
-
-  useEffect(() => {
-    let active = true
-    const loadReactions = async () => {
-      try {
-        const response = await fetch(`${OTAKU_GIFS_API}/gif/allreactions`)
-        if (!response.ok) throw new Error('Could not load reactions')
-        const data = await response.json()
-        if (active && Array.isArray(data?.reactions)) setReactions(data.reactions)
-      } catch {
-        if (active) setError('Live reactions are unavailable right now. Showing popular reactions instead.')
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-    loadReactions()
-    return () => { active = false }
-  }, [])
-
-  const availableReactions = useMemo(() => reactions.length ? reactions : FEATURED_REACTIONS, [reactions])
-  const featuredReactions = useMemo(() => {
-    const preferred = FEATURED_REACTIONS.filter((reaction) => availableReactions.includes(reaction))
-    return preferred.length ? preferred : availableReactions.slice(0, 12)
-  }, [availableReactions])
-  const visibleReactions = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return featuredReactions.slice(0, 10)
-    return availableReactions.filter((reaction) => reaction.toLowerCase().includes(term)).slice(0, 24)
-  }, [availableReactions, featuredReactions, search])
-
-  useEffect(() => {
-    let active = true
-    const missing = visibleReactions.filter((reaction) => !previews[reaction] && !failedPreviews.includes(reaction)).slice(0, 24)
-    if (!missing.length) return undefined
-    Promise.allSettled(missing.map(async (reaction) => [reaction, await fetchOtakuGif(reaction)]))
-      .then((results) => {
-        if (!active) return
-        const next = {}
-        const failed = []
-        results.forEach((result, index) => {
-          if (result.status === 'fulfilled') next[result.value[0]] = result.value[1]
-          else failed.push(missing[index])
-        })
-        if (Object.keys(next).length) setPreviews((current) => ({ ...current, ...next }))
-        if (failed.length) setFailedPreviews((current) => [...new Set([...current, ...failed])])
-      })
-    return () => { active = false }
-  }, [failedPreviews, previews, visibleReactions])
-
-  const chooseReaction = async (reaction) => {
-    setSelecting(reaction)
-    setError('')
-    try {
-      const url = await fetchOtakuGif(reaction)
-      onSelect(url)
-    } catch {
-      setError('That anime GIF could not be loaded. Please choose another reaction.')
-    } finally {
-      setSelecting('')
-    }
-  }
-
-  return (
-    <GifPicker style={alignEnd ? { left: 'auto', right: 0 } : undefined}>
-      <GifPickerHead>
-        <div><strong>Pick a reaction</strong><span>Anime GIFs from a live reaction catalogue</span></div>
-        <IconButton type="button" aria-label="Close GIF picker" title="Close GIF picker" onClick={onClose}><FaTimes size={13} /></IconButton>
-      </GifPickerHead>
-      <QuickReactionRow aria-label="Quick anime reactions">
-        {featuredReactions.slice(0, 7).map((reaction) => <QuickReaction key={reaction} type="button" onClick={() => chooseReaction(reaction)} disabled={Boolean(selecting)}>{reactionLabel(reaction)}</QuickReaction>)}
-      </QuickReactionRow>
-      <GifSearch value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a reaction: hug, laugh, blush…" aria-label="Search anime GIF reactions" />
-      {error && <ErrorMsg style={{ margin: '0 0 8px' }}>{error}</ErrorMsg>}
-      {loading ? (
-        <GifStatus>Preparing a small set of anime reactions…</GifStatus>
-      ) : !visibleReactions.length ? (
-        <GifStatus>No reactions match “{search}”. Try “hug”, “laugh”, or “headpat”.</GifStatus>
-      ) : (
-        <GifGrid>
-          {visibleReactions.map((reaction) => (
-            <GifOption key={reaction} type="button" onClick={() => chooseReaction(reaction)} disabled={Boolean(selecting)} aria-label={`Add ${reactionLabel(reaction)} anime reaction GIF`}>
-              {previews[reaction] ? <GifThumb src={previews[reaction]} alt={`${reactionLabel(reaction)} anime reaction`} loading="lazy" /> : <GifStatus style={{ minHeight: 92 }}>{selecting === reaction ? 'Adding…' : 'Loading preview…'}</GifStatus>}
-              <GifLabel title={reactionLabel(reaction)}><strong>{reactionLabel(reaction)}</strong></GifLabel>
-            </GifOption>
-          ))}
-        </GifGrid>
-      )}
-    </GifPicker>
-  )
-}
-
 const renderItem = (c, reply, {
   profiles, likedIds, replyTo, replyText, busy, user,
-  toggleLike, remove, submitReply, setReplyTo, setReplyText, setPostError,
-  showReplyGif, setShowReplyGif, replyGif, setReplyGif
+  toggleLike, remove, submitReply, setReplyTo, setReplyText, setPostError
 }) => {
   const Mine = reply ? ItemReply : Item
   const contentParts = c.content.split('||GIF:').map(s => s.trim())
@@ -548,14 +245,15 @@ const renderItem = (c, reply, {
       </ItemHead>
       <ItemBody>
         {textContent && <p style={{ margin: 0 }}>{textContent}</p>}
-        {gifUrl && <ItemGif src={gifUrl} alt="anime reaction" loading="lazy" />}
+        {gifUrl && <ItemGif src={gifUrl} alt="anime reaction" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling?.removeAttribute('hidden') }} />}
+        {gifUrl && <LegacyGifFallback hidden>Legacy GIF unavailable.</LegacyGifFallback>}
       </ItemBody>
       <ItemActions>
         <Action $active={likedIds.has(c.id)} onClick={() => toggleLike(c.id)} title="Like">
           {likedIds.has(c.id) ? <FaThumbsUp size={13} /> : <FaRegThumbsUp size={13} />}
           {c.likes || 0}
         </Action>
-        <Action onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText(''); setReplyGif(null); setShowReplyGif(false) }}>
+        <Action onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText(''); setPostError('') }}>
           <FaReply size={12} /> Reply
         </Action>
         {user && user.id === c.user_id && (
@@ -574,24 +272,8 @@ const renderItem = (c, reply, {
                 onChange={e => { setReplyText(e.target.value); setPostError('') }}
                 rows={1}
               />
-              <IconButton type="button" onClick={() => setShowReplyGif(!showReplyGif)} title="Add GIF">
-                <FaRegImage size={18} />
-              </IconButton>
-              <PostBtn $disabled={busy || (!replyText.trim() && !replyGif)} onClick={() => submitReply(c.id)}>Post</PostBtn>
+              <PostBtn $disabled={busy || !replyText.trim()} onClick={() => submitReply(c.id)}>Post</PostBtn>
             </div>
-            {replyGif && (
-              <SelectedGif>
-                <GifPreview src={replyGif} />
-                <RemoveGif onClick={() => setReplyGif(null)}><FaTimes /></RemoveGif>
-              </SelectedGif>
-            )}
-            {showReplyGif && (
-              <OtakuGifPicker
-                alignEnd
-                onClose={() => setShowReplyGif(false)}
-                onSelect={(url) => { setReplyGif(url); setShowReplyGif(false) }}
-              />
-            )}
           </div>
         </Composer>
       )}
@@ -606,12 +288,8 @@ const Comments = ({ animeId, episodeNumber, label }) => {
   const [myProfile, setMyProfile] = useState(null)
   const [likedIds, setLikedIds] = useState(new Set())
   const [content, setContent] = useState('')
-  const [gif, setGif] = useState(null)
-  const [showGifPicker, setShowGifPicker] = useState(false)
   const [replyTo, setReplyTo] = useState(null)
   const [replyText, setReplyText] = useState('')
-  const [replyGif, setReplyGif] = useState(null)
-  const [showReplyGif, setShowReplyGif] = useState(false)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -670,9 +348,9 @@ const Comments = ({ animeId, episodeNumber, label }) => {
   const submit = async (e) => {
     if (e) e.preventDefault()
     const text = content.trim()
-    if ((!text && !gif) || !user || busy) return
+    if (!text || !user || busy) return
     setBusy(true)
-    const finalContent = gif ? `${text}${text ? ' ' : ''}||GIF:${gif}` : text
+    const finalContent = text
     const { data, error } = await supabase
       .from('comments')
       .insert({
@@ -697,15 +375,13 @@ const Comments = ({ animeId, episodeNumber, label }) => {
       },
     }))
     setContent('')
-    setGif(null)
-    setShowGifPicker(false)
   }
 
   const submitReply = async (parentId) => {
     const text = replyText.trim()
-    if ((!text && !replyGif) || !user || busy) return
+    if (!text || !user || busy) return
     setBusy(true)
-    const finalContent = replyGif ? `${text}${text ? ' ' : ''}||GIF:${replyGif}` : text
+    const finalContent = text
     const { data, error } = await supabase
       .from('comments')
       .insert({
@@ -731,8 +407,6 @@ const Comments = ({ animeId, episodeNumber, label }) => {
     }))
     setReplyTo(null)
     setReplyText('')
-    setReplyGif(null)
-    setShowReplyGif(false)
   }
 
   const toggleLike = async (id) => {
@@ -769,11 +443,7 @@ const Comments = ({ animeId, episodeNumber, label }) => {
     submitReply,
     setReplyTo,
     setReplyText,
-    setPostError,
-    showReplyGif,
-    setShowReplyGif,
-    replyGif,
-    setReplyGif
+    setPostError
   }
 
   return (
@@ -795,23 +465,8 @@ const Comments = ({ animeId, episodeNumber, label }) => {
                 onChange={e => { setContent(e.target.value); setPostError('') }}
                 maxLength={2000}
               />
-              <IconButton type="button" onClick={() => setShowGifPicker(!showGifPicker)} title="Add GIF">
-                <FaRegImage size={18} />
-              </IconButton>
-              <PostBtn type="button" $disabled={busy || (!content.trim() && !gif)} onClick={() => submit()}>Post</PostBtn>
+              <PostBtn type="button" $disabled={busy || !content.trim()} onClick={() => submit()}>Post</PostBtn>
             </div>
-            {gif && (
-              <SelectedGif>
-                <GifPreview src={gif} />
-                <RemoveGif onClick={() => setGif(null)}><FaTimes /></RemoveGif>
-              </SelectedGif>
-            )}
-            {showGifPicker && (
-              <OtakuGifPicker
-                onClose={() => setShowGifPicker(false)}
-                onSelect={(url) => { setGif(url); setShowGifPicker(false) }}
-              />
-            )}
             {postError && <ErrorMsg style={{ marginTop: 8 }}>{postError}</ErrorMsg>}
           </div>
         </Composer>
