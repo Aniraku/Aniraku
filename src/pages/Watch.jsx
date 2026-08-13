@@ -4110,6 +4110,13 @@ export default function Watch() {
               )}
             </section>
 
+            <div
+              className="watch-trust-note"
+              style={{ marginTop: 18, padding: '11px 13px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.55 }}
+            >
+              Playback is resolved from third-party sources; Aniraku does not host episode files. If a source is broken, unsafe, or mislabeled, <a href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>report the problem</a> and try another server.
+            </div>
+
             {anime && (
               <div id="watch-comments" style={{ marginTop: 32 }}>
                 <Comments animeId={animeId} episodeNumber={epNumber} animeTitle={anime?.title?.english || anime?.title?.romaji || ''} />

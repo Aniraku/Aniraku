@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { anilistQuery, BROWSE_QUERY, CATALOG_SHELVES_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
+import TrustStrip from '../components/TrustStrip'
 import { setCatalogSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
 import {
@@ -1002,6 +1003,7 @@ export default function Catalog() {
       </DiscoverBar>
 
       <Container>
+        <TrustStrip />
         <Main>
           {isBrowseMode ? (
             <>

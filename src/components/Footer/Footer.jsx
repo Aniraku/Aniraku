@@ -40,6 +40,7 @@ const resourceLinks = [
   { label: 'Terms', to: '/terms' },
   { label: 'DMCA', to: '/dmca' },
   { label: 'AGPL License', to: '/license' },
+  { label: 'Community Guidelines', to: '/community-guidelines' },
 ]
 
 const Footer = () => {
@@ -57,6 +58,10 @@ const Footer = () => {
             <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer" aria-label="GitHub"><FaGithub size={18} /></F.SocialLink>
             <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer" aria-label="Discord"><FaDiscord size={18} /></F.SocialLink>
           </F.Socials>
+          <F.TrustLine>
+            {resourceLinks.map((resource, index) => <React.Fragment key={resource.to}><Link to={resource.to}>{resource.label}</Link>{index < resourceLinks.length - 1 && <span>·</span>}</React.Fragment>)}
+            <span>·</span><a href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Report an issue</a>
+          </F.TrustLine>
         </F.Col>
 
         <F.Col>
@@ -103,13 +108,11 @@ const Footer = () => {
           </F.Socials>
         </F.MobileTop>
         <F.MobileLinks>
-          <F.MobileLink as={Link} to="/dmca">DMCA</F.MobileLink>
+          {resourceLinks.map((resource, index) => <React.Fragment key={resource.to}><F.MobileLink as={Link} to={resource.to}>{resource.label}</F.MobileLink>{index < resourceLinks.length - 1 && <F.MobileDot>·</F.MobileDot>}</React.Fragment>)}
           <F.MobileDot>·</F.MobileDot>
-          <F.MobileLink as={Link} to="/terms">Terms</F.MobileLink>
-          <F.MobileDot>·</F.MobileDot>
-          <F.MobileLink as={Link} to="/license">License</F.MobileLink>
+          <F.MobileLink as="a" href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Report an issue</F.MobileLink>
         </F.MobileLinks>
-        <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0</F.Copyright>
+        <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0 · No media hosting</F.Copyright>
       </F.MobileFooter>
 
       <F.Bottom>

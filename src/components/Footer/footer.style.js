@@ -113,6 +113,19 @@ F.Socials = styled.div`
   gap: 6px;
 `
 
+F.TrustLine = styled.p`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+
+  a { color: var(--text-secondary); text-decoration: none; }
+  a:hover { color: var(--accent); }
+`
+
 F.SocialLink = styled.a`
   width: 32px;
   height: 32px;

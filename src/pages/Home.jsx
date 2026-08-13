@@ -15,6 +15,7 @@ import {
   FaTv,
 } from 'react-icons/fa'
 import ContinueWatching from '../components/ContinueWatching'
+import TrustStrip from '../components/TrustStrip'
 import Footer from '../components/Footer/Footer'
 import { useHomePageData } from '../hooks/useAnime'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
@@ -613,6 +614,7 @@ function Home() {
           )}
 
           <PersonalSection><ContinueWatching /></PersonalSection>
+          <TrustStrip />
 
           <StoryGrid>
             <StoryPanel>

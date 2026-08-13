@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
+import TrustStrip from '../components/TrustStrip'
 import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
 import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
@@ -980,7 +981,7 @@ const AnimeDetail = () => {
               <>
                 {episodesFallback && (
                   <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
-                    Episode details are temporarily unavailable, so the standard episode list is being shown.
+                    Detailed episode metadata is temporarily unavailable, so the standard episode list is being shown. The title, poster, and episode count come from AniList; playback availability is resolved separately from third-party sources.
                   </div>
                 )}
                 {hiddenEpCount > 0 && (
@@ -1037,6 +1038,7 @@ const AnimeDetail = () => {
           </Section>
         )}
 
+        <TrustStrip />
         <Section>
           <Comments animeId={anime.id} />
         </Section>

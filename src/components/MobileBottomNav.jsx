@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser, FaArrowLeft } from 'react-icons/fa'
+import { FaHome, FaThLarge, FaCalendarAlt, FaRandom, FaUser, FaArrowLeft, FaTimes, FaSearch } from 'react-icons/fa'
 import styled from 'styled-components'
 
 const Bar = styled.nav`
@@ -132,9 +132,10 @@ const MobileBottomNav = () => {
         {items.map(({ icon: Icon, label, to, action }) => (
           <Item
             key={label}
-            active={to && path === to ? 1 : 0}
+            active={to && (path === to || path.startsWith(`${to}/`)) ? 1 : 0}
             onClick={action || (() => navigate(to))}
             aria-label={label}
+            aria-current={to && (path === to || path.startsWith(`${to}/`)) ? 'page' : undefined}
           >
             <Icon size={16} />
             <span>{label}</span>
@@ -149,18 +150,21 @@ const MobileBottomNav = () => {
             <button
               type="button"
               onClick={() => setSearchOpen(false)}
-              style={{ background: 'none', border: 'none', color: '#fff', fontSize: 16, cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44 }}
+              aria-label="Close search"
+              title="Close search"
+              style={{ display: 'grid', placeItems: 'center', background: 'none', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 999, color: '#fff', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44 }}
             >
-              ✕ Close
+              <FaTimes size={15} />
             </button>
           </div>
-          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: 10 }}>
+          <form onSubmit={handleSearchSubmit} aria-label="Search anime" style={{ display: 'flex', gap: 10 }}>
             <input
               type="text"
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search anime, characters, genres..."
+              aria-label="Search anime, characters, and genres"
               style={{
                 flex: 1,
                 background: 'rgba(255,255,255,0.08)',
@@ -176,6 +180,10 @@ const MobileBottomNav = () => {
             <button
               type="submit"
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
                 background: 'var(--accent, #6366f1)',
                 color: '#fff',
                 border: 'none',
@@ -188,7 +196,8 @@ const MobileBottomNav = () => {
                 minWidth: 48,
               }}
             >
-              Search
+              <FaSearch size={14} aria-hidden="true" />
+              <span>Search</span>
             </button>
           </form>
         </SearchOverlay>

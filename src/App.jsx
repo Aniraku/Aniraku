@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, Component, useEffect } from "react"
+import { Suspense, lazy, Component, useEffect } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"
@@ -36,8 +36,10 @@ class ErrorBoundary extends Component {
       return (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "sans-serif", background: "#000", color: "#e2e8f0", padding: "1rem", textAlign: "center" }}>
           <h2 style={{ marginBottom: "0.5rem" }}>Something went wrong</h2>
-          <p style={{ marginBottom: "1rem", color: "var(--text-muted, #8c8c8c)" }}>{this.state.error?.message || "An unexpected error occurred."}</p>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
+                        <p style={{ maxWidth: 520, marginBottom: "1rem", color: "var(--text-muted, #8c8c8c)", lineHeight: 1.6 }}>{this.state.error?.message || "An unexpected error occurred."}</p>
+              <p style={{ maxWidth: 520, marginBottom: "1rem", color: "var(--text-muted, #8c8c8c)", fontSize: "0.85rem", lineHeight: 1.5 }}>No account or playback data was changed. You can retry, return home, or report this diagnostic to the Aniraku project.</p>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
+
             <button
               onClick={this.retry}
               style={{ padding: "0.5rem 1.5rem", background: "var(--accent)", color: "#000", border: "none", borderRadius: "9999px", cursor: "pointer", fontSize: "1rem", fontWeight: 600 }}
@@ -50,6 +52,14 @@ class ErrorBoundary extends Component {
             >
               Back to Home
             </button>
+            <a
+              href="https://github.com/Aniraku/Aniraku/issues/new?template=bug_report.md"
+              target="_blank"
+              rel="noreferrer"
+              style={{ padding: "0.5rem 1.5rem", color: "var(--text-muted, #8c8c8c)", border: "1px solid var(--border, #333)", borderRadius: "9999px", fontSize: "1rem", textDecoration: "none" }}
+            >
+              Report a problem
+            </a>
           </div>
         </div>
       )
@@ -68,6 +78,7 @@ const Dmca = lazy(() => import("./pages/Dmca"))
 const Privacy = lazy(() => import("./pages/Privacy"))
 const License = lazy(() => import("./pages/License"))
 const Terms = lazy(() => import("./pages/Terms"))
+const CommunityGuidelines = lazy(() => import("./pages/CommunityGuidelines"))
 
 const AnimeDetail = lazy(() => import("./pages/AnimeDetail"))
 const Auth = lazy(() => import("./pages/Auth"))
@@ -80,8 +91,8 @@ const Random = lazy(() => import("./pages/Random"))
 const SyncCallback = lazy(() => import("./pages/SyncCallback"))
 
 const GenreRedirect = () => {
-  const params = new URLSearchParams(window.location.search)
-  const genre = window.location.pathname.replace('/genre/', '')
+      const genre = window.location.pathname.replace('/genre/', '')
+
   return <Navigate to={`/catalog?genre=${encodeURIComponent(genre)}`} replace />
 }
 
@@ -114,6 +125,7 @@ const ScrollToTop = () => {
       '/privacy': 'Privacy Policy — Aniraku',
       '/license': 'AGPL-3.0 License — Aniraku',
       '/terms': 'Terms of Service — Aniraku',
+      '/community-guidelines': 'Community Guidelines — Aniraku',
     }
     setTitle(routeTitles[pathname] || (search ? 'Aniraku' : 'Aniraku — Free Anime Streaming'))
   }, [pathname, search])
@@ -141,6 +153,7 @@ const App = () => {
             <Route path="/privacy" element={<Suspense fallback={<Skeleton />}><Privacy /></Suspense>} />
             <Route path="/license" element={<Suspense fallback={<Skeleton />}><License /></Suspense>} />
             <Route path="/terms" element={<Suspense fallback={<Skeleton />}><Terms /></Suspense>} />
+            <Route path="/community-guidelines" element={<Suspense fallback={<Skeleton />}><CommunityGuidelines /></Suspense>} />
 
             <Route path="/login" element={<Suspense fallback={<Skeleton />}><Auth mode="login" /></Suspense>} />
             <Route path="/signup" element={<Suspense fallback={<Skeleton />}><Auth mode="signup" /></Suspense>} />
