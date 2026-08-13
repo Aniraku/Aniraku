@@ -2065,7 +2065,10 @@ export default function Watch() {
 
               forceKeyFrameOnDiscontinuity: true,
               maxRecoveryAttempts: 3,
-              manifestLoadingMaxRetry: 2,
+              // A manifest 401/403/404/410/502 is definitive for this signed
+              // source. Do not let hls.js repeat the same failed manifest;
+              // the fatal handler below immediately advances to the next server.
+              manifestLoadingMaxRetry: 0,
               levelLoadingMaxRetry: 2,
               fragLoadingMaxRetry: 2,
               defaultAudioCodec: 'mp4a.40.2',
@@ -2083,9 +2086,11 @@ export default function Watch() {
             let mediaRetries = 0
             const fail = (reason) => {
               if (buildIdRef.current !== myBuildId) return
-              // Distinguish "no upstream response" → backend/CDN issue
-              // vs real playback error.
-              if (!triedDirect) {
+              const permanentCdnFailure = reason === 'blocked'
+              // A permanent CDN response is already conclusive. Direct fallback
+              // uses the same stale URL and only produces another 401/404/502,
+              // so skip it and move straight to the next provider.
+              if (!permanentCdnFailure && !triedDirect) {
                 triedDirect = true
                 showToast('No upstream response — retrying direct…', { long: true })
                 hls.loadSource(url)
@@ -2099,7 +2104,7 @@ export default function Watch() {
               } else {
                 showToast('Playback error — switching server…')
               }
-              if (onBlocked) onBlocked()
+              if (onBlocked) onBlocked(permanentCdnFailure ? 'permanent-cdn' : undefined)
               else setError('Stream playback error. Try a different server.')
             }
             hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -2490,7 +2495,7 @@ export default function Watch() {
           const firstSource = cached.sources[0]
           const qualityList = buildQualityList(cached.sources)
           if (qualityList.length > 0) {
-            const onBlocked = () => handleProviderBlockedRef.current?.()
+            const onBlocked = (reason) => handleProviderBlockedRef.current?.(reason)
             buildPlayer(
               qualityList[0].url,
               qualityList[0].type,
@@ -2780,13 +2785,14 @@ export default function Watch() {
   // place this way, exactly like a fresh page load. Only if the
   // refreshed stream also fails does the source get marked blocked
   // and the switch to the next server happens.
-  const handleProviderBlocked = useCallback(() => {
+  const handleProviderBlocked = useCallback((reason) => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
     const current = activeSourceRef.current
+    const permanentCdnFailure = reason === 'permanent-cdn'
     const now = Date.now()
     if (now - lastBlockCycleRef.current < 3_000) return
     lastBlockCycleRef.current = now
-    if (current && !refreshAttemptedRef.current.has(current)) {
+    if (current && !permanentCdnFailure && !refreshAttemptedRef.current.has(current)) {
       refreshAttemptedRef.current.add(current)
       showToast('Stream expired — refreshing this server once…')
       loadStreamRef.current(current, true)
