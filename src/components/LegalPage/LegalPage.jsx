@@ -4,11 +4,15 @@ import { FaArrowLeft, FaExternalLinkAlt, FaGithub, FaShieldAlt } from 'react-ico
 import Footer from '../Footer/Footer'
 
 const Page = styled.main`
-  min-height: 100vh;
-  padding: calc(var(--header-h) + 26px) 16px 80px;
+  min-height: 100dvh;
+  padding: calc(var(--header-h) + 26px) var(--content-pad) 80px;
   background:
     radial-gradient(circle at 82% 0%, rgba(125, 92, 232, 0.13), transparent 28rem),
     var(--bg);
+
+  @media (max-width: 768px) {
+    padding: calc(var(--header-h) + 14px) var(--content-pad) var(--mobile-dock-clearance);
+  }
 `
 
 const Shell = styled.div`
@@ -24,6 +28,13 @@ const Header = styled.header`
 
   h1 { margin: 20px 0 10px; color: var(--text-primary); font-size: clamp(30px, 5vw, 48px); letter-spacing: -0.06em; line-height: 1; }
   p { max-width: 66ch; margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+
+  @media (max-width: 480px) {
+    padding: 20px 16px;
+    border-radius: var(--radius-lg);
+    h1 { font-size: clamp(29px, 10vw, 39px); line-height: 1.04; letter-spacing: -0.045em; }
+    p { font-size: 12.5px; line-height: 1.6; }
+  }
 `
 
 const BackLink = styled(Link)`
@@ -76,10 +87,23 @@ const Contents = styled.nav`
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-card);
-  @media (max-width: 760px) { position: static; }
   h2 { margin: 0 0 10px; color: var(--text-primary); font-size: 12px; }
   a { display: block; padding: 5px 0; color: var(--text-secondary); font-size: 11px; text-decoration: none; }
   a:hover { color: var(--accent); }
+
+  @media (max-width: 760px) {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 10px;
+    scrollbar-width: none;
+    h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    a { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-full); background: var(--bg-elevated); white-space: nowrap; }
+    &::-webkit-scrollbar { display: none; }
+  }
 `
 
 const Article = styled.article`
@@ -100,6 +124,15 @@ const Article = styled.article`
   strong { color: var(--text-primary); }
   a { color: var(--accent); }
   code { padding: 2px 5px; border-radius: 4px; background: var(--bg-elevated); color: var(--accent); font-size: 0.92em; }
+
+  @media (max-width: 480px) {
+    padding: 20px 16px;
+    border-radius: var(--radius-lg);
+    font-size: 13px;
+    line-height: 1.7;
+    h2 { font-size: 18px; scroll-margin-top: 16px; }
+    h3 { font-size: 14px; }
+  }
 `
 
 const Callout = styled.aside`
@@ -123,8 +156,14 @@ const Support = styled.div`
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid var(--border);
-  a { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 11px; font-weight: 750; text-decoration: none; }
+  a { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 11px; font-weight: 750; text-decoration: none; }
   a:hover { border-color: var(--accent); color: var(--text-primary); }
+
+  @media (max-width: 480px) {
+    display: grid;
+    grid-template-columns: 1fr;
+    a { justify-content: center; text-align: center; }
+  }
 `
 
 const LegalPage = ({ title, eyebrow = 'Trust & transparency', revision = 'August 13, 2026', intro, sections = [], children }) => (
@@ -158,7 +197,7 @@ const LegalPage = ({ title, eyebrow = 'Trust & transparency', revision = 'August
         </Body>
       </Shell>
     </Page>
-    <Footer />
+    <Footer compact />
   </>
 )
 

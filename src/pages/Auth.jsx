@@ -5,17 +5,23 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import styled from 'styled-components'
 
 const Wrapper = styled.main`
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) var(--content-pad) max(20px, env(safe-area-inset-bottom));
+
+  @media (max-width: 768px) {
+    align-items: flex-start;
+    padding-top: calc(var(--header-h) + 18px);
+    padding-bottom: var(--mobile-dock-clearance);
+  }
 `
 
 const Box = styled.div`
-  width: 100%;
-  max-width: 420px;
+  width: min(100%, 420px);
+  min-width: 0;
 `
 
 const Back = styled(Link)`
@@ -35,18 +41,20 @@ const Card = styled.section`
   padding: 40px 32px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
+
   @media (max-width: 480px) {
-    padding: 28px 20px;
+    padding: 26px 18px;
     border-radius: var(--radius-md);
   }
 `
 
 const Title = styled.h1`
-  font-size: 28px;
+  font-size: clamp(25px, 7vw, 28px);
   font-weight: 700;
   margin: 0 0 8px;
   text-align: center;
   color: var(--text-primary);
+  line-height: 1.12;
 `
 
 const Subtitle = styled.p`
@@ -149,6 +157,7 @@ const Footer = styled.p`
   margin: 20px 0 0;
   color: var(--text-muted);
   font-size: 13px;
+  line-height: 1.5;
   a {
     color: var(--accent);
     text-decoration: none;

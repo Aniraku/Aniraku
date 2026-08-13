@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import {
@@ -6,16 +6,14 @@ import {
   FaBolt,
   FaCalendarAlt,
   FaClock,
-  FaCompass,
   FaFilm,
   FaFire,
   FaPlay,
-  FaPlus,
+  FaRandom,
   FaStar,
   FaTv,
 } from 'react-icons/fa'
 import ContinueWatching from '../components/ContinueWatching'
-import TrustStrip from '../components/TrustStrip'
 import Footer from '../components/Footer/Footer'
 import { useHomePageData } from '../hooks/useAnime'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
@@ -27,7 +25,7 @@ import { generateSlug } from '../lib/slug'
 
 const Page = styled.main`
   min-height: 100vh;
-  overflow: hidden;
+  overflow: clip;
   background:
     radial-gradient(circle at 84% 4%, rgba(125, 92, 232, 0.15), transparent 24rem),
     linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 62%, var(--bg)) 0, var(--bg) 37rem);
@@ -36,63 +34,9 @@ const Page = styled.main`
 const Shell = styled.div`
   width: min(100%, 1440px);
   margin: 0 auto;
-  padding: calc(var(--header-h) + clamp(18px, 3vw, 38px)) clamp(14px, 3vw, 46px) 88px;
+  padding: calc(var(--header-h) + clamp(16px, 3vw, 38px)) var(--content-pad) clamp(28px, 5vw, 64px);
 
-  @media (max-width: 640px) { padding: calc(var(--header-h) + 14px) 12px 76px; }
-`
-
-const Topline = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 13px;
-
-  p {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 11px;
-    font-weight: 750;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-  }
-  p svg { color: var(--accent); }
-
-  @media (max-width: 520px) { p span { display: none; } }
-`
-
-const QuickNav = styled.nav`
-  display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  padding: 1px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-`
-
-const QuickNavLink = styled(Link)`
-  display: inline-flex;
-  min-height: 32px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--bg-card) 78%, transparent);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 750;
-  text-decoration: none;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
-  touch-action: manipulation;
-
-  svg { color: var(--accent); }
-  &:hover { border-color: var(--border-hover); background: var(--bg-elevated); color: var(--text-primary); }
-  &:active { transform: scale(0.97); }
+  @media (max-width: 640px) { padding-top: calc(var(--header-h) + 10px); }
 `
 
 const SpotlightGrid = styled.section`
@@ -101,7 +45,7 @@ const SpotlightGrid = styled.section`
   gap: 14px;
   align-items: stretch;
 
-  @media (max-width: 900px) { grid-template-columns: 1fr; }
+  @media (max-width: 980px) { grid-template-columns: 1fr; }
 `
 
 const Spotlight = styled.article`
@@ -137,9 +81,10 @@ const Spotlight = styled.article`
   }
 
   @media (max-width: 640px) {
-    min-height: 460px;
+    min-height: clamp(430px, 128vw, 520px);
+    border-radius: 18px;
     &::before { background-position: 62% center; }
-    &::after { background: linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(8,8,12,0.64) 52%, rgba(8,8,12,0.12) 100%); }
+    &::after { background: linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(8,8,12,0.66) 55%, rgba(8,8,12,0.08) 100%); }
   }
 `
 
@@ -181,7 +126,11 @@ const SpotlightCopy = styled.div`
     -webkit-line-clamp: 3;
   }
 
-  @media (max-width: 640px) { padding: 22px; .summary { font-size: 12px; } }
+  @media (max-width: 640px) {
+    padding: 20px;
+    h1 { max-width: 13ch; font-size: clamp(30px, 11vw, 44px); }
+    .summary { font-size: 12px; -webkit-line-clamp: 2; }
+  }
 `
 
 const MetaRow = styled.div`
@@ -230,6 +179,33 @@ const SpotlightAction = styled(Link)`
   transition: transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
   &:hover { background: ${({ $secondary }) => ($secondary ? 'rgba(255,255,255,0.14)' : 'var(--accent-dim)')}; }
   &:active { transform: scale(0.97); }
+
+  @media (max-width: 430px) {
+    flex: 1 1 calc(50% - 4px);
+    &:first-child { flex-basis: 100%; }
+  }
+`
+
+const RandomSlideButton = styled.button`
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.22);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  &:hover { border-color: rgba(255,255,255,0.42); background: rgba(255,255,255,0.14); }
+  &:active { transform: scale(0.97); }
+
+  @media (max-width: 430px) { flex: 1 1 calc(50% - 4px); }
 `
 
 const OnDeck = styled.aside`
@@ -297,10 +273,11 @@ const DeckItem = styled(Link)`
   h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
   p { margin: 4px 0 0; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 
-  @media (max-width: 420px) {
-    grid-template-columns: 30px minmax(0, 1fr) minmax(70px, auto);
-    gap: 8px;
-    img { width: 30px; height: 42px; }
+  @media (max-width: 520px) {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 9px;
+    img { width: 34px; height: 46px; }
+    h3 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   }
 `
 
@@ -309,6 +286,16 @@ const DeckTime = styled.div`
   text-align: right;
   strong { display: block; color: var(--accent); font-size: 10px; font-weight: 850; white-space: nowrap; }
   span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 9px; line-height: 1.2; }
+
+  @media (max-width: 520px) {
+    grid-column: 2;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    text-align: left;
+    strong, span { display: inline; }
+    span { margin-top: 0; }
+  }
 `
 
 const EmptyDeck = styled.div`
@@ -331,7 +318,8 @@ const StoryGrid = styled.section`
   gap: 14px;
   margin-top: 30px;
 
-  @media (max-width: 960px) { grid-template-columns: 1fr; }
+  @media (max-width: 980px) { grid-template-columns: 1fr; }
+  @media (max-width: 640px) { margin-top: 22px; gap: 12px; }
 `
 
 const StoryPanel = styled.section`
@@ -352,6 +340,13 @@ const SectionTitle = styled.div`
   h2 { margin: 0; color: var(--text-primary); font-size: clamp(21px, 2.5vw, 30px); letter-spacing: -0.04em; }
   a { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 750; text-decoration: none; }
   a:hover { color: var(--text-primary); }
+
+  @media (max-width: 520px) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
 `
 
 const EditorialGrid = styled.div`
@@ -421,49 +416,6 @@ const MovieItem = styled(Link)`
   img { width: 26px; height: 34px; border-radius: 4px; object-fit: cover; background: var(--bg-elevated); }
   h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 11px; font-weight: 730; text-overflow: ellipsis; white-space: nowrap; transition: color var(--transition-fast); }
   span { color: var(--text-muted); font-size: 10px; font-weight: 700; }
-`
-
-const Programme = styled.section`
-  display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
-  gap: 18px;
-  align-items: center;
-  margin-top: 30px;
-  padding: clamp(18px, 3.5vw, 34px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(110deg, color-mix(in srgb, var(--bg-card) 93%, transparent), color-mix(in srgb, var(--bg-elevated) 86%, transparent));
-
-  h2 { max-width: 14ch; margin: 0; color: var(--text-primary); font-size: clamp(24px, 3vw, 36px); letter-spacing: -0.05em; line-height: 1.04; }
-  p { margin: 11px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
-
-  @media (max-width: 820px) { grid-template-columns: 1fr; gap: 18px; }
-`
-
-const ProgrammeLinks = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
-  @media (max-width: 520px) { grid-template-columns: 1fr; }
-`
-
-const ProgrammeLink = styled(Link)`
-  display: flex;
-  min-height: 94px;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 13px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  color: inherit;
-  text-decoration: none;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
-  svg { color: var(--accent); }
-  strong { color: var(--text-primary); font-size: 13px; }
-  span { color: var(--text-muted); font-size: 11px; }
-  &:hover { transform: translateY(-2px); border-color: var(--border-hover); background: var(--bg-elevated); }
-  &:active { transform: scale(0.98); }
 `
 
 const GenreBand = styled.section`
@@ -539,6 +491,14 @@ function Home() {
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
 
   const featured = useMemo(() => trendingList[0] || airingList[0] || tvList[0] || moviesList[0] || null, [trendingList, airingList, tvList, moviesList])
+  const randomSlides = useMemo(() => {
+    const byId = new Map()
+    ;[...trendingList, ...airingList, ...tvList, ...moviesList].forEach((item) => {
+      if (item?.id && !byId.has(item.id)) byId.set(item.id, item)
+    })
+    return [...byId.values()].sort(() => Math.random() - 0.5).slice(0, 10)
+  }, [trendingList, airingList, tvList, moviesList])
+  const [randomIndex, setRandomIndex] = useState(0)
   const upcomingReleases = useMemo(() => airingList
     .filter((item) => item?.id && item.id !== featured?.id && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now())
     .sort((a, b) => Number(a.nextAiringEpisode.airingAt) - Number(b.nextAiringEpisode.airingAt))
@@ -553,6 +513,16 @@ function Home() {
     .slice(0, 6), [trendingList, tvList, featured])
 
   useEffect(() => { setHomepageSEO() }, [])
+
+  useEffect(() => {
+    setRandomIndex((index) => randomSlides.length ? index % randomSlides.length : 0)
+  }, [randomSlides.length])
+
+  useEffect(() => {
+    if (randomSlides.length < 2) return undefined
+    const timer = window.setInterval(() => setRandomIndex((index) => (index + 1) % randomSlides.length), 10000)
+    return () => window.clearInterval(timer)
+  }, [randomSlides.length])
 
   useEffect(() => {
     if (!user) return undefined
@@ -616,40 +586,41 @@ function Home() {
     return () => { cancelled = true }
   }, [user])
 
-  const featuredTitle = titleFor(featured)
-  const featuredImage = imageFor(featured)
-  const featuredEpisode = featured?.nextAiringEpisode?.episode
+  const spotlight = randomSlides.length ? randomSlides[randomIndex % randomSlides.length] : featured
+  const spotlightTitle = titleFor(spotlight)
+  const spotlightImage = imageFor(spotlight)
+  const spotlightEpisode = spotlight?.nextAiringEpisode?.episode
+  const showAnotherRandomSlide = () => {
+    if (randomSlides.length < 2) return
+    setRandomIndex((index) => {
+      let next = index
+      while (next === index) next = Math.floor(Math.random() * randomSlides.length)
+      return next
+    })
+  }
 
   return (
     <>
       <Page>
         <Shell>
-          <Topline>
-            <p><FaCompass size={12} /> <span>Today’s watch programme</span></p>
-            <QuickNav aria-label="Home discovery shortcuts">
-              <QuickNavLink to="/catalog?status=RELEASING"><FaBolt /> Airing</QuickNavLink>
-              <QuickNavLink to="/catalog?sort=POPULARITY_DESC"><FaFire /> Popular</QuickNavLink>
-              <QuickNavLink to="/schedule"><FaCalendarAlt /> Schedule</QuickNavLink>
-              <QuickNavLink to="/catalog?view=all"><FaPlus /> Catalog</QuickNavLink>
-            </QuickNav>
-          </Topline>
 
           {!homeDone || !featured ? <LoadingSpotlight /> : (
             <SpotlightGrid>
-              <Spotlight $image={featuredImage}>
+              <Spotlight $image={spotlightImage}>
                 <SpotlightCopy>
-                  <div className="kicker"><FaStar size={10} /> Featured now</div>
-                  <h1>{featuredTitle}</h1>
+                  <div className="kicker"><FaRandom size={10} /> Random anime pick</div>
+                  <h1>{spotlightTitle}</h1>
                   <MetaRow>
-                    {featured?.format && <span><FaTv size={9} /> {featured.format}</span>}
-                    {featured?.averageScore && <span><FaStar size={9} /> {featured.averageScore}%</span>}
-                    {featured?.episodes && <span>{featured.episodes} episodes</span>}
-                    {featuredEpisode && <span><FaBolt size={9} /> Episode {featuredEpisode} next</span>}
+                    {spotlight?.format && <span><FaTv size={9} /> {spotlight.format}</span>}
+                    {spotlight?.averageScore && <span><FaStar size={9} /> {spotlight.averageScore}%</span>}
+                    {spotlight?.episodes && <span>{spotlight.episodes} episodes</span>}
+                    {spotlightEpisode && <span><FaBolt size={9} /> Episode {spotlightEpisode} next</span>}
                   </MetaRow>
-                  <p className="summary">{stripHtml(featured?.description) || 'A standout title selected from the latest community discovery data.'}</p>
+                  <p className="summary">{stripHtml(spotlight?.description) || 'A hand-picked surprise from the latest anime available on Aniraku.'}</p>
                   <SpotlightActions>
-                    <SpotlightAction to={watchHref(featured)}><FaPlay size={11} /> Start watching</SpotlightAction>
-                    <SpotlightAction $secondary to={detailHref(featured)}>Details <FaArrowRight size={10} /></SpotlightAction>
+                    {spotlight && <SpotlightAction to={watchHref(spotlight)}><FaPlay size={11} /> Start watching</SpotlightAction>}
+                    {spotlight && <SpotlightAction $secondary to={detailHref(spotlight)}>Details <FaArrowRight size={10} /></SpotlightAction>}
+                    <RandomSlideButton type="button" onClick={showAnotherRandomSlide} aria-label="Show another random anime"><FaRandom size={11} /> Surprise me</RandomSlideButton>
                   </SpotlightActions>
                 </SpotlightCopy>
               </Spotlight>
@@ -687,8 +658,8 @@ function Home() {
             </SpotlightGrid>
           )}
 
-          <PersonalSection><ContinueWatching /></PersonalSection>
-          <TrustStrip />
+
+          <PersonalSection aria-label="Continue watching"><ContinueWatching /></PersonalSection>
 
           <StoryGrid>
             <StoryPanel>
@@ -718,15 +689,6 @@ function Home() {
               </MovieList>
             </ScreeningRoom>
           </StoryGrid>
-
-          <Programme>
-            <div><h2>A quieter way to find what is next.</h2><p>Move through the site by intent: follow current episodes, find a complete series, or plan a movie night without jumping into a dense catalogue first.</p></div>
-            <ProgrammeLinks>
-              <ProgrammeLink to="/catalog?status=RELEASING"><FaBolt size={15} /><strong>Current episodes</strong><span>Find shows airing now</span></ProgrammeLink>
-              <ProgrammeLink to="/catalog?format=MOVIE&sort=SCORE_DESC"><FaFilm size={15} /><strong>Movie night</strong><span>Highly rated films</span></ProgrammeLink>
-              <ProgrammeLink to="/schedule"><FaCalendarAlt size={15} /><strong>Plan the week</strong><span>Check your local release times</span></ProgrammeLink>
-            </ProgrammeLinks>
-          </Programme>
 
           <GenreBand>
             <p>Browse by mood</p>

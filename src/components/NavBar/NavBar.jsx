@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FaBars, FaBell, FaSearch, FaRandom } from 'react-icons/fa'
 import { N } from './navbar.style'
 import SideBar from './SideBar'
@@ -7,7 +7,6 @@ import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { avatarUrl, defaultAvatar } from '../../lib/avatars'
 import { supabase } from '../../lib/supabase'
-import { generateSlug } from '../../lib/slug'
 import { API_BASE } from '../../config'
 
 const NavBar = () => {
@@ -22,7 +21,9 @@ const NavBar = () => {
   const navigate = useNavigate()
 
   const location = useLocation()
-  const isHome = location.pathname === '/home'
+  const isHome = location.pathname === '/' || location.pathname === '/home'
+  const focusedRoute = ['/login', '/signup', '/auth/forgot-password', '/auth/new-password', '/privacy', '/terms', '/dmca', '/license', '/community-guidelines'].includes(location.pathname)
+  const shortcutOriginRef = useRef(null)
 
   useEffect(() => {
     if (open) {
@@ -91,13 +92,34 @@ const NavBar = () => {
 
   useEffect(() => {
     const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchRef.current?.focus() }
+      const editable = e.target?.closest?.('input, textarea, select, [contenteditable="true"]')
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !editable) {
+        shortcutOriginRef.current = document.activeElement
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+      if (e.key === 'Escape' && document.activeElement === searchRef.current) {
+        searchRef.current?.blur()
+        shortcutOriginRef.current?.focus?.()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
   const unreadCount = notifications.filter(n => !n.read).length
+
+  if (focusedRoute) {
+    return (
+      <N.Nav $isScrolled={isScrolled} $isHome={false} aria-label="Focused page navigation">
+        <N.Left><Logo to="/home" height={32} showText /></N.Left>
+        <N.Right>
+          <Link to="/home" style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 750, textDecoration: 'none' }}>Home</Link>
+          <Link to="/dmca" style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 750, textDecoration: 'none' }}>Help</Link>
+        </N.Right>
+      </N.Nav>
+    )
+  }
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -107,10 +129,10 @@ const NavBar = () => {
   }
 
   return (
-    <N.Nav $isScrolled={isScrolled} $isHome={isHome}>
+    <N.Nav $isScrolled={isScrolled} $isHome={isHome} aria-label="Primary navigation">
       <N.LayoutBg open={open} onClick={() => setOpen(false)} />
       <N.Left>
-        <N.MenuBtn onClick={() => setOpen(true)} aria-expanded={open} aria-controls="sidebar-menu">
+        <N.MenuBtn type="button" onClick={() => setOpen(true)} aria-label="Open navigation menu" aria-expanded={open} aria-controls="sidebar-menu">
           <FaBars size={20} />
         </N.MenuBtn>
         <SideBar open={open} setOpen={setOpen} profile={profile} isAdmin={isAdmin} />
@@ -128,11 +150,11 @@ const NavBar = () => {
       </N.SearchForm>
 
       <N.Right>
-        <N.RightBtn onClick={() => navigate('/random')} title="Random Anime"><FaRandom size={15} /></N.RightBtn>
+        <N.RightBtn type="button" onClick={() => navigate('/random')} title="Random Anime" aria-label="Find a random anime"><FaRandom size={15} /></N.RightBtn>
 
         {user && (
           <div ref={notifRef} style={{ position: 'relative' }}>
-            <N.RightBtn onClick={() => setShowNotifs(!showNotifs)} title="Notifications" style={{ position: 'relative' }} aria-expanded={showNotifs} aria-controls="notifications-panel">
+            <N.RightBtn type="button" onClick={() => setShowNotifs(!showNotifs)} title="Notifications" aria-label="Notifications" style={{ position: 'relative' }} aria-expanded={showNotifs} aria-controls="notifications-panel">
               <FaBell size={15} />
               {unreadCount > 0 && (
                 <span style={{ position: 'absolute', top: -2, right: -2, background: 'var(--accent)', color: 'var(--bg)', fontSize: 9, fontWeight: 700, borderRadius: '50%', width: 15, height: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

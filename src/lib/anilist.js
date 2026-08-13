@@ -1,14 +1,16 @@
 const ANILIST_URL = 'https://graphql.anilist.co'
+const DEFAULT_API_BASE = 'https://api.aniraku.tech'
 
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
 
-  // ponytail: backend proxy first — browser-direct AniList is CORS-blocked
-  // and still burns the client IP's 90 req/min quota on requests it can't use.
-  const apiBase = import.meta.env.VITE_API_URL || ''
-  if (apiBase) {
-    try {
-      const res = await fetch(`${apiBase}/api/v1/anilist`, {
+  // Always use Aniraku's API proxy by default. It avoids browser CORS issues
+  // and protects users from exhausting AniList's client-side rate limit. A
+  // deployment may still override this endpoint through VITE_API_URL.
+  const apiBase = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
+  const endpoint = `${apiBase}/api/v1/anilist`
+  try {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body,
@@ -20,7 +22,6 @@ export async function anilistQuery(query, variables = {}) {
     } catch (e) {
       console.warn('AniList proxy fetch failed:', e)
     }
-  }
 
   // Last resort: direct fetch — only works outside the browser (no CORS).
   try {
