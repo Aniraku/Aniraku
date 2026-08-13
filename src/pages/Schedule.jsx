@@ -6,6 +6,7 @@ import { FaArrowRight, FaCalendarAlt, FaClock, FaSearch, FaTimes, FaTv } from 'r
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
+import TrustStrip from '../components/TrustStrip'
 import { setScheduleSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
 
@@ -422,6 +423,7 @@ const Schedule = () => {
               ))}
             </DaysRow>
           </ControlPanel>
+          <TrustStrip />
 
           <ScheduleSummary>
             <div>

@@ -1,10 +1,15 @@
-import React from "react"
-import { FaPlay, FaBookmark } from "react-icons/fa"
+import { FaBookmark, FaCheck, FaPlay } from "react-icons/fa"
 import { C } from "./card.style"
 import { Link } from "react-router-dom"
 import { generateSlug } from "../../lib/slug"
+import { useLocalStorage } from "../../hooks/useLocalStorage"
+import { useAuth } from "../../hooks/useAuth"
+import { supabase } from "../../lib/supabase"
 
 const Card = ({ data }) => {
+  const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
+  const { user } = useAuth()
+
   if (!data) return null
 
   const id = data.id || data.mal_id
@@ -15,6 +20,34 @@ const Card = ({ data }) => {
   const format = data.format
   const accentColor = data.coverImage?.color || 'var(--accent)'
   const slug = generateSlug(title)
+  const numericId = Number(id)
+  const isBookmarked = bookmarks.some((bookmark) => Number(bookmark.id) === numericId)
+
+  const toggleBookmark = async (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const next = isBookmarked
+      ? bookmarks.filter((bookmark) => Number(bookmark.id) !== numericId)
+      : [...bookmarks, { id: numericId, title, image: poster }]
+    setBookmarks(next)
+
+    try {
+      if (user && isBookmarked) {
+        await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('anime_id', numericId)
+      } else if (user) {
+        await supabase.from('bookmarks').upsert({
+          user_id: user.id,
+          anime_id: numericId,
+          title,
+          image: poster,
+          added_at: Date.now(),
+        }, { onConflict: 'user_id,anime_id' })
+      }
+    } catch {
+      // Keep the local mirror usable when the cloud bookmark request is unavailable.
+    }
+  }
 
   return (
     <C.Card style={{ '--media-color': accentColor }}>
@@ -28,8 +61,8 @@ const Card = ({ data }) => {
           <C.Overlay>
             <FaPlay size={28} />
           </C.Overlay>
-          <C.BookmarkBtn onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} aria-label="Bookmark" title="Bookmark">
-            <FaBookmark size={12} />
+          <C.BookmarkBtn onClick={toggleBookmark} aria-pressed={isBookmarked} aria-label={isBookmarked ? `Remove ${title} from bookmarks` : `Bookmark ${title}`} title={isBookmarked ? 'Remove bookmark' : 'Bookmark'}>
+            {isBookmarked ? <FaCheck size={11} /> : <FaBookmark size={12} />}
           </C.BookmarkBtn>
           <C.Badges>
             {score && <C.Badge accent>{score}%</C.Badge>}
@@ -44,7 +77,7 @@ const Card = ({ data }) => {
             </C.PreviewMeta>
             <C.PreviewAction>
               <FaPlay size={10} />
-              <span>Watch Now</span>
+              <span>Open details</span>
             </C.PreviewAction>
           </C.Preview>
         </C.Poster>
