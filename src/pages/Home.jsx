@@ -566,29 +566,47 @@ function Home() {
       } catch { /* server bookmarks are optional for this notification */ }
       if (!bookmarks.length || cancelled) return
 
-      const lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}')
+      let lastKnown = {}
+      try { lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}') || {} } catch { /* stale local storage is non-fatal */ }
       const now = Date.now()
       const api = import.meta.env.VITE_API_URL || ''
       bookmarks.forEach((bookmark) => {
         if (lastKnown[bookmark.id] && now - lastKnown[bookmark.id].t < 21600000) return
         anilistQuery(ANIME_DETAIL_QUERY, { id: bookmark.id }).then(({ data }) => {
           const media = data?.Media
-          if (!media || media.status !== 'RELEASING' || !api) return
+          if (!media || media.status !== 'RELEASING' || !api || cancelled) return
           const episode = media.nextAiringEpisode?.episode ? media.nextAiringEpisode.episode - 1 : (media.episodes || 0)
           if (episode <= (lastKnown[bookmark.id]?.e || 0)) return
           fetch(`${api}/api/v1/miruro/episodes/${bookmark.id}`)
             .then((response) => response.ok ? response.json() : Promise.reject())
-            .then((payload) => {
+            .then(async (payload) => {
               const hasEpisode = Object.values(payload?.providers || {}).some((provider) => (provider?.episodes?.sub || []).some((item) => item.number === episode))
               if (!hasEpisode || cancelled) return
+              const message = `Episode ${episode} of ${bookmark.title} is now available`
+              // The table intentionally deduplicates user/type/anime/message. Check
+              // first so normal refreshes do not turn an already-seen release into
+              // a visible 409, while the duplicate race remains harmlessly ignored.
+              const { data: existing, error: lookupError } = await supabase
+                .from('notifications')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('type', 'new_episode')
+                .eq('anime_id', bookmark.id)
+                .eq('message', message)
+                .limit(1)
+                .maybeSingle()
+              if (cancelled || lookupError || existing) return
               lastKnown[bookmark.id] = { e: episode, t: now }
               localStorage.setItem('aniraku-episode-track', JSON.stringify(lastKnown))
-              return supabase.from('notifications').insert({
+              const { error: insertError } = await supabase.from('notifications').insert({
                 user_id: user.id,
                 type: 'new_episode',
-                message: `Episode ${episode} of ${bookmark.title} is now available`,
+                message,
                 anime_id: bookmark.id,
               })
+              // A second tab can win the check between SELECT and INSERT. The
+              // unique violation is the expected idempotency race, not an error.
+              if (insertError && insertError.code !== '23505') return
             })
             .catch(() => {})
         }).catch(() => {})
