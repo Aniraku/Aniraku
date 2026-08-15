@@ -4426,6 +4426,34 @@ export default function Watch() {
           stroke: rgba(8, 12, 20, 0.24);
           stroke-width: 0.35px;
         }
+        /* Artplayer applies negative side margins on its mobile control groups.
+           The player itself clips overflow, so the rightmost settings/fullscreen
+           icon can disappear at the edge on narrow phones. */
+        .watch-art-mount .art-video-player .art-controls {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          padding-inline: 4px;
+        }
+        .watch-art-mount .art-video-player .art-controls-left,
+        .watch-art-mount .art-video-player .art-controls-right {
+          min-width: 0;
+          margin-inline: 0;
+        }
+        .watch-art-mount .art-video-player .art-controls .art-control {
+          min-width: 0;
+          flex: 0 0 auto;
+        }
+        .watch-art-mount .art-video-player .art-controls-seekBackward10,
+        .watch-art-mount .art-video-player .art-controls-seekForward10 {
+          width: 38px !important;
+          min-width: 38px !important;
+          margin-inline: 0 !important;
+          padding-inline: 0 !important;
+        }
+        .watch-art-mount .art-video-player .art-controls-quality {
+          min-width: 64px;
+        }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
            fallback for older browsers. */
@@ -4444,6 +4472,31 @@ export default function Watch() {
           .watch-episodes { width: 100% !important; }
           .watch-page { padding: 0 !important; }
           .watch-nav { gap: 8px !important; }
+          .watch-art-mount .art-video-player {
+            --art-control-height: 42px;
+            --art-control-icon-size: 28px;
+            --art-padding: 8px;
+          }
+          .watch-art-mount .art-video-player .art-controls {
+            padding-inline: 2px;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control {
+            width: 34px;
+            padding-inline: 2px;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control .art-icon {
+            width: 26px;
+            height: 26px;
+          }
+          .watch-art-mount .art-video-player .art-controls-quality {
+            width: 60px;
+            min-width: 60px;
+          }
+          .watch-art-mount .art-video-player .art-controls-seekBackward10,
+          .watch-art-mount .art-video-player .art-controls-seekForward10 {
+            width: 36px !important;
+            min-width: 36px !important;
+          }
           .watch-nav button { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 8px 12px; }
           .watch-rating { gap: 6px !important; }
           .watch-rating span:last-child { gap: 2px !important; }
@@ -4480,6 +4533,28 @@ export default function Watch() {
         @media (max-width: 480px) {
           .watch-nav { gap: 6px !important; }
           .watch-nav button { padding: 8px 10px; font-size: 11px; }
+          .watch-art-mount .art-video-player .art-controls {
+            padding-inline: 0;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control {
+            width: 32px;
+            padding-inline: 1px;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control .art-icon {
+            width: 24px;
+            height: 24px;
+          }
+          .watch-art-mount .art-video-player .art-controls-quality {
+            width: 56px;
+            min-width: 56px;
+          }
+        }
+        @media (max-width: 360px) {
+          /* Quality remains available from settings; remove its duplicate
+             compact label only when the essential controls cannot all fit. */
+          .watch-art-mount .art-video-player .art-controls-quality {
+            display: none !important;
+          }
         }
         /* High-contrast support */
         @media (prefers-contrast: more) {
