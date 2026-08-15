@@ -4459,7 +4459,20 @@ export default function Watch() {
           .watch-skip-overlay { bottom: calc(44px + env(safe-area-inset-bottom, 0px)) !important; }
         }
         @media (orientation: landscape) and (max-height: 560px) {
-          .watch-player { max-height: calc(100dvh - 12px); }
+          /* Keep the 16:9 ratio when the short landscape viewport limits height.
+             A max-height alone leaves the inline width at 100%, which clips the
+             bottom of the player on mobile landscape screens. */
+          .watch-player {
+            width: calc(177.7778vh - 21.3333px) !important;
+            max-width: 100%;
+            max-height: calc(100vh - 12px);
+          }
+          @supports (height: 100dvh) {
+            .watch-player {
+              width: calc(177.7778dvh - 21.3333px) !important;
+              max-height: calc(100dvh - 12px);
+            }
+          }
           .watch-page { padding: 4px !important; }
           .watch-comments-fab { bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
           .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
