@@ -319,11 +319,14 @@ function getQualityPresentation(value) {
   }
 }
 
-function qualityOptionHtml(presentation) {
-  const badge = presentation.badge
-    ? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
-    : ''
-  return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
+function qualityOptionHtml(presentation, mode = '') {
+	const badge = presentation.badge
+		? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
+		: ''
+	const modeBadge = mode
+		? `<span class="watch-quality-badge">${escapeHtml(SOURCE_MODE_LABELS[mode] || mode)}</span>`
+		: ''
+	return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}${modeBadge}</span>`
 }
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
@@ -383,6 +386,24 @@ function isPlayableEmbedSource(source) {
 	return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
 }
 
+const SOURCE_MODE_LABELS = {
+	direct: 'Direct',
+	proxy: 'Proxy',
+	embedded: 'Embedded',
+}
+
+function getSourceMode(source) {
+	if (getSourcePlaybackType(source) === 'embed') return 'embedded'
+	return getSourceVerification(source) === 'proxy' ? 'proxy' : 'direct'
+}
+
+function getSourceModes(sources) {
+	const modes = new Set()
+	;(Array.isArray(sources) ? sources : []).forEach((source) => {
+		if (source?.url) modes.add(getSourceMode(source))
+	})
+	return ['direct', 'proxy', 'embedded'].filter((mode) => modes.has(mode))
+}
 
 function buildQualityList(sources) {
 	const seenUrls = new Set()
@@ -396,13 +417,14 @@ function buildQualityList(sources) {
 			return {
 				src,
 				sourceIndex,
-				presentation,
-				html: qualityOptionHtml(presentation),
-				url: src.url,
+					presentation,
+					html: qualityOptionHtml(presentation, getSourceMode(src)),
+					url: src.url,
 				// Provider metadata and URL classification are both considered so
 				// mislabeled streams use the correct ArtPlayer loader.
 				type: getSourcePlaybackType(src),
 				verification: getSourceVerification(src),
+				mode: getSourceMode(src),
 				expiredToken: hasExpiredEmbeddedToken(src.url),
 			}
 		})
@@ -433,10 +455,11 @@ function buildQualityList(sources) {
       html: entry.html,
       url: entry.url,
       type: entry.type,
-      qualityKey: entry.presentation.key,
-      qualityRank: entry.presentation.rank,
-      isAuto: entry.presentation.isAuto,
-    }))
+		qualityKey: entry.presentation.key,
+		qualityRank: entry.presentation.rank,
+		isAuto: entry.presentation.isAuto,
+		mode: entry.mode,
+	}))
 }
 
 function seekControlHtml(direction) {
@@ -922,8 +945,9 @@ export default function Watch() {
   const blockedSourcesRef = useRef(new Set())
   const lastBlockCycleRef = useRef(0)
   const forceRefreshUsedRef = useRef(false)
-  const refreshAttemptedRef = useRef(new Set())
-  const handleProviderBlockedRef = useRef(null)
+	const refreshAttemptedRef = useRef(new Set())
+	const embedFallbackAttemptedRef = useRef(new Set())
+	const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
   const embedFrameRef = useRef(null)
   const netHintRef = useRef(getConnectionHint())
@@ -1244,8 +1268,9 @@ export default function Watch() {
     forceRefreshUsedRef.current = false
     recoveryBusyRef.current = false
     streamRetries.current = {}
-    refreshAttemptedRef.current = new Set()
-  }, [animeId, epNumber])
+		refreshAttemptedRef.current = new Set()
+		embedFallbackAttemptedRef.current = new Set()
+	}, [animeId, epNumber])
 
   // Keep the active episode row visible in the sidebar.
   useEffect(() => {
@@ -1468,24 +1493,25 @@ export default function Watch() {
           return getSourcePlaybackType(source) !== 'embed' && source?.url && !hasExpiredEmbeddedToken(source.url)
         })
         const embedSources = initialSources.filter(isPlayableEmbedSource)
-        const playableSources = [...mediaSources, ...embedSources]
-        if (playableSources.length === 0) return null
-        return {
-          id: key,
-          label: name,
-          provider: name,
-          providerFamily: family,
-          lang,
-          initialSources: playableSources,
-          headers: server?.headers || {},
-        }
+		const playableSources = [...mediaSources, ...embedSources]
+		if (playableSources.length === 0) return null
+		return {
+			id: key,
+			label: name,
+			provider: name,
+			providerFamily: family,
+			lang,
+			modes: getSourceModes(playableSources),
+			initialSources: playableSources,
+			headers: server?.headers || {},
+		}
       }).filter(Boolean)
     }
     return { sub: normalize(servers.sub, 'sub'), dub: normalize(servers.dub, 'dub') }
   }, [servers])
 
 
-  const currentSource = useMemo(() => {
+	const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
     return all.find((s) => s.id === activeSource) || all[0] || null
   }, [SOURCES, activeSource])
@@ -3041,8 +3067,24 @@ export default function Watch() {
     const currentLang = current
       ? all.find((s) => s.id === current)?.lang
       : null
-    const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
-    const next = pool.find((s) => !blockedSourcesRef.current.has(s.id))
+	const currentProvider = current
+		? all.find((s) => s.id === current)
+		: null
+	const embeddedFallback = currentProvider?.initialSources?.find(isPlayableEmbedSource)
+	if (current && embeddedFallback && !embedFallbackAttemptedRef.current.has(current)) {
+		embedFallbackAttemptedRef.current.add(current)
+		destroyPlayer()
+		setActiveEmbedUrl(embeddedFallback.url)
+		setError('')
+		setNoStreamError(false)
+		setErrorType('')
+		setStreamLoading(false)
+		loadingRef.current = false
+		showToast(`Trying ${currentProvider.label} Embedded…`, { icon: 'signal' })
+		return
+	}
+	const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
+	const next = pool.find((s) => !blockedSourcesRef.current.has(s.id))
     if (next) {
       showToast(
         `Server blocked — switching to ${next.label} (${next.lang.toUpperCase()})…`
@@ -3997,7 +4039,11 @@ export default function Watch() {
           }}
         >
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: error ? '#f87171' : streamLoading ? '#fbbf24' : '#34d399' }} />
-          {error ? 'Playback needs attention. Choose a recovery option or another server.' : streamLoading ? 'Preparing a stream…' : `Playing on ${currentSource?.label || 'the selected server'}.`}
+			{error
+				? 'Playback needs attention. Choose a recovery option or another server.'
+				: streamLoading
+				? 'Preparing a stream…'
+				: `Playing on ${currentSource?.label || 'the selected server'}${currentSource?.modes?.length ? ` · ${currentSource.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(' + ')}` : ''}.`}
         </div>
 
         {/* Source selector */}
@@ -4044,8 +4090,8 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
-                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}${source.modes?.length ? ` — ${source.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(', ')}` : ''}`}
+	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}${source.modes?.length ? ` — ${source.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(', ')}` : ''}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -4069,8 +4115,20 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-                      {source.label}
-                      {isActive && (
+	                      <span>{source.label}</span>
+	                      {source.modes?.length > 0 && (
+	                        <span
+	                          style={{
+	                            color: isActive ? '#c7d2fe' : 'var(--text-muted)',
+	                            fontSize: 10,
+	                            fontWeight: 700,
+	                            whiteSpace: 'nowrap',
+	                          }}
+	                        >
+	                          {source.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(' · ')}
+	                        </span>
+	                      )}
+	                      {isActive && (
                         <span
                           aria-hidden="true"
                           style={{
@@ -4153,8 +4211,9 @@ export default function Watch() {
               {isMovie
                 ? 'Movie'
                 : `Episode ${epNumber} of ${episodes.length || '?'}`}{' '}
-              · {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
-              {currentSource?.label || 'Server 1'}
+				· {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
+				{currentSource?.label || 'Server 1'}
+				{currentSource?.modes?.length ? ` · ${currentSource.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(' + ')}` : ''}
             </div>
 
             <div
