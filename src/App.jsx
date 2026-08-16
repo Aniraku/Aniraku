@@ -6,6 +6,7 @@ import { AuthProvider } from "./hooks/useAuth"
 import { setTitle } from "./lib/seo"
 import NavBar from "./components/NavBar/NavBar"
 import MobileBottomNav from "./components/MobileBottomNav"
+import AndroidAppFallback from "./components/AndroidAppFallback"
 import Error from "./pages/Error"
 import Home from "./pages/Home"
 import Skeleton from "./components/Loader/Skeleton"
@@ -145,6 +146,7 @@ const App = () => {
           <ScrollToTop />
           <NavBar />
           <MobileBottomNav />
+          <AndroidAppFallback />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
