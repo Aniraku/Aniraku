@@ -13,6 +13,7 @@
     "test:android-app-fallback": "node scripts/test-android-app-fallback.mjs",
     "test:android-app-fallback-browser": "node scripts/test-android-app-fallback-browser.mjs",
     "test:embed-csp": "node scripts/test-embed-csp-policy.mjs",
+    "test:kiwi-resolver": "node scripts/test-kiwi-resolver.mjs",
     "test:e2e": "playwright test",
     "generate-sitemap": "node scripts/generate-sitemap.js",
     "postbuild": "echo 'SEO files generated successfully'"

@@ -387,6 +387,37 @@ function isPlayableEmbedSource(source) {
 	return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
 }
 
+function isKiwiEmbedSource(source) {
+	if (!isVerifiedEmbedSource(source)) return false
+	try {
+		const target = new URL(source.url)
+		return target.protocol === 'https:' && target.hostname === 'kwik.cx' && /^\/e\/[A-Za-z0-9_-]{6,128}$/.test(target.pathname)
+	} catch {
+		return false
+	}
+}
+
+async function resolveKiwiEmbedSource(source, signal) {
+	if (!isKiwiEmbedSource(source)) return null
+	try {
+		const response = await fetch(`/api/kiwi-resolve?url=${encodeURIComponent(source.url)}`, {
+			signal,
+			cache: 'no-store',
+		})
+		if (!response.ok) return null
+		const payload = await response.json()
+		if (!payload?.source?.url || getSourcePlaybackType(payload.source) !== 'hls') return null
+		return {
+			...payload.source,
+			quality: source.quality || payload.source.quality || 'AUTO',
+			subtitles: source.subtitles || [],
+			headers: payload.headers || {},
+		}
+	} catch {
+		return null
+	}
+}
+
 function buildQualityList(sources) {
 	const seenUrls = new Set()
 	const entries = (Array.isArray(sources) ? sources : [])
@@ -2712,26 +2743,6 @@ export default function Watch() {
       // the episode-change effect above owns the reset lifecycle.
       setShowEndedOverlay(false)
 
-      // Kiwi’s server list already contains verified embed URLs. Mount the
-      // selected embed immediately instead of keeping the previous provider’s
-      // ArtPlayer instance visible while the embed request is pending.
-      const isKiwiSource = source.label?.toLowerCase() === 'kiwi' || source.provider?.toLowerCase() === 'kiwi'
-      const initialKiwiMedia = isKiwiSource
-        ? (source.initialSources || []).filter((candidate) => getSourcePlaybackType(candidate) !== 'embed' && candidate?.url)
-        : []
-      const initialKiwiEmbed = isKiwiSource && initialKiwiMedia.length === 0
-        ? source.initialSources?.find(isPlayableEmbedSource)
-        : null
-      if (initialKiwiEmbed && !forceRefresh) {
-        if (targetEpisode !== epNumberRef.current) return
-        destroyPlayer()
-        setActiveEmbedUrl(initialKiwiEmbed.url)
-        setStreamLoading(false)
-        loadingRef.current = false
-        setRetryAttempt(0)
-        return
-      }
-
       // Stale-while-revalidate: if we have a recent good stream for
       // this source, play it now, then refresh in the background.
       if (!forceRefresh) {
@@ -2759,15 +2770,15 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-          const cachedEmbed = cached.sources.find(isPlayableEmbedSource)
-          if (cachedEmbed) {
-            destroyPlayer()
-            setActiveEmbedUrl(cachedEmbed.url)
-            applySkipSegments(normalizeProviderSkipSegments(cached))
-            setStreamLoading(false)
-            loadingRef.current = false
-            return
-          }
+	          const cachedEmbed = cached.sources.find(isPlayableEmbedSource)
+	          if (cachedEmbed && !isKiwiEmbedSource(cachedEmbed)) {
+	            destroyPlayer()
+	            setActiveEmbedUrl(cachedEmbed.url)
+	            applySkipSegments(normalizeProviderSkipSegments(cached))
+	            setStreamLoading(false)
+	            loadingRef.current = false
+	            return
+	          }
         }
       }
 
@@ -2876,10 +2887,22 @@ export default function Watch() {
           return
         }
 
-        const firstSource = data.sources[0]
-        const qualityList = buildQualityList(data.sources)
-        if (qualityList.length === 0) {
-          const verifiedEmbed = data.sources.find(isPlayableEmbedSource)
+	        let resolvedData = data
+	        let qualityList = buildQualityList(resolvedData.sources)
+	        if (qualityList.length === 0) {
+	          const verifiedEmbed = resolvedData.sources.find(isPlayableEmbedSource)
+	          const kiwiSource = verifiedEmbed ? await resolveKiwiEmbedSource(verifiedEmbed, controller.signal) : null
+	          if (kiwiSource) {
+	            resolvedData = {
+	              ...resolvedData,
+	              sources: [kiwiSource],
+	              headers: kiwiSource.headers,
+	            }
+	            qualityList = buildQualityList(resolvedData.sources)
+	          }
+	        }
+	        if (qualityList.length === 0) {
+	          const verifiedEmbed = data.sources.find(isPlayableEmbedSource)
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -2902,20 +2925,21 @@ export default function Watch() {
           setError('No video source found for this server.')
           setStreamLoading(false)
           loadingRef.current = false
-          return
-        }
-        const subs = firstSource.subtitles || []
+	          return
+	        }
+	        const firstSource = resolvedData.sources[0]
+	        const subs = firstSource.subtitles || []
         const onBlocked = (reason) => handleProviderBlockedRef.current?.(reason)
         buildPlayer(
           qualityList[0].url,
           qualityList[0].type,
           qualityList,
           subs,
-          data.headers,
-          onBlocked
-        )
-        applySkipSegments(normalizeProviderSkipSegments(data))
-        setCachedStream(source, data)
+	          resolvedData.headers,
+	          onBlocked
+	        )
+	        applySkipSegments(normalizeProviderSkipSegments(resolvedData))
+	        setCachedStream(source, resolvedData)
         setStreamLoading(false)
         loadingRef.current = false
         setRetryAttempt(0)
