@@ -3296,8 +3296,10 @@ export default function Watch() {
             zIndex: 0,
             pointerEvents: 'none',
             backgroundImage: `linear-gradient(to bottom, rgba(5,8,16,0.45) 0%, rgba(5,8,16,0.85) 60%, var(--bg) 92%), url(${anime.bannerImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center 30%',
+            backgroundSize: compactWatchLayout ? 'cover, 100% auto' : 'cover',
+            backgroundPosition: compactWatchLayout ? 'center, center top' : 'center 30%',
+            backgroundRepeat: 'no-repeat',
+            backgroundColor: 'var(--bg)',
           }}
         />
       )}
@@ -4061,12 +4063,12 @@ export default function Watch() {
                 marginBottom: 12,
               }}
             >
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              <span className="watch-rating-label" style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                 {epRatings[epNumber]
                   ? `Rated ${epRatings[epNumber]}/10`
                   : 'Rate this episode'}
               </span>
-              <span style={{ display: 'inline-flex', gap: 3 }}>
+              <span className="watch-rating-stars" role="group" aria-label="Episode rating" style={{ display: 'inline-flex', gap: 3 }}>
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                   <button
                     key={n}
@@ -4078,7 +4080,12 @@ export default function Watch() {
                     style={{
                       background: 'none',
                       border: 'none',
-                      padding: 0,
+                      padding: 2,
+                      minWidth: 22,
+                      minHeight: 28,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       cursor: 'pointer',
                       color:
                         (epRatings[epNumber] || 0) >= n
@@ -4498,9 +4505,28 @@ export default function Watch() {
             min-width: 36px !important;
           }
           .watch-nav button { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 8px 12px; }
-          .watch-rating { gap: 6px !important; }
-          .watch-rating span:last-child { gap: 2px !important; }
-          .watch-rating span:last-child svg { width: 12px !important; height: 12px !important; }
+          .watch-rating {
+            gap: 6px !important;
+            min-width: 0;
+            overflow: visible;
+          }
+          .watch-rating-label {
+            min-width: 0;
+          }
+          .watch-rating-stars {
+            min-width: 0;
+            max-width: 100%;
+            flex-wrap: nowrap;
+            gap: 2px !important;
+            overflow: visible;
+          }
+          .watch-rating-stars button {
+            width: 22px !important;
+            min-width: 22px !important;
+            min-height: 28px !important;
+            padding: 2px !important;
+          }
+          .watch-rating-stars svg { width: 16px !important; height: 16px !important; }
           .watch-skip-overlay { right: 8px !important; max-width: calc(100% - 16px) !important; }
           .watch-skip-btn { min-height: 44px !important; padding: 8px 10px !important; font-size: 12px !important; }
         }
@@ -4531,6 +4557,19 @@ export default function Watch() {
           .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
         }
         @media (max-width: 480px) {
+          .watch-rating {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr);
+            row-gap: 6px !important;
+          }
+          .watch-rating-label,
+          .watch-rating-stars {
+            grid-column: 1;
+          }
+          .watch-rating-stars {
+            width: 100%;
+            justify-content: flex-start;
+          }
           .watch-nav { gap: 6px !important; }
           .watch-nav button { padding: 8px 10px; font-size: 11px; }
           .watch-art-mount .art-video-player .art-controls {
