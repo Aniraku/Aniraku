@@ -12,7 +12,7 @@
     { "source": "/google0e4c03928112e656.html", "destination": "/google0e4c03928112e656.html" },
     { "source": "/icons/(.*)", "destination": "/icons/$1" },
     { "source": "/sw.js", "destination": "/sw.js" },
-    { "source": "/((?!assets/|favicon\\.svg|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.png|google0e4c03928112e656\\.html|icons/|sw\\.js).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|assets/|favicon\\.svg|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.png|google0e4c03928112e656\\.html|icons/|sw\\.js).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
