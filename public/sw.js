@@ -1,5 +1,5 @@
 /* global self, caches */
-const VERSION = 'aniraku-shell-v3'
+const VERSION = 'aniraku-shell-v4'
 const CORE_ASSETS = [
   '/',
   '/manifest.json',
