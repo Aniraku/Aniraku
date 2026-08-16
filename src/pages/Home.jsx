@@ -83,7 +83,15 @@ const Spotlight = styled.article`
   @media (max-width: 640px) {
     min-height: clamp(430px, 128vw, 520px);
     border-radius: 18px;
-    &::before { background-position: 62% center; }
+    /* Use the portrait cover on phones so the Random pick remains fully
+       visible instead of cropping the subject out of the hero frame. */
+    &::before {
+      background-image: ${({ $mobileImage, $image }) => $mobileImage ? `url(${$mobileImage})` : ($image ? `url(${$image})` : 'none')};
+      background-position: center top;
+      background-size: auto 100%;
+      background-repeat: no-repeat;
+      transform: none;
+    }
     &::after { background: linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(8,8,12,0.66) 55%, rgba(8,8,12,0.08) 100%); }
   }
 `
@@ -276,7 +284,7 @@ const DeckItem = styled(Link)`
   @media (max-width: 520px) {
     grid-template-columns: 34px minmax(0, 1fr);
     gap: 9px;
-    img { width: 34px; height: 46px; }
+    img { width: 34px; height: 46px; object-fit: contain; }
     h3 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   }
 `
@@ -465,6 +473,7 @@ const LoadingSpotlight = styled.div`
 
 const titleFor = (item) => item?.title?.english || item?.title?.romaji || item?.title?.userPreferred || 'Unknown title'
 const imageFor = (item) => item?.bannerImage || item?.coverImage?.extraLarge || item?.coverImage?.large || ''
+const posterFor = (item) => item?.coverImage?.extraLarge || item?.coverImage?.large || item?.coverImage?.medium || ''
 const detailHref = (item) => `/anime/${generateSlug(titleFor(item))}-${item.id}`
 const watchHref = (item) => `/watch/${generateSlug(titleFor(item))}-${item.id}-episode-1`
 const stripHtml = (text = '') => text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -589,6 +598,7 @@ function Home() {
   const spotlight = randomSlides.length ? randomSlides[randomIndex % randomSlides.length] : featured
   const spotlightTitle = titleFor(spotlight)
   const spotlightImage = imageFor(spotlight)
+  const spotlightPoster = posterFor(spotlight)
   const spotlightEpisode = spotlight?.nextAiringEpisode?.episode
   const showAnotherRandomSlide = () => {
     if (randomSlides.length < 2) return
@@ -606,7 +616,7 @@ function Home() {
 
           {!homeDone || !featured ? <LoadingSpotlight /> : (
             <SpotlightGrid>
-              <Spotlight $image={spotlightImage}>
+              <Spotlight $image={spotlightImage} $mobileImage={spotlightPoster}>
                 <SpotlightCopy>
                   <div className="kicker"><FaRandom size={10} /> Random anime pick</div>
                   <h1>{spotlightTitle}</h1>
