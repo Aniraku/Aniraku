@@ -319,14 +319,11 @@ function getQualityPresentation(value) {
   }
 }
 
-function qualityOptionHtml(presentation, mode = '') {
+function qualityOptionHtml(presentation) {
 	const badge = presentation.badge
 		? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
 		: ''
-	const modeBadge = mode
-		? `<span class="watch-quality-badge">${escapeHtml(SOURCE_MODE_LABELS[mode] || mode)}</span>`
-		: ''
-	return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}${modeBadge}</span>`
+	return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
 }
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
@@ -373,6 +370,10 @@ function getSourcePlaybackType(source) {
 	return 'native'
 }
 
+function isKiwiEmbedUrl(url) {
+	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
+}
+
 function getSourceVerification(source) {
 	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
@@ -384,25 +385,6 @@ function getSourceVerification(source) {
 function isPlayableEmbedSource(source) {
 	if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
 	return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
-}
-
-const SOURCE_MODE_LABELS = {
-	direct: 'Direct',
-	proxy: 'Proxy',
-	embedded: 'Embedded',
-}
-
-function getSourceMode(source) {
-	if (getSourcePlaybackType(source) === 'embed') return 'embedded'
-	return getSourceVerification(source) === 'proxy' ? 'proxy' : 'direct'
-}
-
-function getSourceModes(sources) {
-	const modes = new Set()
-	;(Array.isArray(sources) ? sources : []).forEach((source) => {
-		if (source?.url) modes.add(getSourceMode(source))
-	})
-	return ['direct', 'proxy', 'embedded'].filter((mode) => modes.has(mode))
 }
 
 function buildQualityList(sources) {
@@ -418,14 +400,13 @@ function buildQualityList(sources) {
 				src,
 				sourceIndex,
 					presentation,
-					html: qualityOptionHtml(presentation, getSourceMode(src)),
+					html: qualityOptionHtml(presentation),
 					url: src.url,
 				// Provider metadata and URL classification are both considered so
 				// mislabeled streams use the correct ArtPlayer loader.
 				type: getSourcePlaybackType(src),
 				verification: getSourceVerification(src),
-				mode: getSourceMode(src),
-				expiredToken: hasExpiredEmbeddedToken(src.url),
+					expiredToken: hasExpiredEmbeddedToken(src.url),
 			}
 		})
     .filter((entry) => {
@@ -458,7 +439,6 @@ function buildQualityList(sources) {
 		qualityKey: entry.presentation.key,
 		qualityRank: entry.presentation.rank,
 		isAuto: entry.presentation.isAuto,
-		mode: entry.mode,
 	}))
 }
 
@@ -1501,7 +1481,6 @@ export default function Watch() {
 			provider: name,
 			providerFamily: family,
 			lang,
-			modes: getSourceModes(playableSources),
 			initialSources: playableSources,
 			headers: server?.headers || {},
 		}
@@ -2722,13 +2701,36 @@ export default function Watch() {
       setError('')
       setNoStreamError(false)
       setErrorType('')
-      if (!quiet) setActiveEmbedUrl('')
+      // A quiet switch can keep an old media player alive, but an old embed
+      // must be removed before mounting a different provider or it will keep
+      // hiding the ArtPlayer mount.
+      setActiveEmbedUrl((current) => (current ? '' : current))
       setRetryAttempt(0)
       setResumePos(null)
       pendingResumeRef.current = null
       // Keep verified intervals while switching servers for the same episode;
       // the episode-change effect above owns the reset lifecycle.
       setShowEndedOverlay(false)
+
+      // Kiwi’s server list already contains verified embed URLs. Mount the
+      // selected embed immediately instead of keeping the previous provider’s
+      // ArtPlayer instance visible while the embed request is pending.
+      const isKiwiSource = source.label?.toLowerCase() === 'kiwi' || source.provider?.toLowerCase() === 'kiwi'
+      const initialKiwiMedia = isKiwiSource
+        ? (source.initialSources || []).filter((candidate) => getSourcePlaybackType(candidate) !== 'embed' && candidate?.url)
+        : []
+      const initialKiwiEmbed = isKiwiSource && initialKiwiMedia.length === 0
+        ? source.initialSources?.find(isPlayableEmbedSource)
+        : null
+      if (initialKiwiEmbed && !forceRefresh) {
+        if (targetEpisode !== epNumberRef.current) return
+        destroyPlayer()
+        setActiveEmbedUrl(initialKiwiEmbed.url)
+        setStreamLoading(false)
+        loadingRef.current = false
+        setRetryAttempt(0)
+        return
+      }
 
       // Stale-while-revalidate: if we have a recent good stream for
       // this source, play it now, then refresh in the background.
@@ -3080,7 +3082,7 @@ export default function Watch() {
 		setErrorType('')
 		setStreamLoading(false)
 		loadingRef.current = false
-		showToast(`Trying ${currentProvider.label} Embedded…`, { icon: 'signal' })
+		showToast(`Trying ${currentProvider.label}…`, { icon: 'signal' })
 		return
 	}
 	const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
@@ -3493,7 +3495,7 @@ export default function Watch() {
               ref={embedFrameRef}
               title="Anime embedded player"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              sandbox="allow-forms allow-modals allow-pointer-lock allow-presentation allow-popups allow-same-origin allow-scripts"
+              sandbox={isKiwiEmbedUrl(activeEmbedUrl) ? undefined : 'allow-forms allow-modals allow-pointer-lock allow-presentation allow-popups allow-same-origin allow-scripts'}
               referrerPolicy="no-referrer-when-downgrade"
               style={{
                 position: 'absolute',
@@ -4043,7 +4045,7 @@ export default function Watch() {
 				? 'Playback needs attention. Choose a recovery option or another server.'
 				: streamLoading
 				? 'Preparing a stream…'
-				: `Playing on ${currentSource?.label || 'the selected server'}${currentSource?.modes?.length ? ` · ${currentSource.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(' + ')}` : ''}.`}
+				: `Playing on ${currentSource?.label || 'the selected server'}.`}
         </div>
 
         {/* Source selector */}
@@ -4090,8 +4092,8 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}${source.modes?.length ? ` — ${source.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(', ')}` : ''}`}
-	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}${source.modes?.length ? ` — ${source.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(', ')}` : ''}`}
+	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -4115,19 +4117,7 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-	                      <span>{source.label}</span>
-	                      {source.modes?.length > 0 && (
-	                        <span
-	                          style={{
-	                            color: isActive ? '#c7d2fe' : 'var(--text-muted)',
-	                            fontSize: 10,
-	                            fontWeight: 700,
-	                            whiteSpace: 'nowrap',
-	                          }}
-	                        >
-	                          {source.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(' · ')}
-	                        </span>
-	                      )}
+	                      {source.label}
 	                      {isActive && (
                         <span
                           aria-hidden="true"
@@ -4213,7 +4203,6 @@ export default function Watch() {
                 : `Episode ${epNumber} of ${episodes.length || '?'}`}{' '}
 				· {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
 				{currentSource?.label || 'Server 1'}
-				{currentSource?.modes?.length ? ` · ${currentSource.modes.map((mode) => SOURCE_MODE_LABELS[mode]).join(' + ')}` : ''}
             </div>
 
             <div
