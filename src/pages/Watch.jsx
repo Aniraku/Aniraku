@@ -388,7 +388,7 @@ function isPlayableEmbedSource(source) {
 }
 
 function isKiwiEmbedSource(source) {
-	if (!isVerifiedEmbedSource(source)) return false
+	if (!isPlayableEmbedSource(source)) return false
 	try {
 		const target = new URL(source.url)
 		return target.protocol === 'https:' && target.hostname === 'kwik.cx' && /^\/e\/[A-Za-z0-9_-]{6,128}$/.test(target.pathname)
