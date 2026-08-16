@@ -327,21 +327,6 @@ function qualityOptionHtml(presentation) {
 }
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
-const OFFLINE_DOWNLOAD_TYPES = new Set(['native', 'mp4', 'webm', 'ogg', 'mpeg'])
-
-function highestDownloadableQuality(qualityList) {
-  return (Array.isArray(qualityList) ? qualityList : [])
-    .filter((item) => OFFLINE_DOWNLOAD_TYPES.has(item?.type) && item?.url)
-    .sort((a, b) => (Number(b.qualityRank) || 0) - (Number(a.qualityRank) || 0))[0] || null
-}
-
-function offlineFileName(title, episode, qualityKey, type) {
-  const safeTitle = generateSlug(title || 'anime') || 'anime'
-  const safeQuality = String(qualityKey || 'quality').replace(/[^a-z0-9]+/gi, '-')
-  const extension = type === 'webm' ? 'webm' : type === 'ogg' ? 'ogv' : 'mp4'
-  return `${safeTitle}-episode-${episode}-${safeQuality}.${extension}`
-}
-
 // Some upstreams embed UTC expiry stamps such as 20260808014918 in the
 // stream URL. A token whose newest valid timestamp is already in the past is
 // definitively dead; mounting it only creates repeated proxy 401/direct 404
@@ -931,7 +916,7 @@ export default function Watch() {
   const refreshAttemptedRef = useRef(new Set())
   const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
-  const downloadBusyRef = useRef(false)
+  const embedFrameRef = useRef(null)
   const netHintRef = useRef(getConnectionHint())
 
   // State
@@ -955,6 +940,73 @@ export default function Watch() {
   )
   const [backendHealthy, setBackendHealthy] = useState(true)
   const [errorType, setErrorType] = useState('') // for actionable UI
+
+  // Embedded providers are cross-origin, so the parent page cannot inspect or
+  // block their network requests. We still apply safe browser-level defenses:
+  // popup/new-window attempts are restricted by sandbox, and same-origin
+  // embeds get lightweight overlay cleanup without touching the video element.
+  useEffect(() => {
+    const frame = embedFrameRef.current
+    if (!activeEmbedUrl || !frame) return undefined
+
+    let observer = null
+    let originalOpen = null
+    const adPattern = /(^|[-_])(?:ad|ads|advert|advertisement|banner|popup|popunder|sponsor)([-_]|$)/i
+
+    const cleanSameOriginEmbed = () => {
+      try {
+        const doc = frame.contentDocument
+        const win = frame.contentWindow
+        if (!doc || !win) return
+
+        if (!doc.getElementById('aniraku-embed-ad-guard')) {
+          const style = doc.createElement('style')
+          style.id = 'aniraku-embed-ad-guard'
+          style.textContent = `
+            [id*="advert"], [class*="advert"], [id*="popup"], [class*="popup"],
+            [id*="popunder"], [class*="popunder"], [id*="banner-ad"], [class*="banner-ad"],
+            [data-ad], [data-ad-slot], iframe[src*="ad" i], iframe[src*="popup" i] {
+              display: none !important;
+              visibility: hidden !important;
+              pointer-events: none !important;
+            }
+          `
+          doc.head?.appendChild(style)
+        }
+
+        originalOpen = win.open
+        try {
+          win.open = () => null
+        } catch {}
+
+        const removeAdNodes = () => {
+          doc.querySelectorAll('[id], [class], [data-ad], [data-ad-slot]').forEach((node) => {
+            if (node === doc.body || node.matches('video, audio, source, track, canvas')) return
+            const token = `${node.id || ''} ${typeof node.className === 'string' ? node.className : ''}`
+            if (adPattern.test(token)) {
+              node.style.setProperty('display', 'none', 'important')
+            }
+          })
+        }
+        removeAdNodes()
+        observer = new window.MutationObserver(removeAdNodes)
+        observer.observe(doc.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['id', 'class', 'data-ad', 'data-ad-slot'] })
+      } catch {
+        // Cross-origin frames intentionally reject DOM access; sandbox still
+        // blocks popup/new-window behavior without breaking normal playback.
+      }
+    }
+
+    frame.addEventListener('load', cleanSameOriginEmbed)
+    cleanSameOriginEmbed()
+    return () => {
+      frame.removeEventListener('load', cleanSameOriginEmbed)
+      observer?.disconnect()
+      try {
+        if (originalOpen && frame.contentWindow) frame.contentWindow.open = originalOpen
+      } catch {}
+    }
+  }, [activeEmbedUrl])
   const [retryAttempt, setRetryAttempt] = useState(0)
   const [buffering, setBuffering] = useState(false)
 
@@ -1201,48 +1253,6 @@ export default function Watch() {
     clearTimeout(toastTimerRef.current)
     toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
   }, [])
-
-  const downloadHighestQuality = useCallback(async (qualityList, headers = {}) => {
-    if (downloadBusyRef.current) return
-    const candidate = highestDownloadableQuality(qualityList)
-    if (!candidate) {
-      showToast('This provider does not expose a downloadable video file.', { icon: 'warn', long: true })
-      return
-    }
-
-    downloadBusyRef.current = true
-    showToast(`Preparing ${candidate.qualityRank ? `${candidate.qualityRank}p` : 'highest-quality'} offline download…`, { long: true })
-    try {
-      const isLocalUrl = /^(blob|data):/i.test(candidate.url)
-      const headersParam = headers && Object.keys(headers).length
-        ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
-        : ''
-      const downloadUrl = isLocalUrl
-        ? candidate.url
-        : `${PROXY_BASE}/proxy?url=${encodeURIComponent(candidate.url)}${headersParam}&download=1`
-      const response = await fetch(downloadUrl, { cache: 'no-store' })
-      if (!response.ok) throw new Error(`download-${response.status}`)
-      const blob = await response.blob()
-      if (!blob.size) throw new Error('empty-download')
-
-      const title = anime?.title?.english || anime?.title?.romaji || animeId || 'Anime'
-      const objectUrl = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = objectUrl
-      anchor.download = offlineFileName(title, epNumber, candidate.qualityKey, candidate.type)
-      anchor.rel = 'noopener'
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000)
-      showToast('Download complete. The video file was saved to your device.', { icon: 'ok', long: true })
-    } catch (error) {
-      console.warn('[Watch] offline download failed', error)
-      showToast('Download unavailable for this provider or device.', { icon: 'warn', long: true })
-    } finally {
-      downloadBusyRef.current = false
-    }
-  }, [anime?.title?.english, anime?.title?.romaji, animeId, epNumber, showToast])
 
   const skipSegmentNow = useCallback((type) => {
     const segment = skipSegmentsRef.current[type]
@@ -2107,12 +2117,6 @@ export default function Watch() {
             },
           },
           {
-            name: 'download',
-            width: 220,
-            html: 'Download highest quality',
-            click: () => downloadHighestQuality(qualityList, headers),
-          },
-          {
             name: 'autoSkip',
             width: 220,
             html: 'Auto-skip intro & outro',
@@ -2577,7 +2581,6 @@ export default function Watch() {
       setAutoNextPreference,
       setAutoSkipPreference,
       skipSegmentNow,
-      downloadHighestQuality,
     ]
   )
 
@@ -3430,8 +3433,10 @@ export default function Watch() {
           {activeEmbedUrl && (
             <iframe
               src={activeEmbedUrl}
+              ref={embedFrameRef}
               title="Anime embedded player"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              sandbox="allow-forms allow-modals allow-pointer-lock allow-presentation allow-same-origin allow-scripts"
               referrerPolicy="no-referrer-when-downgrade"
               style={{
                 position: 'absolute',
@@ -4642,17 +4647,28 @@ export default function Watch() {
         }
         @media (max-width: 480px) {
           .watch-rating {
-            display: grid !important;
-            grid-template-columns: minmax(0, 1fr);
-            row-gap: 6px !important;
-          }
-          .watch-rating-label,
-          .watch-rating-stars {
-            grid-column: 1;
-          }
-          .watch-rating-stars {
+            display: flex !important;
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 6px !important;
+            flex-wrap: nowrap !important;
             width: 100%;
-            justify-content: flex-start;
+            max-width: 100%;
+          }
+          .watch-rating-label {
+            width: 100%;
+          }
+          .watch-rating-stars {
+            display: grid !important;
+            grid-template-columns: repeat(10, minmax(18px, 1fr));
+            width: min(220px, 100%);
+            max-width: 100%;
+            gap: 0 !important;
+            overflow: visible;
+          }
+          .watch-rating-stars button {
+            width: 100% !important;
+            min-width: 18px !important;
           }
           .watch-nav { gap: 6px !important; }
           .watch-nav button { padding: 8px 10px; font-size: 11px; }
