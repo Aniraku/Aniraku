@@ -327,6 +327,20 @@ function qualityOptionHtml(presentation) {
 }
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
+const OFFLINE_DOWNLOAD_TYPES = new Set(['native', 'mp4', 'webm', 'ogg', 'mpeg'])
+
+function highestDownloadableQuality(qualityList) {
+  return (Array.isArray(qualityList) ? qualityList : [])
+    .filter((item) => OFFLINE_DOWNLOAD_TYPES.has(item?.type) && item?.url)
+    .sort((a, b) => (Number(b.qualityRank) || 0) - (Number(a.qualityRank) || 0))[0] || null
+}
+
+function offlineFileName(title, episode, qualityKey, type) {
+  const safeTitle = generateSlug(title || 'anime') || 'anime'
+  const safeQuality = String(qualityKey || 'quality').replace(/[^a-z0-9]+/gi, '-')
+  const extension = type === 'webm' ? 'webm' : type === 'ogg' ? 'ogv' : 'mp4'
+  return `${safeTitle}-episode-${episode}-${safeQuality}.${extension}`
+}
 
 // Some upstreams embed UTC expiry stamps such as 20260808014918 in the
 // stream URL. A token whose newest valid timestamp is already in the past is
@@ -917,6 +931,7 @@ export default function Watch() {
   const refreshAttemptedRef = useRef(new Set())
   const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
+  const downloadBusyRef = useRef(false)
   const netHintRef = useRef(getConnectionHint())
 
   // State
@@ -1186,6 +1201,48 @@ export default function Watch() {
     clearTimeout(toastTimerRef.current)
     toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
   }, [])
+
+  const downloadHighestQuality = useCallback(async (qualityList, headers = {}) => {
+    if (downloadBusyRef.current) return
+    const candidate = highestDownloadableQuality(qualityList)
+    if (!candidate) {
+      showToast('This provider does not expose a downloadable video file.', { icon: 'warn', long: true })
+      return
+    }
+
+    downloadBusyRef.current = true
+    showToast(`Preparing ${candidate.qualityRank ? `${candidate.qualityRank}p` : 'highest-quality'} offline download…`, { long: true })
+    try {
+      const isLocalUrl = /^(blob|data):/i.test(candidate.url)
+      const headersParam = headers && Object.keys(headers).length
+        ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
+        : ''
+      const downloadUrl = isLocalUrl
+        ? candidate.url
+        : `${PROXY_BASE}/proxy?url=${encodeURIComponent(candidate.url)}${headersParam}&download=1`
+      const response = await fetch(downloadUrl, { cache: 'no-store' })
+      if (!response.ok) throw new Error(`download-${response.status}`)
+      const blob = await response.blob()
+      if (!blob.size) throw new Error('empty-download')
+
+      const title = anime?.title?.english || anime?.title?.romaji || animeId || 'Anime'
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = offlineFileName(title, epNumber, candidate.qualityKey, candidate.type)
+      anchor.rel = 'noopener'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000)
+      showToast('Download complete. The video file was saved to your device.', { icon: 'ok', long: true })
+    } catch (error) {
+      console.warn('[Watch] offline download failed', error)
+      showToast('Download unavailable for this provider or device.', { icon: 'warn', long: true })
+    } finally {
+      downloadBusyRef.current = false
+    }
+  }, [anime?.title?.english, anime?.title?.romaji, animeId, epNumber, showToast])
 
   const skipSegmentNow = useCallback((type) => {
     const segment = skipSegmentsRef.current[type]
@@ -2030,6 +2087,32 @@ export default function Watch() {
         ],
         settings: [
           {
+            name: 'quality',
+            width: 220,
+            html: 'Quality',
+            selector: qualityList.map((item) => ({
+              default: Boolean(item.default),
+              html: item.html,
+              value: item.url,
+            })),
+            onSelect: (item) => {
+              const selected = qualityList.find((quality) => quality.url === item.value)
+              const art = artInstance.current
+              if (selected && art && selected.url !== art.option.url) {
+                Promise.resolve(art.switchQuality(selected.url)).catch(() => {
+                  showToast('Could not switch quality right now.', { icon: 'warn' })
+                })
+              }
+              return item.html
+            },
+          },
+          {
+            name: 'download',
+            width: 220,
+            html: 'Download highest quality',
+            click: () => downloadHighestQuality(qualityList, headers),
+          },
+          {
             name: 'autoSkip',
             width: 220,
             html: 'Auto-skip intro & outro',
@@ -2075,7 +2158,6 @@ export default function Watch() {
             },
           },
         ],
-        quality: qualityList,
         customType: {
           native: (video, url, art) => playAsNative(video, url, art),
           mp4: (video, url, art) => playAsNative(video, url, art),
@@ -2495,6 +2577,7 @@ export default function Watch() {
       setAutoNextPreference,
       setAutoSkipPreference,
       skipSegmentNow,
+      downloadHighestQuality,
     ]
   )
 
@@ -2559,6 +2642,7 @@ export default function Watch() {
       if (!source) {
         return
       }
+
 
       // Initial playback must not depend on the user discovering a working
       // provider manually. If a provider has no usable source, move to the
