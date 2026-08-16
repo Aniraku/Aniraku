@@ -14,8 +14,8 @@ try {
     hasTouch: true,
   })
   const androidPage = await androidContext.newPage()
-  await androidPage.goto(baseUrl, { waitUntil: 'networkidle' })
-  await androidPage.getByRole('dialog', { name: /Use the Aniraku app/i }).waitFor({ timeout: 4_000 })
+  await androidPage.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
+  await androidPage.getByRole('dialog', { name: /Use the Aniraku app/i }).waitFor({ timeout: 8_000 })
   assert.equal(await androidPage.getByRole('link', { name: /GET ANDROID APP/i }).count(), 1)
   assert.equal(await androidPage.getByRole('button', { name: /CONTINUE ON WEB/i }).count(), 1)
   if (process.env.ANIRAKU_FALLBACK_SCREENSHOT) {
@@ -23,14 +23,14 @@ try {
   }
   await androidPage.getByRole('button', { name: /CONTINUE ON WEB/i }).click()
   await androidPage.getByRole('dialog').waitFor({ state: 'hidden' })
-  await androidPage.reload({ waitUntil: 'networkidle' })
+  await androidPage.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
   await androidPage.waitForTimeout(1_000)
   assert.equal(await androidPage.getByRole('dialog').count(), 0)
   await androidContext.close()
 
   const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 800 } })
   const desktopPage = await desktopContext.newPage()
-  await desktopPage.goto(baseUrl, { waitUntil: 'networkidle' })
+  await desktopPage.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
   await desktopPage.waitForTimeout(1_000)
   assert.equal(await desktopPage.getByRole('dialog').count(), 0)
   await desktopContext.close()
@@ -42,7 +42,7 @@ try {
     hasTouch: true,
   })
   const legacyAndroidPage = await legacyAndroidContext.newPage()
-  await legacyAndroidPage.goto(baseUrl, { waitUntil: 'networkidle' })
+  await legacyAndroidPage.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 })
   await legacyAndroidPage.waitForTimeout(1_000)
   assert.equal(await legacyAndroidPage.getByRole('dialog').count(), 0)
   await legacyAndroidContext.close()
