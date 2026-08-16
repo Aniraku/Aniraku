@@ -370,11 +370,19 @@ function getSourcePlaybackType(source) {
 	return 'native'
 }
 
-function isVerifiedEmbedSource(source) {
-	if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
-	const verdict = String(source.verification || source.Verification || '').toLowerCase()
-	return verdict === 'embed'
+function getSourceVerification(source) {
+	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
+
+// Embed verification is normally supplied by the API. Some provider responses
+// omit the advisory field, so an otherwise valid embed URL should remain
+// selectable instead of removing the whole provider row. A definitive dead
+// verdict or an expired signed token is still rejected.
+function isPlayableEmbedSource(source) {
+	if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
+	return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
+}
+
 
 function buildQualityList(sources) {
 	const seenUrls = new Set()
@@ -394,7 +402,7 @@ function buildQualityList(sources) {
 				// Provider metadata and URL classification are both considered so
 				// mislabeled streams use the correct ArtPlayer loader.
 				type: getSourcePlaybackType(src),
-				verification: String(src.verification || src.Verification || '').toLowerCase(),
+				verification: getSourceVerification(src),
 				expiredToken: hasExpiredEmbeddedToken(src.url),
 			}
 		})
@@ -404,11 +412,12 @@ function buildQualityList(sources) {
       return true
     })
 
-  // Unlike a soft backend verdict, a passed signed-token expiry is definitive.
-  // Omit it entirely so an empty result activates existing server failover.
+  // Backend verification is a soft snapshot; the stream endpoint can return a
+  // usable URL after the list endpoint has marked it stale. Only an expired
+  // signed token is definitive enough to omit before playback/failover.
   return entries
-    .filter((entry) => !entry.expiredToken && entry.verification !== 'dead')
-    // Among verified non-dead entries, prefer the provider's own Auto/adaptive
+    .filter((entry) => !entry.expiredToken)
+    // Prefer the provider's own Auto/adaptive
     // URL and then the highest numeric quality without inventing a new URL.
     .sort((a, b) => {
       if (a.presentation.isAuto !== b.presentation.isAuto) {
@@ -976,7 +985,11 @@ export default function Watch() {
 
         originalOpen = win.open
         try {
-          win.open = () => null
+          win.open = (url, target, features) => {
+            const destination = String(url || '')
+            if (!destination || adPattern.test(destination)) return null
+            return originalOpen.call(win, url, target, features)
+          }
         } catch {}
 
         const removeAdNodes = () => {
@@ -1449,10 +1462,12 @@ export default function Watch() {
         seen.add(key)
         const initialSources = Array.isArray(server?.sources) ? server.sources : []
         const mediaSources = initialSources.filter((source) => {
-          const verification = String(source?.verification || source?.Verification || '').toLowerCase()
-          return getSourcePlaybackType(source) !== 'embed' && verification !== 'dead' && !hasExpiredEmbeddedToken(source?.url)
+          // Verification is an advisory snapshot. Keep usable non-embed URLs
+          // even when the list response says "dead" so the provider remains
+          // available for the stream endpoint's fresh response and failover.
+          return getSourcePlaybackType(source) !== 'embed' && source?.url && !hasExpiredEmbeddedToken(source.url)
         })
-        const embedSources = initialSources.filter(isVerifiedEmbedSource)
+        const embedSources = initialSources.filter(isPlayableEmbedSource)
         const playableSources = [...mediaSources, ...embedSources]
         if (playableSources.length === 0) return null
         return {
@@ -2716,7 +2731,7 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-          const cachedEmbed = cached.sources.find(isVerifiedEmbedSource)
+          const cachedEmbed = cached.sources.find(isPlayableEmbedSource)
           if (cachedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(cachedEmbed.url)
@@ -2836,7 +2851,7 @@ export default function Watch() {
         const firstSource = data.sources[0]
         const qualityList = buildQualityList(data.sources)
         if (qualityList.length === 0) {
-          const verifiedEmbed = data.sources.find(isVerifiedEmbedSource)
+          const verifiedEmbed = data.sources.find(isPlayableEmbedSource)
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -3436,7 +3451,7 @@ export default function Watch() {
               ref={embedFrameRef}
               title="Anime embedded player"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              sandbox="allow-forms allow-modals allow-pointer-lock allow-presentation allow-same-origin allow-scripts"
+              sandbox="allow-forms allow-modals allow-pointer-lock allow-presentation allow-popups allow-same-origin allow-scripts"
               referrerPolicy="no-referrer-when-downgrade"
               style={{
                 position: 'absolute',
