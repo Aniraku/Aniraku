@@ -374,6 +374,12 @@ function isKiwiEmbedUrl(url) {
 	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
 }
 
+function isKiwiProvider(source) {
+	return /(?:^|\s)(?:kiwi|kwik)(?:\s|$)/i.test(
+		`${source?.providerFamily || ''} ${source?.provider || ''} ${source?.label || ''}`.trim()
+	)
+}
+
 function getSourceVerification(source) {
 	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
@@ -2853,7 +2859,7 @@ export default function Watch() {
           STREAM_FETCH_TIMEOUT
         )
 
-        const res = await fetch(`${API_BASE}/api/v1/stream`, {
+        const requestStream = (refresh) => fetch(`${API_BASE}/api/v1/stream`, {
           method: 'POST',
           signal: controller.signal,
           headers: { 'Content-Type': 'application/json' },
@@ -2863,10 +2869,11 @@ export default function Watch() {
             provider: source.provider,
             lang: source.lang,
             quality: 'auto',
-            refresh: forceRefresh,
+            refresh,
           }),
           cache: 'no-store',
         })
+        let res = await requestStream(forceRefresh)
         clearTimeout(timeoutId)
         if (streamAbortRef.current === controller) streamAbortRef.current = null
 
@@ -2897,7 +2904,23 @@ export default function Watch() {
           return
         }
 
-        const data = await res.json().catch(() => ({}))
+        let data = await res.json().catch(() => ({}))
+	      // Kiwi sometimes returns a frame-blocked embed first and a directly
+	      // playable HLS master on the next fresh lookup. The latter is the
+	      // browser-quality path the site used before the resolver rewrite.
+	      // Retry only this provider, only while it is embed-only, and only twice.
+	      if (isKiwiProvider(source) && buildQualityList(data.sources).length === 0) {
+	        for (let attempt = 0; attempt < 2; attempt += 1) {
+	          await backoff(attempt, { base: 500, cap: 1_200 })
+	          res = await requestStream(true)
+	          if (!res.ok) break
+	          const candidate = await res.json().catch(() => ({}))
+	          if (buildQualityList(candidate.sources).length > 0) {
+	            data = candidate
+	            break
+	          }
+	        }
+	      }
         if (!mountedRef.current) return
         // Navigation may have happened while the stream was fetching —
         // never build a player for an episode the user has left.
