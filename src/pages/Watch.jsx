@@ -2369,6 +2369,42 @@ export default function Watch() {
               fail(httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'unknown'))
             })
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
+	              const levels = (hls.levels || [])
+	                .map((level, index) => ({
+	                  index,
+	                  height: Number(level?.height || 0),
+	                  bitrate: Number(level?.bitrate || 0),
+	                }))
+	                .filter((level, index, list) =>
+	                  level.height > 0 && list.findIndex((item) => item.height === level.height) === index
+	                )
+	                .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
+	              if (levels.length > 1 && art?.setting?.update) {
+	                const auto = getQualityPresentation('auto')
+	                art.setting.update({
+	                  name: 'quality',
+	                  width: 220,
+	                  html: 'Quality',
+	                  selector: [
+	                    {
+	                      default: hls.currentLevel === -1,
+	                      html: qualityOptionHtml(auto),
+	                      value: '-1',
+	                    },
+	                    ...levels.map((level) => ({
+	                      default: hls.currentLevel === level.index,
+	                      html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
+	                      value: String(level.index),
+	                    })),
+	                  ],
+	                  onSelect: (item) => {
+	                    const nextLevel = Number(item.value)
+	                    hls.currentLevel = nextLevel
+	                    hls.nextLevel = nextLevel
+	                    return item.html
+	                  },
+	                })
+	              }
               const p = video.play()
               if (p && typeof p.catch === 'function') p.catch(() => {})
             })
