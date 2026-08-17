@@ -45,6 +45,7 @@ import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '..
 const EPISODES_PER_PAGE = 50
 const STREAM_CACHE_TTL_MS = 30_000       // 30s — short so a "switch server"
 const SLOW_THRESHOLD_MS = 10_000         //   refresh on the same server
+const KIWI_RESOLVE_CACHE_TTL_MS = 30_000
 const RESUME_MIN_TIME = 30               //   after a token expires is cheap
 const PLAYER_RECONNECT_MAX = 8           // ArtPlayer built-in retries
 const MAX_SERVER_RETRIES = 3             // refresh cap per source per ep
@@ -397,8 +398,18 @@ function isKiwiEmbedSource(source) {
 	}
 }
 
+const kiwiResolvedSourceCache = new Map()
+
 async function resolveKiwiEmbedSource(source, signal) {
 	if (!isKiwiEmbedSource(source)) return null
+	const cached = kiwiResolvedSourceCache.get(source.url)
+	if (cached && Date.now() - cached.savedAt <= KIWI_RESOLVE_CACHE_TTL_MS) {
+		return {
+			...cached.source,
+			quality: source.quality || cached.source.quality || 'AUTO',
+			subtitles: source.subtitles || [],
+		}
+	}
 	try {
 		const response = await fetch(`/api/kiwi-resolve?url=${encodeURIComponent(source.url)}`, {
 			signal,
@@ -407,15 +418,26 @@ async function resolveKiwiEmbedSource(source, signal) {
 		if (!response.ok) return null
 		const payload = await response.json()
 		if (!payload?.source?.url || getSourcePlaybackType(payload.source) !== 'hls') return null
-		return {
+		const resolvedSource = {
 			...payload.source,
-			quality: source.quality || payload.source.quality || 'AUTO',
-			subtitles: source.subtitles || [],
 			headers: payload.headers || {},
+		}
+		kiwiResolvedSourceCache.set(source.url, { source: resolvedSource, savedAt: Date.now() })
+		return {
+			...resolvedSource,
+			quality: source.quality || resolvedSource.quality || 'AUTO',
+			subtitles: source.subtitles || [],
 		}
 	} catch {
 		return null
 	}
+}
+
+async function resolveKiwiEmbedSources(sources, signal) {
+	const candidates = (Array.isArray(sources) ? sources : []).filter(isKiwiEmbedSource)
+	if (candidates.length === 0) return []
+	const resolved = await Promise.all(candidates.map((source) => resolveKiwiEmbedSource(source, signal)))
+	return resolved.filter(Boolean)
 }
 
 function buildQualityList(sources) {
@@ -2042,25 +2064,10 @@ export default function Watch() {
             : null
         if (next) {
           showToast('Stream issue — trying the next quality…')
-          let switching = null
-          try {
-            switching = art.switchQuality(next.url)
-          } catch {
-            recoveryBusyRef.current = false
-            destroyPlayer()
-            buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
-            return
-          }
-          switching.then(
-            () => {
-              if (buildIdRef.current === myBuildId) recoveryBusyRef.current = false
-            },
-            () => {
-              if (buildIdRef.current !== myBuildId) return
-              recoveryBusyRef.current = false
-              recoverPlayback()
-            }
-          )
+          const resumeAt = Number(art?.video?.currentTime || 0)
+          if (resumeAt > 0) pendingResumeRef.current = resumeAt
+          recoveryBusyRef.current = false
+          buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
           return
         }
         recoveryBusyRef.current = false
@@ -2160,9 +2167,9 @@ export default function Watch() {
               const selected = qualityList.find((quality) => quality.url === item.value)
               const art = artInstance.current
               if (selected && art && selected.url !== art.option.url) {
-                Promise.resolve(art.switchQuality(selected.url)).catch(() => {
-                  showToast('Could not switch quality right now.', { icon: 'warn' })
-                })
+                const resumeAt = Number(art.video?.currentTime || 0)
+                if (resumeAt > 0) pendingResumeRef.current = resumeAt
+                buildPlayer(selected.url, selected.type || 'hls', qualityList, subtitles, headers, onBlocked)
               }
               return item.html
             },
@@ -2340,7 +2347,8 @@ export default function Watch() {
               // A permanent CDN response is already conclusive. Direct fallback
               // uses the same stale URL and only produces another 401/404/502,
               // so skip it and move straight to the next provider.
-              if (!terminalProxyFailure && !triedDirect) {
+	              const requiresProtectedProxy = Boolean(headers?.Referer)
+	              if (!terminalProxyFailure && !triedDirect && !requiresProtectedProxy) {
                 triedDirect = true
                 showToast('No upstream response — retrying direct…', { long: true })
                 hls.loadSource(url)
@@ -2887,22 +2895,23 @@ export default function Watch() {
           return
         }
 
-	        let resolvedData = data
-	        let qualityList = buildQualityList(resolvedData.sources)
+		let resolvedData = data
+		let qualityList = buildQualityList(resolvedData.sources)
+		if (qualityList.length === 0) {
+		  const kiwiSources = await resolveKiwiEmbedSources(resolvedData.sources, controller.signal)
+		  if (kiwiSources.length > 0) {
+		    resolvedData = {
+		      ...resolvedData,
+		      sources: kiwiSources,
+		      headers: kiwiSources[0].headers || {},
+		    }
+		    qualityList = buildQualityList(resolvedData.sources)
+		  }
+		}
 	        if (qualityList.length === 0) {
-	          const verifiedEmbed = resolvedData.sources.find(isPlayableEmbedSource)
-	          const kiwiSource = verifiedEmbed ? await resolveKiwiEmbedSource(verifiedEmbed, controller.signal) : null
-	          if (kiwiSource) {
-	            resolvedData = {
-	              ...resolvedData,
-	              sources: [kiwiSource],
-	              headers: kiwiSource.headers,
-	            }
-	            qualityList = buildQualityList(resolvedData.sources)
-	          }
-	        }
-	        if (qualityList.length === 0) {
-	          const verifiedEmbed = data.sources.find(isPlayableEmbedSource)
+	          const verifiedEmbed = data.sources.find(
+	            (candidate) => isPlayableEmbedSource(candidate) && !isKiwiEmbedSource(candidate)
+	          )
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -3096,7 +3105,9 @@ export default function Watch() {
 	const currentProvider = current
 		? all.find((s) => s.id === current)
 		: null
-	const embeddedFallback = currentProvider?.initialSources?.find(isPlayableEmbedSource)
+		const embeddedFallback = currentProvider?.initialSources?.find(
+			(candidate) => isPlayableEmbedSource(candidate) && !isKiwiEmbedSource(candidate)
+		)
 	if (current && embeddedFallback && !embedFallbackAttemptedRef.current.has(current)) {
 		embedFallbackAttemptedRef.current.add(current)
 		destroyPlayer()
