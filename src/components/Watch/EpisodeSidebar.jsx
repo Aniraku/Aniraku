@@ -38,6 +38,11 @@ const EpisodeRow = memo(function EpisodeRow({
           ? '1px solid rgba(99,102,241,0.35)'
           : '1px solid transparent',
         minHeight: 44,
+        width: '100%',
+        minWidth: 0,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
         opacity: ep.filler && !isActive ? 0.72 : 1,
         width: '100%',
         minWidth: 0,
@@ -131,9 +136,14 @@ const EpisodeRow = memo(function EpisodeRow({
           style={{
             fontSize: 13,
             fontWeight: 600,
+            minWidth: 0,
+            maxWidth: '100%',
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            overflowWrap: 'anywhere',
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 2,
+            lineHeight: 1.25,
           }}
         >
           {ep.title || `Episode ${num}`}
@@ -246,6 +256,7 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
         overflowY: 'auto',
         width: '100%',
         minWidth: 0,
+        maxWidth: '100%',
         boxSizing: 'border-box',
       }}
     >
@@ -363,13 +374,14 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
             </form>
           </div>
           {episodeCount > 100 && (
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 6, marginBottom: 6 }} aria-label="Episode range selector">
+            <div className="watch-episode-ranges" style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 6, marginBottom: 6 }} aria-label="Episode range selector">
               {Array.from({ length: Math.ceil(episodeCount / 100) }, (_, i) => {
                 const start = i * 100 + 1
                 const end = Math.min(episodeCount, (i + 1) * 100)
                 const isCurrentRange = epPage >= i * 2 && epPage < (i + 1) * 2
                 return (
-                  <button
+                    <button
+                    className="watch-episode-range"
                     key={start}
                     type="button"
                     onClick={() => onPageChange(i * 2)}
@@ -450,7 +462,7 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
 
       <div
         className="watch-ep-list"
-        style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}
       >
         {pagedEps.map((ep, i) => {
           // Canonical episode numbering: derive number from position in the list

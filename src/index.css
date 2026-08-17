@@ -1337,6 +1337,46 @@ button, input, select, textarea {
   overflow-wrap: anywhere;
 }
 
+.watch-episode-row,
+.watch-episode-ranges,
+.watch-ep-list,
+.comments-composer__body,
+.comments-composer__row {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.watch-episode-row > :nth-child(2),
+.comments-item-head__meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.watch-episode-ranges {
+  scrollbar-width: thin;
+  overscroll-behavior-inline: contain;
+}
+
+.watch-episode-range {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.comments-composer__row > textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.comments-composer__row > button {
+  flex: 0 0 auto;
+}
+
+#watch-comments {
+  min-width: 0;
+  max-width: 100%;
+}
+
 @media (max-width: 768px) {
   .watch-page {
     padding: 8px var(--content-pad) var(--mobile-dock-clearance) !important;
@@ -1493,6 +1533,39 @@ button, input, select, textarea {
 /* Final compact-phone corrections for the current Watch layout. Keep server
    controls content-sized instead of stretching each button into a full row. */
 @media (max-width: 600px) {
+  .watch-episodes {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .watch-episode-ranges {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible !important;
+    gap: 6px !important;
+  }
+
+  .watch-episode-range {
+    width: 100%;
+    min-height: 34px;
+    white-space: normal !important;
+  }
+
+  .comments-composer__row {
+    flex-wrap: wrap;
+  }
+
+  .comments-composer__row > textarea {
+    flex: 1 1 140px;
+  }
+
+  .comments-composer__row > button {
+    min-height: 40px;
+  }
+
   .watch-page:not(.theater) {
     padding-bottom: calc(124px + var(--safe-bottom)) !important;
   }
@@ -1541,6 +1614,16 @@ button, input, select, textarea {
 /* At very narrow widths, keep the server label and buttons readable without
    forcing a second full-width column. */
 @media (max-width: 380px) {
+  .watch-episode-ranges {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px !important;
+  }
+
+  .watch-episode-range {
+    padding-inline: 5px !important;
+    font-size: 10px !important;
+  }
+
   .watch-source-group {
     gap: 6px !important;
   }

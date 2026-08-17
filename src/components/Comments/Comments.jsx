@@ -28,6 +28,8 @@ const Title = styled.h2`
 `
 
 const Subtitle = styled.p`
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 16px;
@@ -36,6 +38,10 @@ const Subtitle = styled.p`
 const Composer = styled.div`
   display: flex;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   margin-bottom: 24px;
   background: var(--bg-card);
   padding: 16px;
@@ -97,7 +103,7 @@ const ErrorMsg = styled.p`
 `
 
 const Textarea = styled.textarea`
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   background: transparent;
   border: none;
@@ -112,6 +118,8 @@ const Textarea = styled.textarea`
 `
 
 const PostBtn = styled.button`
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 8px 20px;
   background: var(--accent);
   color: var(--bg);
@@ -128,12 +136,18 @@ const PostBtn = styled.button`
 
 const List = styled.div`
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: 14px;
 `
 
 const Item = styled.div`
   background: var(--bg-card);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
@@ -141,11 +155,13 @@ const Item = styled.div`
 
 const ItemReply = styled(Item)`
   margin-left: 46px;
-  @media (max-width: 480px) { margin-left: 20px; }
+  @media (max-width: 480px) { margin-left: 20px; max-width: calc(100% - 20px); }
+  @media (max-width: 380px) { margin-left: 12px; max-width: calc(100% - 12px); }
 `
 
 const ItemHead = styled.div`
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
@@ -153,6 +169,9 @@ const ItemHead = styled.div`
 
 const ItemName = styled(Link)`
   color: var(--text-primary);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
@@ -161,11 +180,15 @@ const ItemName = styled(Link)`
 
 const ItemTime = styled.span`
   color: var(--text-muted);
+  white-space: nowrap;
   font-size: 12px;
 `
 
 const ItemBody = styled.div`
   color: var(--text-secondary);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 1.6;
   margin: 0 0 10px;
@@ -174,7 +197,8 @@ const ItemBody = styled.div`
 `
 
 const ItemGif = styled.img`
-  max-width: 300px;
+  max-width: min(300px, 100%);
+  width: auto;
   max-height: 200px;
   border-radius: 8px;
   margin-top: 8px;
@@ -184,6 +208,9 @@ const ItemGif = styled.img`
 
 const ItemActions = styled.div`
   display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
 `
@@ -191,6 +218,8 @@ const ItemActions = styled.div`
 const Action = styled.button`
   display: inline-flex;
   align-items: center;
+  min-height: 32px;
+  white-space: nowrap;
   gap: 6px;
   background: none;
   border: none;
@@ -202,6 +231,8 @@ const Action = styled.button`
 `
 
 const Empty = styled.p`
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 14px;
   text-align: center;
@@ -209,6 +240,9 @@ const Empty = styled.p`
 `
 
 const GuestBox = styled.div`
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -254,7 +288,7 @@ const renderItem = (c, reply, {
     <Mine key={c.id}>
       <ItemHead>
         <AvatarBlock url={avatarOf(profiles, c.user_id)} name={nameOf(profiles, c.user_id)} />
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="comments-item-head__meta" style={{ display: 'flex', flexDirection: 'column' }}>
           <ItemName to="/profile">{nameOf(profiles, c.user_id)}</ItemName>
           <ItemTime>{timeAgo(c.created_at)}</ItemTime>
         </div>
@@ -280,8 +314,8 @@ const renderItem = (c, reply, {
       </ItemActions>
       {replyTo === c.id && (
         <Composer style={{ marginTop: 12, marginBottom: 0, padding: '12px' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="comments-composer__body" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div className="comments-composer__row" style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
               <Textarea
                 placeholder={`Reply to ${nameOf(profiles, c.user_id)}…`}
                 value={replyText}
@@ -473,8 +507,8 @@ const Comments = ({ animeId, episodeNumber, label }) => {
             url={myProfile?.avatar_url}
             name={myProfile?.display_name || myProfile?.username || user.email || 'You'}
           />
-          <div className="comment-composer-body" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="comment-compose-row">
+          <div className="comment-composer-body comments-composer__body" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div className="comment-compose-row comments-composer__row" style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
               <Textarea
                 placeholder="Share your thoughts…"
                 value={content}

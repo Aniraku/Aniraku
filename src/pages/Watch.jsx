@@ -4745,7 +4745,7 @@ export default function Watch() {
           .watch-page {
             width: 100% !important;
             max-width: 100vw !important;
-            padding: 0 !important;
+            padding: 8px var(--content-pad) var(--mobile-dock-clearance) !important;
             overflow-x: clip !important;
             overflow-y: visible !important;
           }
@@ -4753,8 +4753,9 @@ export default function Watch() {
             width: 100% !important;
             min-width: 0 !important;
             max-width: 100% !important;
+            max-height: none !important;
             position: static !important;
-            overflow-x: hidden !important;
+            overflow: visible !important;
           }
           .watch-episode-row { min-width: 0 !important; max-width: 100% !important; }
           .watch-episode-title {
@@ -4859,8 +4860,8 @@ export default function Watch() {
         }
         @media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
           .watch-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
-          .watch-page { padding: 8px !important; }
-          .watch-episodes { width: 100% !important; max-height: 46dvh; }
+          .watch-page { padding: 8px var(--content-pad) var(--mobile-dock-clearance) !important; }
+          .watch-episodes { width: 100% !important; max-width: 100% !important; max-height: none !important; overflow: visible !important; position: static !important; }
           .watch-art-mount .art-controls { min-height: 42px; }
           .watch-skip-overlay { bottom: calc(44px + env(safe-area-inset-bottom, 0px)) !important; }
         }
@@ -4879,7 +4880,7 @@ export default function Watch() {
               max-height: calc(100dvh - 12px);
             }
           }
-          .watch-page { padding: 4px !important; }
+          .watch-page { padding: 4px 4px var(--mobile-dock-clearance) !important; }
           .watch-comments-fab { bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; }
           .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
         }
