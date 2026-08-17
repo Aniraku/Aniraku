@@ -2252,6 +2252,20 @@ export default function Watch() {
 	              }
 	              variants.sort((a, b) => b.height - a.height)
 	              if (variants.length < 2 || !art?.setting?.update) return
+	              const nativeQualityList = [
+	                {
+	                  default: true,
+	                  html: qualityOptionHtml(getQualityPresentation('auto')),
+	                  url,
+	                  type: 'hls',
+	                },
+	                ...variants.map((variant) => ({
+	                  default: false,
+	                  html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
+	                  url: variant.url,
+	                  type: 'hls',
+	                })),
+	              ]
 	              art.setting.update({
 	                name: 'quality',
 	                width: 220,
@@ -2265,10 +2279,13 @@ export default function Watch() {
 	                  })),
 	                ],
 	                onSelect: (item) => {
-	                  const next = item.value === 'auto' ? url : item.value
-	                  video.src = proxiedH(next)
-	                  video.load()
-	                  video.play().catch(() => {})
+	                  const selected = item.value === 'auto'
+	                    ? nativeQualityList[0]
+	                    : variants.find((variant) => item.html.includes(`${variant.height}p`))
+	                  const next = selected?.url || url
+	                  const resumeAt = Number(video.currentTime || 0)
+	                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
+	                  buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
 	                  return item.html
 	                },
 	              })
