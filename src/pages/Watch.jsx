@@ -20,6 +20,7 @@ import {
   FaStar,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
+import { ANDROID_APP_INTENT, ANDROID_APP_RELEASE_URL } from '../lib/androidAppFallback'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
@@ -373,6 +374,12 @@ function getSourcePlaybackType(source) {
 
 function isKiwiEmbedUrl(url) {
 	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
+}
+
+function isKiwiProvider(source) {
+	return /(?:^|\s)(?:kiwi|kwik)(?:\s|$)/i.test(
+		`${source?.providerFamily || ''} ${source?.provider || ''} ${source?.label || ''}`.trim()
+	)
 }
 
 function getSourceVerification(source) {
@@ -3181,6 +3188,14 @@ export default function Watch() {
       const source = [...SOURCES.sub, ...SOURCES.dub].find(
         (s) => s.id === sourceId
       )
+      if (source && isKiwiProvider(source)) {
+        showToast('Kiwi uses protected playback. Opening the native Aniraku app…', { icon: 'signal', long: true })
+        window.setTimeout(() => {
+          if (IS_ANDROID) window.location.href = ANDROID_APP_INTENT
+          else window.open(ANDROID_APP_RELEASE_URL, '_blank', 'noopener,noreferrer')
+        }, 80)
+        return
+      }
       if (source)
         showToast(`Switching to ${source.lang.toUpperCase()}…`)
       setActiveSource(sourceId)
@@ -4120,6 +4135,7 @@ export default function Watch() {
                 </span>
                 {SOURCES[lang].map((source) => {
                   const isActive = activeSource === source.id
+                  const isKiwi = isKiwiProvider(source)
                   return (
                     <button
                       key={source.id}
@@ -4127,8 +4143,8 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
-	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      aria-label={isKiwi ? 'Open Kiwi in the native Aniraku app' : `${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      title={isKiwi ? 'Kiwi protected playback opens in the native Aniraku app' : `${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -4152,7 +4168,7 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-	                      {source.label}
+	                      {source.label}{isKiwi ? ' · APP' : ''}
 	                      {isActive && (
                         <span
                           aria-hidden="true"
