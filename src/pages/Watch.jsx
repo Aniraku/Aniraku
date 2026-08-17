@@ -20,7 +20,6 @@ import {
   FaStar,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
-import { ANDROID_APP_INTENT, ANDROID_APP_RELEASE_URL } from '../lib/androidAppFallback'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
@@ -46,7 +45,6 @@ import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '..
 const EPISODES_PER_PAGE = 50
 const STREAM_CACHE_TTL_MS = 30_000       // 30s — short so a "switch server"
 const SLOW_THRESHOLD_MS = 10_000         //   refresh on the same server
-const KIWI_RESOLVE_CACHE_TTL_MS = 30_000
 const RESUME_MIN_TIME = 30               //   after a token expires is cheap
 const PLAYER_RECONNECT_MAX = 8           // ArtPlayer built-in retries
 const MAX_SERVER_RETRIES = 3             // refresh cap per source per ep
@@ -376,12 +374,6 @@ function isKiwiEmbedUrl(url) {
 	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
 }
 
-function isKiwiProvider(source) {
-	return /(?:^|\s)(?:kiwi|kwik)(?:\s|$)/i.test(
-		`${source?.providerFamily || ''} ${source?.provider || ''} ${source?.label || ''}`.trim()
-	)
-}
-
 function getSourceVerification(source) {
 	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
@@ -403,48 +395,6 @@ function isKiwiEmbedSource(source) {
 	} catch {
 		return false
 	}
-}
-
-const kiwiResolvedSourceCache = new Map()
-
-async function resolveKiwiEmbedSource(source, signal) {
-	if (!isKiwiEmbedSource(source)) return null
-	const cached = kiwiResolvedSourceCache.get(source.url)
-	if (cached && Date.now() - cached.savedAt <= KIWI_RESOLVE_CACHE_TTL_MS) {
-		return {
-			...cached.source,
-			quality: source.quality || cached.source.quality || 'AUTO',
-			subtitles: source.subtitles || [],
-		}
-	}
-	try {
-		const response = await fetch(`/api/kiwi-resolve?url=${encodeURIComponent(source.url)}`, {
-			signal,
-			cache: 'no-store',
-		})
-		if (!response.ok) return null
-		const payload = await response.json()
-		if (!payload?.source?.url || getSourcePlaybackType(payload.source) !== 'hls') return null
-		const resolvedSource = {
-			...payload.source,
-			headers: payload.headers || {},
-		}
-		kiwiResolvedSourceCache.set(source.url, { source: resolvedSource, savedAt: Date.now() })
-		return {
-			...resolvedSource,
-			quality: source.quality || resolvedSource.quality || 'AUTO',
-			subtitles: source.subtitles || [],
-		}
-	} catch {
-		return null
-	}
-}
-
-async function resolveKiwiEmbedSources(sources, signal) {
-	const candidates = (Array.isArray(sources) ? sources : []).filter(isKiwiEmbedSource)
-	if (candidates.length === 0) return []
-	const resolved = await Promise.all(candidates.map((source) => resolveKiwiEmbedSource(source, signal)))
-	return resolved.filter(Boolean)
 }
 
 function buildQualityList(sources) {
@@ -2786,7 +2736,7 @@ export default function Watch() {
             return
           }
 	          const cachedEmbed = cached.sources.find(isPlayableEmbedSource)
-	          if (cachedEmbed && !isKiwiEmbedSource(cachedEmbed)) {
+	          if (cachedEmbed) {
 	            destroyPlayer()
 	            setActiveEmbedUrl(cachedEmbed.url)
 	            applySkipSegments(normalizeProviderSkipSegments(cached))
@@ -2902,23 +2852,10 @@ export default function Watch() {
           return
         }
 
-		let resolvedData = data
-		let qualityList = buildQualityList(resolvedData.sources)
-		if (qualityList.length === 0) {
-		  const kiwiSources = await resolveKiwiEmbedSources(resolvedData.sources, controller.signal)
-		  if (kiwiSources.length > 0) {
-		    resolvedData = {
-		      ...resolvedData,
-		      sources: kiwiSources,
-		      headers: kiwiSources[0].headers || {},
-		    }
-		    qualityList = buildQualityList(resolvedData.sources)
-		  }
-		}
+	        const firstSource = data.sources[0]
+	        const qualityList = buildQualityList(data.sources)
 	        if (qualityList.length === 0) {
-	          const verifiedEmbed = data.sources.find(
-	            (candidate) => isPlayableEmbedSource(candidate) && !isKiwiEmbedSource(candidate)
-	          )
+	          const verifiedEmbed = data.sources.find(isPlayableEmbedSource)
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -2943,7 +2880,6 @@ export default function Watch() {
           loadingRef.current = false
 	          return
 	        }
-	        const firstSource = resolvedData.sources[0]
 	        const subs = firstSource.subtitles || []
         const onBlocked = (reason) => handleProviderBlockedRef.current?.(reason)
         buildPlayer(
@@ -2951,11 +2887,11 @@ export default function Watch() {
           qualityList[0].type,
           qualityList,
           subs,
-	          resolvedData.headers,
+	          data.headers,
 	          onBlocked
 	        )
-	        applySkipSegments(normalizeProviderSkipSegments(resolvedData))
-	        setCachedStream(source, resolvedData)
+	        applySkipSegments(normalizeProviderSkipSegments(data))
+	        setCachedStream(source, data)
         setStreamLoading(false)
         loadingRef.current = false
         setRetryAttempt(0)
@@ -3112,9 +3048,7 @@ export default function Watch() {
 	const currentProvider = current
 		? all.find((s) => s.id === current)
 		: null
-		const embeddedFallback = currentProvider?.initialSources?.find(
-			(candidate) => isPlayableEmbedSource(candidate) && !isKiwiEmbedSource(candidate)
-		)
+		const embeddedFallback = currentProvider?.initialSources?.find(isPlayableEmbedSource)
 	if (current && embeddedFallback && !embedFallbackAttemptedRef.current.has(current)) {
 		embedFallbackAttemptedRef.current.add(current)
 		destroyPlayer()
@@ -3188,14 +3122,6 @@ export default function Watch() {
       const source = [...SOURCES.sub, ...SOURCES.dub].find(
         (s) => s.id === sourceId
       )
-      if (source && isKiwiProvider(source)) {
-        showToast('Kiwi uses protected playback. Opening the native Aniraku app…', { icon: 'signal', long: true })
-        window.setTimeout(() => {
-          if (IS_ANDROID) window.location.href = ANDROID_APP_INTENT
-          else window.open(ANDROID_APP_RELEASE_URL, '_blank', 'noopener,noreferrer')
-        }, 80)
-        return
-      }
       if (source)
         showToast(`Switching to ${source.lang.toUpperCase()}…`)
       setActiveSource(sourceId)
@@ -4135,7 +4061,6 @@ export default function Watch() {
                 </span>
                 {SOURCES[lang].map((source) => {
                   const isActive = activeSource === source.id
-                  const isKiwi = isKiwiProvider(source)
                   return (
                     <button
                       key={source.id}
@@ -4143,8 +4068,8 @@ export default function Watch() {
                       onClick={() => handleSourceSwitch(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-	                      aria-label={isKiwi ? 'Open Kiwi in the native Aniraku app' : `${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
-	                      title={isKiwi ? 'Kiwi protected playback opens in the native Aniraku app' : `${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -4168,7 +4093,7 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-	                      {source.label}{isKiwi ? ' · APP' : ''}
+	                      {source.label}
 	                      {isActive && (
                         <span
                           aria-hidden="true"
