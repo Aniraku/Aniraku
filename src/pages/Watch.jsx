@@ -2928,7 +2928,7 @@ export default function Watch() {
 	      // Retry only this provider, only while it is embed-only, and only five
 	      // times: the upstream alternates valid sources in short bursts.
 	      if (isKiwiProvider(source) && buildQualityList(data.sources).length === 0) {
-	        for (let attempt = 0; attempt < 5; attempt += 1) {
+	        for (let attempt = 0; attempt < 12; attempt += 1) {
 	          await backoff(attempt, { base: 500, cap: 1_200 })
 	          res = await requestStream(true)
 	          if (!res.ok) break
