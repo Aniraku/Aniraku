@@ -64,8 +64,8 @@ const AndroidAppFallback = () => {
     setOpen(false)
   }
 
-  const useApp = () => {
-    window.location.assign(ANDROID_APP_INTENT)
+  const noteAppOpenAttempt = () => {
+    setShowInstallHint(false)
     window.setTimeout(() => {
       if (document.visibilityState === 'visible') setShowInstallHint(true)
     }, APP_OPEN_TIMEOUT_MS)
@@ -88,7 +88,7 @@ const AndroidAppFallback = () => {
 
         <StatusLine><i /> Android 9+ / native app available</StatusLine>
 
-        <PrimaryButton ref={appButtonRef} type="button" onClick={useApp}>
+        <PrimaryButton ref={appButtonRef} as="a" href={ANDROID_APP_INTENT} onClick={noteAppOpenAttempt}>
           <span><FaAndroid /> USE ANIRAKU APP</span><FaArrowRight />
         </PrimaryButton>
 
@@ -100,7 +100,7 @@ const AndroidAppFallback = () => {
         )}
 
         <ActionRow>
-          <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer"><FaDownload /> GET ANDROID APP</a>
+          <a href={ANDROID_APP_RELEASE_URL}><FaDownload /> GET ANDROID APP</a>
           <a href={ANDROID_APP_ORION_URL} target="_blank" rel="noreferrer"><FaGlobe /> ORION STORE</a>
         </ActionRow>
 

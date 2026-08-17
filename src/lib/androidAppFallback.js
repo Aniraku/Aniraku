@@ -1,6 +1,10 @@
 export const ANDROID_APP_PACKAGE = 'aniraku.anime.app'
-export const ANDROID_APP_INTENT = `intent://open#Intent;scheme=aniraku;package=${ANDROID_APP_PACKAGE};end`
-export const ANDROID_APP_RELEASE_URL = 'https://github.com/Aniraku/Aniraku-App/releases/download/v2.0.Alpha/app-release.apk'
+// The Android app currently registers `aniraku://auth` as its verified
+// browsable host. `intent://open` does not match that filter, so Chrome cannot
+// resolve it to the installed app. Keep a browser fallback in the intent so an
+// uninstalled device is sent directly to the current signed APK.
+export const ANDROID_APP_RELEASE_URL = 'https://github.com/Aniraku/Aniraku-App/releases/download/v4.0/Aniraku-v4.0.apk'
+export const ANDROID_APP_INTENT = `intent://auth#Intent;scheme=aniraku;package=${ANDROID_APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(ANDROID_APP_RELEASE_URL)};end`
 export const ANDROID_APP_ORION_URL = 'https://rookieenough.github.io/Orion-Data/redirect.html?id=aniraku'
 export const ANDROID_FALLBACK_DISMISS_KEY = 'aniraku:android-app-fallback:hide-until'
 
