@@ -42,6 +42,20 @@ const Composer = styled.div`
   border-radius: 16px;
   border: 1px solid var(--border);
   position: relative;
+  min-width: 0;
+  box-sizing: border-box;
+
+  > * { min-width: 0; }
+  .comment-composer-body { flex: 1; min-width: 0; }
+  .comment-compose-row { display: flex; gap: 10px; align-items: center; min-width: 0; }
+
+  @media (max-width: 480px) {
+    padding: 12px;
+    gap: 10px;
+    .comment-compose-row { flex-wrap: wrap; }
+    .comment-compose-row textarea { flex: 1 1 100%; width: 100%; min-width: 0; min-height: 44px; }
+    .comment-post-btn { margin-left: auto; min-height: 38px; }
+  }
 `
 
 /* Removed active GIF picker styles: new GIF composition is intentionally disabled while public no-auth alternatives are evaluated. */
@@ -84,6 +98,7 @@ const ErrorMsg = styled.p`
 
 const Textarea = styled.textarea`
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -108,6 +123,7 @@ const PostBtn = styled.button`
   opacity: ${p => p.$disabled ? 0.6 : 1};
   transition: all 0.2s;
   &:hover { transform: translateY(-1px); }
+  flex-shrink: 0;
 `
 
 const List = styled.div`
@@ -457,15 +473,15 @@ const Comments = ({ animeId, episodeNumber, label }) => {
             url={myProfile?.avatar_url}
             name={myProfile?.display_name || myProfile?.username || user.email || 'You'}
           />
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="comment-composer-body" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="comment-compose-row">
               <Textarea
                 placeholder="Share your thoughts…"
                 value={content}
                 onChange={e => { setContent(e.target.value); setPostError('') }}
                 maxLength={2000}
               />
-              <PostBtn type="button" $disabled={busy || !content.trim()} onClick={() => submit()}>Post</PostBtn>
+              <PostBtn className="comment-post-btn" type="button" $disabled={busy || !content.trim()} onClick={() => submit()}>Post</PostBtn>
             </div>
             {postError && <ErrorMsg style={{ marginTop: 8 }}>{postError}</ErrorMsg>}
           </div>

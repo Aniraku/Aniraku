@@ -1128,12 +1128,25 @@ export default function Watch() {
   useEffect(() => {
     const el = document.getElementById('watch-comments')
     if (!el || !window.IntersectionObserver) return
+    const updateVisibility = () => {
+      const rect = el.getBoundingClientRect()
+      const viewportHeight = window.visualViewport?.height || window.innerHeight
+      const isVisible = rect.top < viewportHeight * 0.88 && rect.bottom > 0
+      setCommentsVisible((previous) => previous === isVisible ? previous : isVisible)
+    }
     const obs = new window.IntersectionObserver(
-      (entries) => setCommentsVisible(entries[0]?.isIntersecting || false),
-      { rootMargin: '0px 0px -15% 0px', threshold: 0.05 }
+      () => updateVisibility(),
+      { rootMargin: '0px 0px -12% 0px', threshold: 0.01 }
     )
     obs.observe(el)
-    return () => obs.disconnect()
+    updateVisibility()
+    window.addEventListener('scroll', updateVisibility, { passive: true })
+    window.visualViewport?.addEventListener('resize', updateVisibility)
+    return () => {
+      obs.disconnect()
+      window.removeEventListener('scroll', updateVisibility)
+      window.visualViewport?.removeEventListener('resize', updateVisibility)
+    }
   }, [anime?.id, epNumber])
   useEffect(() => {
     if (!animeId) return
@@ -4288,6 +4301,7 @@ export default function Watch() {
               {anime?.title?.english || anime?.title?.romaji || 'Loading…'}
             </h1>
             <div
+              className="watch-current-meta"
               style={{
                 fontSize: 13,
                 color: 'var(--text-muted)',
@@ -4591,7 +4605,11 @@ export default function Watch() {
             animation: none !important;
           }
         }
-        .watch-page { word-break: break-word; }
+        .watch-page {
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+        .watch-page > * { min-width: 0; }
         .watch-art-mount video {
           background: #000;
         }
@@ -4724,8 +4742,40 @@ export default function Watch() {
         }
         @media (max-width: 768px) {
           .watch-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
-          .watch-episodes { width: 100% !important; }
-          .watch-page { padding: 0 !important; }
+          .watch-page {
+            width: 100% !important;
+            max-width: 100vw !important;
+            padding: 0 !important;
+            overflow-x: clip !important;
+            overflow-y: visible !important;
+          }
+          .watch-episodes {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            position: static !important;
+            overflow-x: hidden !important;
+          }
+          .watch-episode-row { min-width: 0 !important; max-width: 100% !important; }
+          .watch-episode-title {
+            display: -webkit-box !important;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            white-space: normal !important;
+            overflow: hidden !important;
+            overflow-wrap: anywhere;
+            line-height: 1.3;
+          }
+          .watch-episode-meta { flex-wrap: wrap; min-width: 0; }
+          .watch-current-meta,
+          .watch-synopsis,
+          .watch-trust-note,
+          #watch-comments {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+          }
           .watch-nav { gap: 8px !important; }
 	          /* Keep page-flow actions independently reachable on Android browsers.
 	             Provider controls are already compatible, so this only protects
@@ -4834,6 +4884,9 @@ export default function Watch() {
           .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
         }
         @media (max-width: 480px) {
+          .watch-nav { grid-template-columns: 1fr !important; }
+          .watch-nav button,
+          .watch-nav a { min-height: 44px; }
           .watch-rating {
             display: flex !important;
             flex-direction: column;

@@ -12,6 +12,7 @@ const EpisodeRow = memo(function EpisodeRow({
   return (
     <Link
       key={num}
+      className="watch-episode-row"
       to={`/watch/${slug}-${animeId}-episode-${num}`}
       aria-current={isActive ? 'true' : 'false'}
       data-active={isActive ? 'true' : 'false'}
@@ -38,6 +39,9 @@ const EpisodeRow = memo(function EpisodeRow({
           : '1px solid transparent',
         minHeight: 44,
         opacity: ep.filler && !isActive ? 0.72 : 1,
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
       }}
     >
       <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -123,6 +127,7 @@ const EpisodeRow = memo(function EpisodeRow({
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
+          className="watch-episode-title"
           style={{
             fontSize: 13,
             fontWeight: 600,
@@ -134,6 +139,7 @@ const EpisodeRow = memo(function EpisodeRow({
           {ep.title || `Episode ${num}`}
         </div>
         <div
+          className="watch-episode-meta"
           style={{
             fontSize: 11,
             color: 'var(--text-muted)',
@@ -238,6 +244,9 @@ const EpisodeSidebar = memo(function EpisodeSidebar({
         position: 'sticky',
         top: 16,
         overflowY: 'auto',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
       }}
     >
       <div
