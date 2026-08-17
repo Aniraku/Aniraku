@@ -2247,7 +2247,10 @@ export default function Watch() {
 	                const child = lines.slice(index + 1).find((line) => line && !line.startsWith('#'))
 	                const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
 	                if (!child || !height) continue
-	                const childUrl = new URL(child, url).toString()
+	                const childCandidate = new URL(child, window.location.origin)
+	                const childUrl = childCandidate.origin === new URL(PROXY_BASE).origin && childCandidate.pathname.endsWith('/proxy')
+	                  ? childCandidate.searchParams.get('url') || new URL(child, url).toString()
+	                  : new URL(child, url).toString()
 	                if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
 	              }
 	              variants.sort((a, b) => b.height - a.height)
