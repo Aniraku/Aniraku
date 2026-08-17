@@ -4727,6 +4727,31 @@ export default function Watch() {
           .watch-episodes { width: 100% !important; }
           .watch-page { padding: 0 !important; }
           .watch-nav { gap: 8px !important; }
+	          /* Keep page-flow actions independently reachable on Android browsers.
+	             Provider controls are already compatible, so this only protects
+	             rating, episode navigation, and related outside-player controls. */
+	          .watch-info,
+	          .watch-details {
+	            min-width: 0 !important;
+	            overflow: visible !important;
+	          }
+	          .watch-rating,
+	          .watch-nav {
+	            position: relative;
+	            z-index: 1;
+	          }
+	          .watch-nav {
+	            display: grid !important;
+	            grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+	            width: 100%;
+	          }
+	          .watch-nav button,
+	          .watch-nav a {
+	            width: 100%;
+	            min-width: 0 !important;
+	            justify-content: center;
+	            white-space: nowrap;
+	          }
           .watch-art-mount .art-video-player {
             --art-control-height: 42px;
             --art-control-icon-size: 28px;
@@ -4766,8 +4791,12 @@ export default function Watch() {
             max-width: 100%;
             flex-wrap: nowrap;
             gap: 2px !important;
-            overflow: visible;
+	            overflow-x: auto;
+	            overflow-y: visible;
+	            -webkit-overflow-scrolling: touch;
+	            scrollbar-width: none;
           }
+	          .watch-rating-stars::-webkit-scrollbar { display: none; }
           .watch-rating-stars button {
             width: 22px !important;
             min-width: 22px !important;
