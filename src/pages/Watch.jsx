@@ -2229,12 +2229,52 @@ export default function Watch() {
           m3u8: async (video, url, art) => {
             const proxiedH = proxied
             const referer = (headers && headers.Referer) || ''
+	          const updateNativeHlsQualities = async () => {
+	            try {
+	              const response = await fetch(proxiedH(url), { cache: 'no-store' })
+	              if (!response.ok) return
+	              const lines = (await response.text()).split(/\r?\n/)
+	              const variants = []
+	              for (let index = 0; index < lines.length; index += 1) {
+	                const streamInfo = lines[index]
+	                if (!streamInfo.startsWith('#EXT-X-STREAM-INF:')) continue
+	                const child = lines.slice(index + 1).find((line) => line && !line.startsWith('#'))
+	                const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
+	                if (!child || !height) continue
+	                const childUrl = new URL(child, url).toString()
+	                if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
+	              }
+	              variants.sort((a, b) => b.height - a.height)
+	              if (variants.length < 2 || !art?.setting?.update) return
+	              art.setting.update({
+	                name: 'quality',
+	                width: 220,
+	                html: 'Quality',
+	                selector: [
+	                  { default: true, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
+	                  ...variants.map((variant) => ({
+	                    default: false,
+	                    html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
+	                    value: variant.url,
+	                  })),
+	                ],
+	                onSelect: (item) => {
+	                  const next = item.value === 'auto' ? url : item.value
+	                  video.src = proxiedH(next)
+	                  video.load()
+	                  video.play().catch(() => {})
+	                  return item.html
+	                },
+	              })
+	            } catch {}
+	          }
             // iOS Safari has native HLS support — use it directly.
             if (video.canPlayType('application/vnd.apple.mpegurl')) {
               try {
                 video.src = proxiedH(url)
                 const p = video.play()
                 if (p && typeof p.catch === 'function') p.catch(() => {})
+	              void updateNativeHlsQualities()
               } catch {
                 // fall through to hls.js
               }
