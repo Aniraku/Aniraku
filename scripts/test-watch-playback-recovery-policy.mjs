@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  getHlsProviderRecoveryReason,
   getHlsLoadPolicies,
   isTerminalHlsStatus,
 } from '../src/lib/watchBufferPolicy.js'
@@ -23,5 +24,11 @@ assert.equal(retryFragment(null, 0, false, { code: 403 }), false)
 assert.equal(retryFragment(null, 0, false, { status: 429 }), false)
 assert.equal(retryFragment(null, 0, false, { code: 502 }), true)
 assert.equal(retryFragment(null, 0, true, undefined), true)
+
+assert.equal(getHlsProviderRecoveryReason(401), 'refresh-source')
+assert.equal(getHlsProviderRecoveryReason(403), 'refresh-source')
+assert.equal(getHlsProviderRecoveryReason(404), 'permanent-cdn')
+assert.equal(getHlsProviderRecoveryReason(429), 'permanent-cdn')
+assert.equal(getHlsProviderRecoveryReason(502), 'native-hls-error')
 
 console.log('watch playback recovery policy tests passed')

@@ -63,6 +63,17 @@ export function isTerminalHlsStatus(status) {
 }
 
 /**
+ * A 401/403 must stop retries against the same signed URL, but it may be
+ * repairable by asking the resolver for a fresh URL. Other terminal statuses
+ * are conclusive and should move to the next eligible provider instead.
+ */
+export function getHlsProviderRecoveryReason(status) {
+  const code = Number(status)
+  if (code === 401 || code === 403) return 'refresh-source'
+  return isTerminalHlsStatus(code) ? 'permanent-cdn' : 'native-hls-error'
+}
+
+/**
  * hls.js owns transient segment, playlist, and manifest retry. Letting the
  * outer player reload the source at the first recoverable failure discards
  * the MediaSource buffer and creates visible ArtPlayer reconnect loops.
