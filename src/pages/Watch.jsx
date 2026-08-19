@@ -44,6 +44,7 @@ import {
   getHlsRequestCacheMode,
   isTerminalHlsStatus,
 } from '../lib/watchBufferPolicy'
+import { getRecoveryResumePosition } from '../lib/watchRecoveryPosition'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 
 // ────────────────────────────────────────────────────────────────
@@ -2060,6 +2061,11 @@ export default function Watch() {
         if (recoveryBusyRef.current) return
         recoveryBusyRef.current = true
         const art = artInstance.current
+        const resumeAt = getRecoveryResumePosition(
+          art?.video?.currentTime,
+          art?.video?.duration
+        )
+        if (resumeAt !== null) pendingResumeRef.current = resumeAt
         const cur = art ? art.option.url : streamUrl
         const idx = qualityList.findIndex((q) => q.url === cur)
         const next =
@@ -2068,8 +2074,6 @@ export default function Watch() {
             : null
         if (next) {
           showToast('Stream issue — trying the next quality…')
-          const resumeAt = Number(art?.video?.currentTime || 0)
-          if (resumeAt > 0) pendingResumeRef.current = resumeAt
           recoveryBusyRef.current = false
           buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
           return
@@ -2852,7 +2856,9 @@ export default function Watch() {
       setActiveEmbedUrl((current) => (current ? '' : current))
       setRetryAttempt(0)
       setResumePos(null)
-      pendingResumeRef.current = null
+      // A recovery path can set a handoff position before refreshing a signed
+      // source. Do not erase it here: the rebuilt player consumes it in
+      // video:canplay. Episode changes explicitly clear it below.
       // Keep verified intervals while switching servers for the same episode;
       // the episode-change effect above owns the reset lifecycle.
       setShowEndedOverlay(false)
@@ -3197,12 +3203,21 @@ export default function Watch() {
   const handleProviderBlocked = useCallback((reason) => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
     const current = activeSourceRef.current
+    const captureRecoveryPosition = () => {
+      const art = artInstance.current
+      const resumeAt = getRecoveryResumePosition(
+        art?.video?.currentTime,
+        art?.video?.duration
+      )
+      if (resumeAt !== null) pendingResumeRef.current = resumeAt
+    }
     const permanentCdnFailure = reason === 'permanent-cdn'
     const now = Date.now()
     if (now - lastBlockCycleRef.current < 3_000) return
     lastBlockCycleRef.current = now
     if (current && !permanentCdnFailure && !refreshAttemptedRef.current.has(current)) {
       refreshAttemptedRef.current.add(current)
+      captureRecoveryPosition()
       showToast('Stream expired — refreshing this server once…')
       loadStreamRef.current(current, true)
       return
@@ -3229,8 +3244,9 @@ export default function Watch() {
 		return
 	}
 	const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
-	const next = pool.find((s) => !blockedSourcesRef.current.has(s.id))
+    const next = pool.find((s) => !blockedSourcesRef.current.has(s.id))
     if (next) {
+      captureRecoveryPosition()
       showToast(
         `Server blocked — switching to ${next.label} (${next.lang.toUpperCase()})…`
       )
@@ -3239,6 +3255,7 @@ export default function Watch() {
     }
     if (!forceRefreshUsedRef.current && current) {
       forceRefreshUsedRef.current = true
+      captureRecoveryPosition()
       showToast('All servers blocked — retrying once…')
       loadStreamRef.current(current, true)
       return
@@ -3264,6 +3281,7 @@ export default function Watch() {
       const el = art?.video
       const skipSync = skipSwitchSyncRef.current
       skipSwitchSyncRef.current = false
+      pendingResumeRef.current = null
       if (
         !skipSync &&
         el &&
