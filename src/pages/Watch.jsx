@@ -38,7 +38,12 @@ import {
 } from '../lib/sync'
 import { WatchPageSkeleton } from '../components/Skeletons/Skeletons'
 import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '../lib/watchHistory'
-import { getHlsBufferPolicy, getHlsRequestCacheMode } from '../lib/watchBufferPolicy'
+import {
+  getHlsBufferPolicy,
+  getHlsLoadPolicies,
+  getHlsRequestCacheMode,
+  isTerminalHlsStatus,
+} from '../lib/watchBufferPolicy'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 
 // ────────────────────────────────────────────────────────────────
@@ -48,7 +53,6 @@ const EPISODES_PER_PAGE = 50
 const STREAM_CACHE_TTL_MS = 30_000       // 30s — short so a "switch server"
 const SLOW_THRESHOLD_MS = 10_000         //   refresh on the same server
 const RESUME_MIN_TIME = 30               //   after a token expires is cheap
-const PLAYER_RECONNECT_MAX = 8           // ArtPlayer built-in retries
 const MAX_SERVER_RETRIES = 3             // refresh cap per source per ep
 const HEALTH_CHECK_TIMEOUT = 4_000
 const STREAM_FETCH_TIMEOUT = 60_000
@@ -1995,24 +1999,36 @@ export default function Watch() {
           if (!Hls?.isSupported?.() || buildIdRef.current !== myBuildId) return false
           const hls = new Hls({
             enableWorker: false,
-            maxBufferLength: netHintRef.current.effectiveType === '4g' ? 12 : 6,
-            maxMaxBufferLength: 24,
+            ...getHlsBufferPolicy(netHintRef.current),
+            ...getHlsLoadPolicies(),
             startFragPrefetch: false,
-                          manifestLoadingMaxRetry: 0,
-              levelLoadingMaxRetry: 0,
-              fragLoadingMaxRetry: 0,
-
+            lowLatencyMode: false,
           })
           hlsInstance.current = hls
+          art.hls = hls
           hls.loadSource(proxied(url))
           hls.attachMedia(video)
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             if (buildIdRef.current !== myBuildId) return
             video.play().catch(() => {})
           })
+          let lastMediaRecoveryAt = 0
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (buildIdRef.current !== myBuildId || !data?.fatal) return
-            if (onBlocked) onBlocked('native-hls-error')
+            const status = Number(data?.response?.code || data?.response?.status || 0)
+            if (
+              data.type === Hls.ErrorTypes.MEDIA_ERROR &&
+              Date.now() - lastMediaRecoveryAt >= 5_000
+            ) {
+              lastMediaRecoveryAt = Date.now()
+              try {
+                hls.recoverMediaError()
+                return
+              } catch {}
+            }
+            if (onBlocked) {
+              onBlocked(isTerminalHlsStatus(status) ? 'permanent-cdn' : 'native-hls-error')
+            }
           })
           return true
         }
@@ -2366,15 +2382,10 @@ export default function Watch() {
               appendInSequenceGaps: true,
 
               forceKeyFrameOnDiscontinuity: true,
-              maxRecoveryAttempts: 3,
-              // A manifest 401/403/404/410/502 is definitive for this signed
-              // source. Do not let hls.js repeat the same failed manifest;
-              // the fatal handler below immediately advances to the next server.
-              manifestLoadingMaxRetry: 0,
-              // A 429 from the shared proxy must never trigger repeated
-              // segment requests. Let the fatal handler rotate providers.
-              levelLoadingMaxRetry: 0,
-              fragLoadingMaxRetry: 0,
+              // hls.js retains the active MediaSource and its forward buffer
+              // while it performs these bounded per-request retries. ArtPlayer
+              // must not reload the source during that recovery window.
+              ...getHlsLoadPolicies(),
               defaultAudioCodec: 'mp4a.40.2',
               fetchSetup: (context, init = {}) => {
                 const requestInit = {
@@ -2393,7 +2404,6 @@ export default function Watch() {
               },
             })
             let triedDirect = false
-            let netRetries = 0
             let mediaRetries = 0
             const fail = (reason) => {
               if (buildIdRef.current !== myBuildId) return
@@ -2424,11 +2434,12 @@ export default function Watch() {
             hls.on(Hls.Events.ERROR, (_event, data) => {
               if (buildIdRef.current !== myBuildId) return
               if (!data.fatal) return
-              // A signed CDN URL that returns a permanent HTTP error cannot be
-              // repaired by hls.startLoad(). Fail over immediately instead of
-              // hammering the same expired/blocked URL several more times.
+              // Signed URL and throttle responses are terminal. Every other
+              // transient request has already used hls.js' bounded retry policy;
+              // do not call startLoad() here because that restarts loading and
+              // can discard the buffer the viewer already earned.
               const httpStatus = Number(data?.response?.code || data?.response?.status || 0)
-              const permanentCdnFailure = [401, 403, 404, 410, 429, 502].includes(httpStatus)
+              const permanentCdnFailure = isTerminalHlsStatus(httpStatus)
               // MP4 mis-classified as HLS
               if (
                 data.type === Hls.ErrorTypes.MANIFEST_ERROR &&
@@ -2442,7 +2453,7 @@ export default function Watch() {
                 return
               }
               if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                if (mediaRetries < 2) {
+                if (mediaRetries < 1) {
                   mediaRetries += 1
                   try {
                     hls.recoverMediaError()
@@ -2453,13 +2464,6 @@ export default function Watch() {
                 return
               }
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                if (!permanentCdnFailure && netRetries < 2) {
-                  netRetries += 1
-                  try {
-                    hls.startLoad()
-                  } catch {}
-                  return
-                }
                 fail(httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'backend'))
                 return
               }
@@ -2550,14 +2554,13 @@ export default function Watch() {
       destroyPlayer()
       const art = new Artplayer(playerConfig)
 
-      // ArtPlayer built-in reconnect loop. We only step in once it
-      // has given up.
-      let reconnectCount = 0
-      art.on('error', (_err, count) => {
-        reconnectCount = count || 0
-      })
+      // ArtPlayer retries a video error by assigning art.url again. That
+      // recreates the custom HLS source and flushes the MediaSource buffer.
+      // hls.js owns HLS recovery above, so remove only ArtPlayer's internal
+      // source-reset listener and retain a direct-media fallback for streams
+      // not managed by hls.js.
+      art.off('video:error')
       art.on('video:canplay', () => {
-        reconnectCount = 0
         setBuffering(false)
         if (pendingResumeRef.current) {
           art.video.currentTime = pendingResumeRef.current
@@ -2567,12 +2570,8 @@ export default function Watch() {
       art.on('video:waiting', () => setBuffering(true))
       art.on('video:playing', () => setBuffering(false))
       art.on('video:error', () => {
-        if (reconnectCount >= PLAYER_RECONNECT_MAX) {
-          try {
-            art.layers.error.show = false
-          } catch {}
-          recoverPlayback()
-        }
+        if (art.hls || hlsInstance.current) return
+        recoverPlayback()
       })
 
       if (subtitles && subtitles.length > 1) {
