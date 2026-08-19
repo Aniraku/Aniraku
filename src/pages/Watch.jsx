@@ -39,6 +39,7 @@ import {
 import { WatchPageSkeleton } from '../components/Skeletons/Skeletons'
 import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '../lib/watchHistory'
 import { getHlsBufferPolicy, getHlsRequestCacheMode } from '../lib/watchBufferPolicy'
+import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -1059,6 +1060,9 @@ export default function Watch() {
   const autoSkipRef = useRef(autoSkip)
   autoSkipRef.current = autoSkip
   const autoSkippedRef = useRef({ intro: false, outro: false })
+  const [autoSkipFailures, setAutoSkipFailures] = useState({ intro: false, outro: false })
+  const autoSkipFailuresRef = useRef(autoSkipFailures)
+  autoSkipFailuresRef.current = autoSkipFailures
   const [hideFillers, setHideFillers] = useState(false)
 
   // Auto-play next episode when the current one ends (user-toggleable).
@@ -1092,6 +1096,9 @@ export default function Watch() {
     const next = Boolean(value)
     autoSkipRef.current = next
     autoSkippedRef.current = { intro: false, outro: false }
+    const clearedFailures = { intro: false, outro: false }
+    autoSkipFailuresRef.current = clearedFailures
+    setAutoSkipFailures(clearedFailures)
     setAutoSkip(next)
     try {
       localStorage.setItem('aniraku-auto-skip', next ? 'on' : 'off')
@@ -1309,9 +1316,10 @@ export default function Watch() {
       showToast(type === 'intro' ? 'Intro skip data is unavailable' : 'Outro skip data is unavailable', { icon: 'warn' })
       return false
     }
-    const duration = Number(art.video.duration) || 0
-    const target = Math.min(segment.end, Math.max(0, duration > 0 ? duration - 0.5 : segment.end))
-    art.video.currentTime = target
+    if (!attemptSkipSegment(art.video, segment)) {
+      showToast(type === 'intro' ? 'Intro could not be skipped' : 'Outro could not be skipped', { icon: 'warn' })
+      return false
+    }
     autoSkippedRef.current[type] = true
     showToast(type === 'intro' ? 'Intro skipped' : 'Outro skipped', { icon: 'ok' })
     return true
@@ -1691,6 +1699,9 @@ export default function Watch() {
     skipSegmentsRef.current = { intro: null, outro: null }
     setSkipSegments(skipSegmentsRef.current)
     autoSkippedRef.current = { intro: false, outro: false }
+    const clearedFailures = { intro: false, outro: false }
+    autoSkipFailuresRef.current = clearedFailures
+    setAutoSkipFailures(clearedFailures)
   }, [animeId, epNumber])
 
   // AniSkip is the anime-specific, verified timestamp source. It requires a
@@ -2646,17 +2657,34 @@ export default function Watch() {
           for (const type of ['intro', 'outro']) {
             const segment = latestSegments[type]
             if (!segment) continue
-            if (position < segment.start - 3) autoSkippedRef.current[type] = false
+            if (position < segment.start - 3) {
+              autoSkippedRef.current[type] = false
+              if (autoSkipFailuresRef.current[type]) {
+                const clearedFailures = { ...autoSkipFailuresRef.current, [type]: false }
+                autoSkipFailuresRef.current = clearedFailures
+                setAutoSkipFailures(clearedFailures)
+              }
+            }
             if (
               !autoSkippedRef.current[type] &&
+              !autoSkipFailuresRef.current[type] &&
               position >= segment.start + 1 &&
               position < segment.end - 0.5
             ) {
-              const duration = Number(art.video.duration) || 0
-              const target = Math.min(segment.end, Math.max(0, duration > 0 ? duration - 0.5 : segment.end))
-              autoSkippedRef.current[type] = true
-              art.video.currentTime = target
-              showToast(type === 'intro' ? 'Intro skipped' : 'Outro skipped', { icon: 'check' })
+              if (attemptSkipSegment(art.video, segment)) {
+                autoSkippedRef.current[type] = true
+                showToast(type === 'intro' ? 'Intro skipped' : 'Outro skipped', { icon: 'check' })
+              } else {
+                const failures = { ...autoSkipFailuresRef.current, [type]: true }
+                autoSkipFailuresRef.current = failures
+                setAutoSkipFailures(failures)
+                showToast(
+                  type === 'intro'
+                    ? 'Automatic intro skip failed — use Skip Intro'
+                    : 'Automatic outro skip failed — use Skip Outro',
+                  { icon: 'warn' }
+                )
+              }
               break
             }
           }
@@ -3449,9 +3477,18 @@ export default function Watch() {
   const t = currentTime
   const intro = skipSegments?.intro
   const outro = skipSegments?.outro
-  const showSkipIntro = !!intro && t >= intro.start - 2 && t < intro.end - 0.5
-  const showSkipOutro =
-    !!outro && t >= outro.start - 2 && t < outro.end - 0.5
+  const showSkipIntro = shouldShowManualSkipOverlay({
+    segment: intro,
+    currentTime: t,
+    autoSkip,
+    autoSkipFailed: autoSkipFailures.intro,
+  })
+  const showSkipOutro = shouldShowManualSkipOverlay({
+    segment: outro,
+    currentTime: t,
+    autoSkip,
+    autoSkipFailed: autoSkipFailures.outro,
+  })
   const handleSkipSegment = (type) => {
     skipSegmentNow(type)
   }
