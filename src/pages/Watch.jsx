@@ -41,6 +41,7 @@ import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '..
 import {
   getHlsBufferPolicy,
   getHlsLoadPolicies,
+  getHlsProviderRecoveryReason,
   getHlsRequestCacheMode,
   isTerminalHlsStatus,
 } from '../lib/watchBufferPolicy'
@@ -408,6 +409,12 @@ function isKiwiEmbedSource(source) {
 	} catch {
 		return false
 	}
+}
+
+// Kwik denies being framed by third-party pages. Do not turn a recoverable
+// Kiwi direct-source failure into a browser iframe that must be rejected.
+function isBrowserPlayableEmbedSource(source) {
+	return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
 }
 
 function buildQualityList(sources) {
@@ -2028,7 +2035,7 @@ export default function Watch() {
               } catch {}
             }
             if (onBlocked) {
-              onBlocked(isTerminalHlsStatus(status) ? 'permanent-cdn' : 'native-hls-error')
+              onBlocked(getHlsProviderRecoveryReason(status))
             }
           })
           return true
@@ -2409,7 +2416,7 @@ export default function Watch() {
             })
             let triedDirect = false
             let mediaRetries = 0
-            const fail = (reason) => {
+            const fail = (reason, status = 0) => {
               if (buildIdRef.current !== myBuildId) return
               const terminalProxyFailure = reason === 'blocked' || reason === 'rate-limited'
               // A permanent CDN response is already conclusive. Direct fallback
@@ -2432,7 +2439,13 @@ export default function Watch() {
               } else {
                 showToast('Playback error — switching server…')
               }
-              if (onBlocked) onBlocked(terminalProxyFailure ? 'permanent-cdn' : undefined)
+              if (onBlocked) {
+                onBlocked(
+                  terminalProxyFailure
+                    ? getHlsProviderRecoveryReason(status)
+                    : undefined
+                )
+              }
               else setError('Stream playback error. Try a different server.')
             }
             hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -2468,10 +2481,16 @@ export default function Watch() {
                 return
               }
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                fail(httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'backend'))
+                fail(
+                  httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'backend'),
+                  httpStatus
+                )
                 return
               }
-              fail(httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'unknown'))
+              fail(
+                httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'unknown'),
+                httpStatus
+              )
             })
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
 	              const levels = (hls.levels || [])
@@ -2890,7 +2909,7 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-	          const cachedEmbed = cached.sources.find(isPlayableEmbedSource)
+	          const cachedEmbed = cached.sources.find(isBrowserPlayableEmbedSource)
 	          if (cachedEmbed) {
 	            destroyPlayer()
 	            setActiveEmbedUrl(cachedEmbed.url)
@@ -3028,7 +3047,7 @@ export default function Watch() {
 	        const firstSource = data.sources[0]
 	        const qualityList = buildQualityList(data.sources)
 	        if (qualityList.length === 0) {
-	          const verifiedEmbed = data.sources.find(isPlayableEmbedSource)
+	          const verifiedEmbed = data.sources.find(isBrowserPlayableEmbedSource)
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -3230,7 +3249,7 @@ export default function Watch() {
 	const currentProvider = current
 		? all.find((s) => s.id === current)
 		: null
-		const embeddedFallback = currentProvider?.initialSources?.find(isPlayableEmbedSource)
+	const embeddedFallback = currentProvider?.initialSources?.find(isBrowserPlayableEmbedSource)
 	if (current && embeddedFallback && !embedFallbackAttemptedRef.current.has(current)) {
 		embedFallbackAttemptedRef.current.add(current)
 		destroyPlayer()
