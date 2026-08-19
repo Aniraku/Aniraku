@@ -38,6 +38,7 @@ import {
 } from '../lib/sync'
 import { WatchPageSkeleton } from '../components/Skeletons/Skeletons'
 import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '../lib/watchHistory'
+import { getHlsBufferPolicy, getHlsRequestCacheMode } from '../lib/watchBufferPolicy'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -2342,17 +2343,16 @@ export default function Watch() {
                 art.hls.destroy()
               } catch {}
             }
+            const bufferPolicy = getHlsBufferPolicy(netHintRef.current)
             const hls = new Hls({
               enableWorker: false,
-              // Keep the initial buffer deliberately small so the first frame
-              // appears quickly. HLS will continue filling in the background.
-              maxBufferLength: netHintRef.current.effectiveType === '4g' ? 12 : 6,
-              maxMaxBufferLength: 24,
+              // Hold a substantial forward reserve for VOD playback. The
+              // policy scales down on constrained networks and remains bounded
+              // to let the browser's MediaSource eviction protect device RAM.
+              ...bufferPolicy,
               startFragPrefetch: false,
               lowLatencyMode: false,
-              backBufferLength: 3,
               appendInSequenceGaps: true,
-              maxBufferHole: 0.5,
 
               forceKeyFrameOnDiscontinuity: true,
               maxRecoveryAttempts: 3,
@@ -2365,14 +2365,21 @@ export default function Watch() {
               levelLoadingMaxRetry: 0,
               fragLoadingMaxRetry: 0,
               defaultAudioCodec: 'mp4a.40.2',
-              fetchSetup: referer
-                ? (context, init) => {
-                    try {
-                      init.referrer = referer
-                    } catch {}
-                    return new Request(context.url, init)
-                  }
-                : undefined,
+              fetchSetup: (context, init = {}) => {
+                const requestInit = {
+                  ...init,
+                  // Reuse a browser-cached VOD fragment when the source allows
+                  // it; manifests stay fresh so signed URLs and ABR updates are
+                  // never masked by a stale playlist response.
+                  cache: getHlsRequestCacheMode(context),
+                }
+                if (referer) {
+                  try {
+                    requestInit.referrer = referer
+                  } catch {}
+                }
+                return new Request(context.url, requestInit)
+              },
             })
             let triedDirect = false
             let netRetries = 0
