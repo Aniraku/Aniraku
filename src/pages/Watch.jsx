@@ -56,6 +56,7 @@ import {
   settleQuietProviderSwitch,
 } from '../lib/watchQuietSwitchState'
 import { createMediaTransportPlan } from '../lib/watchSourceTransport'
+import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -2961,6 +2962,28 @@ export default function Watch() {
       // source. Episode changes explicitly clear it below.
       setShowEndedOverlay(false)
 
+      const createSameProviderFailureHandler = (payload) => {
+        const embedFallback = chooseBrowserPlayableEmbed(
+          payload?.sources,
+          isBrowserPlayableEmbedSource
+        )
+        let fallbackUsed = false
+        return (reason) => {
+          if (embedFallback && !fallbackUsed) {
+            fallbackUsed = true
+            destroyPlayer()
+            setActiveEmbedUrl(embedFallback.url)
+            applySkipSegments(normalizeProviderSkipSegments(payload))
+            setStreamLoading(false)
+            loadingRef.current = false
+            setError('')
+            showToast(`${source.label} direct media is unavailable — using its compatible player.`, { long: true })
+            return
+          }
+          handleProviderBlockedRef.current?.(reason)
+        }
+      }
+
       // Stale-while-revalidate: if we have a recent good stream for
       // this source, play it now, then refresh in the background.
       if (!forceRefresh) {
@@ -2970,7 +2993,7 @@ export default function Watch() {
           const firstSource = cached.sources[0]
           const qualityList = buildQualityList(cached.sources)
           if (qualityList.length > 0) {
-            const onBlocked = (reason) => handleProviderBlockedRef.current?.(reason)
+            const onBlocked = createSameProviderFailureHandler(cached)
             buildPlayer(
               qualityList[0].url,
               qualityList[0].type,
@@ -2988,7 +3011,7 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-	          const cachedEmbed = cached.sources.find(isBrowserPlayableEmbedSource)
+          const cachedEmbed = chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
 	          if (cachedEmbed) {
 	            destroyPlayer()
 	            setActiveEmbedUrl(cachedEmbed.url)
@@ -3098,10 +3121,10 @@ export default function Watch() {
           return
         }
 
-	        const firstSource = data.sources[0]
-	        const qualityList = buildQualityList(data.sources)
-	        if (qualityList.length === 0) {
-	          const verifiedEmbed = data.sources.find(isBrowserPlayableEmbedSource)
+        const firstSource = data.sources[0]
+        const qualityList = buildQualityList(data.sources)
+        if (qualityList.length === 0) {
+          const verifiedEmbed = chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -3124,9 +3147,9 @@ export default function Watch() {
           setStreamLoading(false)
           loadingRef.current = false
 	          return
-	        }
-	        const subs = firstSource.subtitles || []
-        const onBlocked = (reason) => handleProviderBlockedRef.current?.(reason)
+        }
+        const subs = firstSource.subtitles || []
+        const onBlocked = createSameProviderFailureHandler(data)
         buildPlayer(
           qualityList[0].url,
           qualityList[0].type,
@@ -4750,19 +4773,19 @@ export default function Watch() {
         .watch-art-mount .art-selector-item.art-current .watch-quality-badge {
           color: #cbd5e1;
         }
-        .watch-art-mount .art-controls-seekBackward10,
-        .watch-art-mount .art-controls-seekForward10 {
+        .watch-art-mount .art-control-seekBackward10,
+        .watch-art-mount .art-control-seekForward10 {
           color: #e2e8f0;
           opacity: 0.82;
           transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
         }
-        .watch-art-mount .art-controls-seekBackward10:hover,
-        .watch-art-mount .art-controls-seekForward10:hover {
+        .watch-art-mount .art-control-seekBackward10:hover,
+        .watch-art-mount .art-control-seekForward10:hover {
           opacity: 1;
           background: rgba(255,255,255,0.1);
         }
-        .watch-art-mount .art-controls-seekBackward10:active,
-        .watch-art-mount .art-controls-seekForward10:active {
+        .watch-art-mount .art-control-seekBackward10:active,
+        .watch-art-mount .art-control-seekForward10:active {
           transform: scale(0.94);
         }
         .watch-art-seek-icon {
@@ -4805,8 +4828,8 @@ export default function Watch() {
           min-width: 0;
           flex: 0 0 auto;
         }
-        .watch-art-mount .art-video-player .art-controls-seekBackward10,
-        .watch-art-mount .art-video-player .art-controls-seekForward10 {
+        .watch-art-mount .art-video-player .art-control-seekBackward10,
+        .watch-art-mount .art-video-player .art-control-seekForward10 {
           width: 38px !important;
           min-width: 38px !important;
           margin-inline: 0 !important;
@@ -4911,10 +4934,16 @@ export default function Watch() {
             width: 60px;
             min-width: 60px;
           }
-          .watch-art-mount .art-video-player .art-controls-seekBackward10,
-          .watch-art-mount .art-video-player .art-controls-seekForward10 {
+          .watch-art-mount .art-video-player .art-control-seekBackward10,
+          .watch-art-mount .art-video-player .art-control-seekForward10 {
             width: 36px !important;
             min-width: 36px !important;
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+          .watch-art-mount .art-video-player .art-controls-left .art-control-time {
+            display: none !important;
           }
           .watch-nav button { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 8px 12px; }
           .watch-rating {
