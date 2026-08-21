@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck } from 'react-icons/fa'
+import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck, FaSpinner } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
@@ -15,6 +15,7 @@ import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
+import { EPISODE_BACKEND_GRACE_MS, getEpisodeBackendAttemptPlan } from '../lib/episodeLoadPolicy'
 
 const Page = styled.div`
   min-height: 100vh;
@@ -635,6 +636,7 @@ const AnimeDetail = () => {
   const [activeTab, setActiveTab] = useState('episodes')
   const [episodes, setEpisodes] = useState([])
   const [episodesFallback, setEpisodesFallback] = useState(false)
+  const [episodesLoading, setEpisodesLoading] = useState(false)
   const [hideFillers, setHideFillers] = useState(false)
   const [watchHistory, setWatchHistory] = useState([])
   const [episodeRatings, setEpisodeRatings] = useState({})
@@ -792,26 +794,58 @@ const AnimeDetail = () => {
 
     const loadEpisodes = async () => {
       setEpisodesFallback(false)
+      setEpisodesLoading(true)
       try {
-        let response
+        let epData
         let lastError
-        for (let attempt = 0; attempt < 2; attempt += 1) {
+        const startedAt = Date.now()
+        const attemptPlan = getEpisodeBackendAttemptPlan()
+        for (let attempt = 0; attempt < attemptPlan.length; attempt += 1) {
+          const { delayMs, timeoutMs } = attemptPlan[attempt]
+          if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs))
+          if (cancelled || controller.signal.aborted) return
+          const requestController = new AbortController()
+          const abortRequest = () => requestController.abort()
+          controller.signal.addEventListener('abort', abortRequest, { once: true })
+          let timedOut = false
+          const timeout = setTimeout(() => {
+            timedOut = true
+            requestController.abort()
+          }, timeoutMs)
           try {
-            response = await fetch(`${API_BASE}/api/v1/anime/${id}/episodes`, {
-              signal: controller.signal,
+            const response = await fetch(`${API_BASE}/api/v1/anime/${id}/episodes`, {
+              signal: requestController.signal,
               headers: { Accept: 'application/json' },
             })
-            if (response.ok) break
-            lastError = new Error(`Episode API returned ${response.status}`)
+            if (!response.ok) {
+              lastError = new Error(`Episode API returned ${response.status}`)
+            } else {
+              const candidate = await response.json()
+              if (Array.isArray(candidate?.episodes) && candidate.episodes.length > 0) {
+                epData = candidate
+                break
+              }
+              lastError = new Error('Episode API returned no episodes')
+            }
           } catch (error) {
-            if (error?.name === 'AbortError') return
-            lastError = error
+            if (controller.signal.aborted) return
+            lastError = timedOut
+              ? new Error('Episode API request timed out')
+              : error
+          } finally {
+            clearTimeout(timeout)
+            controller.signal.removeEventListener('abort', abortRequest)
           }
-          if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350))
+          if (Date.now() - startedAt >= EPISODE_BACKEND_GRACE_MS) break
         }
 
-        if (!response?.ok) throw lastError || new Error('Episode API unavailable')
-        const epData = await response.json()
+        const remainingGraceMs = EPISODE_BACKEND_GRACE_MS - (Date.now() - startedAt)
+        if (!epData && remainingGraceMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, remainingGraceMs))
+        }
+        if (cancelled || controller.signal.aborted) return
+
+        if (!epData) throw lastError || new Error('Episode API unavailable')
         const eps = Array.isArray(epData?.episodes)
           ? epData.episodes.filter(Boolean).map((ep, index) => {
             const num = index + 1
@@ -833,6 +867,8 @@ const AnimeDetail = () => {
         const fallback = fallbackEpisodes()
         setEpisodes(fallback)
         setEpisodesFallback(fallback.length > 0)
+      } finally {
+        if (!cancelled) setEpisodesLoading(false)
       }
     }
 
@@ -995,6 +1031,14 @@ const AnimeDetail = () => {
       </Banner>
 
       <Content>
+        {episodesLoading && (
+          <Section aria-live="polite">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13 }} role="status">
+              <FaSpinner className="watch-spin" aria-hidden="true" />
+              Checking the complete episode list before using a fallback…
+            </div>
+          </Section>
+        )}
         {desc && (
           <Section>
             <SectionTitle>Synopsis</SectionTitle>

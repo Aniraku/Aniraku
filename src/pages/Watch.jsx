@@ -59,6 +59,7 @@ import {
 } from '../lib/watchQuietSwitchState'
 import { createMediaTransportPlan, shouldTryHlsFallback } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
+import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -947,6 +948,7 @@ export default function Watch() {
   const artInstance = useRef(null)
   const hlsInstance = useRef(null)
   const dashInstance = useRef(null)
+  const bufferIndicatorCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
   const epSidebarRef = useRef(null)
@@ -1922,6 +1924,8 @@ export default function Watch() {
   // Player build / destroy
   // ────────────────────────────────────────────────────────────
   const destroyPlayer = useCallback(() => {
+    bufferIndicatorCleanupRef.current?.()
+    bufferIndicatorCleanupRef.current = null
     if (dashInstance.current) {
       try {
         dashInstance.current.reset()
@@ -2349,8 +2353,10 @@ export default function Watch() {
 	              })
 	            } catch {}
 	          }
-            // iOS Safari has native HLS support — use it directly.
-	            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Only iOS Safari needs native HLS. Desktop Chromium advertising
+            // HLS support can bypass hls.js and then stream an unrestricted
+            // full VOD into the browser cache instead of honoring our target.
+            if (IS_IOS && video.canPlayType('application/vnd.apple.mpegurl')) {
 	              try {
 	                video.src = hlsTransportPlan[hlsTransportIndex].url
 	                if (pendingHandoffRef.current?.shouldPlay !== false) {
@@ -2602,6 +2608,14 @@ export default function Watch() {
       if (buildIdRef.current !== myBuildId) return
       destroyPlayer()
       const art = new Artplayer(playerConfig)
+
+      const progressInner = art.video
+        ?.closest('.art-video-player')
+        ?.querySelector('.art-control-progress-inner')
+      bufferIndicatorCleanupRef.current = createBufferedTimelineIndicator(
+        art.video,
+        progressInner
+      )
 
       // ArtPlayer retries a video error by assigning art.url again. That
       // recreates the custom HLS source and flushes the MediaSource buffer.
@@ -4836,6 +4850,35 @@ export default function Watch() {
         }
         .watch-art-mount .art-video-player .art-controls-quality {
           min-width: 64px;
+        }
+        /* A YouTube-like downloaded-range cue, clipped to the intended
+           120-second cache window. It sits behind ArtPlayer's red played line
+           and thumb, never captures input, and keeps the Nothing-style signal
+           red reserved for the actual playback position. */
+        .watch-art-mount .art-control-progress-inner {
+          overflow: hidden;
+        }
+        .watch-art-mount .watch-buffer-indicator {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 1;
+        }
+        .watch-art-mount .watch-buffer-indicator-segment {
+          position: absolute;
+          top: 50%;
+          height: 3px;
+          transform: translateY(-50%);
+          border-radius: 999px;
+          background: rgba(226, 232, 240, 0.44);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+        .watch-art-mount .art-progress-loaded {
+          background: transparent !important;
+        }
+        .watch-art-mount .art-progress-played,
+        .watch-art-mount .art-progress-indicator {
+          z-index: 3;
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
