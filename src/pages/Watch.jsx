@@ -55,7 +55,7 @@ import {
   beginQuietProviderSwitch,
   settleQuietProviderSwitch,
 } from '../lib/watchQuietSwitchState'
-import { createMediaTransportPlan } from '../lib/watchSourceTransport'
+import { createMediaTransportPlan, shouldTryHlsFallback } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 
 // ────────────────────────────────────────────────────────────────
@@ -2062,7 +2062,7 @@ export default function Watch() {
 				)
 	            return
 	          }
-          if (await tryHls()) return
+          if (shouldTryHlsFallback(url) && await tryHls()) return
 	          showToast('Direct playback failed — choose another server if needed.', { long: true })
           if (onBlocked) onBlocked('native-media-error')
           else setError('Stream playback error. Try a different server.')
