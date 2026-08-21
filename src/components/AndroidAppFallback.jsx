@@ -94,13 +94,13 @@ const AndroidAppFallback = () => {
 
         {showInstallHint && (
           <InstallHint role="status">
-            <span>The app did not open. Install the current build, then try again.</span>
-            <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer">GET APK <FaExternalLinkAlt /></a>
+            <span>The app did not open. Get the latest stable build, then try again.</span>
+            <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer">VIEW LATEST BUILD <FaExternalLinkAlt /></a>
           </InstallHint>
         )}
 
         <ActionRow>
-          <a href={ANDROID_APP_RELEASE_URL}><FaDownload /> GET ANDROID APP</a>
+          <a href={ANDROID_APP_RELEASE_URL}><FaDownload /> VIEW LATEST BUILD</a>
           <a href={ANDROID_APP_ORION_URL} target="_blank" rel="noreferrer"><FaGlobe /> ORION STORE</a>
         </ActionRow>
 
