@@ -41,13 +41,11 @@ import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '..
 import {
   getHlsBufferPolicy,
   getHlsLoadPolicies,
-  getHlsProviderRecoveryReason,
   getHlsRequestCacheMode,
-  isTerminalHlsStatus,
 } from '../lib/watchBufferPolicy'
-import { getRecoveryResumePosition } from '../lib/watchRecoveryPosition'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 import {
+  createHlsQualitySelection,
   getHlsQualitySettingDisplay,
   getQualitySettingTitle,
   selectQualityInList,
@@ -57,10 +55,10 @@ import {
 // Constants
 // ────────────────────────────────────────────────────────────────
 const EPISODES_PER_PAGE = 50
-const STREAM_CACHE_TTL_MS = 30_000       // 30s — short so a "switch server"
-const SLOW_THRESHOLD_MS = 10_000         //   refresh on the same server
-const RESUME_MIN_TIME = 30               //   after a token expires is cheap
-const MAX_SERVER_RETRIES = 3             // refresh cap per source per ep
+const STREAM_CACHE_TTL_MS = 30_000       // recent working source cache
+const SLOW_THRESHOLD_MS = 10_000
+const RESUME_MIN_TIME = 30
+const MAX_SERVER_RETRIES = 3             // manual Retry cap per source per ep
 const HEALTH_CHECK_TIMEOUT = 4_000
 const STREAM_FETCH_TIMEOUT = 60_000
 const EPISODE_RATINGS_LS_KEY = 'aniraku-episode-ratings'
@@ -114,15 +112,12 @@ const fsExit =
 // ────────────────────────────────────────────────────────────────
 // `no-source`        → backend explicitly said no provider had a stream
 //                      for this anime/episode (give up, don't loop)
-// `expired`          → tokenized CDN URL is dead (refresh the same
-//                      source once before giving up on it)
-// `blocked`          → geo / referer / network block from CDN
-//                      (try next server of same lang)
-// `network`          → fetch itself failed (retry with backoff)
+// `expired`          → tokenized CDN URL is dead (offer manual retry)
+// `blocked`          → geo / referer / network block from CDN (offer a
+//                      manual server choice; never switch automatically)
+// `network`          → fetch itself failed (offer manual retry)
 // `timeout`          → fetch or proxy never returned in time
-// `backend`          → backend 5xx, cold start, or no upstream
-//                      response (retry with backoff, show "backend
-//                      is waking up")
+// `backend`          → backend 5xx, cold start, or no upstream response
 // `cdn-unreachable`  → proxy or CDN host itself is unreachable
 // `unknown`          → anything else (treat as retryable)
 function classifyStreamError(err, data) {
@@ -385,12 +380,6 @@ function getSourcePlaybackType(source) {
 
 function isKiwiEmbedUrl(url) {
 	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
-}
-
-function isKiwiProvider(source) {
-	return /(?:^|\s)(?:kiwi|kwik)(?:\s|$)/i.test(
-		`${source?.providerFamily || ''} ${source?.provider || ''} ${source?.label || ''}`.trim()
-	)
 }
 
 function getSourceVerification(source) {
@@ -958,7 +947,6 @@ export default function Watch() {
   const prevEpisodeRef = useRef(null)
   const recoveryBusyRef = useRef(false)
   const streamRetries = useRef({})
-  const blockedSourcesRef = useRef(new Set())
   const lastBlockCycleRef = useRef(0)
   const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
@@ -1293,9 +1281,8 @@ export default function Watch() {
     return () => window.removeEventListener('pagehide', onHide)
   }, [])
 
-  // Reset per-episode block tracking
+  // Reset per-episode recovery state.
   useEffect(() => {
-    blockedSourcesRef.current = new Set()
     lastBlockCycleRef.current = 0
     recoveryBusyRef.current = false
     streamRetries.current = {}
@@ -2023,7 +2010,6 @@ export default function Watch() {
           let lastMediaRecoveryAt = 0
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (buildIdRef.current !== myBuildId || !data?.fatal) return
-            const status = Number(data?.response?.code || data?.response?.status || 0)
             if (
               data.type === Hls.ErrorTypes.MEDIA_ERROR &&
               Date.now() - lastMediaRecoveryAt >= 5_000
@@ -2034,9 +2020,7 @@ export default function Watch() {
                 return
               } catch {}
             }
-            if (onBlocked) {
-              onBlocked(getHlsProviderRecoveryReason(status))
-            }
+	            if (onBlocked) onBlocked('playback-error')
           })
           return true
         }
@@ -2051,45 +2035,24 @@ export default function Watch() {
             return
           }
           if (await tryHls()) return
-          showToast('CDN refused playback — trying the next server…', {
-            long: true,
-          })
+	          showToast('Direct playback failed — choose another server if needed.', { long: true })
           if (onBlocked) onBlocked('native-media-error')
           else setError('Stream playback error. Try a different server.')
         }
       }
 
-      // Recovery step after ArtPlayer's built-in reconnect loop has
-      // exhausted itself: try the next quality, then fall through to
-      // the next server via onBlocked. Build-id guard ensures stale
-      // work never touches a newer player.
-      const recoverPlayback = () => {
-        if (buildIdRef.current !== myBuildId) return
-        if (recoveryBusyRef.current) return
-        recoveryBusyRef.current = true
-        const art = artInstance.current
-        const resumeAt = getRecoveryResumePosition(
-          art?.video?.currentTime,
-          art?.video?.duration
-        )
-        if (resumeAt !== null) pendingResumeRef.current = resumeAt
-        const cur = art ? art.option.url : streamUrl
-        const idx = qualityList.findIndex((q) => q.url === cur)
-        const next =
-          idx >= 0 && idx + 1 < qualityList.length
-            ? qualityList[idx + 1]
-            : null
-        if (next) {
-          showToast('Stream issue — trying the next quality…')
-          recoveryBusyRef.current = false
-          buildPlayer(next.url, next.type || 'hls', qualityList, subtitles, headers, onBlocked)
-          return
-        }
-        recoveryBusyRef.current = false
-        showToast('All qualities failed — switching server…', {
-          long: true,
-        })
-        if (onBlocked) onBlocked()
+	      // Recovery after ArtPlayer's reconnect loop is intentionally manual.
+	      // Auto-changing a representation or provider made healthy servers look
+	      // blocked and replaced a viewer's selected playback path unexpectedly.
+	      const recoverPlayback = () => {
+	        if (buildIdRef.current !== myBuildId) return
+	        if (recoveryBusyRef.current) return
+	        recoveryBusyRef.current = true
+	        recoveryBusyRef.current = false
+	        showToast('Playback interrupted — choose another server manually.', {
+	          long: true,
+	        })
+	        if (onBlocked) onBlocked('playback-error')
         else setError('Stream playback error. Try a different server.')
       }
 
@@ -2422,25 +2385,11 @@ export default function Watch() {
               },
             })
 	            let mediaRetries = 0
-	            const fail = (reason, status = 0) => {
+	            const fail = () => {
 	              if (buildIdRef.current !== myBuildId) return
-	              const terminalProxyFailure = reason === 'blocked' || reason === 'rate-limited'
-	              if (reason === 'rate-limited') {
-                showToast('Playback proxy is busy — switching server…', { long: true })
-              } else if (reason === 'backend' || reason === 'cdn-unreachable') {
-                showToast(
-                  'Stream source is unreachable — switching server…',
-                  { long: true }
-                )
-              } else {
-                showToast('Playback error — switching server…')
-              }
-              if (onBlocked) {
-	                onBlocked(
-	                  terminalProxyFailure
-	                    ? getHlsProviderRecoveryReason(status)
-	                    : 'native-hls-error'
-	                )
+	              showToast('Stream issue — keeping the selected server.', { long: true })
+	              if (onBlocked) {
+	                onBlocked('playback-error')
               }
               else setError('Stream playback error. Try a different server.')
             }
@@ -2451,9 +2400,7 @@ export default function Watch() {
               // transient request has already used hls.js' bounded retry policy;
               // do not call startLoad() here because that restarts loading and
               // can discard the buffer the viewer already earned.
-              const httpStatus = Number(data?.response?.code || data?.response?.status || 0)
-              const permanentCdnFailure = isTerminalHlsStatus(httpStatus)
-              // MP4 mis-classified as HLS
+	              // MP4 mis-classified as HLS
               if (
                 data.type === Hls.ErrorTypes.MANIFEST_ERROR &&
                 data.details === Hls.ErrorDetails.MANIFEST_PARSE_ERROR
@@ -2473,20 +2420,14 @@ export default function Watch() {
                   } catch {}
                   return
                 }
-                fail('media')
+	                fail()
                 return
               }
               if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                fail(
-                  httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'backend'),
-                  httpStatus
-                )
+	                fail()
                 return
               }
-              fail(
-                httpStatus === 429 ? 'rate-limited' : (permanentCdnFailure ? 'blocked' : 'unknown'),
-                httpStatus
-              )
+	              fail()
             })
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
 	              const levels = (hls.levels || [])
@@ -2501,6 +2442,16 @@ export default function Watch() {
 	                .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
 	              if (levels.length > 1 && art?.setting?.update) {
 	                const auto = getQualityPresentation('auto')
+	                const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
+	                const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
+	                  const display = getHlsQualitySettingDisplay(levels, level)
+	                  const qualitySetting = art.setting.find('quality')
+	                  if (qualitySetting) {
+	                    qualitySetting.html = display.title
+	                    qualitySetting.tooltip = display.label
+	                  }
+	                  return display
+	                }
 	                const buildHlsQualitySetting = (activeLevel) => {
 	                  const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel)
 	                  return {
@@ -2521,24 +2472,22 @@ export default function Watch() {
 	                      })),
 	                    ],
 	                    onSelect: (item) => {
-	                      const nextLevel = Number(item.value)
+	                      const nextLevel = hlsQualitySelection.selectLevel(item.value)
 	                      hls.currentLevel = nextLevel
 	                      hls.nextLevel = nextLevel
-	                      const nextDisplay = getHlsQualitySettingDisplay(levels, nextLevel)
-	                      const qualitySetting = art.setting.find('quality')
-	                      if (qualitySetting) {
-	                        // ArtPlayer checks the selector item before it runs
-	                        // this callback. Update the already-rendered parent
-	                        // setting instead of rebuilding it mid-click, which
-	                        // left the on-screen title at its initial Auto value.
-	                        qualitySetting.html = nextDisplay.title
-	                        qualitySetting.tooltip = nextDisplay.label
-	                      }
+	                      const nextDisplay = syncHlsQualitySetting(nextLevel)
 	                      return nextDisplay.label
 	                    },
 	                  }
 	                }
 	                art.setting.update(buildHlsQualitySetting(hls.currentLevel))
+	                hls.on(Hls.Events.LEVEL_SWITCHED, () => {
+	                  if (buildIdRef.current !== myBuildId) return
+	                  // hls.js can publish a transient adaptive currentLevel
+	                  // while a manually selected rendition is settling. Keep
+	                  // the displayed setting tied to the explicit user choice.
+	                  syncHlsQualitySetting()
+	                })
 	              }
               const p = video.play()
               if (p && typeof p.catch === 'function') p.catch(() => {})
@@ -2845,31 +2794,6 @@ export default function Watch() {
       if (!source) {
         return
       }
-
-
-      // Initial playback must not depend on the user discovering a working
-      // provider manually. If a provider has no usable source, move to the
-      // next provider automatically, preferring the same language first.
-      const failoverToNextSource = () => {
-        if (quiet || !mountedRef.current) return false
-        const allSources = [...SOURCES.sub, ...SOURCES.dub]
-        blockedSourcesRef.current.add(sourceId)
-        const sameLanguage = allSources.filter(
-          (candidate) => candidate.lang === source.lang
-        )
-        const next = [...sameLanguage, ...allSources].find(
-          (candidate) =>
-            candidate.id !== sourceId &&
-            !blockedSourcesRef.current.has(candidate.id)
-        )
-        if (!next) return false
-        setActiveSource(next.id)
-        showToast(`Trying ${next.label} automatically…`, { icon: 'signal' })
-        loadingRef.current = false
-        setStreamLoading(true)
-        return true
-      }
-
       loadingRef.current = true
       lastStreamAttemptRef.current = { sourceId, forceRefresh }
       // Quiet mode (provider switch with a live player): keep the old
@@ -2887,11 +2811,8 @@ export default function Watch() {
       setActiveEmbedUrl((current) => (current ? '' : current))
       setRetryAttempt(0)
       setResumePos(null)
-      // A recovery path can set a handoff position before refreshing a signed
-      // source. Do not erase it here: the rebuilt player consumes it in
-      // video:canplay. Episode changes explicitly clear it below.
-      // Keep verified intervals while switching servers for the same episode;
-      // the episode-change effect above owns the reset lifecycle.
+      // An explicit user retry can set a handoff position before rebuilding a
+      // source. Episode changes explicitly clear it below.
       setShowEndedOverlay(false)
 
       // Stale-while-revalidate: if we have a recent good stream for
@@ -2990,42 +2911,13 @@ export default function Watch() {
             return
           }
           setErrorType('backend')
-          setError(
-            "Backend is having trouble reaching an upstream source. Retrying automatically…"
-          )
-          // try one more time with backoff
-          if (!forceRefresh) {
-            await backoff(0, { base: 1_500, cap: 4_000 })
-            if (activeSourceRef.current === sourceId && mountedRef.current) {
-              loadingRef.current = false
-              loadStream(sourceId, true)
-              return
-            }
-          }
-          if (failoverToNextSource()) return
+          setError('Backend is having trouble reaching this source. Try again or choose another server.')
           setStreamLoading(false)
           loadingRef.current = false
           return
         }
 
-        let data = await res.json().catch(() => ({}))
-	      // Kiwi sometimes returns a frame-blocked embed first and a directly
-	      // playable HLS master on the next fresh lookup. The latter is the
-	      // browser-quality path the site used before the resolver rewrite.
-	      // Retry only this provider, only while it is embed-only, and only five
-	      // times: the upstream alternates valid sources in short bursts.
-	      if (isKiwiProvider(source) && buildQualityList(data.sources).length === 0) {
-	        for (let attempt = 0; attempt < 12; attempt += 1) {
-	          await backoff(attempt, { base: 500, cap: 1_200 })
-	          res = await requestStream(true)
-	          if (!res.ok) break
-	          const candidate = await res.json().catch(() => ({}))
-	          if (buildQualityList(candidate.sources).length > 0) {
-	            data = candidate
-	            break
-	          }
-	        }
-	      }
+        const data = await res.json().catch(() => ({}))
         if (!mountedRef.current) return
         // Navigation may have happened while the stream was fetching —
         // never build a player for an episode the user has left.
@@ -3050,7 +2942,6 @@ export default function Watch() {
               ? 'This server is blocked in your region. Try a different server.'
               : data.error || 'No video source found'
           )
-          if (failoverToNextSource()) return
           setStreamLoading(false)
           loadingRef.current = false
           return
@@ -3076,7 +2967,6 @@ export default function Watch() {
             showToast('No stream on that server — staying on the current one', { icon: 'warn' })
             return
           }
-          if (failoverToNextSource()) return
           setNoStreamError(true)
           setErrorType('no-source')
           setError('No video source found for this server.')
@@ -3124,23 +3014,10 @@ export default function Watch() {
             cls.type === 'network'
               ? 'Network error. Check your connection and try again.'
               : cls.type === 'backend'
-              ? "Backend is having trouble reaching an upstream source. Retrying automatically…"
+              ? 'Backend is having trouble reaching this source. Try again or choose another server.'
               : 'Failed to load stream. Check your connection and try again.'
           )
-          // Auto-retry once on network/backend errors
-          if (
-            (cls.type === 'network' || cls.type === 'backend' || cls.type === 'timeout') &&
-            streamRetries.current[retryKey] < MAX_SERVER_RETRIES
-          ) {
-            await backoff(streamRetries.current[retryKey] || 0, { base: 1_500, cap: 5_000 })
-            if (activeSourceRef.current === sourceId && mountedRef.current) {
-              loadingRef.current = false
-              loadStream(sourceId, forceRefresh || true)
-              return
-            }
-          }
         }
-        if (failoverToNextSource()) return
         setStreamLoading(false)
         loadingRef.current = false
         return
@@ -3226,44 +3103,14 @@ export default function Watch() {
   const loadStreamRef = useRef(loadStream)
   loadStreamRef.current = loadStream
 
-	  // A playing source must never be rebuilt in place. hls.js owns normal
-	  // request recovery; once it reports a terminal failure, move only to an
-	  // already eligible alternate server rather than asking the resolver for
-	  // another URL from the provider that just failed.
-	  const handleProviderBlocked = useCallback((_reason) => {
-    const all = [...SOURCES.sub, ...SOURCES.dub]
-    const current = activeSourceRef.current
-    const captureRecoveryPosition = () => {
-      const art = artInstance.current
-      const resumeAt = getRecoveryResumePosition(
-        art?.video?.currentTime,
-        art?.video?.duration
-      )
-      if (resumeAt !== null) pendingResumeRef.current = resumeAt
-    }
-    const now = Date.now()
-    if (now - lastBlockCycleRef.current < 3_000) return
-    lastBlockCycleRef.current = now
-    if (current) blockedSourcesRef.current.add(current)
-    // Stay within the selected language.
-    const currentLang = current
-      ? all.find((s) => s.id === current)?.lang
-      : null
-		const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
-    const next = pool.find((s) => !blockedSourcesRef.current.has(s.id))
-    if (next) {
-      captureRecoveryPosition()
-      showToast(
-        `Server blocked — switching to ${next.label} (${next.lang.toUpperCase()})…`
-      )
-      setActiveSource(next.id)
-      return
-    }
-    destroyPlayer()
-    setNoStreamError(true)
-    setErrorType('no-source')
-    setError("We don't have streaming for this anime.")
-  }, [SOURCES, showToast, destroyPlayer])
+	  // A playback issue never changes the selected provider. The visible server
+	  // controls remain the only way to select another provider.
+	  const handleProviderBlocked = useCallback(() => {
+	    const now = Date.now()
+	    if (now - lastBlockCycleRef.current < 3_000) return
+	    lastBlockCycleRef.current = now
+	    showToast('Stream issue — choose another server manually if needed.', { long: true })
+	  }, [showToast])
 
   handleProviderBlockedRef.current = handleProviderBlocked
 

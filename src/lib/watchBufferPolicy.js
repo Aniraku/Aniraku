@@ -63,16 +63,6 @@ export function isTerminalHlsStatus(status) {
 }
 
 /**
- * A terminal status must stop same-URL retries and send the player to an
- * eligible alternate server. The Watch page deliberately does not ask the
- * resolver to refresh an actively playing provider because that rebuilds the
- * player and discards its earned MediaSource buffer.
- */
-export function getHlsProviderRecoveryReason(status) {
-  return isTerminalHlsStatus(status) ? 'permanent-cdn' : 'native-hls-error'
-}
-
-/**
  * hls.js owns transient segment, playlist, and manifest retry. Letting the
  * outer player reload the source at the first recoverable failure discards
  * the MediaSource buffer and creates visible ArtPlayer reconnect loops.
