@@ -39,9 +39,11 @@ import {
 import { WatchPageSkeleton } from '../components/Skeletons/Skeletons'
 import { historyEntryKey, subscribeToWatchHistory, upsertWatchHistory } from '../lib/watchHistory'
 import {
+  getDashBufferPolicy,
   getHlsBufferPolicy,
   getHlsLoadPolicies,
   getHlsRequestCacheMode,
+  getNativeMediaBufferPolicy,
 } from '../lib/watchBufferPolicy'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 import {
@@ -1990,9 +1992,10 @@ export default function Watch() {
 			})
 	        let transportIndex = 0
 	        let hlsTried = false
-	        const tryUrl = (target, withCors) => {
+        const tryUrl = (target, withCors) => {
           try {
             video.crossOrigin = withCors ? 'anonymous' : ''
+            video.preload = getNativeMediaBufferPolicy().preload
             video.src = target
             video.load()
             const p = video.play()
@@ -2017,7 +2020,7 @@ export default function Watch() {
             enableWorker: false,
             ...getHlsBufferPolicy(netHintRef.current),
             ...getHlsLoadPolicies(),
-            startFragPrefetch: false,
+            startFragPrefetch: true,
             lowLatencyMode: false,
           })
           hlsInstance.current = hls
@@ -2121,7 +2124,7 @@ export default function Watch() {
           (navigator.language || 'en').toLowerCase() === 'zh-cn' ? 'zh-cn' : 'en',
         moreVideoAttr: {
           crossOrigin: 'anonymous',
-          preload: 'metadata',
+          preload: getNativeMediaBufferPolicy().preload,
           playsInline: true,
           'webkit-playsinline': 'true',
           'x5-playsinline': 'true',
@@ -2253,11 +2256,7 @@ export default function Watch() {
               const player = dash.MediaPlayer().create()
               player.updateSettings?.({
                 streaming: {
-                  buffer: {
-                    stableBufferTime: 6,
-                    bufferTimeAtTopQuality: 8,
-                    fastSwitchEnabled: true,
-                  },
+                  buffer: getDashBufferPolicy(netHintRef.current),
                 },
               })
               const dashProxy = (request) => {
@@ -2394,7 +2393,7 @@ export default function Watch() {
               // policy scales down on constrained networks and remains bounded
               // to let the browser's MediaSource eviction protect device RAM.
               ...bufferPolicy,
-              startFragPrefetch: false,
+              startFragPrefetch: true,
               lowLatencyMode: false,
               appendInSequenceGaps: true,
 
