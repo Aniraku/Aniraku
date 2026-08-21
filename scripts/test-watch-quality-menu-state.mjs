@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+	createHlsQualitySelection,
 	getHlsQualitySettingDisplay,
   getQualitySettingTitle,
   selectQualityInList,
@@ -29,5 +30,15 @@ assert.deepEqual(getHlsQualitySettingDisplay(hlsLevels, 1), {
   label: '720p',
   title: 'Quality · 720p',
 })
+
+const hlsQualitySelection = createHlsQualitySelection(-1)
+assert.equal(hlsQualitySelection.getSelectedLevel(), -1)
+assert.equal(hlsQualitySelection.selectLevel(1), 1)
+assert.equal(
+  hlsQualitySelection.getSelectedLevel(),
+  1,
+  'a later hls.js level event must retain the user-selected 720p index'
+)
+assert.equal(hlsQualitySelection.selectLevel('-1'), -1)
 
 console.log('watch quality menu state tests passed')
