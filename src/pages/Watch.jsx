@@ -44,9 +44,11 @@ import {
   getHlsProviderRecoveryReason,
   getHlsRequestCacheMode,
   isTerminalHlsStatus,
+  shouldRefreshHlsSource,
 } from '../lib/watchBufferPolicy'
 import { getRecoveryResumePosition } from '../lib/watchRecoveryPosition'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
+import { getQualitySettingTitle, selectQualityInList } from '../lib/watchQualityMenuState'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -466,6 +468,7 @@ function buildQualityList(sources) {
       html: entry.html,
       url: entry.url,
       type: entry.type,
+		label: entry.presentation.label,
 		qualityKey: entry.presentation.key,
 		qualityRank: entry.presentation.rank,
 		isAuto: entry.presentation.isAuto,
@@ -2172,7 +2175,7 @@ export default function Watch() {
           {
             name: 'quality',
             width: 220,
-            html: 'Quality',
+            html: getQualitySettingTitle(qualityList.find((item) => item.default) || qualityList[0]),
             selector: qualityList.map((item) => ({
               default: Boolean(item.default),
               html: item.html,
@@ -2184,9 +2187,16 @@ export default function Watch() {
               if (selected && art && selected.url !== art.option.url) {
                 const resumeAt = Number(art.video?.currentTime || 0)
                 if (resumeAt > 0) pendingResumeRef.current = resumeAt
-                buildPlayer(selected.url, selected.type || 'hls', qualityList, subtitles, headers, onBlocked)
+                buildPlayer(
+                  selected.url,
+                  selected.type || 'hls',
+                  selectQualityInList(qualityList, selected.url),
+                  subtitles,
+                  headers,
+                  onBlocked
+                )
               }
-              return item.html
+              return getQualitySettingTitle(selected)
             },
           },
           {
@@ -2414,22 +2424,11 @@ export default function Watch() {
                 return new Request(context.url, requestInit)
               },
             })
-            let triedDirect = false
-            let mediaRetries = 0
-            const fail = (reason, status = 0) => {
-              if (buildIdRef.current !== myBuildId) return
-              const terminalProxyFailure = reason === 'blocked' || reason === 'rate-limited'
-              // A permanent CDN response is already conclusive. Direct fallback
-              // uses the same stale URL and only produces another 401/404/502,
-              // so skip it and move straight to the next provider.
-	              const requiresProtectedProxy = Boolean(headers?.Referer)
-	              if (!terminalProxyFailure && !triedDirect && !requiresProtectedProxy) {
-                triedDirect = true
-                showToast('No upstream response — retrying direct…', { long: true })
-                hls.loadSource(url)
-                return
-              }
-              if (reason === 'rate-limited') {
+	            let mediaRetries = 0
+	            const fail = (reason, status = 0) => {
+	              if (buildIdRef.current !== myBuildId) return
+	              const terminalProxyFailure = reason === 'blocked' || reason === 'rate-limited'
+	              if (reason === 'rate-limited') {
                 showToast('Playback proxy is busy — switching server…', { long: true })
               } else if (reason === 'backend' || reason === 'cdn-unreachable') {
                 showToast(
@@ -2440,11 +2439,11 @@ export default function Watch() {
                 showToast('Playback error — switching server…')
               }
               if (onBlocked) {
-                onBlocked(
-                  terminalProxyFailure
-                    ? getHlsProviderRecoveryReason(status)
-                    : undefined
-                )
+	                onBlocked(
+	                  terminalProxyFailure
+	                    ? getHlsProviderRecoveryReason(status)
+	                    : 'native-hls-error'
+	                )
               }
               else setError('Stream playback error. Try a different server.')
             }
@@ -2505,29 +2504,39 @@ export default function Watch() {
 	                .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
 	              if (levels.length > 1 && art?.setting?.update) {
 	                const auto = getQualityPresentation('auto')
-	                art.setting.update({
-	                  name: 'quality',
-	                  width: 220,
-	                  html: 'Quality',
-	                  selector: [
-	                    {
-	                      default: hls.currentLevel === -1,
-	                      html: qualityOptionHtml(auto),
-	                      value: '-1',
+	                const buildHlsQualitySetting = (activeLevel) => {
+	                  const activePresentation = activeLevel === -1
+	                    ? auto
+	                    : getQualityPresentation(`${levels.find((level) => level.index === activeLevel)?.height || 0}p`)
+	                  return {
+	                    name: 'quality',
+	                    width: 220,
+	                    html: getQualitySettingTitle({ label: activePresentation.label }),
+	                    selector: [
+	                      {
+	                        default: activeLevel === -1,
+	                        html: qualityOptionHtml(auto),
+	                        value: '-1',
+	                      },
+	                      ...levels.map((level) => ({
+	                        default: activeLevel === level.index,
+	                        html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
+	                        value: String(level.index),
+	                      })),
+	                    ],
+	                    onSelect: (item) => {
+	                      const nextLevel = Number(item.value)
+	                      hls.currentLevel = nextLevel
+	                      hls.nextLevel = nextLevel
+	                      art.setting.update(buildHlsQualitySetting(nextLevel))
+	                      const label = nextLevel === -1
+	                        ? auto.label
+	                        : `${levels.find((level) => level.index === nextLevel)?.height || 'Auto'}p`
+	                      return getQualitySettingTitle({ label })
 	                    },
-	                    ...levels.map((level) => ({
-	                      default: hls.currentLevel === level.index,
-	                      html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
-	                      value: String(level.index),
-	                    })),
-	                  ],
-	                  onSelect: (item) => {
-	                    const nextLevel = Number(item.value)
-	                    hls.currentLevel = nextLevel
-	                    hls.nextLevel = nextLevel
-	                    return item.html
-	                  },
-	                })
+	                  }
+	                }
+	                art.setting.update(buildHlsQualitySetting(hls.currentLevel))
 	              }
               const p = video.play()
               if (p && typeof p.catch === 'function') p.catch(() => {})
@@ -2690,12 +2699,13 @@ export default function Watch() {
             if (
               !autoSkippedRef.current[type] &&
               !autoSkipFailuresRef.current[type] &&
-              position >= segment.start + 1 &&
+              position >= segment.start - 0.25 &&
               position < segment.end - 0.5
             ) {
               if (attemptSkipSegment(art.video, segment)) {
                 autoSkippedRef.current[type] = true
-                showToast(type === 'intro' ? 'Intro skipped' : 'Outro skipped', { icon: 'check' })
+                // Successful automatic skips remain silent; the manual overlay
+                // stays hidden unless the media seek actually fails.
               } else {
                 const failures = { ...autoSkipFailuresRef.current, [type]: true }
                 autoSkipFailuresRef.current = failures
@@ -3230,14 +3240,14 @@ export default function Watch() {
       )
       if (resumeAt !== null) pendingResumeRef.current = resumeAt
     }
-    const permanentCdnFailure = reason === 'permanent-cdn'
+	    const refreshableSignedUrl = shouldRefreshHlsSource(reason)
     const now = Date.now()
     if (now - lastBlockCycleRef.current < 3_000) return
     lastBlockCycleRef.current = now
-    if (current && !permanentCdnFailure && !refreshAttemptedRef.current.has(current)) {
-      refreshAttemptedRef.current.add(current)
-      captureRecoveryPosition()
-      showToast('Stream expired — refreshing this server once…')
+	    if (current && refreshableSignedUrl && !refreshAttemptedRef.current.has(current)) {
+	      refreshAttemptedRef.current.add(current)
+	      captureRecoveryPosition()
+	      showToast('Stream expired — refreshing this server once…')
       loadStreamRef.current(current, true)
       return
     }

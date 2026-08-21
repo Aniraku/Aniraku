@@ -74,6 +74,15 @@ export function getHlsProviderRecoveryReason(status) {
 }
 
 /**
+ * Refreshing a resolver source rebuilds the player and should therefore be a
+ * last resort. Only a confirmed signed-URL authentication response can benefit
+ * from it; ordinary stalls must keep hls.js' MediaSource and retry policy.
+ */
+export function shouldRefreshHlsSource(reason) {
+  return reason === 'refresh-source'
+}
+
+/**
  * hls.js owns transient segment, playlist, and manifest retry. Letting the
  * outer player reload the source at the first recoverable failure discards
  * the MediaSource buffer and creates visible ArtPlayer reconnect loops.
