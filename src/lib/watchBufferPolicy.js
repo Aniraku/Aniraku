@@ -63,23 +63,13 @@ export function isTerminalHlsStatus(status) {
 }
 
 /**
- * A 401/403 must stop retries against the same signed URL, but it may be
- * repairable by asking the resolver for a fresh URL. Other terminal statuses
- * are conclusive and should move to the next eligible provider instead.
+ * A terminal status must stop same-URL retries and send the player to an
+ * eligible alternate server. The Watch page deliberately does not ask the
+ * resolver to refresh an actively playing provider because that rebuilds the
+ * player and discards its earned MediaSource buffer.
  */
 export function getHlsProviderRecoveryReason(status) {
-  const code = Number(status)
-  if (code === 401 || code === 403) return 'refresh-source'
-  return isTerminalHlsStatus(code) ? 'permanent-cdn' : 'native-hls-error'
-}
-
-/**
- * Refreshing a resolver source rebuilds the player and should therefore be a
- * last resort. Only a confirmed signed-URL authentication response can benefit
- * from it; ordinary stalls must keep hls.js' MediaSource and retry policy.
- */
-export function shouldRefreshHlsSource(reason) {
-  return reason === 'refresh-source'
+  return isTerminalHlsStatus(status) ? 'permanent-cdn' : 'native-hls-error'
 }
 
 /**

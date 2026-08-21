@@ -44,11 +44,14 @@ import {
   getHlsProviderRecoveryReason,
   getHlsRequestCacheMode,
   isTerminalHlsStatus,
-  shouldRefreshHlsSource,
 } from '../lib/watchBufferPolicy'
 import { getRecoveryResumePosition } from '../lib/watchRecoveryPosition'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
-import { getQualitySettingTitle, selectQualityInList } from '../lib/watchQualityMenuState'
+import {
+  getHlsQualitySettingDisplay,
+  getQualitySettingTitle,
+  selectQualityInList,
+} from '../lib/watchQualityMenuState'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -957,10 +960,7 @@ export default function Watch() {
   const streamRetries = useRef({})
   const blockedSourcesRef = useRef(new Set())
   const lastBlockCycleRef = useRef(0)
-  const forceRefreshUsedRef = useRef(false)
-	const refreshAttemptedRef = useRef(new Set())
-	const embedFallbackAttemptedRef = useRef(new Set())
-	const handleProviderBlockedRef = useRef(null)
+  const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
   const embedFrameRef = useRef(null)
   const netHintRef = useRef(getConnectionHint())
@@ -1297,11 +1297,8 @@ export default function Watch() {
   useEffect(() => {
     blockedSourcesRef.current = new Set()
     lastBlockCycleRef.current = 0
-    forceRefreshUsedRef.current = false
     recoveryBusyRef.current = false
     streamRetries.current = {}
-		refreshAttemptedRef.current = new Set()
-		embedFallbackAttemptedRef.current = new Set()
 	}, [animeId, epNumber])
 
   // Keep the active episode row visible in the sidebar.
@@ -2505,13 +2502,12 @@ export default function Watch() {
 	              if (levels.length > 1 && art?.setting?.update) {
 	                const auto = getQualityPresentation('auto')
 	                const buildHlsQualitySetting = (activeLevel) => {
-	                  const activePresentation = activeLevel === -1
-	                    ? auto
-	                    : getQualityPresentation(`${levels.find((level) => level.index === activeLevel)?.height || 0}p`)
+	                  const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel)
 	                  return {
 	                    name: 'quality',
 	                    width: 220,
-	                    html: getQualitySettingTitle({ label: activePresentation.label }),
+	                    html: activeDisplay.title,
+	                    tooltip: activeDisplay.label,
 	                    selector: [
 	                      {
 	                        default: activeLevel === -1,
@@ -2528,11 +2524,17 @@ export default function Watch() {
 	                      const nextLevel = Number(item.value)
 	                      hls.currentLevel = nextLevel
 	                      hls.nextLevel = nextLevel
-	                      art.setting.update(buildHlsQualitySetting(nextLevel))
-	                      const label = nextLevel === -1
-	                        ? auto.label
-	                        : `${levels.find((level) => level.index === nextLevel)?.height || 'Auto'}p`
-	                      return getQualitySettingTitle({ label })
+	                      const nextDisplay = getHlsQualitySettingDisplay(levels, nextLevel)
+	                      const qualitySetting = art.setting.find('quality')
+	                      if (qualitySetting) {
+	                        // ArtPlayer checks the selector item before it runs
+	                        // this callback. Update the already-rendered parent
+	                        // setting instead of rebuilding it mid-click, which
+	                        // left the on-screen title at its initial Auto value.
+	                        qualitySetting.html = nextDisplay.title
+	                        qualitySetting.tooltip = nextDisplay.label
+	                      }
+	                      return nextDisplay.label
 	                    },
 	                  }
 	                }
@@ -3224,12 +3226,11 @@ export default function Watch() {
   const loadStreamRef = useRef(loadStream)
   loadStreamRef.current = loadStream
 
-  // When a server's CDN blocks playback, try ONE cache-bypassing
-  // refresh of that same server first — expired CDN tokens renew in
-  // place this way, exactly like a fresh page load. Only if the
-  // refreshed stream also fails does the source get marked blocked
-  // and the switch to the next server happens.
-  const handleProviderBlocked = useCallback((reason) => {
+	  // A playing source must never be rebuilt in place. hls.js owns normal
+	  // request recovery; once it reports a terminal failure, move only to an
+	  // already eligible alternate server rather than asking the resolver for
+	  // another URL from the provider that just failed.
+	  const handleProviderBlocked = useCallback((_reason) => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
     const current = activeSourceRef.current
     const captureRecoveryPosition = () => {
@@ -3240,39 +3241,15 @@ export default function Watch() {
       )
       if (resumeAt !== null) pendingResumeRef.current = resumeAt
     }
-	    const refreshableSignedUrl = shouldRefreshHlsSource(reason)
     const now = Date.now()
     if (now - lastBlockCycleRef.current < 3_000) return
     lastBlockCycleRef.current = now
-	    if (current && refreshableSignedUrl && !refreshAttemptedRef.current.has(current)) {
-	      refreshAttemptedRef.current.add(current)
-	      captureRecoveryPosition()
-	      showToast('Stream expired — refreshing this server once…')
-      loadStreamRef.current(current, true)
-      return
-    }
     if (current) blockedSourcesRef.current.add(current)
     // Stay within the selected language.
     const currentLang = current
       ? all.find((s) => s.id === current)?.lang
       : null
-	const currentProvider = current
-		? all.find((s) => s.id === current)
-		: null
-	const embeddedFallback = currentProvider?.initialSources?.find(isBrowserPlayableEmbedSource)
-	if (current && embeddedFallback && !embedFallbackAttemptedRef.current.has(current)) {
-		embedFallbackAttemptedRef.current.add(current)
-		destroyPlayer()
-		setActiveEmbedUrl(embeddedFallback.url)
-		setError('')
-		setNoStreamError(false)
-		setErrorType('')
-		setStreamLoading(false)
-		loadingRef.current = false
-		showToast(`Trying ${currentProvider.label}…`, { icon: 'signal' })
-		return
-	}
-	const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
+		const pool = currentLang ? all.filter((s) => s.lang === currentLang) : all
     const next = pool.find((s) => !blockedSourcesRef.current.has(s.id))
     if (next) {
       captureRecoveryPosition()
@@ -3280,13 +3257,6 @@ export default function Watch() {
         `Server blocked — switching to ${next.label} (${next.lang.toUpperCase()})…`
       )
       setActiveSource(next.id)
-      return
-    }
-    if (!forceRefreshUsedRef.current && current) {
-      forceRefreshUsedRef.current = true
-      captureRecoveryPosition()
-      showToast('All servers blocked — retrying once…')
-      loadStreamRef.current(current, true)
       return
     }
     destroyPlayer()
