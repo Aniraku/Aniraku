@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createMediaTransportPlan } from '../src/lib/watchSourceTransport.js'
+import { createMediaTransportPlan, shouldTryHlsFallback } from '../src/lib/watchSourceTransport.js'
 
 const common = {
   directUrl: 'https://vault-02.uwucdn.top/stream/example/uwu.m3u8',
@@ -18,5 +18,8 @@ assert.deepEqual(createMediaTransportPlan({ ...common, verification: '' }), [
   { mode: 'proxy', url: common.proxyUrl },
   { mode: 'direct', url: common.directUrl },
 ])
+
+assert.equal(shouldTryHlsFallback('https://cdn.example/video/master.m3u8?token=one'), true)
+assert.equal(shouldTryHlsFallback('https://a1.mp4upload.com/video.mp4'), false)
 
 console.log('watch source transport tests passed')

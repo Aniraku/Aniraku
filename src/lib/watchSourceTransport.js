@@ -8,3 +8,7 @@ export function createMediaTransportPlan({ verification, directUrl, proxyUrl }) 
   // playback remains the one bounded fallback if that proxy attempt fails.
   return [proxy, direct]
 }
+
+export function shouldTryHlsFallback(url) {
+  return /\.m3u8(?:[?#]|$)/i.test(String(url || ''))
+}

@@ -10,7 +10,7 @@ const watchSource = await readFile(
 assert.match(watchSource, /createMediaTransportPlan/)
 assert.match(watchSource, /transportIndex \+ 1 < transportPlan\.length/)
 assert.match(watchSource, /!manifestReady && hlsTransportIndex \+ 1 < hlsTransportPlan\.length/)
-assert.match(watchSource, /if \(await tryHls\(\)\) return/)
+assert.match(watchSource, /shouldTryHlsFallback\(url\) && await tryHls\(\)/)
 assert.match(watchSource, /playAsNative\(video, url, art\)/)
 assert.match(watchSource, /isBrowserPlayableEmbedSource/)
 assert.match(watchSource, /hls\.recoverMediaError\(\)/)
