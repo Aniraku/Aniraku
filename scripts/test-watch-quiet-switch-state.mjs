@@ -13,6 +13,21 @@ const pending = beginQuietProviderSwitch({
 })
 
 assert.deepEqual(pending, { from: 'bonk-sub', to: 'kiwi-sub', episode: 3 })
+
+const handoffPending = beginQuietProviderSwitch({
+  from: 'bonk-sub',
+  to: 'kiwi-sub',
+  episode: 3,
+  resumeAt: 421.25,
+  shouldPlay: true,
+})
+assert.deepEqual(handoffPending, {
+  from: 'bonk-sub',
+  to: 'kiwi-sub',
+  episode: 3,
+  resumeAt: 421.25,
+  shouldPlay: true,
+})
 assert.deepEqual(
   settleQuietProviderSwitch({ pending, sourceId: 'kiwi-sub', episode: 3, succeeded: false }),
   { pending: null, restoreSourceId: 'bonk-sub', skipSourceLoad: true }

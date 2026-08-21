@@ -46,6 +46,7 @@ import {
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 import {
   createHlsQualitySelection,
+  getHlsDataSaverCap,
   getHlsQualitySettingDisplay,
   getQualitySettingTitle,
   selectQualityInList,
@@ -54,6 +55,7 @@ import {
   beginQuietProviderSwitch,
   settleQuietProviderSwitch,
 } from '../lib/watchQuietSwitchState'
+import { createMediaTransportPlan } from '../lib/watchSourceTransport'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -459,12 +461,13 @@ function buildQualityList(sources) {
       }
       return a.sourceIndex - b.sourceIndex
     })
-    .map((entry, index) => ({
-      default: index === 0,
-      html: entry.html,
-      url: entry.url,
-      type: entry.type,
-		label: entry.presentation.label,
+	    .map((entry, index) => ({
+	      default: index === 0,
+	      html: entry.html,
+	      url: entry.url,
+	      type: entry.type,
+			verification: entry.verification,
+			label: entry.presentation.label,
 		qualityKey: entry.presentation.key,
 		qualityRank: entry.presentation.rank,
 		isAuto: entry.presentation.isAuto,
@@ -956,6 +959,7 @@ export default function Watch() {
   const lastBlockCycleRef = useRef(0)
   const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
+  const providerWarmRequestsRef = useRef(new Map())
   const embedFrameRef = useRef(null)
   const netHintRef = useRef(getConnectionHint())
 
@@ -1844,6 +1848,7 @@ export default function Watch() {
   }, [animeId, epNumber, user?.id])
 
   const pendingResumeRef = useRef(null)
+  const pendingHandoffRef = useRef(null)
   const handleResume = useCallback(() => {
     const art = artInstance.current
     if (art && resumePos) {
@@ -1966,16 +1971,25 @@ export default function Watch() {
       // The backend strips "rn" before dialing the CDN.
       const nonce =
         Math.random().toString(36).slice(2) + Date.now().toString(36)
-      const proxied = (u) =>
-        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+	      const proxied = (u) =>
+	        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+			const activeQuality = Array.isArray(qualityList)
+				? qualityList.find((quality) => quality?.url === streamUrl)
+				: null
+			const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
 
       // Browser-native media playback — proxy first, direct as fallback.
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
-      const playAsNative = async (video, url, art) => {
-        let directTried = false
-        let hlsTried = false
-        const tryUrl = (target, withCors) => {
+	      const playAsNative = async (video, url, art) => {
+			const transportPlan = createMediaTransportPlan({
+				verification: sourceVerification,
+				directUrl: url,
+				proxyUrl: proxied(url),
+			})
+	        let transportIndex = 0
+	        let hlsTried = false
+	        const tryUrl = (target, withCors) => {
           try {
             video.crossOrigin = withCors ? 'anonymous' : ''
             video.src = target
@@ -2011,7 +2025,7 @@ export default function Watch() {
           hls.attachMedia(video)
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             if (buildIdRef.current !== myBuildId) return
-            video.play().catch(() => {})
+            if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
           })
           let lastMediaRecoveryAt = 0
           hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -2031,15 +2045,22 @@ export default function Watch() {
           return true
         }
 
-        tryUrl(proxied(url), true)
-        video.onerror = async () => {
-          if (buildIdRef.current !== myBuildId) return
-          if (!directTried) {
-            directTried = true
-            showToast('Trying direct playback…')
-            tryUrl(url, false)
-            return
-          }
+	        tryUrl(transportPlan[transportIndex].url, transportPlan[transportIndex].mode === 'proxy')
+	        video.onerror = async () => {
+	          if (buildIdRef.current !== myBuildId) return
+	          if (transportIndex + 1 < transportPlan.length) {
+	            transportIndex += 1
+	            showToast(
+					transportPlan[transportIndex].mode === 'direct'
+						? 'Trying direct playback…'
+						: 'Trying the media proxy…'
+				)
+	            tryUrl(
+					transportPlan[transportIndex].url,
+					transportPlan[transportIndex].mode === 'proxy'
+				)
+	            return
+	          }
           if (await tryHls()) return
 	          showToast('Direct playback failed — choose another server if needed.', { long: true })
           if (onBlocked) onBlocked('native-media-error')
@@ -2260,12 +2281,18 @@ export default function Watch() {
               if (buildIdRef.current === myBuildId) onBlocked?.('dash-error')
             }
           },
-          m3u8: async (video, url, art) => {
-            const proxiedH = proxied
-            const referer = (headers && headers.Referer) || ''
-	          const updateNativeHlsQualities = async () => {
-	            try {
-	              const response = await fetch(proxiedH(url), { cache: 'no-store' })
+	          m3u8: async (video, url, art) => {
+	            const proxiedH = proxied
+	            const referer = (headers && headers.Referer) || ''
+				const hlsTransportPlan = createMediaTransportPlan({
+					verification: sourceVerification,
+					directUrl: url,
+					proxyUrl: proxiedH(url),
+				})
+				let hlsTransportIndex = 0
+		          const updateNativeHlsQualities = async () => {
+		            try {
+		              const response = await fetch(hlsTransportPlan[hlsTransportIndex].url, { cache: 'no-store' })
 	              if (!response.ok) return
 	              const lines = (await response.text()).split(/\r?\n/)
 	              const variants = []
@@ -2323,11 +2350,13 @@ export default function Watch() {
 	            } catch {}
 	          }
             // iOS Safari has native HLS support — use it directly.
-            if (video.canPlayType('application/vnd.apple.mpegurl')) {
-              try {
-                video.src = proxiedH(url)
-                const p = video.play()
-                if (p && typeof p.catch === 'function') p.catch(() => {})
+	            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+	              try {
+	                video.src = hlsTransportPlan[hlsTransportIndex].url
+	                if (pendingHandoffRef.current?.shouldPlay !== false) {
+	                  const p = video.play()
+	                  if (p && typeof p.catch === 'function') p.catch(() => {})
+	                }
 	              void updateNativeHlsQualities()
               } catch {
                 // fall through to hls.js
@@ -2344,12 +2373,12 @@ export default function Watch() {
               }
               return
             }
-            if (!Hls.isSupported()) {
-              // last-resort native
-              try {
-                video.src = proxiedH(url)
-                video.play().catch(() => {})
-              } catch {}
+	            if (!Hls.isSupported()) {
+	              // last-resort native
+	              try {
+	                video.src = proxiedH(url)
+	                if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
+	              } catch {}
               return
             }
             if (art.hls) {
@@ -2391,6 +2420,7 @@ export default function Watch() {
               },
             })
 	            let mediaRetries = 0
+				let manifestReady = false
 	            const fail = () => {
 	              if (buildIdRef.current !== myBuildId) return
 	              showToast('Stream issue — keeping the selected server.', { long: true })
@@ -2399,7 +2429,7 @@ export default function Watch() {
               }
               else setError('Stream playback error. Try a different server.')
             }
-            hls.on(Hls.Events.ERROR, (_event, data) => {
+	            hls.on(Hls.Events.ERROR, (_event, data) => {
               if (buildIdRef.current !== myBuildId) return
               if (!data.fatal) return
               // Signed URL and throttle responses are terminal. Every other
@@ -2429,13 +2459,21 @@ export default function Watch() {
 	                fail()
                 return
               }
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-	                fail()
-                return
+	              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+						if (!manifestReady && hlsTransportIndex + 1 < hlsTransportPlan.length) {
+							hlsTransportIndex += 1
+							try {
+								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
+								return
+							} catch {}
+						}
+		                fail()
+		                return
               }
 	              fail()
             })
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+	            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+						manifestReady = true
 	              const levels = (hls.levels || [])
 	                .map((level, index) => ({
 	                  index,
@@ -2449,8 +2487,10 @@ export default function Watch() {
 	              if (levels.length > 1 && art?.setting?.update) {
 	                const auto = getQualityPresentation('auto')
 	                const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
+	                const dataSaver = getHlsDataSaverCap(levels)
+	                let dataSaverCap = null
 	                const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
-	                  const display = getHlsQualitySettingDisplay(levels, level)
+	                  const display = getHlsQualitySettingDisplay(levels, level, dataSaverCap)
 	                  const qualitySetting = art.setting.find('quality')
 	                  if (qualitySetting) {
 	                    qualitySetting.html = display.title
@@ -2459,7 +2499,7 @@ export default function Watch() {
 	                  return display
 	                }
 	                const buildHlsQualitySetting = (activeLevel) => {
-	                  const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel)
+	                  const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel, dataSaverCap)
 	                  return {
 	                    name: 'quality',
 	                    width: 220,
@@ -2467,21 +2507,39 @@ export default function Watch() {
 	                    tooltip: activeDisplay.label,
 	                    selector: [
 	                      {
-	                        default: activeLevel === -1,
+	                        default: activeLevel === -1 && dataSaverCap === null,
 	                        html: qualityOptionHtml(auto),
-	                        value: '-1',
+	                        value: 'auto',
 	                      },
+	                      ...(dataSaver ? [{
+	                        default: dataSaverCap === dataSaver.index,
+	                        html: qualityOptionHtml(getQualityPresentation(`Data Saver · ≤${dataSaver.height}p`)),
+	                        value: 'saver',
+	                      }] : []),
 	                      ...levels.map((level) => ({
-	                        default: activeLevel === level.index,
+	                        default: dataSaverCap === null && activeLevel === level.index,
 	                        html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
-	                        value: String(level.index),
+	                        value: `level:${level.index}`,
 	                      })),
 	                    ],
 	                    onSelect: (item) => {
-	                      const nextLevel = hlsQualitySelection.selectLevel(item.value)
-	                      hls.currentLevel = nextLevel
-	                      hls.nextLevel = nextLevel
-	                      const nextDisplay = syncHlsQualitySetting(nextLevel)
+	                      if (item.value === 'saver' && dataSaver) {
+	                        dataSaverCap = dataSaver.index
+	                        hlsQualitySelection.selectLevel(-1)
+	                        hls.autoLevelCapping = dataSaver.index
+	                        hls.currentLevel = -1
+	                        hls.nextLevel = -1
+	                      } else {
+	                        const nextLevel = item.value === 'auto'
+	                          ? -1
+	                          : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
+	                        dataSaverCap = null
+	                        hls.autoLevelCapping = -1
+	                        hls.currentLevel = nextLevel
+	                        hls.nextLevel = nextLevel
+	                        hlsQualitySelection.selectLevel(nextLevel)
+	                      }
+	                      const nextDisplay = syncHlsQualitySetting()
 	                      return nextDisplay.label
 	                    },
 	                  }
@@ -2495,14 +2553,16 @@ export default function Watch() {
 	                  syncHlsQualitySetting()
 	                })
 	              }
-              const p = video.play()
-              if (p && typeof p.catch === 'function') p.catch(() => {})
-            })
-            hls.on(Hls.Events.BUFFER_APPENDING, () => {
+	              if (pendingHandoffRef.current?.shouldPlay !== false) {
+	                const p = video.play()
+	                if (p && typeof p.catch === 'function') p.catch(() => {})
+	              }
+	            })
+	            hls.on(Hls.Events.BUFFER_APPENDING, () => {
               // could be used to show buffering indicator if needed
             })
-            try {
-              hls.loadSource(proxiedH(url))
+	            try {
+	              hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
               hls.attachMedia(video)
               art.hls = hls
               hlsInstance.current = hls
@@ -2554,6 +2614,12 @@ export default function Watch() {
         if (pendingResumeRef.current) {
           art.video.currentTime = pendingResumeRef.current
           pendingResumeRef.current = null
+        }
+        const handoff = pendingHandoffRef.current
+        if (handoff) {
+          if (handoff.shouldPlay === false) art.video.pause()
+          else art.video.play().catch(() => {})
+          pendingHandoffRef.current = null
         }
       })
       art.on('video:waiting', () => setBuffering(true))
@@ -2769,6 +2835,49 @@ export default function Watch() {
     streamCacheRef.current.set(cacheKey(source), { data, t: Date.now() })
   }
 
+  const warmProviderStream = useCallback((sourceId) => {
+    const source = [...SOURCES.sub, ...SOURCES.dub].find((candidate) => candidate.id === sourceId)
+    if (!source || source.id === activeSourceRef.current || getCachedStream(source)) return null
+
+    const key = cacheKey(source)
+    const existing = providerWarmRequestsRef.current.get(key)
+    if (existing) return existing
+
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000)
+    const targetEpisode = epNumber
+    const request = fetch(`${API_BASE}/api/v1/stream`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        animeId: parseInt(animeId, 10),
+        episode: targetEpisode,
+        provider: source.provider,
+        lang: source.lang,
+        quality: 'auto',
+        refresh: false,
+      }),
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        if (!response.ok || targetEpisode !== epNumberRef.current) return null
+        const data = await response.json().catch(() => null)
+        if (data?.sources?.[0]?.url) setCachedStream(source, data)
+        return data?.sources?.[0]?.url ? data : null
+      })
+      .catch(() => null)
+      .finally(() => {
+        window.clearTimeout(timeoutId)
+        if (providerWarmRequestsRef.current.get(key) === request) {
+          providerWarmRequestsRef.current.delete(key)
+        }
+      })
+
+    providerWarmRequestsRef.current.set(key, request)
+    return request
+  }, [animeId, epNumber, SOURCES])
+
   // ────────────────────────────────────────────────────────────
   // Load stream
   // ────────────────────────────────────────────────────────────
@@ -2810,6 +2919,7 @@ export default function Watch() {
           succeeded: false,
         })
         quietProviderSwitchRef.current = settled.pending
+        pendingResumeRef.current = null
         const previous = [...SOURCES.sub, ...SOURCES.dub].find(
           (candidate) => candidate.id === settled.restoreSourceId
         )
@@ -2934,11 +3044,16 @@ export default function Watch() {
           }),
           cache: 'no-store',
         })
-        let res = await requestStream(forceRefresh)
+        const warmedRequest = !forceRefresh
+          ? providerWarmRequestsRef.current.get(cacheKey(source))
+          : null
+        let data = warmedRequest ? await warmedRequest : null
+        let res = null
+        if (!data) res = await requestStream(forceRefresh)
         clearTimeout(timeoutId)
         if (streamAbortRef.current === controller) streamAbortRef.current = null
 
-        if (res.status >= 500) {
+        if (res?.status >= 500) {
           // Backend explicitly says "no upstream response".
           if (quiet) {
             setStreamLoading(false)
@@ -2953,7 +3068,7 @@ export default function Watch() {
           return
         }
 
-        const data = await res.json().catch(() => ({}))
+        if (!data) data = await res?.json().catch(() => ({}))
         if (!mountedRef.current) return
         // Navigation may have happened while the stream was fetching —
         // never build a player for an episode the user has left.
@@ -3206,11 +3321,16 @@ export default function Watch() {
       )
       if (source)
         showToast(`Switching to ${source.lang.toUpperCase()}…`)
+      const video = artInstance.current?.video
+      const resumeAt = Number(video?.currentTime || 0)
+      if (resumeAt > 0) pendingResumeRef.current = resumeAt
       quietProviderSwitchRef.current = artInstance.current
         ? beginQuietProviderSwitch({
             from: activeSourceRef.current || activeSource,
             to: sourceId,
             episode: epNumber,
+            resumeAt,
+            shouldPlay: Boolean(video && !video.paused && !video.ended),
           })
         : null
       setActiveSource(sourceId)
@@ -4164,6 +4284,9 @@ export default function Watch() {
                       key={source.id}
                       type="button"
                       onClick={() => handleSourceSwitch(source.id)}
+	                      onPointerEnter={() => warmProviderStream(source.id)}
+	                      onFocus={() => warmProviderStream(source.id)}
+	                      onTouchStart={() => warmProviderStream(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
 	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}

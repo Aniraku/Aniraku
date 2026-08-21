@@ -2,9 +2,12 @@
  * Tracks a manual provider change that keeps the old player alive until the
  * new provider has returned a browser-playable source.
  */
-export function beginQuietProviderSwitch({ from, to, episode }) {
+export function beginQuietProviderSwitch({ from, to, episode, resumeAt, shouldPlay }) {
   if (!from || !to || from === to) return null
-  return { from, to, episode }
+  const handoff = {}
+  if (Number.isFinite(Number(resumeAt)) && Number(resumeAt) > 0) handoff.resumeAt = Number(resumeAt)
+  if (typeof shouldPlay === 'boolean') handoff.shouldPlay = shouldPlay
+  return { from, to, episode, ...handoff }
 }
 
 /**
