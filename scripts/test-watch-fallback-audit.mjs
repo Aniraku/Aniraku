@@ -7,8 +7,9 @@ const watchSource = await readFile(
 )
 
 // Retained, browser-useful fallbacks.
-assert.match(watchSource, /tryUrl\(proxied\(url\), true\)/)
-assert.match(watchSource, /tryUrl\(url, false\)/)
+assert.match(watchSource, /createMediaTransportPlan/)
+assert.match(watchSource, /transportIndex \+ 1 < transportPlan\.length/)
+assert.match(watchSource, /!manifestReady && hlsTransportIndex \+ 1 < hlsTransportPlan\.length/)
 assert.match(watchSource, /if \(await tryHls\(\)\) return/)
 assert.match(watchSource, /playAsNative\(video, url, art\)/)
 assert.match(watchSource, /isBrowserPlayableEmbedSource/)

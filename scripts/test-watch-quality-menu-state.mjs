@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
 	createHlsQualitySelection,
+	getHlsDataSaverCap,
 	getHlsQualitySettingDisplay,
   getQualitySettingTitle,
   selectQualityInList,
@@ -27,9 +28,15 @@ assert.deepEqual(getHlsQualitySettingDisplay(hlsLevels, -1), {
   title: 'Quality · Auto',
 })
 assert.deepEqual(getHlsQualitySettingDisplay(hlsLevels, 1), {
-  label: '720p',
-  title: 'Quality · 720p',
+	label: '720p',
+	title: 'Quality · 720p',
 })
+assert.deepEqual(getHlsDataSaverCap(hlsLevels), { index: 2, height: 480 })
+assert.deepEqual(getHlsQualitySettingDisplay(hlsLevels, -1, 2), {
+	label: 'Data Saver · ≤480p',
+	title: 'Quality · Data Saver · ≤480p',
+})
+assert.equal(getHlsDataSaverCap([{ index: 0, height: 720 }]), null)
 
 const hlsQualitySelection = createHlsQualitySelection(-1)
 assert.equal(hlsQualitySelection.getSelectedLevel(), -1)
