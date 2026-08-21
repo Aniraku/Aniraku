@@ -6,36 +6,15 @@ const TERMINAL_HLS_HTTP_STATUSES = new Set([401, 403, 404, 410, 429])
  * browser, so these values deliberately reserve meaningful forward playback
  * without allowing a low-bitrate stream to grow memory usage indefinitely.
  */
-export function getHlsBufferPolicy(connection = {}) {
-  const effectiveType = String(connection?.effectiveType || '').toLowerCase()
-  const downlink = Number(connection?.downlink || 0)
-  const saveData = connection?.saveData === true
-
-  if (saveData || effectiveType === 'slow-2g' || effectiveType === '2g') {
-    return {
-      maxBufferLength: 45,
-      maxMaxBufferLength: 90,
-      maxBufferSize: 32 * MEBIBYTE,
-      backBufferLength: 20,
-      maxBufferHole: 0.75,
-    }
-  }
-
-  if (effectiveType === '3g' || (downlink > 0 && downlink < 4)) {
-    return {
-      maxBufferLength: 75,
-      maxMaxBufferLength: 150,
-      maxBufferSize: 64 * MEBIBYTE,
-      backBufferLength: 45,
-      maxBufferHole: 0.75,
-    }
-  }
-
+export function getHlsBufferPolicy(_connection = {}) {
   return {
+    // A predictable VOD reserve: 120 seconds forward and 120 seconds behind
+    // the playhead. hls.js treats these as targets and still obeys browser MSE
+    // limits when a device cannot retain the complete target.
     maxBufferLength: 120,
-    maxMaxBufferLength: 180,
-    maxBufferSize: 96 * MEBIBYTE,
-    backBufferLength: 60,
+    maxMaxBufferLength: 120,
+    maxBufferSize: 128 * MEBIBYTE,
+    backBufferLength: 120,
     maxBufferHole: 0.75,
   }
 }
@@ -47,10 +26,11 @@ export function getHlsBufferPolicy(connection = {}) {
  * not served from a stale playlist.
  */
 export function getHlsRequestCacheMode(context = {}) {
-  const kind = String(context?.type || '').toLowerCase()
-  return context?.frag || kind.includes('fragment') || kind.includes('part')
-    ? 'force-cache'
-    : 'default'
+  // MSE provides the explicit 120-second playback reserve. Forcing all VOD
+  // fragments into the browser HTTP cache made the full episode look buffered
+  // and could retain far more media than the player target. Normal caching
+  // honors the origin's headers and allows browser eviction.
+  return 'default'
 }
 
 /**
@@ -127,7 +107,7 @@ export function getDashBufferPolicy(connection = {}) {
     initialBufferLevel: Math.min(6, hls.maxBufferLength),
     bufferTimeDefault: hls.maxBufferLength,
     bufferTimeAtTopQuality: hls.maxBufferLength,
-    bufferTimeAtTopQualityLongForm: hls.maxMaxBufferLength,
+    bufferTimeAtTopQualityLongForm: hls.maxBufferLength,
     longFormContentDurationThreshold: 600,
     bufferToKeep: hls.backBufferLength,
     bufferPruningInterval: 15,

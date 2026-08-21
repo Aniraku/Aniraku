@@ -16,5 +16,9 @@ assert.match(watchSource, /buffer: getDashBufferPolicy\(netHintRef\.current\)/)
 
 const hlsPrefetches = watchSource.match(/startFragPrefetch: true/g) || []
 assert.equal(hlsPrefetches.length, 2)
+assert.match(watchSource, /createBufferedTimelineIndicator/)
+assert.match(watchSource, /bufferIndicatorCleanupRef/)
+assert.match(watchSource, /IS_IOS && video\.canPlayType\('application\/vnd\.apple\.mpegurl'\)/)
+assert.match(watchSource, /watch-buffer-indicator-segment/)
 
 console.log('watch all-source buffer coverage tests passed')
