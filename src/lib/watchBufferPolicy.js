@@ -106,3 +106,31 @@ export function getHlsLoadPolicies() {
     },
   }
 }
+
+/**
+ * Native media elements do not expose a portable byte or second buffer target.
+ * `auto` is the strongest standards-based hint: direct and proxied files may
+ * prefetch as their network, cache headers, and local storage permit.
+ */
+export function getNativeMediaBufferPolicy() {
+  return { preload: 'auto' }
+}
+
+/**
+ * Express the same bounded connection-aware reserve through dash.js's forward
+ * and backward buffer settings. Startup stays prompt while VOD keeps building
+ * a meaningful reserve for smooth playback.
+ */
+export function getDashBufferPolicy(connection = {}) {
+  const hls = getHlsBufferPolicy(connection)
+  return {
+    initialBufferLevel: Math.min(6, hls.maxBufferLength),
+    bufferTimeDefault: hls.maxBufferLength,
+    bufferTimeAtTopQuality: hls.maxBufferLength,
+    bufferTimeAtTopQualityLongForm: hls.maxMaxBufferLength,
+    longFormContentDurationThreshold: 600,
+    bufferToKeep: hls.backBufferLength,
+    bufferPruningInterval: 15,
+    fastSwitchEnabled: true,
+  }
+}
