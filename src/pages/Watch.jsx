@@ -50,6 +50,10 @@ import {
   getQualitySettingTitle,
   selectQualityInList,
 } from '../lib/watchQualityMenuState'
+import {
+  beginQuietProviderSwitch,
+  settleQuietProviderSwitch,
+} from '../lib/watchQuietSwitchState'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -947,6 +951,8 @@ export default function Watch() {
   const prevEpisodeRef = useRef(null)
   const recoveryBusyRef = useRef(false)
   const streamRetries = useRef({})
+  const quietProviderSwitchRef = useRef(null)
+  const skipQuietProviderReloadRef = useRef(null)
   const lastBlockCycleRef = useRef(0)
   const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
@@ -2794,6 +2800,36 @@ export default function Watch() {
       if (!source) {
         return
       }
+
+      const reportQuietSwitchFailure = (fallbackMessage) => {
+        if (!quiet) return
+        const settled = settleQuietProviderSwitch({
+          pending: quietProviderSwitchRef.current,
+          sourceId,
+          episode: targetEpisode,
+          succeeded: false,
+        })
+        quietProviderSwitchRef.current = settled.pending
+        const previous = [...SOURCES.sub, ...SOURCES.dub].find(
+          (candidate) => candidate.id === settled.restoreSourceId
+        )
+        if (previous && activeSourceRef.current === sourceId) {
+          if (settled.skipSourceLoad) {
+            skipQuietProviderReloadRef.current = {
+              sourceId: previous.id,
+              episode: targetEpisode,
+            }
+          }
+          activeSourceRef.current = previous.id
+          setActiveSource(previous.id)
+        }
+        showToast(
+          previous
+            ? `${source.label} is unavailable — still playing ${previous.label}.`
+            : fallbackMessage,
+          { icon: 'warn' }
+        )
+      }
       loadingRef.current = true
       lastStreamAttemptRef.current = { sourceId, forceRefresh }
       // Quiet mode (provider switch with a live player): keep the old
@@ -2907,7 +2943,7 @@ export default function Watch() {
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
-            showToast('Could not switch server right now — try again', { icon: 'warn' })
+            reportQuietSwitchFailure('Could not switch server right now — try again')
             return
           }
           setErrorType('backend')
@@ -2927,7 +2963,7 @@ export default function Watch() {
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
-            showToast('No stream on that server — staying on the current one', { icon: 'warn' })
+            reportQuietSwitchFailure('No stream on that server — staying on the current one')
             return
           }
           const cls = classifyStreamError(null, data)
@@ -2964,7 +3000,7 @@ export default function Watch() {
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
-            showToast('No stream on that server — staying on the current one', { icon: 'warn' })
+            reportQuietSwitchFailure('No stream on that server — staying on the current one')
             return
           }
           setNoStreamError(true)
@@ -2984,8 +3020,14 @@ export default function Watch() {
 	          data.headers,
 	          onBlocked
 	        )
-	        applySkipSegments(normalizeProviderSkipSegments(data))
-	        setCachedStream(source, data)
+        applySkipSegments(normalizeProviderSkipSegments(data))
+        setCachedStream(source, data)
+        quietProviderSwitchRef.current = settleQuietProviderSwitch({
+          pending: quietProviderSwitchRef.current,
+          sourceId,
+          episode: targetEpisode,
+          succeeded: true,
+        }).pending
         setStreamLoading(false)
         loadingRef.current = false
         setRetryAttempt(0)
@@ -2998,7 +3040,7 @@ export default function Watch() {
         if (quiet) {
           setStreamLoading(false)
           loadingRef.current = false
-          showToast('Could not switch server right now — try again', { icon: 'warn' })
+          reportQuietSwitchFailure('Could not switch server right now — try again')
           return
         }
         const cls = classifyStreamError(err, null)
@@ -3142,6 +3184,15 @@ export default function Watch() {
       loadStreamRef.current(activeSource)
       return
     }
+    const skippedReload = skipQuietProviderReloadRef.current
+    if (
+      skippedReload &&
+      skippedReload.sourceId === activeSource &&
+      skippedReload.episode === epNumber
+    ) {
+      skipQuietProviderReloadRef.current = null
+      return
+    }
     // Same episode, server switch: keep the old video playing and only
     // swap when the new stream is ready.
     loadStreamRef.current(activeSource, false, Boolean(artInstance.current))
@@ -3155,12 +3206,19 @@ export default function Watch() {
       )
       if (source)
         showToast(`Switching to ${source.lang.toUpperCase()}…`)
+      quietProviderSwitchRef.current = artInstance.current
+        ? beginQuietProviderSwitch({
+            from: activeSourceRef.current || activeSource,
+            to: sourceId,
+            episode: epNumber,
+          })
+        : null
       setActiveSource(sourceId)
       setError('')
       setNoStreamError(false)
       setErrorType('')
     },
-    [activeSource, SOURCES, showToast]
+    [activeSource, SOURCES, epNumber, showToast]
   )
 
   // ────────────────────────────────────────────────────────────
