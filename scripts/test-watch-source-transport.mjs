@@ -7,8 +7,8 @@ const common = {
 }
 
 assert.deepEqual(createMediaTransportPlan({ ...common, verification: 'unverified' }), [
-  { mode: 'direct', url: common.directUrl },
   { mode: 'proxy', url: common.proxyUrl },
+  { mode: 'direct', url: common.directUrl },
 ])
 assert.deepEqual(createMediaTransportPlan({ ...common, verification: 'proxy' }), [
   { mode: 'proxy', url: common.proxyUrl },
