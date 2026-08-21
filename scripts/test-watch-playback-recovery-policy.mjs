@@ -3,6 +3,7 @@ import {
   getHlsProviderRecoveryReason,
   getHlsLoadPolicies,
   isTerminalHlsStatus,
+  shouldRefreshHlsSource,
 } from '../src/lib/watchBufferPolicy.js'
 
 for (const status of [401, 403, 404, 410, 429]) {
@@ -30,5 +31,8 @@ assert.equal(getHlsProviderRecoveryReason(403), 'refresh-source')
 assert.equal(getHlsProviderRecoveryReason(404), 'permanent-cdn')
 assert.equal(getHlsProviderRecoveryReason(429), 'permanent-cdn')
 assert.equal(getHlsProviderRecoveryReason(502), 'native-hls-error')
+assert.equal(shouldRefreshHlsSource('refresh-source'), true)
+assert.equal(shouldRefreshHlsSource('native-hls-error'), false)
+assert.equal(shouldRefreshHlsSource('permanent-cdn'), false)
 
 console.log('watch playback recovery policy tests passed')
