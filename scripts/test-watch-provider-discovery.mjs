@@ -23,13 +23,24 @@ assert.deepEqual(
 
 assert.deepEqual(
   filterBrowserProviders([
-    { name: 'bonk', lang: 'sub' },
-    { name: 'Ally', lang: 'sub' },
-    { name: 'kiwi', lang: 'sub' },
+    { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
+    { name: 'Ally', lang: 'sub', sources: [{ url: 'https://cdn.example/ally.m3u8' }] },
+    { name: 'kiwi', lang: 'sub', sources: [] },
   ]),
   [
-    { name: 'bonk', lang: 'sub' },
-    { name: 'kiwi', lang: 'sub' },
+    { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
+    { name: 'kiwi', lang: 'sub', sources: [] },
+  ]
+)
+
+assert.deepEqual(
+  filterBrowserProviders([
+    { name: 'bonk', lang: 'sub', sources: [] },
+    { name: 'Ally', lang: 'sub', sources: [{ url: 'https://cdn.example/ally.m3u8' }] },
+  ]),
+  [
+    { name: 'bonk', lang: 'sub', sources: [] },
+    { name: 'Ally', lang: 'sub', sources: [{ url: 'https://cdn.example/ally.m3u8' }] },
   ]
 )
 

@@ -3313,8 +3313,11 @@ export default function Watch() {
       if (cancelled) return
 
       discovered = {
-        sub: mergeProviderServers(discovered.sub, filterBrowserProviders(subs)),
-        dub: mergeProviderServers(discovered.dub, filterBrowserProviders(dubs)),
+        // Re-apply the conditional Ally rule after merging late resolver
+        // responses so Ally remains available only until an actual alternative
+        // source arrives; it never triggers a player/source replacement.
+        sub: filterBrowserProviders(mergeProviderServers(discovered.sub, subs)),
+        dub: filterBrowserProviders(mergeProviderServers(discovered.dub, dubs)),
       }
       setServers(discovered)
 
