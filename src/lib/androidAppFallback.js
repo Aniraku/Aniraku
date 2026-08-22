@@ -1,11 +1,11 @@
 export const ANDROID_APP_PACKAGE = 'aniraku.anime.app'
 // The Android app currently registers `aniraku://auth` as its verified
 // browsable host. `intent://open` does not match that filter, so Chrome cannot
-// resolve it to the installed app. Keep a browser fallback in the intent so an
-// uninstalled device is sent to the latest published release instead of a
-// version-pinned APK asset. Release asset filenames include their version, so
-// GitHub's latest-release redirect is the stable route across future builds.
-export const ANDROID_APP_RELEASE_URL = 'https://github.com/Aniraku/Aniraku-App/releases/latest'
+// resolve it to the installed app. Keep a browser fallback in the intent for
+// the verified public Android release; update this pair alongside every
+// published direct-distribution build.
+export const ANDROID_APP_RELEASE_VERSION = 'V4.2.1'
+export const ANDROID_APP_RELEASE_URL = 'https://github.com/Aniraku/Aniraku-App/releases/tag/v4.2.1'
 export const ANDROID_APP_INTENT = `intent://auth#Intent;scheme=aniraku;package=${ANDROID_APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(ANDROID_APP_RELEASE_URL)};end`
 export const ANDROID_APP_ORION_URL = 'https://rookieenough.github.io/Orion-Data/redirect.html?id=aniraku'
 export const ANDROID_FALLBACK_DISMISS_KEY = 'aniraku:android-app-fallback:hide-until'
