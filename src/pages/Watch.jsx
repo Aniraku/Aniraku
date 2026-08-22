@@ -65,6 +65,7 @@ import {
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
+  filterBrowserProviders,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
@@ -3312,8 +3313,8 @@ export default function Watch() {
       if (cancelled) return
 
       discovered = {
-        sub: mergeProviderServers(discovered.sub, subs),
-        dub: mergeProviderServers(discovered.dub, dubs),
+        sub: mergeProviderServers(discovered.sub, filterBrowserProviders(subs)),
+        dub: mergeProviderServers(discovered.dub, filterBrowserProviders(dubs)),
       }
       setServers(discovered)
 

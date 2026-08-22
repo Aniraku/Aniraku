@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  filterBrowserProviders,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../src/lib/watchProviderDiscovery.js'
@@ -17,6 +18,18 @@ assert.deepEqual(
   [
     { name: 'bonk', provider: 'miruro', lang: 'sub', sources: ['fresh'] },
     { name: 'ally', provider: 'miruro', lang: 'sub', sources: ['ally'] },
+  ]
+)
+
+assert.deepEqual(
+  filterBrowserProviders([
+    { name: 'bonk', lang: 'sub' },
+    { name: 'Ally', lang: 'sub' },
+    { name: 'kiwi', lang: 'sub' },
+  ]),
+  [
+    { name: 'bonk', lang: 'sub' },
+    { name: 'kiwi', lang: 'sub' },
   ]
 )
 
