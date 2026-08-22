@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaBell, FaSearch, FaRandom } from 'react-icons/fa'
+import { FaBell, FaHeart, FaSearch, FaRandom } from 'react-icons/fa'
 import { N } from './navbar.style'
 import Logo from '../Logo'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
@@ -136,6 +136,7 @@ const NavBar = () => {
 
       <N.Right>
         <N.RightBtn type="button" onClick={() => navigate('/random')} title="Random Anime" aria-label="Find a random anime"><FaRandom size={15} /></N.RightBtn>
+        <N.RightBtn type="button" onClick={() => window.dispatchEvent(new Event('aniraku:open-support'))} title="Support Aniraku" aria-label="Support Aniraku"><FaHeart size={14} /></N.RightBtn>
 
         {user && (
           <div ref={notifRef} style={{ position: 'relative' }}>
