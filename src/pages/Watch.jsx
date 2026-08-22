@@ -57,7 +57,11 @@ import {
   beginQuietProviderSwitch,
   settleQuietProviderSwitch,
 } from '../lib/watchQuietSwitchState'
-import { createMediaTransportPlan, shouldTryHlsFallback } from '../lib/watchSourceTransport'
+import {
+  createMediaTransportPlan,
+  shouldPreferNativeHls,
+  shouldTryHlsFallback,
+} from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
@@ -2381,10 +2385,10 @@ export default function Watch() {
 	              })
 	            } catch {}
 	          }
-            // Restore the last verified Kiwi startup branch. A browser that
-            // exposes native HLS can start the proxy-first Kiwi manifest here;
-            // the cache indicator remains separate from source transport.
-            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Kiwi is verified on the native proxy-first HLS branch. Ally and
+            // other manifests remain on hls.js, whose bounded buffer and media
+            // recovery avoid falling through to an expired embed page.
+            if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
 	              try {
 	                video.src = hlsTransportPlan[hlsTransportIndex].url
 	                if (pendingHandoffRef.current?.shouldPlay !== false) {
