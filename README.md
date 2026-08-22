@@ -18,6 +18,24 @@ Open-source anime discovery and viewing for people who want to find something, w
 
 ---
 
+## Support Aniraku
+
+Aniraku is open source. Voluntary support helps fund **hosting, releases, and open-source development** and never changes access to site features.
+
+<a href="https://patreon.com/ShoIslam">Support on Patreon</a>
+
+| Optional crypto support | Value |
+|:--|:--|
+| Asset | USDT |
+| Network | **BNB Smart Chain (BEP20) only** |
+| Address | `0x0dc085fc880f2f67b4e200f125bc0de352da904e` |
+
+> **Send USDT on BNB Smart Chain (BEP20) only.** Do not use Ethereum, Polygon, Arbitrum, or another network. Verify both the asset and network before sending because crypto transfers cannot be reversed.
+
+<img src="./docs/assets/usdt-bep20-support-qr.png" width="180" alt="USDT on BNB Smart Chain BEP20 support QR code" />
+
+Read the full [Support Guide](./SUPPORT.md).
+
 ## What Aniraku is
 
 Aniraku keeps discovery, playback, watch history, ratings, bookmarks, comments, and recommendations close to the title you are watching. The goal is simple: spend less time moving between pages and more time watching.
