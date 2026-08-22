@@ -60,6 +60,10 @@ import {
 import { createMediaTransportPlan, shouldTryHlsFallback } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
+import {
+  PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
+  mergeProviderServers,
+} from '../lib/watchProviderDiscovery'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -1675,6 +1679,22 @@ export default function Watch() {
             }
           }
         }
+        // The episode endpoint can be temporarily unavailable during an
+        // upstream AniList throttle even when anime metadata succeeded. Keep a
+        // navigable chooser in that case instead of rendering an empty Watch
+        // sidebar until the backend recovers.
+        if (!epData?.episodes?.length && animeData?.episodes) {
+          epData = {
+            episodes: Array.from(
+              { length: animeData.episodes },
+              (_, i) => ({
+                number: i + 1,
+                title: `Episode ${i + 1}`,
+                thumbnail: animeData.coverImage?.medium || animeData.coverImage?.large || '',
+              })
+            ),
+          }
+        }
         if (cancelled) return
         setAnime(animeData)
         setEpisodes(normalizeEpisodeList(epData?.episodes))
@@ -1998,7 +2018,15 @@ export default function Watch() {
 	        let hlsTried = false
         const tryUrl = (target, withCors) => {
           try {
-            video.crossOrigin = withCors ? 'anonymous' : ''
+            if (withCors) {
+              video.crossOrigin = 'anonymous'
+            } else {
+              // Some direct media hosts omit ACAO but permit ordinary video
+              // playback. Removing the attribute prevents this fallback from
+              // being rejected in CORS mode before its same-provider embed is
+              // considered.
+              video.removeAttribute('crossorigin')
+            }
             video.preload = getNativeMediaBufferPolicy().preload
             video.src = target
             video.load()
@@ -2353,10 +2381,10 @@ export default function Watch() {
 	              })
 	            } catch {}
 	          }
-            // Only iOS Safari needs native HLS. Desktop Chromium advertising
-            // HLS support can bypass hls.js and then stream an unrestricted
-            // full VOD into the browser cache instead of honoring our target.
-            if (IS_IOS && video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Restore the last verified Kiwi startup branch. A browser that
+            // exposes native HLS can start the proxy-first Kiwi manifest here;
+            // the cache indicator remains separate from source transport.
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
 	              try {
 	                video.src = hlsTransportPlan[hlsTransportIndex].url
 	                if (pendingHandoffRef.current?.shouldPlay !== false) {
@@ -3239,7 +3267,10 @@ export default function Watch() {
   useEffect(() => {
     if (!animeId || !epNumber) return
     let cancelled = false
-    let retries = 0
+    let attempt = 0
+    let retryTimer = null
+    const requestControllers = new Set()
+    let discovered = { sub: [], dub: [] }
     // Clear both language groups before this episode's parallel requests begin.
     // A previous episode's DUB list must never remain selectable while its new
     // SUB response is already available.
@@ -3248,47 +3279,59 @@ export default function Watch() {
 
     const fetchServers = async () => {
       const fetchLanguage = async (lang) => {
-        const response = await fetch(`${base}&lang=${lang}`, { cache: 'no-store' })
-        if (!response.ok) throw new Error(`${lang} server list unavailable`)
-        const payload = await response.json()
-        return Array.isArray(payload) ? payload : []
+        const controller = new AbortController()
+        requestControllers.add(controller)
+        const timeout = setTimeout(() => controller.abort(), 50_000)
+        try {
+          const response = await fetch(`${base}&lang=${lang}`, {
+            cache: 'no-store',
+            signal: controller.signal,
+          })
+          if (!response.ok) return []
+          const payload = await response.json()
+          return Array.isArray(payload) ? payload : []
+        } catch {
+          return []
+        } finally {
+          clearTimeout(timeout)
+          requestControllers.delete(controller)
+        }
       }
 
-      try {
-        // Start both requests at once. SUB is committed as soon as it arrives
-        // so the preferred player can begin from the server payload cache;
-        // DUB is added when its parallel request completes.
-        const subTask = fetchLanguage('sub')
-        const dubTask = fetchLanguage('dub')
-        const subs = await subTask.catch(() => [])
-        if (cancelled) return
-        setServers({ sub: subs, dub: [] })
+      // Resolve both languages in parallel, but retain any providers discovered
+      // in prior attempts. A slow resolver must never make already-approved
+      // servers disappear or cause an early “no source” state.
+      const [subs, dubs] = await Promise.all([
+        fetchLanguage('sub'),
+        fetchLanguage('dub'),
+      ])
+      if (cancelled) return
 
-        const dubs = await dubTask.catch(() => [])
-        if (cancelled) return
-        // Providers are per-episode: each completed response replaces only its
-        // current episode language list, so stale server buttons never leak in.
-        setServers({ sub: subs, dub: dubs })
-        if (subs.length === 0 && dubs.length === 0) {
-          setNoStreamError(true)
-          setErrorType('no-source')
-          setError("We don't have streaming for this anime.")
-          setStreamLoading(false)
-        }
-        if ((subs.length === 0 || dubs.length === 0) && retries < 2) {
-          retries += 1
-          setTimeout(fetchServers, 12_000)
-        }
-      } catch {
-        if (!cancelled && retries < 2) {
-          retries += 1
-          setTimeout(fetchServers, 12_000)
-        }
+      discovered = {
+        sub: mergeProviderServers(discovered.sub, subs),
+        dub: mergeProviderServers(discovered.dub, dubs),
+      }
+      setServers(discovered)
+
+      const nextDelay = PROVIDER_DISCOVERY_RETRY_DELAYS_MS[attempt + 1]
+      if (nextDelay !== undefined) {
+        attempt += 1
+        retryTimer = setTimeout(fetchServers, nextDelay)
+        return
+      }
+
+      if (discovered.sub.length === 0 && discovered.dub.length === 0) {
+        setNoStreamError(true)
+        setErrorType('no-source')
+        setError("We don't have streaming for this anime.")
+        setStreamLoading(false)
       }
     }
     fetchServers()
     return () => {
       cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      requestControllers.forEach((controller) => controller.abort())
     }
   }, [animeId, epNumber])
 
