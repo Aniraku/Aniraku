@@ -1,16 +1,29 @@
 export const PROVIDER_DISCOVERY_RETRY_DELAYS_MS = [0, 4_000, 8_000, 12_000]
 
-// Ally's currently returned browser sources have been independently verified
-// to fail: its proxy HLS route falls through and its Byse recovery page is a
-// 404. Keep backend/native availability intact, but do not advertise this
-// unusable server in browser Watch controls until a playable web source exists.
-const BROWSER_DISABLED_PROVIDER_NAMES = new Set(['ally'])
+// Ally is a degraded browser fallback. Do not offer it while another returned
+// server has a source, but retain it if it is the sole source-bearing option.
+// This is deliberately a control-list decision, not source filtering: an
+// actively playing server is never rebuilt or switched by this helper.
+const BROWSER_DEPRIORITIZED_PROVIDER_NAMES = new Set(['ally'])
+
+function serverName(server) {
+  return String(server?.name || '').trim().toLowerCase()
+}
+
+function serverHasSource(server) {
+  return Array.isArray(server?.sources) && server.sources.some((source) => {
+    if (typeof source === 'string') return Boolean(source.trim())
+    return Boolean(String(source?.url || '').trim())
+  })
+}
 
 export function filterBrowserProviders(servers = []) {
-  return (Array.isArray(servers) ? servers : []).filter((server) => {
-    const name = String(server?.name || '').trim().toLowerCase()
-    return name && !BROWSER_DISABLED_PROVIDER_NAMES.has(name)
-  })
+  const candidates = (Array.isArray(servers) ? servers : []).filter((server) => serverName(server))
+  const hasPlayableAlternative = candidates.some((server) => (
+    !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server)) && serverHasSource(server)
+  ))
+  if (!hasPlayableAlternative) return candidates
+  return candidates.filter((server) => !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server)))
 }
 
 export function mergeProviderServers(existing = [], incoming = []) {
