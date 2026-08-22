@@ -6,6 +6,7 @@ import {
   ANDROID_APP_INTENT,
   ANDROID_APP_ORION_URL,
   ANDROID_APP_PACKAGE,
+  ANDROID_APP_RELEASE_VERSION,
   ANDROID_APP_RELEASE_URL,
   dismissFallback,
   isAndroidAppCompatible,
@@ -36,7 +37,7 @@ const AndroidAppFallback = () => {
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
   const [showInstallHint, setShowInstallHint] = useState(false)
-  const [releaseLabel, setReleaseLabel] = useState(null)
+  const [releaseLabel, setReleaseLabel] = useState(ANDROID_APP_RELEASE_VERSION)
   const appButtonRef = useRef(null)
 
   useEffect(() => {
@@ -56,7 +57,7 @@ const AndroidAppFallback = () => {
     fetch(GITHUB_LATEST_RELEASE_API, { signal: controller.signal, headers: { Accept: 'application/vnd.github+json' } })
       .then((response) => (response.ok ? response.json() : null))
       .then((release) => setReleaseLabel(formatReleaseLabel(release?.tag_name)))
-      .catch(() => setReleaseLabel(null))
+      .catch(() => setReleaseLabel(ANDROID_APP_RELEASE_VERSION))
 
     return () => controller.abort()
   }, [open])
