@@ -14,6 +14,12 @@ import {
 } from '../lib/androidAppFallback'
 
 const APP_OPEN_TIMEOUT_MS = 1250
+const GITHUB_LATEST_RELEASE_API = 'https://api.github.com/repos/Aniraku/Aniraku-App/releases/latest'
+
+function formatReleaseLabel(value) {
+  const tag = String(value || '').trim()
+  return /^v?\d+(?:\.\d+){1,3}(?:[-.][\w]+)?$/i.test(tag) ? tag.toUpperCase().replace(/^V/, 'V') : null
+}
 
 function getCompatibility() {
   if (typeof window === 'undefined') return false
@@ -30,6 +36,7 @@ const AndroidAppFallback = () => {
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
   const [showInstallHint, setShowInstallHint] = useState(false)
+  const [releaseLabel, setReleaseLabel] = useState(null)
   const appButtonRef = useRef(null)
 
   useEffect(() => {
@@ -41,6 +48,18 @@ const AndroidAppFallback = () => {
     const timer = window.setTimeout(() => setOpen(true), 850)
     return () => window.clearTimeout(timer)
   }, [pathname])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const controller = new AbortController()
+    fetch(GITHUB_LATEST_RELEASE_API, { signal: controller.signal, headers: { Accept: 'application/vnd.github+json' } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((release) => setReleaseLabel(formatReleaseLabel(release?.tag_name)))
+      .catch(() => setReleaseLabel(null))
+
+    return () => controller.abort()
+  }, [open])
 
   useEffect(() => {
     if (!open) return undefined
@@ -86,7 +105,7 @@ const AndroidAppFallback = () => {
         <h2 id="android-app-fallback-title">Use the<br /><em>Aniraku app.</em></h2>
         <p id="android-app-fallback-description">This Android device can run the native Aniraku experience with direct playback controls, a synced library, quality selection, and fullscreen viewing.</p>
 
-        <StatusLine><i /> Android 9+ / native app available</StatusLine>
+        <StatusLine><i /> Android 9+ / native app available{releaseLabel ? ` · ${releaseLabel}` : ''}</StatusLine>
 
         <PrimaryButton ref={appButtonRef} as="a" href={ANDROID_APP_INTENT} onClick={noteAppOpenAttempt}>
           <span><FaAndroid /> USE ANIRAKU APP</span><FaArrowRight />
@@ -95,12 +114,12 @@ const AndroidAppFallback = () => {
         {showInstallHint && (
           <InstallHint role="status">
             <span>The app did not open. Get the latest stable build, then try again.</span>
-            <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer">VIEW LATEST BUILD <FaExternalLinkAlt /></a>
+            <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer">VIEW {releaseLabel || 'LATEST BUILD'} <FaExternalLinkAlt /></a>
           </InstallHint>
         )}
 
         <ActionRow>
-          <a href={ANDROID_APP_RELEASE_URL}><FaDownload /> VIEW LATEST BUILD</a>
+          <a href={ANDROID_APP_RELEASE_URL}><FaDownload /> VIEW {releaseLabel || 'LATEST BUILD'}</a>
           <a href={ANDROID_APP_ORION_URL} target="_blank" rel="noreferrer"><FaGlobe /> ORION STORE</a>
         </ActionRow>
 
