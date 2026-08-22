@@ -1,4 +1,5 @@
 export const PLAYBACK_CACHE_SECONDS = 120
+export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
 function finite(value, fallback = 0) {
   const number = Number(value)
@@ -35,6 +36,26 @@ export function getBufferedTimelineSegments(
     }))
 }
 
+/**
+ * A downloaded TimeRanges entry is not sufficient proof that a stalled video
+ * can resume. Only show the cache layer while the media element reports
+ * future decodable data at the current position.
+ */
+export function getPlayableBufferedTimelineSegments(
+  ranges = [],
+  { currentTime = 0, duration = 0, readyState = 0, cacheSeconds = PLAYBACK_CACHE_SECONDS } = {}
+) {
+  if (finite(readyState) < 3) return []
+  const current = finite(currentTime)
+  const hasForwardPlayableRange = (Array.isArray(ranges) ? ranges : []).some((range) => {
+    const start = finite(range?.start)
+    const end = finite(range?.end)
+    return start <= current + 0.1 && end - current >= MIN_PLAYABLE_BUFFER_SECONDS
+  })
+  if (!hasForwardPlayableRange) return []
+  return getBufferedTimelineSegments(ranges, { currentTime, duration, cacheSeconds })
+}
+
 function getVideoRanges(video) {
   const ranges = []
   const buffered = video?.buffered
@@ -58,9 +79,10 @@ export function createBufferedTimelineIndicator(video, progressInner) {
   progressInner.append(layer)
 
   const render = () => {
-    const segments = getBufferedTimelineSegments(getVideoRanges(video), {
+    const segments = getPlayableBufferedTimelineSegments(getVideoRanges(video), {
       currentTime: video.currentTime,
       duration: video.duration,
+      readyState: video.readyState,
     })
     layer.replaceChildren(
       ...segments.map((segment) => {
@@ -73,7 +95,17 @@ export function createBufferedTimelineIndicator(video, progressInner) {
     )
   }
 
-  const events = ['progress', 'loadedmetadata', 'durationchange', 'timeupdate', 'seeking']
+  const events = [
+    'progress',
+    'loadedmetadata',
+    'durationchange',
+    'timeupdate',
+    'seeking',
+    'waiting',
+    'stalled',
+    'canplay',
+    'playing',
+  ]
   events.forEach((event) => video.addEventListener(event, render))
   render()
 
