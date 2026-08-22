@@ -22,7 +22,9 @@ Open-source anime discovery and viewing for people who want to find something, w
 
 Aniraku is open source. Voluntary support helps fund **hosting, releases, and open-source development** and never changes access to site features.
 
-<a href="https://patreon.com/ShoIslam">Support on Patreon</a>
+## Sponsor☕💘
+
+<a href="https://patreon.com/ShoIslam"><img src="https://user-images.githubusercontent.com/61944859/180249027-678b01b8-c336-451e-b147-6d84a5b9d0e7.png" width="250"/></a>
 
 | Optional crypto support | Value |
 |:--|:--|
