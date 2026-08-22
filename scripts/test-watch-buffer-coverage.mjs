@@ -18,7 +18,7 @@ const hlsPrefetches = watchSource.match(/startFragPrefetch: true/g) || []
 assert.equal(hlsPrefetches.length, 2)
 assert.match(watchSource, /createBufferedTimelineIndicator/)
 assert.match(watchSource, /bufferIndicatorCleanupRef/)
-assert.match(watchSource, /if \(video\.canPlayType\('application\/vnd\.apple\.mpegurl'\)\)/)
+assert.match(watchSource, /shouldPreferNativeHls\(url\) && video\.canPlayType\('application\/vnd\.apple\.mpegurl'\)/)
 assert.match(watchSource, /watch-buffer-indicator-segment/)
 assert.match(watchSource, /video\.removeAttribute\('crossorigin'\)/)
 
