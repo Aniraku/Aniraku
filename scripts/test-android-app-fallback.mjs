@@ -16,8 +16,8 @@ const storage = new Map()
 const localStorageLike = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }
 
 assert.equal(parseAndroidMajorVersion(androidChrome), 15)
-assert.equal(ANDROID_APP_RELEASE_VERSION, 'V4.2.3')
-assert.equal(ANDROID_APP_RELEASE_URL, 'https://github.com/Aniraku/Aniraku-App/releases/tag/v4.2.3')
+assert.equal(ANDROID_APP_RELEASE_VERSION, 'V4.2.4')
+assert.equal(ANDROID_APP_RELEASE_URL, 'https://github.com/Aniraku/Aniraku-App/releases/tag/v4.2.4')
 assert.equal(ANDROID_APP_INTENT, `intent://auth#Intent;scheme=aniraku;package=aniraku.anime.app;S.browser_fallback_url=${encodeURIComponent(ANDROID_APP_RELEASE_URL)};end`)
 assert.equal(parseAndroidMajorVersion('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)'), null)
 assert.equal(isAndroidAppCompatible({ userAgent: androidChrome, maxTouchPoints: 5, viewportWidth: 412, coarsePointer: true }), true)

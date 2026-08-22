@@ -19,7 +19,7 @@ try {
   await androidPage.getByRole('dialog', { name: /Use the Aniraku app/i }).waitFor({ timeout: 8_000 })
   const appOpenLink = androidPage.getByRole('link', { name: /USE ANIRAKU APP/i })
   assert.equal(await appOpenLink.getAttribute('href'), ANDROID_APP_INTENT)
-  const downloadLink = androidPage.getByRole('link', { name: /VIEW (V4\.2\.3|LATEST BUILD)/i })
+  const downloadLink = androidPage.getByRole('link', { name: /VIEW (V4\.2\.4|LATEST BUILD)/i })
   assert.equal(await downloadLink.count(), 1)
   assert.equal(await downloadLink.getAttribute('href'), ANDROID_APP_RELEASE_URL)
   assert.equal(await androidPage.getByRole('button', { name: /CONTINUE ON WEB/i }).count(), 1)
