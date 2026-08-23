@@ -29,8 +29,8 @@ export function canSubmitComment(content, gifUrl) {
 
 export function toGiphyGif(record) {
   const images = record?.images || {}
-  const url = images.downsized?.url || images.fixed_width?.url || images.original?.url || ''
-  const previewUrl = images.fixed_width_small?.url || images.fixed_width?.url || images.downsized_still?.url || url
+  const url = images.original?.url || ''
+  const previewUrl = images.original?.url || url
   if (!isTrustedGiphyGifUrl(url) || !isTrustedGiphyGifUrl(previewUrl)) return null
   return {
     id: record?.id || url,
