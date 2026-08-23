@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  FaEye,
+  FaRegEye,
   FaEyeSlash,
-  FaImage,
+  FaRegImages,
+  FaPaperPlane,
   FaRegThumbsUp,
   FaReply,
   FaThumbsUp,
@@ -49,61 +50,67 @@ const Subtitle = styled.p`
 `
 
 const Composer = styled.form`
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: ${p => p.$compact ? '12px' : '16px'};
+  background: transparent;
+  border: none;
+  border-radius: 0;
   box-sizing: border-box;
   display: flex;
-  gap: 12px;
-  margin: ${p => p.$compact ? '12px 0 0' : '0 0 24px'};
+  gap: 8px;
+  margin: ${p => p.$compact ? '8px 0 0' : '0 0 16px'};
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
-  padding: ${p => p.$compact ? '12px' : '16px'};
+  overflow: visible;
+  padding: 0;
   position: relative;
 
   > * { min-width: 0; }
 
   @media (max-width: 480px) {
-    gap: 10px;
-    padding: 12px;
+    gap: 7px;
   }
 `
 
 const ComposerBody = styled.div`
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
+  padding: 8px 9px;
 `
 
 const ComposerRow = styled.div`
   align-items: flex-start;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
 
   @media (max-width: 480px) {
-    flex-wrap: wrap;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 `
 
 const ComposerTools = styled.div`
   align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
+  padding-top: 6px;
 `
 
 const Avatar = styled.img`
   background: var(--bg-elevated);
   border-radius: 50%;
   flex-shrink: 0;
-  height: 36px;
+  height: 32px;
   object-fit: cover;
-  width: 36px;
+  width: 32px;
 `
 
 const InitialAvatar = styled.div`
@@ -113,12 +120,12 @@ const InitialAvatar = styled.div`
   color: var(--bg);
   display: flex;
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
-  height: 36px;
+  height: 32px;
   justify-content: center;
   text-transform: uppercase;
-  width: 36px;
+  width: 32px;
 `
 
 const Textarea = styled.textarea`
@@ -129,7 +136,8 @@ const Textarea = styled.textarea`
   flex: 1 1 auto;
   font-family: inherit;
   font-size: 14px;
-  min-height: 42px;
+  line-height: 1.45;
+  min-height: 30px;
   min-width: 0;
   outline: none;
   padding: 0;
@@ -137,59 +145,68 @@ const Textarea = styled.textarea`
 `
 
 const PostBtn = styled.button`
+  align-items: center;
   background: var(--accent);
   border: none;
-  border-radius: 999px;
+  border-radius: 7px;
   color: var(--bg);
   cursor: ${p => p.$disabled ? 'wait' : 'pointer'};
+  display: inline-flex;
   flex: 0 0 auto;
-  font-size: 13px;
-  font-weight: 700;
+  height: 28px;
+  justify-content: center;
   opacity: ${p => p.$disabled ? 0.6 : 1};
-  padding: 8px 18px;
+  padding: 0;
   transition: transform 160ms ease, opacity 160ms ease;
-  white-space: nowrap;
+  width: 30px;
 
   &:not(:disabled):hover { transform: translateY(-1px); }
   &:not(:disabled):active { transform: scale(0.97); }
 
   @media (max-width: 480px) {
     margin-left: auto;
-    min-height: 38px;
+    min-height: 28px;
   }
 `
 
 const ToolBtn = styled.button`
   align-items: center;
   background: ${p => p.$active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-elevated)'};
-  border: 1px solid ${p => p.$active ? 'color-mix(in srgb, var(--accent) 55%, var(--border))' : 'var(--border)'};
-  border-radius: 999px;
+  border: 1px solid ${p => p.$active ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'transparent'};
+  border-radius: 7px;
   color: ${p => p.$active ? 'var(--accent)' : 'var(--text-secondary)'};
   cursor: pointer;
   display: inline-flex;
-  font-size: 12px;
-  font-weight: 650;
-  gap: 6px;
-  min-height: 32px;
-  padding: 6px 10px;
+  gap: 5px;
+  height: 26px;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 7px;
   transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
 
   &:hover { border-color: var(--accent); color: var(--accent); }
-  &:active { transform: scale(0.97); }
+  &:active { transform: scale(0.96); }
+  width: auto;
+`
+
+const ToolText = styled.span`
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 `
 
 const GifPreview = styled.div`
   align-items: flex-start;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   display: inline-flex;
-  gap: 8px;
-  max-width: min(260px, 100%);
+  gap: 6px;
+  max-width: min(190px, 100%);
   overflow: hidden;
-  padding: 6px;
+  padding: 4px;
 
-  img { border-radius: 6px; display: block; height: 72px; max-width: 150px; object-fit: cover; width: auto; }
+  img { border-radius: 5px; display: block; height: 48px; max-width: 120px; object-fit: cover; width: auto; }
 `
 
 const RemoveGif = styled.button`
@@ -205,16 +222,23 @@ const RemoveGif = styled.button`
 `
 
 const Picker = styled.div`
-  background: color-mix(in srgb, var(--bg-card) 96%, #000);
+  background: color-mix(in srgb, var(--bg-elevated) 94%, #000);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 430px;
-  padding: 12px;
-  width: min(430px, 100%);
+  gap: 6px;
+  margin-top: 2px;
+  max-width: 368px;
+  padding: 8px;
+  width: 100%;
+
+  @media (max-width: 480px) {
+    max-height: none;
+    max-width: 100%;
+    position: static;
+    width: 100%;
+  }
 `
 
 const PickerHead = styled.div`
@@ -226,20 +250,20 @@ const PickerHead = styled.div`
 
 const PickerTitle = styled.strong`
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 12px;
 `
 
 const PickerSearch = styled.input`
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 7px;
   box-sizing: border-box;
   color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   min-width: 0;
   outline: none;
-  padding: 9px 10px;
+  padding: 7px 8px;
   width: 100%;
   &:focus { border-color: var(--accent); }
 `
@@ -257,20 +281,23 @@ const PickerClose = styled.button`
 
 const GifGrid = styled.div`
   display: grid;
-  gap: 7px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  max-height: 220px;
+  gap: 4px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-height: 142px;
   min-width: 0;
   overflow: auto;
 
-  @media (max-width: 480px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-height: 132px;
+  }
 `
 
 const GifOption = styled.button`
-  aspect-ratio: 1.16;
+  aspect-ratio: 1.12;
   background: var(--bg-elevated);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   min-width: 0;
   overflow: hidden;
@@ -281,9 +308,20 @@ const GifOption = styled.button`
 
 const PickerNote = styled.p`
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
   margin: 0;
+`
+
+const GiphyAttribution = styled.a`
+  align-self: flex-end;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  &:hover { color: var(--accent); }
 `
 
 const ErrorMsg = styled.p`
@@ -303,12 +341,12 @@ const List = styled.div`
 const Item = styled.div`
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   box-sizing: border-box;
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
-  padding: 14px 16px;
+  padding: 12px 14px;
 `
 
 const ItemReply = styled(Item)`
@@ -368,17 +406,17 @@ const SpoilerShield = styled.button`
   align-items: center;
   background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--bg-elevated)) 0 9px, var(--bg-elevated) 9px 18px);
   border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border));
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--text-primary);
   cursor: pointer;
   display: flex;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   gap: 8px;
   justify-content: center;
   margin: 0 0 10px;
-  min-height: 72px;
-  padding: 12px;
+  min-height: 54px;
+  padding: 10px;
   text-align: center;
   width: 100%;
   &:hover { border-color: var(--accent); color: var(--accent); }
@@ -531,30 +569,26 @@ function CommentComposer({ avatar, placeholder, value, onChange, gifUrl, onGifCh
             maxLength={2000}
             rows={compact ? 1 : 2}
           />
-          <PostBtn type="submit" $disabled={busy || !canSubmit} disabled={busy || !canSubmit}>Post</PostBtn>
+          <PostBtn type="submit" $disabled={busy || !canSubmit} disabled={busy || !canSubmit} aria-label="Post comment" title="Post comment">
+            <FaPaperPlane size={13} />
+          </PostBtn>
         </ComposerRow>
         <ComposerTools>
-          <ToolBtn type="button" onClick={() => setPickerOpen(open => !open)} $active={pickerOpen || Boolean(gifUrl)} aria-expanded={pickerOpen} aria-controls="comment-gif-picker">
-            <FaImage size={13} /> GIF
-          </ToolBtn>
-          <ToolBtn type="button" onClick={() => onSpoilerChange(!spoiler)} $active={spoiler} aria-pressed={spoiler}>
-            <FaEyeSlash size={13} /> {spoiler ? 'Spoiler on' : 'Mark spoiler'}
+          {GIPHY_API_KEY && <ToolBtn type="button" onClick={() => setPickerOpen(open => !open)} $active={pickerOpen || Boolean(gifUrl)} aria-expanded={pickerOpen} aria-controls="comment-gif-picker" aria-label="Choose a GIF" title="Choose a GIF">
+            <FaRegImages size={13} /> <ToolText>GIF</ToolText>
+          </ToolBtn>}
+          <ToolBtn type="button" onClick={() => onSpoilerChange(!spoiler)} $active={spoiler} aria-pressed={spoiler} aria-label={spoiler ? 'Spoiler protection on' : 'Mark comment as a spoiler'} title={spoiler ? 'Spoiler protection on' : 'Mark as spoiler'}>
+            <FaEyeSlash size={13} /> <ToolText>{spoiler ? 'Spoiler' : 'Spoiler'}</ToolText>
           </ToolBtn>
         </ComposerTools>
-        {gifUrl && (
-          <GifPreview>
-            <img src={gifUrl} alt="Selected reaction GIF" />
-            <RemoveGif type="button" onClick={() => onGifChange('')} aria-label="Remove selected GIF"><FaTimes /></RemoveGif>
-          </GifPreview>
-        )}
         {pickerOpen && (
           <Picker id="comment-gif-picker" role="dialog" aria-label="Choose a reaction GIF">
             <PickerHead>
               <PickerTitle>Reaction GIFs</PickerTitle>
-              <PickerClose type="button" onClick={() => setPickerOpen(false)} aria-label="Close GIF picker"><FaTimes /></PickerClose>
+              <PickerClose type="button" onClick={() => setPickerOpen(false)} aria-label="Close GIF picker"><FaTimes size={12} /></PickerClose>
             </PickerHead>
-            <PickerSearch value={query} onChange={event => setQuery(event.target.value)} placeholder="Search G-rated GIFs" aria-label="Search G-rated GIFs" autoFocus />
-            {gifLoading ? <PickerNote>Loading GIFs…</PickerNote> : gifError ? <PickerNote>{gifError}</PickerNote> : gifs.length ? (
+            <PickerSearch value={query} onChange={event => setQuery(event.target.value)} placeholder="Search reactions" aria-label="Search G-rated GIFs" autoFocus />
+            {gifLoading ? <PickerNote>Loading…</PickerNote> : gifError ? <PickerNote>{gifError}</PickerNote> : gifs.length ? (
               <GifGrid>
                 {gifs.map(gif => (
                   <GifOption type="button" key={gif.id} onClick={() => chooseGif(gif)} title={`Use GIF: ${gif.label}`} aria-label={`Use GIF: ${gif.label}`}>
@@ -563,7 +597,14 @@ function CommentComposer({ avatar, placeholder, value, onChange, gifUrl, onGifCh
                 ))}
               </GifGrid>
             ) : <PickerNote>No G-rated GIFs found.</PickerNote>}
+            <GiphyAttribution href="https://giphy.com" target="_blank" rel="noreferrer">Powered by GIPHY</GiphyAttribution>
           </Picker>
+        )}
+        {gifUrl && (
+          <GifPreview>
+            <img src={gifUrl} alt="Selected reaction GIF" />
+            <RemoveGif type="button" onClick={() => onGifChange('')} aria-label="Remove selected GIF"><FaTimes /></RemoveGif>
+          </GifPreview>
         )}
         {error && <ErrorMsg>{error}</ErrorMsg>}
       </ComposerBody>
@@ -594,7 +635,7 @@ const renderItem = (c, reply, {
         </SpoilerShield>
       ) : (
         <>
-          {c.is_spoiler && <SpoilerTag><FaEye /> Spoiler revealed</SpoilerTag>}
+          {c.is_spoiler && <SpoilerTag><FaRegEye /> Spoiler revealed</SpoilerTag>}
           <ItemBody>
             {textContent && <p style={{ margin: 0 }}>{textContent}</p>}
             {gifUrl && <ItemGif src={gifUrl} alt="Animated reaction GIF" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}
@@ -641,7 +682,8 @@ const renderItem = (c, reply, {
 }
 
 const Comments = ({ animeId, episodeNumber, label }) => {
-  const { user } = useAuth()
+  const { user: authenticatedUser } = useAuth()
+  const user = authenticatedUser
   const [comments, setComments] = useState([])
   const [profiles, setProfiles] = useState({})
   const [myProfile, setMyProfile] = useState(null)
@@ -796,7 +838,7 @@ const Comments = ({ animeId, episodeNumber, label }) => {
   }
 
   return (
-    <Wrapper>
+    <Wrapper id="comments">
       <Title>Comments ({comments.length})</Title>
       {label && <Subtitle>{label}</Subtitle>}
       {user ? (
