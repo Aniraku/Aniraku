@@ -270,7 +270,7 @@ const Auth = ({ mode }) => {
     try {
       if (isLogin) {
         await signIn(email, password)
-        navigate('/home')
+        navigate('/')
       } else {
         await signUp(email, password, cleanUsername(username))
         setSentKind('signup')
@@ -323,7 +323,7 @@ const Auth = ({ mode }) => {
   return (
     <Wrapper id="main">
       <Box>
-        <Back to={isForgot ? '/login' : '/home'}>&larr; {isForgot ? 'Back to sign in' : 'Back to Home'}</Back>
+        <Back to={isForgot ? '/login' : '/'}>&larr; {isForgot ? 'Back to sign in' : 'Back to Home'}</Back>
         <Card>
           <Title>{title}</Title>
           <Subtitle>{subtitle}</Subtitle>

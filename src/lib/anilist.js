@@ -1,4 +1,3 @@
-const ANILIST_URL = 'https://graphql.anilist.co'
 const DEFAULT_API_BASE = 'https://api.aniraku.tech'
 
 export async function anilistQuery(query, variables = {}) {
@@ -7,7 +6,10 @@ export async function anilistQuery(query, variables = {}) {
   // Always use Aniraku's API proxy by default. It avoids browser CORS issues
   // and protects users from exhausting AniList's client-side rate limit. A
   // deployment may still override this endpoint through VITE_API_URL.
-  const apiBase = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
+  const apiBase = (
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.DEV ? '' : DEFAULT_API_BASE)
+  ).replace(/\/$/, '')
   const endpoint = `${apiBase}/api/v1/anilist`
   try {
       const res = await fetch(endpoint, {
@@ -23,22 +25,7 @@ export async function anilistQuery(query, variables = {}) {
       console.warn('AniList proxy fetch failed:', e)
     }
 
-  // Last resort: direct fetch — only works outside the browser (no CORS).
-  try {
-    const res = await fetch(ANILIST_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body,
-    })
-    if (res.ok) {
-      const json = await res.json()
-      if (json.data) return json
-    }
-  } catch (e) {
-    console.warn('AniList direct fetch failed:', e)
-  }
-
-  throw new Error('AniList: all methods failed')
+  throw new Error('AniList backend is unavailable')
 }
 
 // --- Queries ---

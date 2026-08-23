@@ -6,6 +6,15 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
+    proxy: {
+      // Development requests remain server-backed. This avoids local-browser
+      // CORS failure without allowing a direct AniList fallback in the app.
+      '/api': {
+        target: 'https://api.aniraku.tech',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
   preview: {
     host: true,

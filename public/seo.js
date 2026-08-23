@@ -8,9 +8,13 @@
   var IS_LOCAL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
   var SITE = IS_LOCAL ? 'http://localhost:3000' : 'https://www.aniraku.tech';
 
+  function canonicalPath() {
+    return window.location.pathname === '/home' ? '/' : window.location.pathname;
+  }
+
   function updateCanonical() {
     var c = document.getElementById('canonical-link');
-    if (c) c.href = SITE + window.location.pathname;
+    if (c) c.href = SITE + canonicalPath();
   }
 
   function updateMetaUrls() {

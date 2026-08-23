@@ -1,0 +1,30 @@
+# Project TODO
+
+- [ ] Repair the Watch page on narrow Android mobile viewports so no player, source rail, episode panel, metadata, comment control, or fixed navigation content is horizontally clipped or hidden behind the dock.
+- [ ] Keep the repair strictly layout-only: do not change playback, providers, API calls, metadata, ratings, comments, or unrelated navigation behavior.
+- [ ] Preserve the existing fixed bottom Home and Catalog navigation and solve overlap through Watch page dock clearance rather than replacing its navigation model.
+- [ ] Restrict the Watch-page bottom dock to exactly Back, Home, and Catalog.
+- [ ] Make the mobile Watch page compact and minimalistic by reducing visual noise and vertical density without removing Watch functionality.
+- [ ] Redesign and reposition the comments entry point within the Watch layout while preserving the existing functional comments destination and flow.
+- [ ] Redesign the mobile episode panel placement, toggle, search/jump controls, range selector, paging controls, and episode rows while preserving episode selection and route behavior.
+- [ ] Add a compact in-player audio/provider control that presents up to four providers cleanly in minimized and fullscreen player states while retaining current playback behavior.
+- [ ] Discard the rejected floating provider-sheet presentation and redesign it after studying Animex’s live Watch hierarchy.
+- [ ] Place the provider selector as an icon inside the ArtPlayer control bar immediately to the left of the existing settings/menu control, with compact SUB/DUB and provider choices.
+- [ ] Preserve the current player-control layout and bottom dock exactly; do not redesign, move, remove, or add any other controls.
+- [ ] Preserve the player mechanism exactly: do not alter direct, proxy, or verified-embed source resolution; stream headers; buffering; quality selection; or engine setup.
+- [ ] Generate an actual full-page phone-size Watch preview for user approval before any GitHub push or Vercel deployment.
+- [ ] Verify the repaired Watch layout at representative supported Android browser viewport widths, including dense-provider and 1,174-episode One Piece states.
+- [ ] Verify the deployed repair on current Chromium-based Android browsers, current Firefox for Android, and current Safari on supported iPhone/iPad devices; do not make unsupported universal-device guarantees.
+- [ ] Push the verified Watch mobile repair to Aniraku/Aniraku main, wait for Vercel deployment, and re-test the deployed production Watch route.
+- [ ] Audit the submitted full-page Watch preview in ordered crops and document every visible visual, density, readability, layout, and interaction issue before any redesign is approved.
+- [ ] Correct the approved visual-audit findings and regenerate full-page plus focused player previews before any GitHub push.
+- [x] Diagnose and repair the Android-compatible website popup so both “Open Aniraku App” and the APK download action work reliably without affecting unrelated Watch-page behavior.
+- [x] Keep the Android popup repair strictly isolated from `src/pages/Watch.jsx` and all Watch-page layout, playback, and player-control behavior.
+- [x] Commit and push only the user-approved Android popup repair and its focused tests, excluding every unapproved Watch-page file.
+- [x] Audit the remote popup commit against its parent for accidental Watch-file inclusion and correct the remote branch if any Watch file was published.
+- [x] Check the Vercel deployment status for the published Android popup repair and confirm the current production state.
+- [x] Make `/` the canonical Home route in site SEO and remove `/home` as the published Home URL.
+- [x] Remove Anime Detail’s client-side AniList GraphQL metadata fallback so placeholders and metadata remain backend-only.
+- [x] Validate canonical Home navigation, backend-only detail metadata and episodes, profile persistence, and the scoped Bonk player repair before release approval.
+- [ ] Commit and push only the approved Home, SEO, account, Anime Detail, and scoped Bonk Watch changes.
+- [ ] Verify the resulting Vercel deployment on production for desktop and mobile layout, canonical Home routing, backend-only Anime Detail, and Bonk playback behavior.

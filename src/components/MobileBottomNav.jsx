@@ -72,14 +72,14 @@ const MobileBottomNav = () => {
     return (
       <CompactBar aria-label="Focused page navigation">
         <Item type="button" onClick={() => navigate(-1)} aria-label="Go back"><FaArrowLeft size={16} /><span>Back</span></Item>
-        <Item type="button" $active={false} onClick={() => navigate('/home')} aria-label="Go to Home"><FaHome size={16} /><span>Home</span></Item>
+        <Item type="button" $active={false} onClick={() => navigate('/')} aria-label="Go to Home"><FaHome size={16} /><span>Home</span></Item>
         <Item type="button" $active={false} onClick={() => navigate('/catalog')} aria-label="Go to Catalog"><FaThLarge size={16} /><span>Catalog</span></Item>
       </CompactBar>
     )
   }
 
   const items = [
-    { icon: FaHome, label: 'Home', to: '/home' },
+    { icon: FaHome, label: 'Home', to: '/' },
     { icon: FaThLarge, label: 'Catalog', to: '/catalog' },
     { icon: FaCalendarAlt, label: 'Schedule', to: '/schedule' },
     { icon: FaRandom, label: 'Random', to: '/random', ariaLabel: 'Open Random Anime Pick' },
@@ -90,7 +90,7 @@ const MobileBottomNav = () => {
     <>
       <Bar aria-label="Mobile navigation">
         {items.map(({ icon: Icon, label, to, action, ariaLabel }) => {
-          const active = Boolean(to && (path === to || path.startsWith(`${to}/`) || (to === '/home' && path === '/')))
+          const active = Boolean(to && (path === to || (to !== '/' && path.startsWith(`${to}/`))))
           return (
             <Item key={label} type="button" $active={active} onClick={action || (() => navigate(to))} aria-label={ariaLabel || label} aria-current={active ? 'page' : undefined}>
               <Icon size={16} aria-hidden="true" />

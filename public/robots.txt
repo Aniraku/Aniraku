@@ -5,7 +5,6 @@
 
 User-agent: *
 Allow: /
-Allow: /home
 Allow: /catalog
 Allow: /schedule
 Allow: /anime/

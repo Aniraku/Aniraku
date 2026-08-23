@@ -37,7 +37,7 @@ const SideBar = ({ open, setOpen, profile, isAdmin }) => {
       </S.SettingsIcon>
       <S.NavList>
         <S.Item>
-          <Link to="/home" onClick={() => setOpen(false)}>Home</Link>
+          <Link to="/" onClick={() => setOpen(false)}>Home</Link>
         </S.Item>
         <S.Item>
           <Link to="/catalog" onClick={() => setOpen(false)}>Catalog</Link>
