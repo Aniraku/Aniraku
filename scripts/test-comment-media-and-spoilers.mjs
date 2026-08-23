@@ -31,13 +31,16 @@ assert.deepEqual(toGiphyGif({
   title: 'Reaction',
   images: {
     fixed_width_small: { url: 'https://media1.giphy.com/media/example/200w.gif' },
-    original: { url: mediaUrl },
+    original: { url: mediaUrl, width: '480', height: '270' },
   },
 }), {
   id: 'reaction',
   url: mediaUrl,
   previewUrl: mediaUrl,
   label: 'Reaction',
+  width: 480,
+  height: 270,
+  aspectRatio: 480 / 270,
 })
 
 const commentsSource = await readFile(new URL('../src/components/Comments/Comments.jsx', import.meta.url), 'utf8')
@@ -52,7 +55,11 @@ assert.match(commentsSource, /overflow-y: auto;/)
 assert.match(commentsSource, /overscroll-behavior: contain;/)
 assert.doesNotMatch(commentsSource, /grid-template-columns:/)
 assert.doesNotMatch(commentsSource, /aspect-ratio: 1\.45;/)
-assert.match(commentsSource, /height: auto; object-fit: contain; width: 100%;/)
+assert.match(commentsSource, /min-height: 124px;/)
+assert.match(commentsSource, /aspect-ratio: \$\{p => p\.\$aspectRatio\};/)
+assert.match(commentsSource, /height: 100%; max-height: none; object-fit: contain; width: 100%;/)
+assert.match(commentsSource, /\$aspectRatio=\{gif\.aspectRatio\}/)
+assert.match(commentsSource, /width=\{gif\.width \|\| undefined\} height=\{gif\.height \|\| undefined\}/)
 assert.doesNotMatch(commentsSource, /const GifLabel = styled\.span/)
 
 console.log('Comment GIF and spoiler regressions passed.')
