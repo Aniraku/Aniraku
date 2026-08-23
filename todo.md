@@ -68,3 +68,4 @@
 - [x] Preserve each GIF’s full original aspect ratio and allow the picker to grow vertically rather than cropping media into fixed squares.
 - [x] Keep the GIF picker compact and fixed-height while making only full-ratio search results scrollable inside it.
 - [x] Keep the picker header fixed while the complete full-GIF results panel scrolls as one collection.
+- [x] Restore compact GIF thumbnails and show only four to six tiles in a fixed two-row results viewport before internal scrolling.
