@@ -283,18 +283,16 @@ const GifGrid = styled.div`
   display: grid;
   gap: 4px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-height: 240px;
+  max-height: none;
   min-width: 0;
-  overflow: auto;
+  overflow: visible;
 
   @media (max-width: 480px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: 260px;
   }
 `
 
 const GifOption = styled.button`
-  aspect-ratio: 1;
   background: var(--bg-elevated);
   border: 1px solid transparent;
   border-radius: 6px;
@@ -305,7 +303,7 @@ const GifOption = styled.button`
   padding: 0;
   position: relative;
   &:hover, &:focus-visible { border-color: var(--accent); outline: none; }
-  img { display: block; height: 100%; object-fit: cover; width: 100%; }
+  img { display: block; height: auto; object-fit: contain; width: 100%; }
 `
 
 const PickerNote = styled.p`

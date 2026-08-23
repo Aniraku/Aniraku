@@ -65,3 +65,4 @@
 - [x] Make GIF titles readable in the compact picker on desktop and mobile without reintroducing overflow or obscuring comment controls.
 - [x] Keep the website and native GIF picker tile-label treatment aligned and visibly readable across compact layouts.
 - [x] Replace GIF tile labels with a 1:1 two- or three-column picker grid so embedded GIF text is legible on mobile and desktop.
+- [x] Preserve each GIF’s full original aspect ratio and allow the picker to grow vertically rather than cropping media into fixed squares.
