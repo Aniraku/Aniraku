@@ -1,21 +1,22 @@
 import React, { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck, FaSpinner } from 'react-icons/fa'
+import { FaPlay, FaStar, FaBookmark, FaRegBookmark, FaCheck } from 'react-icons/fa'
 import Footer from '../components/Footer/Footer'
 import Comments from '../components/Comments/Comments'
 import useLocalStorage from '../hooks/useLocalStorage'
-import { useAnimeDetails, useSimilar } from '../hooks/useAnime'
+import { useAnimeDetails } from '../hooks/useAnime'
 import { useAuth } from '../hooks/useAuth'
 import { filterAdult, isNsfw, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
-import { API_BASE } from '../config'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 import { fetchEpisodeRatings } from '../lib/sync'
 import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
-import { EPISODE_BACKEND_GRACE_MS, getEpisodeBackendAttemptPlan } from '../lib/episodeLoadPolicy'
+
+const MIRURO_EPISODES_BASE = 'https://miruro-api-v3.onrender.com/episodes'
+const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 
 const Page = styled.div`
   min-height: 100vh;
@@ -101,11 +102,17 @@ const Info = styled.div`
 `
 
 const Title = styled.h1`
-  font-size: 28px;
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(22px, 3vw, 28px);
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   @media (max-width: 768px) { font-size: 22px; }
-  @media (max-width: 480px) { font-size: clamp(18px, 5.6vw, 22px); line-height: 1.1; }
+  @media (max-width: 480px) { font-size: clamp(18px, 5.6vw, 22px); line-height: 1.14; }
 `
 
 const Meta = styled.div`
@@ -395,16 +402,6 @@ const FilterBtn = styled.button`
   &:hover { border-color: var(--accent); }
 `
 
-const Spinner = styled.div`
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  @keyframes spin { to { transform: rotate(360deg); } }
-`
-
 const Center = styled.div`
   min-height: 80vh;
   background: var(--bg);
@@ -637,14 +634,17 @@ const AnimeDetail = () => {
   const [episodes, setEpisodes] = useState([])
   const [episodesFallback, setEpisodesFallback] = useState(false)
   const [episodesLoading, setEpisodesLoading] = useState(false)
+  const [relations, setRelations] = useState([])
+  const [relationsLoading, setRelationsLoading] = useState(false)
   const [hideFillers, setHideFillers] = useState(false)
   const [watchHistory, setWatchHistory] = useState([])
   const [episodeRatings, setEpisodeRatings] = useState({})
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   const { data: anime, isLoading } = useAnimeDetails(id)
-  const { data: similar } = useSimilar(id)
-  const similarList = useStreamable(filterAdult(similar || [], nsfwEnabled))
+  const similarList = useStreamable(filterAdult((anime?.recommendations?.nodes || [])
+    .map((entry) => entry?.mediaRecommendation)
+    .filter(Boolean), nsfwEnabled))
   const isBookmarked = bookmarks.some(b => b.id === parseInt(id))
 
   // Bookmarks live in Supabase when signed in (cloud source of truth);
@@ -748,15 +748,42 @@ const AnimeDetail = () => {
     return () => { cancelled = true }
   }, [id, user])
 
-  const relations = React.useMemo(() => {
-    if (!anime?.relations?.edges) return []
-    return anime.relations.edges
-      .filter(e => e.node?.id && ['ADAPTATION', 'SEQUEL', 'PREQUEL', 'SPIN_OFF', 'SIDE_STORY'].includes(e.relationType))
-      .map(e => ({ ...e.node, relationType: e.relationType }))
-  }, [anime])
+  React.useEffect(() => {
+    if (!anime || !id) return undefined
+    const controller = new AbortController()
+    let cancelled = false
+
+    const loadRelations = async () => {
+      setRelations([])
+      setRelationsLoading(true)
+      try {
+        const response = await fetch(`${MIRURO_RELATIONS_BASE}/${encodeURIComponent(id)}/relations`, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        })
+        if (!response.ok) throw new Error(`Miruro relations API returned ${response.status}`)
+        const payload = await response.json()
+        const directRelations = (Array.isArray(payload?.relations) ? payload.relations : [])
+          .filter((entry) => entry?.node?.id && entry.node.type === 'ANIME' && ['SEQUEL', 'PREQUEL', 'SPIN_OFF', 'SIDE_STORY', 'ADAPTATION'].includes(entry.relationType))
+          .map((entry) => ({ ...entry.node, relationType: entry.relationType }))
+        if (!cancelled) setRelations(directRelations)
+      } catch (error) {
+        if (error?.name === 'AbortError' || cancelled) return
+        setRelations([])
+      } finally {
+        if (!cancelled) setRelationsLoading(false)
+      }
+    }
+
+    loadRelations()
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [anime, id])
 
   React.useEffect(() => {
-    if (!anime) return undefined
+    if (!anime || !id) return undefined
     const controller = new AbortController()
     let cancelled = false
 
@@ -764,64 +791,30 @@ const AnimeDetail = () => {
       setEpisodesFallback(false)
       setEpisodesLoading(true)
       try {
-        let epData
-        let lastError
-        const startedAt = Date.now()
-        const attemptPlan = getEpisodeBackendAttemptPlan()
-        for (let attempt = 0; attempt < attemptPlan.length; attempt += 1) {
-          const { delayMs, timeoutMs } = attemptPlan[attempt]
-          if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs))
-          if (cancelled || controller.signal.aborted) return
-          const requestController = new AbortController()
-          const abortRequest = () => requestController.abort()
-          controller.signal.addEventListener('abort', abortRequest, { once: true })
-          let timedOut = false
-          const timeout = setTimeout(() => {
-            timedOut = true
-            requestController.abort()
-          }, timeoutMs)
-          try {
-            const response = await fetch(`${API_BASE}/api/v1/anime/${id}/episodes`, {
-              signal: requestController.signal,
-              headers: { Accept: 'application/json' },
+        const response = await fetch(`${MIRURO_EPISODES_BASE}/${encodeURIComponent(id)}`, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        })
+        if (!response.ok) throw new Error(`Miruro episode API returned ${response.status}`)
+        const payload = await response.json()
+        const byNumber = new Map()
+        Object.values(payload?.providers || {}).forEach((provider) => {
+          Object.values(provider?.episodes || {}).forEach((episodeList) => {
+            if (!Array.isArray(episodeList)) return
+            episodeList.forEach((episode) => {
+              const number = Number(episode?.number)
+              if (!Number.isFinite(number) || number < 1 || byNumber.has(number)) return
+              byNumber.set(number, {
+                ...episode,
+                number,
+                thumbnail: episode.thumbnail || episode.image || '',
+              })
             })
-            if (!response.ok) {
-              lastError = new Error(`Episode API returned ${response.status}`)
-            } else {
-              const candidate = await response.json()
-              if (Array.isArray(candidate?.episodes) && candidate.episodes.length > 0) {
-                epData = candidate
-                break
-              }
-              lastError = new Error('Episode API returned no episodes')
-            }
-          } catch (error) {
-            if (controller.signal.aborted) return
-            lastError = timedOut
-              ? new Error('Episode API request timed out')
-              : error
-          } finally {
-            clearTimeout(timeout)
-            controller.signal.removeEventListener('abort', abortRequest)
-          }
-          if (Date.now() - startedAt >= EPISODE_BACKEND_GRACE_MS) break
-        }
-
-        const remainingGraceMs = EPISODE_BACKEND_GRACE_MS - (Date.now() - startedAt)
-        if (!epData && remainingGraceMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, remainingGraceMs))
-        }
-        if (cancelled || controller.signal.aborted) return
-
-        if (!epData) throw lastError || new Error('Episode API unavailable')
-        const eps = Array.isArray(epData?.episodes)
-          ? epData.episodes.filter(Boolean).map((ep, index) => ({
-            ...ep,
-            number: Number(ep.number) || index + 1,
-          }))
-          : []
-        if (!eps.length) throw new Error('Episode API returned no episodes')
-        if (!cancelled) setEpisodes(eps)
+          })
+        })
+        const directEpisodes = [...byNumber.values()].sort((a, b) => a.number - b.number)
+        if (!directEpisodes.length) throw new Error('Miruro episode API returned no episodes')
+        if (!cancelled) setEpisodes(directEpisodes)
       } catch (error) {
         if (error?.name === 'AbortError' || cancelled) return
         setEpisodes([])
@@ -955,7 +948,7 @@ const AnimeDetail = () => {
         : `Episodes (${visibleEps.length}${hideFillers ? ` of ${episodes.length}` : ''})`,
     })
   }
-  if (hasRelations) tabs.push({ key: 'relations', label: 'Relations' })
+  if (hasRelations || relationsLoading) tabs.push({ key: 'relations', label: 'Relations' })
 
   return (
     <Page className="anime-detail-page">
@@ -990,14 +983,6 @@ const AnimeDetail = () => {
       </Banner>
 
       <Content>
-        {episodesLoading && (
-          <Section aria-live="polite">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13 }} role="status">
-              <FaSpinner className="watch-spin" aria-hidden="true" />
-              Loading the verified episode list from Aniraku’s backend…
-            </div>
-          </Section>
-        )}
         {desc && (
           <Section>
             <SectionTitle>Synopsis</SectionTitle>
@@ -1049,7 +1034,7 @@ const AnimeDetail = () => {
               <>
                 {episodesFallback && (
                   <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
-                    The verified backend episode list is unavailable right now. Aniraku will not create a guessed episode list; check again after the backend source recovers.
+                    Miruro’s episode list is unavailable right now. Aniraku will not create a guessed episode list; check again shortly.
                   </div>
                 )}
                 {hasEpisodes && hiddenEpCount > 0 && (
@@ -1058,10 +1043,8 @@ const AnimeDetail = () => {
                   </FilterBtn>
                 )}
                 {hasEpisodes && <EpisodeList>
-                  {visibleEps.map((ep, i) => {
-                    // Preserve the episode's canonical source position even when
-                    // filler/recap filtering hides earlier rows.
-                    const num = Number(ep.number) || episodes.indexOf(ep) + 1 || i + 1
+                  {visibleEps.map((ep) => {
+                    const num = Number(ep.number)
                     const activity = activityByEpisode.get(num)
                     const rated = Number(episodeRatings[num]) || 0
                     const progress = activity
@@ -1099,11 +1082,13 @@ const AnimeDetail = () => {
               </>
             )}
 
-            {activeTab === 'relations' && hasRelations && (
+            {activeTab === 'relations' && (relationsLoading ? (
+              <div style={{ padding: '12px 0', color: 'var(--text-muted)', fontSize: 13 }} role="status">Loading related anime…</div>
+            ) : hasRelations ? (
               <Grid>
                 {relations.map(r => <RelationCard key={r.id} r={{ node: r, relationType: r.relationType || '' }} />)}
               </Grid>
-            )}
+            ) : null)}
           </Section>
         )}
 

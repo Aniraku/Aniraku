@@ -923,10 +923,22 @@ select {
   }
 }
 
-/* Respect user font scaling and prevent long titles from forcing horizontal
-   overflow on every supported viewport. */
-:is(h1, h2, h3, h4, p, a, span, button) {
-  overflow-wrap: anywhere;
+/* Keep reader-facing text contained without splitting ordinary words mid-word.
+   Individual components can still deliberately use a one-line ellipsis for
+   dense poster rails and compact controls. */
+:is(h1, h2, h3, h4, h5, h6, p, li, a, span, button, label) {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+:is(h1, h2, h3, h4, h5, h6) {
+  text-wrap: balance;
+}
+
+:is(p, li, blockquote) {
+  text-wrap: pretty;
 }
 
 @media (prefers-reduced-motion: reduce) {

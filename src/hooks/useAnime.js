@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY, RECOMMEND_QUERY } from '../lib/anilist'
-import { API_BASE } from '../config'
+import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
+
+const MIRURO_INFO_BASE = 'https://miruro-api-v3.onrender.com/info'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -102,22 +103,12 @@ export function useGenre({ genre }) {
 
 export function useAnimeDetails(id) {
   return useQuery(['anime', id], async () => {
-    const response = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${MIRURO_INFO_BASE}/${encodeURIComponent(id)}`, {
       headers: { Accept: 'application/json' },
     })
-    if (!response.ok) throw new Error(`Anime metadata API returned ${response.status}`)
+    if (!response.ok) throw new Error(`Miruro info API returned ${response.status}`)
     const anime = await response.json()
-    if (!anime?.id) throw new Error('Anime metadata API returned no anime')
+    if (!anime?.id) throw new Error('Miruro info API returned no anime')
     return anime
-  }, { enabled: !!id, staleTime: 300000 })
-}
-
-export function useSimilar(id) {
-  return useQuery(['similar', id], async () => {
-    const { data } = await anilistQuery(RECOMMEND_QUERY, { id: parseInt(id), genres: [], page: 1, perPage: 12 })
-    const genres = data.Media?.genres || []
-    if (!genres.length) return []
-    const { data: d2 } = await anilistQuery(RECOMMEND_QUERY, { id: parseInt(id), genres, page: 1, perPage: 12 })
-    return d2.Page.media || []
   }, { enabled: !!id, staleTime: 300000 })
 }

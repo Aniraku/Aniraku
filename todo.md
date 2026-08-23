@@ -31,3 +31,21 @@
 - [x] Remove the Vercel build warnings for duplicate `width`, `minWidth`, and `boxSizing` keys in `EpisodeSidebar` without changing its layout behavior.
 - [ ] Publish and verify the warning-free corrective deployment.
 - [x] Remove the segmented Trending Anime/Movies hero control and present a single broader backend-powered trending spotlight.
+- [x] Redesign Home’s visual hierarchy and discovery layout using Animex Home as public-structure reference while keeping an original Aniraku implementation.
+- [x] Preserve backend-only AniList data, canonical routing, profile/auth behavior, Anime Detail flows, and Watch playback while redesigning Home.
+- [x] Validate the redesigned Home at desktop and mobile viewports before any production replacement.
+- [x] Replace the fixed trending hero with an accessible auto-advancing backend-powered carousel.
+- [x] Remove empty Home-page gaps and boxed rail framing while keeping the page dense and easy to scan.
+- [x] Verify phone poster cards, metadata, rail edges, and actions do not clip at a 390px viewport.
+- [x] Add the existing Support destination and icon to the mobile bottom navigation without removing core navigation items.
+- [x] Load Anime Detail metadata from `https://miruro-api-v3.onrender.com/info/{anilist_id}` and retain only genuine direct source data.
+- [x] Reduce Home hero and section sizing so desktop and mobile discovery remain compact without clipped content.
+- [x] Load real Anime Detail episode rows directly from `https://miruro-api-v3.onrender.com/episodes/{anilist_id}`.
+- [x] Retain the existing Anime Detail skeleton while switching metadata and real episode requests to direct Miruro endpoints without fabricated rows or below-title Aniraku-backend episode-status copy.
+- [x] Remove all visible trend-carousel controls and counter text while retaining automatic title rotation.
+- [x] Strengthen shared responsive typography so long titles, metadata, labels, and actions wrap or truncate safely without overflow.
+- [x] Refine visible Home and Anime Detail copy for concise, natural reading without changing data or user flows.
+- [x] Load Anime Detail relation cards from `https://miruro-api-v3.onrender.com/anime/{anilist_id}/relations` and retain the Relations tab.
+- [x] Remove the `/home` compatibility route and all related canonicalization logic so Home exists only at `/`.
+- [x] Redesign the site not-found page with Aniraku’s shared visual language and existing site components, while keeping the deleted `/home` path as a true not-found route.
+- [ ] Commit, push, and production-verify the approved local Home, direct-Miruro Detail, profile, scoped Watch, root-only routing, and Aniraku-themed not-found-page changes without including unrelated workspace artifacts.
