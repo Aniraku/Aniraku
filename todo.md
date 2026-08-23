@@ -53,3 +53,12 @@
 - [x] Add a Flemozi-backed GIF picker to the existing comment composer without broadening playback or Anime Detail data behavior.
 - [x] Add spoiler-marking and click-to-reveal behavior for comments, including stored spoiler metadata and accessible labels.
 - [ ] Commit, push, and production-verify the approved GIF picker and spoiler-safe comment enhancement without including unrelated workspace artifacts.
+- [ ] Repair the production GIF picker so it never exposes a nonfunctional search panel and can retrieve configured GIF results without affecting spoiler controls.
+- [x] Redesign the comment composer and GIF picker into a compact Aniraku-native layout with refined iconography and less visual weight.
+- [x] Capture and present a local compact comment and spoiler-state preview for approval before publishing the redesigned UI.
+- [x] Replace the static mockup with a real browser-rendered authenticated preview of the live comment component and compact GIF picker before user approval.
+- [x] Simplify the comment composer and use clear GIF and spoiler iconography with a genuinely minimalist visual hierarchy.
+- [x] Make the GIF picker viewport-safe on desktop and mobile with no clipping, overflow, or content obscuration.
+- [x] Present the revised real desktop and mobile comment previews for approval before publishing this layout.
+- [x] Rework the website mobile comment composer and GIF sheet so the layout feels native, compact, and does not obscure the Detail page content or dock.
+- [x] Verify that website comments—including spoiler and GIF fields—remain available through the shared Supabase schema for native client consumption.
