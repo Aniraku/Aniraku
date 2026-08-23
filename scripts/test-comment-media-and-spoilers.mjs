@@ -48,10 +48,11 @@ assert.match(commentsSource, /aria-label="Spoiler hidden\. Activate to reveal th
 assert.match(commentsSource, /rating', 'g'/)
 assert.match(commentsSource, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
 assert.match(commentsSource, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)/)
-assert.match(commentsSource, /max-height: 260px;/)
+assert.match(commentsSource, /max-height: 168px;/)
 assert.match(commentsSource, /overflow-y: auto;/)
 assert.match(commentsSource, /overscroll-behavior: contain;/)
-assert.match(commentsSource, /height: auto; object-fit: contain; width: 100%;/)
+assert.match(commentsSource, /aspect-ratio: 1\.45;/)
+assert.match(commentsSource, /height: 100%; object-fit: cover; width: 100%;/)
 assert.doesNotMatch(commentsSource, /const GifLabel = styled\.span/)
 
 console.log('Comment GIF and spoiler regressions passed.')
