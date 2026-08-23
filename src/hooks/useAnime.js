@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY, ANIME_DETAIL_QUERY, RECOMMEND_QUERY } from '../lib/anilist'
+import { anilistQuery, BROWSE_QUERY, RECOMMEND_QUERY } from '../lib/anilist'
+import { API_BASE } from '../config'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -26,7 +27,7 @@ async function fetchHomePageData() {
         }
       }
       movies: Page(page: 1, perPage: 20) {
-        media(type: ANIME, format: MOVIE, sort: SCORE_DESC) {
+        media(type: ANIME, format: MOVIE, sort: TRENDING_DESC) {
           id title { romaji english native userPreferred }
           coverImage { extraLarge large medium color }
           bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
@@ -101,8 +102,13 @@ export function useGenre({ genre }) {
 
 export function useAnimeDetails(id) {
   return useQuery(['anime', id], async () => {
-    const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
-    return data.Media
+    const response = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(id)}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new Error(`Anime metadata API returned ${response.status}`)
+    const anime = await response.json()
+    if (!anime?.id) throw new Error('Anime metadata API returned no anime')
+    return anime
   }, { enabled: !!id, staleTime: 300000 })
 }
 
@@ -113,19 +119,5 @@ export function useSimilar(id) {
     if (!genres.length) return []
     const { data: d2 } = await anilistQuery(RECOMMEND_QUERY, { id: parseInt(id), genres, page: 1, perPage: 12 })
     return d2.Page.media || []
-  }, { enabled: !!id, staleTime: 300000 })
-}
-
-export function useAnimeEpisodes(id) {
-  return useQuery(['episodes', id], async () => {
-    const { data } = await anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(id) })
-    const media = data.Media
-    if (!media) return []
-    const count = media.episodes || 12
-    return Array.from({ length: count }, (_, i) => ({
-      number: i + 1,
-      title: `Episode ${i + 1}`,
-      thumbnail: media.coverImage?.medium || '',
-    }))
   }, { enabled: !!id, staleTime: 300000 })
 }

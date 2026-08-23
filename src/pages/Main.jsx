@@ -56,7 +56,7 @@ const Main = () => {
         <M.VideoContent>
           <M.VideoSubtitle>Stream, Discover & Download your favorite anime</M.VideoSubtitle>
           <M.CTA>
-            <M.CTAPrimary to="/home">Browse</M.CTAPrimary>
+            <M.CTAPrimary to="/">Browse</M.CTAPrimary>
             <M.CTAGhost to="/dmca">DMCA</M.CTAGhost>
           </M.CTA>
         </M.VideoContent>
@@ -71,7 +71,7 @@ const Main = () => {
               Explore a vast library of anime with detailed information, episodes, and community features.
               Your next favorite anime is just a click away.
             </p>
-            <Link to="/home" style={{
+            <Link to="/" style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',

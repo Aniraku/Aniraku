@@ -11,7 +11,7 @@ const letters = [
 ]
 
 const browseLinks = [
-  { label: 'Home', to: '/home' },
+  { label: 'Home', to: '/' },
   { label: 'Catalog', to: '/catalog' },
   { label: 'Schedule', to: '/schedule' },
   { label: 'Most Popular', to: '/catalog?sort=POPULARITY_DESC' },
@@ -66,7 +66,7 @@ const Footer = ({ compact = false }) => {
     return (
       <F.Footer id="footer">
         <CompactContent>
-          <Logo to="/home" height={28} showText />
+          <Logo to="/" height={28} showText />
           <nav aria-label="Legal and support links">
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
@@ -83,7 +83,7 @@ const Footer = ({ compact = false }) => {
       {/* Desktop grid */}
       <F.DesktopGrid>
         <F.Col>
-          <Logo to="/home" height={36} showText />
+          <Logo to="/" height={36} showText />
           <F.Disclaimer>
             Aniraku is an open-source media client. We do not host, store, or upload video files.
             Stream links are resolved from publicly available third-party sources at playback time.
@@ -135,7 +135,7 @@ const Footer = ({ compact = false }) => {
       {/* Mobile layout */}
       <F.MobileFooter>
         <F.MobileTop>
-          <Logo to="/home" height={28} showText />
+          <Logo to="/" height={28} showText />
           <F.Socials>
             <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer" aria-label="GitHub"><FaGithub size={16} /></F.SocialLink>
             <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer" aria-label="Discord"><FaDiscord size={16} /></F.SocialLink>

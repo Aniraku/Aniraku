@@ -433,7 +433,7 @@ const Settings = () => {
       // signed in until a later refresh.
       await signOut()
       clearAnirakuStorage()
-      navigate('/home')
+      navigate('/')
     } catch (error) {
       console.error('Delete account:', error)
       setDeleteErr(error?.message || 'We could not delete your account. Please try again.')
@@ -445,7 +445,7 @@ const Settings = () => {
     try {
       await signOut()
       showToast('Signed out')
-      navigate('/home')
+      navigate('/')
     } catch (err) {
       console.error('Sign out:', err)
       showToast('Could not sign out — try again')

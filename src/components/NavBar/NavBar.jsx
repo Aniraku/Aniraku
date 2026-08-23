@@ -19,7 +19,7 @@ const NavBar = () => {
   const navigate = useNavigate()
 
   const location = useLocation()
-  const isHome = location.pathname === '/' || location.pathname === '/home'
+  const isHome = location.pathname === '/'
   const focusedRoute = ['/login', '/signup', '/auth/forgot-password', '/auth/new-password', '/privacy', '/terms', '/dmca', '/license', '/community-guidelines'].includes(location.pathname)
   const shortcutOriginRef = useRef(null)
 
@@ -102,9 +102,9 @@ const NavBar = () => {
   if (focusedRoute) {
     return (
       <N.Nav $isScrolled={isScrolled} $isHome={false} aria-label="Focused page navigation">
-        <N.Left><Logo to="/home" height={32} showText /></N.Left>
+        <N.Left><Logo to="/" height={32} showText /></N.Left>
         <N.Right>
-          <Link to="/home" style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 750, textDecoration: 'none' }}>Home</Link>
+          <Link to="/" style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 750, textDecoration: 'none' }}>Home</Link>
           <Link to="/dmca" style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 750, textDecoration: 'none' }}>Help</Link>
         </N.Right>
       </N.Nav>
@@ -121,9 +121,9 @@ const NavBar = () => {
   return (
     <N.Nav $isScrolled={isScrolled} $isHome={isHome} aria-label="Primary navigation">
       <N.Left>
-        <Logo to="/home" height={36} showText />
+        <Logo to="/" height={36} showText />
         <N.NavLinks>
-          <N.NavLink to="/" className={location.pathname === '/' || location.pathname === '/home' ? 'active' : ''}>Home</N.NavLink>
+          <N.NavLink to="/" className={location.pathname === '/' ? 'active' : ''}>Home</N.NavLink>
           <N.NavLink to="/catalog" className={location.pathname === '/catalog' ? 'active' : ''}>Catalog</N.NavLink>
           <N.NavLink to="/schedule" className={location.pathname === '/schedule' ? 'active' : ''}>Schedule</N.NavLink>
         </N.NavLinks>

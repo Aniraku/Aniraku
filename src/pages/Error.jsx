@@ -17,7 +17,7 @@ const Error = () => {
       <E.Img src={img} />
       <E.ErrorText>404 Error</E.ErrorText>
       <E.Text>Oops! We can't find this page.</E.Text>
-      <E.BtnLink to="/home">
+      <E.BtnLink to="/">
         <FaChevronCircleLeft />
         Back to homepage
       </E.BtnLink>

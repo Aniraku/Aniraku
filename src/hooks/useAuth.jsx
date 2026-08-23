@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { defaultAvatar } from '../lib/avatars'
+import { buildProfileSeed, isUnverifiedEmailUser } from '../lib/accountSessionPolicy'
 
 const AuthContext = createContext(null)
 
@@ -14,21 +15,6 @@ function sanitizeUsername(raw) {
     .replace(/^_|_$/g, '')
   const clipped = base.slice(0, 20)
   return clipped.length >= 3 ? clipped : `user_${Math.random().toString(36).slice(2, 6)}`
-}
-
-function isEmailIdentity(user) {
-  return Boolean(
-    user?.email && (
-      user?.app_metadata?.provider === 'email' ||
-      user?.identities?.some(identity => identity.provider === 'email') ||
-      (!user?.app_metadata?.provider && !user?.identities?.length)
-    )
-  )
-}
-
-function isUnverifiedEmailUser(user) {
-  if (!isEmailIdentity(user)) return false
-  return !user.email_confirmed_at && !user.confirmed_at
 }
 
 function hasRecoveryMarker() {
@@ -62,36 +48,48 @@ export const AuthProvider = ({ children }) => {
     }, 0)
   }, [clearAuthState])
 
-  const fetchProfile = useCallback(async (userId, email) => {
+  const fetchProfile = useCallback(async (authenticatedUser) => {
+    const seed = buildProfileSeed(authenticatedUser)
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, username, display_name, bio, avatar_url, banner_url, location, socials, created_at')
-        .eq('id', userId)
+        .eq('id', authenticatedUser.id)
         .maybeSingle()
       if (error) throw error
       if (data) {
         setProfile(data)
       } else {
-        // Ensure profile row exists (trigger may have failed on bad username)
-        const username = sanitizeUsername(email?.split('@')[0] || `user_${userId.slice(0, 6)}`)
-        const fallbackAvatar = defaultAvatar(username.charCodeAt(0)).url
-        const { data: created } = await supabase
+        // Never upsert a fallback over a pre-existing profile. A missing row is
+        // created once; a uniqueness race is then re-read without overwriting
+        // the name, username, or bio the account already saved.
+        const fallbackAvatar = defaultAvatar(seed.username.charCodeAt(0)).url
+        const { data: created, error: createError } = await supabase
           .from('profiles')
-          .upsert({
-            id: userId,
-            username,
-            display_name: username,
+          .insert({
+            id: authenticatedUser.id,
+            username: seed.username,
+            display_name: seed.display_name,
             avatar_url: fallbackAvatar,
-          }, { onConflict: 'id' })
+          })
           .select('id, username, display_name, bio, avatar_url, banner_url, location, socials, created_at')
           .maybeSingle()
-        setProfile(created || { id: userId, username, display_name: username, avatar_url: fallbackAvatar })
+        if (createError && createError.code !== '23505') throw createError
+        if (created) {
+          setProfile(created)
+        } else {
+          const { data: existing, error: retryError } = await supabase
+            .from('profiles')
+            .select('id, username, display_name, bio, avatar_url, banner_url, location, socials, created_at')
+            .eq('id', authenticatedUser.id)
+            .maybeSingle()
+          if (retryError) throw retryError
+          setProfile(existing || { ...seed, avatar_url: fallbackAvatar })
+        }
       }
     } catch (err) {
       console.error('fetchProfile error:', err)
-      const username = sanitizeUsername(email?.split('@')[0] || 'user')
-      setProfile({ id: userId, username, display_name: username, avatar_url: defaultAvatar(0).url })
+      setProfile({ ...seed, avatar_url: defaultAvatar(seed.username.charCodeAt(0)).url })
     } finally {
       setLoading(false)
     }
@@ -104,18 +102,45 @@ export const AuthProvider = ({ children }) => {
     }
     let mounted = true
 
-    const applySession = (session, event = '') => {
+    let sessionRevision = 0
+    const applySession = async (session, event = '') => {
+      const revision = ++sessionRevision
       if (!mounted) return
-      const nextUser = session?.user || null
+      const claimedUser = session?.user || null
 
-      if (nextUser && isUnverifiedEmailUser(nextUser) && !isAllowedRecoverySession(event)) {
+      if (!claimedUser) {
+        setUser(null)
+        setProfile(null)
+        setIsAdmin(false)
+        setLoading(false)
+        return
+      }
+
+      if (isUnverifiedEmailUser(claimedUser) && !isAllowedRecoverySession(event)) {
         rejectUnverifiedSession()
         return
       }
 
+      // A persisted browser session is only a local cache. Ask Supabase Auth
+      // for the current user before allowing the app to retain a session, so a
+      // deleted, stale, or unconfirmed account cannot appear signed in.
+      const { data: serverUserData, error: serverUserError } = await supabase.auth.getUser(session?.access_token)
+      if (!mounted || revision !== sessionRevision) return
+      const nextUser = serverUserData?.user || null
+      if (
+        serverUserError ||
+        !nextUser ||
+        nextUser.id !== claimedUser.id ||
+        (isUnverifiedEmailUser(nextUser) && !isAllowedRecoverySession(event))
+      ) {
+        rejectUnverifiedSession()
+        return
+      }
+
+      setLoading(true)
       setUser(nextUser)
       if (nextUser) {
-        fetchProfile(nextUser.id, nextUser.email)
+        fetchProfile(nextUser)
         supabase.rpc('is_admin').then(({ data }) => { if (mounted) setIsAdmin(!!data) }).catch(() => { if (mounted) setIsAdmin(false) })
       } else {
         setProfile(null)
@@ -124,10 +149,10 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => applySession(session))
+    supabase.auth.getSession().then(({ data: { session } }) => { void applySession(session) })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      applySession(session, event)
+      void applySession(session, event)
     })
 
     return () => { mounted = false; subscription.unsubscribe() }
@@ -168,7 +193,14 @@ export const AuthProvider = ({ children }) => {
       await supabase.auth.signOut({ scope: 'local' })
       throw new Error('Please verify your email address before signing in. Check your inbox for the confirmation link.')
     }
-    return data
+    const { data: verifiedUserData, error: verifiedUserError } = await supabase.auth.getUser(data.session?.access_token)
+    const verifiedUser = verifiedUserData?.user || null
+    if (verifiedUserError || !verifiedUser || verifiedUser.id !== data.user?.id || isUnverifiedEmailUser(verifiedUser)) {
+      clearAuthState()
+      await supabase.auth.signOut({ scope: 'local' })
+      throw new Error('Your account must be verified before signing in.')
+    }
+    return { ...data, user: verifiedUser }
   }, [clearAuthState])
 
   const signOut = useCallback(async () => {

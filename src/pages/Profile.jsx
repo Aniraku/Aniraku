@@ -117,7 +117,7 @@ const Profile = () => {
         }
       }).catch(err => console.error('watch history fetch error:', err))
     }
-  }, [user?.id])
+  }, [user?.id, profile])
 
   const handleSave = async () => {
     setSaving(true)
@@ -146,7 +146,7 @@ const Profile = () => {
 
   const handleSignOut = async () => {
     await signOut()
-    navigate('/home')
+    navigate('/')
   }
 
   const removeBookmark = async (id) => {
@@ -379,7 +379,7 @@ const Profile = () => {
               {bookmarks.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                   <p>No bookmarks yet</p>
-                  <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14, marginTop: 8, display: 'inline-block' }}>Browse Anime</Link>
+                  <Link to="/" style={{ color: 'var(--accent)', fontSize: 14, marginTop: 8, display: 'inline-block' }}>Browse Anime</Link>
                 </div>
               ) : (
                 <div className="profile-bookmark-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
@@ -404,7 +404,7 @@ const Profile = () => {
               {history.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                   <p>No watch history yet</p>
-                  <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14, marginTop: 8, display: 'inline-block' }}>Start Watching</Link>
+                  <Link to="/" style={{ color: 'var(--accent)', fontSize: 14, marginTop: 8, display: 'inline-block' }}>Start Watching</Link>
                 </div>
               ) : (
                 <>

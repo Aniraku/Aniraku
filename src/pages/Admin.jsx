@@ -103,7 +103,7 @@ const Admin = () => {
           <Container>
             <Title>Access Denied</Title>
             <Subtitle>You don't have admin access.</Subtitle>
-            <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
+            <Link to="/" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
           </Container>
         </Page>
         <Footer />

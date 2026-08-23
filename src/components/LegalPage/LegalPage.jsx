@@ -172,7 +172,7 @@ const LegalPage = ({ title, eyebrow = 'Trust & transparency', revision = 'August
       <Shell>
         <Header>
           <Eyebrow><FaShieldAlt size={10} /> {eyebrow}</Eyebrow>
-          <BackLink to="/home"><FaArrowLeft size={11} /> Back to Aniraku</BackLink>
+          <BackLink to="/"><FaArrowLeft size={11} /> Back to Aniraku</BackLink>
           <h1>{title}</h1>
           <p>{intro}</p>
           <Revision><span>{revision}</span><span>Plain-language working draft</span><span>Open-source project</span></Revision>

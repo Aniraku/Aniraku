@@ -9,7 +9,6 @@ import {
   FaFilm,
   FaFire,
   FaPlay,
-  FaRandom,
   FaStar,
   FaTv,
 } from 'react-icons/fa'
@@ -194,28 +193,6 @@ const SpotlightAction = styled(Link)`
   }
 `
 
-const RandomSlideButton = styled.button`
-  display: inline-flex;
-  min-height: 42px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px;
-  background: rgba(0,0,0,0.22);
-  color: #fff;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 850;
-  cursor: pointer;
-  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
-  &:hover { border-color: rgba(255,255,255,0.42); background: rgba(255,255,255,0.14); }
-  &:active { transform: scale(0.97); }
-
-  @media (max-width: 430px) { flex: 1 1 calc(50% - 4px); }
-`
-
 const OnDeck = styled.aside`
   display: flex;
   flex-direction: column;
@@ -318,6 +295,80 @@ const EmptyDeck = styled.div`
 
 const PersonalSection = styled.section`
   margin-top: 26px;
+`
+
+const DiscoverSection = styled.section`
+  margin-top: 30px;
+  padding: clamp(18px, 2.8vw, 30px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+
+  @media (max-width: 640px) { margin-top: 22px; padding: 17px; }
+`
+
+const DiscoveryRail = styled.div`
+  display: grid;
+  grid-auto-columns: minmax(138px, 1fr);
+  grid-auto-flow: column;
+  grid-template-rows: 1fr;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px 1px 9px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+
+  @media (min-width: 980px) { grid-auto-columns: minmax(150px, 1fr); }
+`
+
+const DiscoveryCard = styled(Link)`
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: inherit;
+  scroll-snap-align: start;
+  text-decoration: none;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+
+  &:hover { transform: translateY(-3px); border-color: var(--border-hover); background: var(--bg-secondary); }
+  &:active { transform: scale(0.985); }
+  img { display: block; width: 100%; aspect-ratio: 0.69; object-fit: cover; background: var(--bg-secondary); }
+  h3 { margin: 9px 9px 3px; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 780; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+  p { margin: 0 9px 10px; color: var(--text-muted); font-size: 10px; font-weight: 750; }
+`
+
+const SectionStack = styled.div`
+  display: grid;
+  gap: 14px;
+  margin-top: 30px;
+
+  @media (max-width: 640px) { gap: 12px; margin-top: 22px; }
+`
+
+const TrendTabs = styled.div`
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+`
+
+const TrendTab = styled.button`
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: ${({ $active }) => ($active ? 'var(--accent)' : 'transparent')};
+  color: ${({ $active }) => ($active ? 'var(--bg)' : 'var(--text-secondary)')};
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  &:active { transform: scale(0.97); }
 `
 
 const StoryGrid = styled.section`
@@ -489,6 +540,20 @@ const releaseTiming = (timestamp) => {
   return { relative, stamp }
 }
 
+function MediaRail({ items, badge }) {
+  return (
+    <DiscoveryRail>
+      {items.slice(0, 12).map((item) => (
+        <DiscoveryCard key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`}>
+          <img src={posterFor(item)} alt="" loading="lazy" />
+          <h3>{titleFor(item)}</h3>
+          <p>{badge(item)}</p>
+        </DiscoveryCard>
+      ))}
+    </DiscoveryRail>
+  )
+}
+
 function Home() {
   const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
   const { trending = [], airing = [], movies = [], topTV = [] } = homeData
@@ -498,16 +563,13 @@ function Home() {
   const airingList = useStreamable(filterAdult(airing, nsfwEnabled))
   const moviesList = useStreamable(filterAdult(movies, nsfwEnabled))
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
+  const [trendingKind, setTrendingKind] = useState('anime')
+  const activeTrending = trendingKind === 'movies' ? moviesList : trendingList
 
-  const featured = useMemo(() => trendingList[0] || airingList[0] || tvList[0] || moviesList[0] || null, [trendingList, airingList, tvList, moviesList])
-  const randomSlides = useMemo(() => {
-    const byId = new Map()
-    ;[...trendingList, ...airingList, ...tvList, ...moviesList].forEach((item) => {
-      if (item?.id && !byId.has(item.id)) byId.set(item.id, item)
-    })
-    return [...byId.values()].sort(() => Math.random() - 0.5).slice(0, 10)
-  }, [trendingList, airingList, tvList, moviesList])
-  const [randomIndex, setRandomIndex] = useState(0)
+  const featured = useMemo(
+    () => activeTrending[0] || airingList[0] || tvList[0] || null,
+    [activeTrending, airingList, tvList]
+  )
   const upcomingReleases = useMemo(() => airingList
     .filter((item) => item?.id && item.id !== featured?.id && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now())
     .sort((a, b) => Number(a.nextAiringEpisode.airingAt) - Number(b.nextAiringEpisode.airingAt))
@@ -520,18 +582,15 @@ function Home() {
   const editorialPicks = useMemo(() => [...trendingList, ...tvList]
     .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
     .slice(0, 6), [trendingList, tvList, featured])
+  const seasonalMomentum = useMemo(() => airingList
+    .filter((item) => item?.id && item.id !== featured?.id)
+    .slice(0, 12), [airingList, featured])
+  const fanFavorites = useMemo(() => [...tvList, ...trendingList]
+    .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
+    .sort((a, b) => (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0))
+    .slice(0, 12), [tvList, trendingList, featured])
 
   useEffect(() => { setHomepageSEO() }, [])
-
-  useEffect(() => {
-    setRandomIndex((index) => randomSlides.length ? index % randomSlides.length : 0)
-  }, [randomSlides.length])
-
-  useEffect(() => {
-    if (randomSlides.length < 2) return undefined
-    const timer = window.setInterval(() => setRandomIndex((index) => (index + 1) % randomSlides.length), 10000)
-    return () => window.clearInterval(timer)
-  }, [randomSlides.length])
 
   useEffect(() => {
     if (!user) return undefined
@@ -595,20 +654,11 @@ function Home() {
     return () => { cancelled = true }
   }, [user])
 
-  const spotlight = randomSlides.length ? randomSlides[randomIndex % randomSlides.length] : featured
+  const spotlight = featured
   const spotlightTitle = titleFor(spotlight)
   const spotlightImage = imageFor(spotlight)
   const spotlightPoster = posterFor(spotlight)
   const spotlightEpisode = spotlight?.nextAiringEpisode?.episode
-  const showAnotherRandomSlide = () => {
-    if (randomSlides.length < 2) return
-    setRandomIndex((index) => {
-      let next = index
-      while (next === index) next = Math.floor(Math.random() * randomSlides.length)
-      return next
-    })
-  }
-
   return (
     <>
       <Page>
@@ -618,7 +668,11 @@ function Home() {
             <SpotlightGrid>
               <Spotlight $image={spotlightImage} $mobileImage={spotlightPoster}>
                 <SpotlightCopy>
-                  <div className="kicker"><FaRandom size={10} /> Random anime pick</div>
+                  <div className="kicker"><FaFire size={10} /> Trending on AniList</div>
+                  <TrendTabs aria-label="Trending content type" style={{ marginBottom: 16 }}>
+                    <TrendTab type="button" $active={trendingKind === 'anime'} onClick={() => setTrendingKind('anime')}>Trending anime</TrendTab>
+                    <TrendTab type="button" $active={trendingKind === 'movies'} onClick={() => setTrendingKind('movies')}>Trending movies</TrendTab>
+                  </TrendTabs>
                   <h1>{spotlightTitle}</h1>
                   <MetaRow>
                     {spotlight?.format && <span><FaTv size={9} /> {spotlight.format}</span>}
@@ -630,7 +684,6 @@ function Home() {
                   <SpotlightActions>
                     {spotlight && <SpotlightAction to={watchHref(spotlight)}><FaPlay size={11} /> Start watching</SpotlightAction>}
                     {spotlight && <SpotlightAction $secondary to={detailHref(spotlight)}>Details <FaArrowRight size={10} /></SpotlightAction>}
-                    <RandomSlideButton type="button" onClick={showAnotherRandomSlide} aria-label="Show another random anime"><FaRandom size={11} /> Surprise me</RandomSlideButton>
                   </SpotlightActions>
                 </SpotlightCopy>
               </Spotlight>
@@ -671,6 +724,30 @@ function Home() {
 
           <PersonalSection aria-label="Continue watching"><ContinueWatching /></PersonalSection>
 
+          <SectionStack aria-label="Anime discovery">
+            <DiscoverSection>
+              <SectionTitle>
+                <div><p className="eyebrow"><FaCalendarAlt size={10} /> Seasonal momentum</p><h2>Keeping the season moving.</h2></div>
+                <Link to="/catalog?status=RELEASING">All airing <FaArrowRight size={11} /></Link>
+              </SectionTitle>
+              <MediaRail
+                items={seasonalMomentum}
+                badge={(item) => item.nextAiringEpisode?.episode ? `Episode ${item.nextAiringEpisode.episode} next` : (item.format || 'Airing')}
+              />
+            </DiscoverSection>
+
+            <DiscoverSection>
+              <SectionTitle>
+                <div><p className="eyebrow"><FaStar size={10} /> Community favorites</p><h2>High-score, high-replay series.</h2></div>
+                <Link to="/catalog?sort=SCORE_DESC">Top rated <FaArrowRight size={11} /></Link>
+              </SectionTitle>
+              <MediaRail
+                items={fanFavorites}
+                badge={(item) => item.averageScore ? `${item.averageScore}% community score` : (item.format || 'Anime')}
+              />
+            </DiscoverSection>
+          </SectionStack>
+
           <StoryGrid>
             <StoryPanel>
               <SectionTitle>
@@ -699,6 +776,17 @@ function Home() {
               </MovieList>
             </ScreeningRoom>
           </StoryGrid>
+
+          <DiscoverSection>
+            <SectionTitle>
+              <div><p className="eyebrow"><FaFilm size={10} /> Movie radar</p><h2>Big stories, one sitting.</h2></div>
+              <Link to="/catalog?format=MOVIE">All movies <FaArrowRight size={11} /></Link>
+            </SectionTitle>
+            <MediaRail
+              items={moviesList}
+              badge={(item) => item.averageScore ? `${item.averageScore}% audience score` : 'Movie'}
+            />
+          </DiscoverSection>
 
           <GenreBand>
             <p>Browse by mood</p>

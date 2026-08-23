@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 
-const Logo = ({ to = '/home', height = 40, showText = false, style = {} }) => {
+const Logo = ({ to = '/', height = 40, showText = false, style = {} }) => {
   return (
     <Link
       to={to}

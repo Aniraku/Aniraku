@@ -114,7 +114,7 @@ const ScrollToTop = () => {
   // own effects once their data is ready.
   useEffect(() => {
     if (pathname.startsWith('/watch/') || pathname.startsWith('/anime/') || pathname === '/catalog' || pathname === '/schedule') return
-    if (pathname === '/' || pathname === '/home') return
+    if (pathname === '/') return
 
     const routeTitles = {
       '/profile': 'Profile — Aniraku',
@@ -151,7 +151,7 @@ const App = () => {
           <SupportPrompt />
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/home" element={<Home />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/catalog" element={<Suspense fallback={<Skeleton />}><Catalog /></Suspense>} />
             <Route path="/schedule" element={<Suspense fallback={<Skeleton />}><Schedule /></Suspense>} />
             <Route path="/watch/:slugId" element={<RouteBoundary><Suspense fallback={<Skeleton />}><Watch /></Suspense></RouteBoundary>} />

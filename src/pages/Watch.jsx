@@ -63,6 +63,7 @@ import {
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
+import { shouldPreferProviderPlayer } from '../lib/watchProviderPlayer'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
   filterBrowserProviders,
@@ -1949,6 +1950,9 @@ export default function Watch() {
   // Player build / destroy
   // ────────────────────────────────────────────────────────────
   const destroyPlayer = useCallback(() => {
+    // A native media event may have raised the indicator immediately before an
+    // iframe handoff. Never allow that stale event to cover the next player.
+    setBuffering(false)
     bufferIndicatorCleanupRef.current?.()
     bufferIndicatorCleanupRef.current = null
     if (dashInstance.current) {
@@ -1972,6 +1976,13 @@ export default function Watch() {
     }
     recoveryBusyRef.current = false
   }, [])
+
+  useEffect(() => {
+    // Provider players are cross-origin frames. Their playback events are not
+    // observable from the page, so a prior native `waiting` event must not
+    // leave the page-owned buffering badge above the frame.
+    if (activeEmbedUrl) setBuffering(false)
+  }, [activeEmbedUrl])
 
   useEffect(
     () => () => {
@@ -3036,6 +3047,25 @@ export default function Watch() {
         const cached = getCachedStream(source)
         if (cached && cached.sources?.[0]?.url) {
           if (targetEpisode !== epNumberRef.current) return
+          const cachedProviderPlayer = shouldPreferProviderPlayer(source)
+            ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
+            : null
+          if (cachedProviderPlayer) {
+            destroyPlayer()
+            setBuffering(false)
+            setActiveEmbedUrl(cachedProviderPlayer.url)
+            applySkipSegments(normalizeProviderSkipSegments(cached))
+            setStreamLoading(false)
+            loadingRef.current = false
+            return
+          }
+          if (shouldPreferProviderPlayer(source)) {
+            setErrorType('no-source')
+            setError(`${source.label} player is unavailable for this episode.`)
+            setStreamLoading(false)
+            loadingRef.current = false
+            return
+          }
           const firstSource = cached.sources[0]
           const qualityList = buildQualityList(cached.sources)
           if (qualityList.length > 0) {
@@ -3168,6 +3198,34 @@ export default function Watch() {
         }
 
         const firstSource = data.sources[0]
+        const providerPlayer = shouldPreferProviderPlayer(source)
+          ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
+          : null
+        if (providerPlayer) {
+          destroyPlayer()
+          setBuffering(false)
+          setActiveEmbedUrl(providerPlayer.url)
+          applySkipSegments(normalizeProviderSkipSegments(data))
+          setCachedStream(source, data)
+          setStreamLoading(false)
+          loadingRef.current = false
+          setRetryAttempt(0)
+          return
+        }
+        if (shouldPreferProviderPlayer(source)) {
+          if (quiet) {
+            setStreamLoading(false)
+            loadingRef.current = false
+            reportQuietSwitchFailure(`${source.label} player is unavailable — staying on the current one`)
+            return
+          }
+          setNoStreamError(true)
+          setErrorType('no-source')
+          setError(`${source.label} player is unavailable for this episode.`)
+          setStreamLoading(false)
+          loadingRef.current = false
+          return
+        }
         const qualityList = buildQualityList(data.sources)
         if (qualityList.length === 0) {
           const verifiedEmbed = chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
@@ -3791,7 +3849,7 @@ export default function Watch() {
 
 
           {/* Buffering indicator */}
-          {buffering && !streamLoading && (
+          {buffering && !streamLoading && !activeEmbedUrl && (
             <div
               aria-live="polite"
               role="status"

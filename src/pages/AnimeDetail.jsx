@@ -760,38 +760,6 @@ const AnimeDetail = () => {
     const controller = new AbortController()
     let cancelled = false
 
-    const fallbackEpisodes = () => {
-      // Prioritize AniList's real streaming episode metadata (titles + thumbnails)
-      if (Array.isArray(anime?.streamingEpisodes) && anime.streamingEpisodes.length > 0) {
-        return anime.streamingEpisodes.map((ep, i) => {
-          // AniList titles often look like "Episode 1 - Title" or "1: Title"
-          // We'll try to extract just the title if possible, otherwise use as-is.
-          const cleanTitle = ep.title?.replace(/^(Episode\s+\d+\s*-\s*|\d+:\s*)/i, '') || `Episode ${i + 1}`
-          return {
-            number: i + 1,
-            title: cleanTitle,
-            thumbnail: ep.thumbnail || anime.coverImage?.large || anime.coverImage?.medium || '',
-            url: ep.url,
-          }
-        })
-      }
-      // Movies are one playable item even when AniList omits `episodes`.
-      if (!anime?.episodes && anime?.format === 'MOVIE') {
-        return [{
-          number: 1,
-          title: title || 'Movie',
-          thumbnail: anime.coverImage?.medium || anime.coverImage?.large || '',
-        }]
-      }
-      // Absolute last resort: generic list if AniList also has no metadata
-      if (!anime?.episodes) return []
-      return Array.from({ length: anime.episodes }, (_, i) => ({
-        number: i + 1,
-        title: `Episode ${i + 1}`,
-        thumbnail: anime.coverImage?.medium || anime.coverImage?.large || '',
-      }))
-    }
-
     const loadEpisodes = async () => {
       setEpisodesFallback(false)
       setEpisodesLoading(true)
@@ -847,26 +815,17 @@ const AnimeDetail = () => {
 
         if (!epData) throw lastError || new Error('Episode API unavailable')
         const eps = Array.isArray(epData?.episodes)
-          ? epData.episodes.filter(Boolean).map((ep, index) => {
-            const num = index + 1
-            return {
-              ...ep,
-              number: num,
-              title: (ep.title && ep.title.toLowerCase() === `episode ${ep.number}`) 
-                ? `Episode ${num}` 
-                : ep.title,
-            }
-          })
+          ? epData.episodes.filter(Boolean).map((ep, index) => ({
+            ...ep,
+            number: Number(ep.number) || index + 1,
+          }))
           : []
-        if (!cancelled) {
-          setEpisodes(eps.length > 0 ? eps : fallbackEpisodes())
-          setEpisodesFallback(eps.length === 0)
-        }
+        if (!eps.length) throw new Error('Episode API returned no episodes')
+        if (!cancelled) setEpisodes(eps)
       } catch (error) {
         if (error?.name === 'AbortError' || cancelled) return
-        const fallback = fallbackEpisodes()
-        setEpisodes(fallback)
-        setEpisodesFallback(fallback.length > 0)
+        setEpisodes([])
+        setEpisodesFallback(true)
       } finally {
         if (!cancelled) setEpisodesLoading(false)
       }
@@ -912,7 +871,7 @@ const AnimeDetail = () => {
       <Center>
         <div style={{ textAlign: 'center', padding: '0 20px' }}>
           <p style={{ fontSize: 18, marginBottom: 12, color: 'var(--text-muted)' }}>Anime not found</p>
-          <Link to="/home" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
+          <Link to="/" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
         </div>
       </Center>
     </>
@@ -931,7 +890,7 @@ const AnimeDetail = () => {
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <NsfwBtn as={Link} to="/profile/settings">Open Settings</NsfwBtn>
-            <OutlineLink to="/home">Go Back</OutlineLink>
+            <OutlineLink to="/">Go Back</OutlineLink>
           </div>
         </NsfwCard>
       </Center>
@@ -988,7 +947,7 @@ const AnimeDetail = () => {
     ? episodes.filter(ep => !ep.filler && !ep.recap)
     : episodes
   const tabs = []
-  if (hasEpisodes) {
+  if (hasEpisodes || episodesLoading || episodesFallback) {
     tabs.push({
       key: 'episodes',
       label: isMovie
@@ -1035,7 +994,7 @@ const AnimeDetail = () => {
           <Section aria-live="polite">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13 }} role="status">
               <FaSpinner className="watch-spin" aria-hidden="true" />
-              Checking the complete episode list before using a fallback…
+              Loading the verified episode list from Aniraku’s backend…
             </div>
           </Section>
         )}
@@ -1086,19 +1045,19 @@ const AnimeDetail = () => {
               ))}
             </Tabs>
 
-            {activeTab === 'episodes' && hasEpisodes && (
+            {activeTab === 'episodes' && (
               <>
                 {episodesFallback && (
                   <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
-                    Detailed episode metadata is temporarily unavailable, so the standard episode list is being shown. The title, poster, and episode count come from AniList; playback availability is resolved separately from third-party sources.
+                    The verified backend episode list is unavailable right now. Aniraku will not create a guessed episode list; check again after the backend source recovers.
                   </div>
                 )}
-                {hiddenEpCount > 0 && (
+                {hasEpisodes && hiddenEpCount > 0 && (
                   <FilterBtn $active={hideFillers} onClick={() => setHideFillers(p => !p)}>
                     {hideFillers ? '✓ Showing canon only' : 'Hide filler & recap'}
                   </FilterBtn>
                 )}
-                <EpisodeList>
+                {hasEpisodes && <EpisodeList>
                   {visibleEps.map((ep, i) => {
                     // Preserve the episode's canonical source position even when
                     // filler/recap filtering hides earlier rows.
@@ -1119,7 +1078,7 @@ const AnimeDetail = () => {
                         <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
                         <EpNum>{num}</EpNum>
                         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ep.title || `Episode ${num}`}
+                          {ep.title || 'Untitled episode'}
                         </span>
                         {!!ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
                         {!!ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}
@@ -1131,8 +1090,8 @@ const AnimeDetail = () => {
                       </EpisodeRow>
                     )
                   })}
-                </EpisodeList>
-                {visibleEps.length === 0 && (
+                </EpisodeList>}
+                {hasEpisodes && visibleEps.length === 0 && (
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', padding: '12px 0' }}>
                     No canon episodes listed. Switch back to see all episodes.
                   </p>
