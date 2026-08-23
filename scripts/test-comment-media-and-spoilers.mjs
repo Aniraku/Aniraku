@@ -46,5 +46,7 @@ assert.match(commentsSource, /is_spoiler: Boolean\(spoiler\)/)
 assert.match(commentsSource, /Spoiler hidden · tap to reveal/)
 assert.match(commentsSource, /aria-label="Spoiler hidden\. Activate to reveal this comment\."/)
 assert.match(commentsSource, /rating', 'g'/)
+assert.match(commentsSource, /const GifLabel = styled\.span/)
+assert.match(commentsSource, /<GifLabel>\{gif\.label\}<\/GifLabel>/)
 
 console.log('Comment GIF and spoiler regressions passed.')
