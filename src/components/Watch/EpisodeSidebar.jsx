@@ -44,9 +44,6 @@ const EpisodeRow = memo(function EpisodeRow({
         boxSizing: 'border-box',
         overflow: 'hidden',
         opacity: ep.filler && !isActive ? 0.72 : 1,
-        width: '100%',
-        minWidth: 0,
-        boxSizing: 'border-box',
       }}
     >
       <div style={{ position: 'relative', flexShrink: 0 }}>

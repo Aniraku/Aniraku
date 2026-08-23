@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import {
@@ -347,30 +347,6 @@ const SectionStack = styled.div`
   @media (max-width: 640px) { gap: 12px; margin-top: 22px; }
 `
 
-const TrendTabs = styled.div`
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--bg-elevated);
-`
-
-const TrendTab = styled.button`
-  min-height: 30px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: ${({ $active }) => ($active ? 'var(--accent)' : 'transparent')};
-  color: ${({ $active }) => ($active ? 'var(--bg)' : 'var(--text-secondary)')};
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-  &:active { transform: scale(0.97); }
-`
-
 const StoryGrid = styled.section`
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(270px, 0.6fr);
@@ -563,12 +539,12 @@ function Home() {
   const airingList = useStreamable(filterAdult(airing, nsfwEnabled))
   const moviesList = useStreamable(filterAdult(movies, nsfwEnabled))
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
-  const [trendingKind, setTrendingKind] = useState('anime')
-  const activeTrending = trendingKind === 'movies' ? moviesList : trendingList
+  const unifiedTrending = useMemo(() => [...trendingList, ...moviesList]
+    .filter((item, index, list) => item?.id && list.findIndex((candidate) => candidate.id === item.id) === index), [trendingList, moviesList])
 
   const featured = useMemo(
-    () => activeTrending[0] || airingList[0] || tvList[0] || null,
-    [activeTrending, airingList, tvList]
+    () => unifiedTrending[0] || airingList[0] || tvList[0] || null,
+    [unifiedTrending, airingList, tvList]
   )
   const upcomingReleases = useMemo(() => airingList
     .filter((item) => item?.id && item.id !== featured?.id && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now())
@@ -668,11 +644,7 @@ function Home() {
             <SpotlightGrid>
               <Spotlight $image={spotlightImage} $mobileImage={spotlightPoster}>
                 <SpotlightCopy>
-                  <div className="kicker"><FaFire size={10} /> Trending on AniList</div>
-                  <TrendTabs aria-label="Trending content type" style={{ marginBottom: 16 }}>
-                    <TrendTab type="button" $active={trendingKind === 'anime'} onClick={() => setTrendingKind('anime')}>Trending anime</TrendTab>
-                    <TrendTab type="button" $active={trendingKind === 'movies'} onClick={() => setTrendingKind('movies')}>Trending movies</TrendTab>
-                  </TrendTabs>
+                  <div className="kicker"><FaFire size={10} /> Trending now</div>
                   <h1>{spotlightTitle}</h1>
                   <MetaRow>
                     {spotlight?.format && <span><FaTv size={9} /> {spotlight.format}</span>}
