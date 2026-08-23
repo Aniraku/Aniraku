@@ -63,3 +63,4 @@
 - [x] Rework the website mobile comment composer and GIF sheet so the layout feels native, compact, and does not obscure the Detail page content or dock.
 - [x] Verify that website comments—including spoiler and GIF fields—remain available through the shared Supabase schema for native client consumption.
 - [x] Make GIF titles readable in the compact picker on desktop and mobile without reintroducing overflow or obscuring comment controls.
+- [x] Keep the website and native GIF picker tile-label treatment aligned and visibly readable across compact layouts.
