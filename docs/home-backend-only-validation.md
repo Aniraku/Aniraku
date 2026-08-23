@@ -2,11 +2,15 @@
 
 ## Root Home route
 
-On 23 August 2026, the local Vite preview at `http://127.0.0.1:3001/` was checked after data settled. The former Random Anime Pick hero rendered the AniList-backed **Trending anime** selector with a real `BLEACH: Thousand-Year Blood War - The Calamity` record, while the companion **Trending movies** control remained available in the hero.
+On 23 August 2026, the local Vite preview at `http://127.0.0.1:3001/` was checked after data settled. The former Random Anime Pick hero rendered a compact, AniList-backed **Trending now** feature using genuine series and movie records from a unified trend feed.
 
-The page also rendered real backend-proxied records for On deck, Seasonal momentum, Community favorites, editorial picks, Screening room, and Movie radar. The local process occupies port `3001` only because the sandbox's port `3000` is held by a separate service; the Vite configuration itself remains set to port `3000`.
+The page also rendered real backend-proxied records for Now airing, Airing next, Continue Watching, trending, top series, Movie night, and Browse by mood. The local process occupies port `3001` only because the sandbox's port `3000` is held by a separate service; the Vite configuration itself remains set to port `3000`.
 
 The root URL `http://127.0.0.1:3001/` is the sole Home route, and all visible header and footer Home controls link to `/`. The former `http://127.0.0.1:3001/home` path was intentionally rechecked after route removal and now renders the site’s not-found page rather than a Home redirect.
+
+## Production route verification
+
+After deployment of commit `246bf33`, `https://www.aniraku.tech/` rendered the compact discovery Home with its canonical root title. `https://www.aniraku.tech/home` rendered the dedicated Aniraku-themed not-found page, including recovery links to Home, Catalog, and Random, rather than redirecting to `/`.
 
 ## Unified trending hero
 
@@ -14,11 +18,9 @@ The locally served Home route was checked again after the hero refinement. Its p
 
 ## Data-policy result
 
-Home requests use the Aniraku backend proxy. Anime Detail metadata is requested directly from `https://miruro-api-v3.onrender.com/info/:anilist_id`, while its real episode list is requested separately from Aniraku’s backend endpoint `/api/v1/anime/:id/episodes`; the browser does not construct episode rows or use an AniList GraphQL detail fallback.
+Home requests use the Aniraku backend proxy. Anime Detail metadata, real episode rows, and relations are requested directly from `https://miruro-api-v3.onrender.com/info/:anilist_id`, `https://miruro-api-v3.onrender.com/episodes/:anilist_id`, and `https://miruro-api-v3.onrender.com/anime/:anilist_id/relations`; the browser does not construct episode rows or use an AniList GraphQL detail fallback.
 
 ## Anime Detail route
-
-The local Anime Detail route for `Tamon's B-Side` (AniList ID `178005`) loaded the backend metadata title, cover, synopsis, score, format, genres, and 13 backend episode rows. The visible rows carried the returned episode titles, including `You Need Money to Support Your Oshi`, `Do You Like Me?`, and `FLY`; the page only exposed **Watch Now** after the real episode collection was present.
 
 For the previously failing ID `111762`, the local Anime Detail route loaded title, cover, banner, score, format, description, genres, relations, and recommendations from `https://miruro-api-v3.onrender.com/info/111762`. Its real 25-row episode list also loaded directly from `https://miruro-api-v3.onrender.com/episodes/111762`, combining only genuine provider records by their supplied episode numbers. The detail skeleton remained during the initial load, the obsolete text claiming Aniraku backend episode loading was absent, and no episode rows were fabricated. The direct Miruro endpoints permitted CORS access for both the production and local development origins during validation.
 
