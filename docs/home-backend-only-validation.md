@@ -12,6 +12,10 @@ The root URL `http://127.0.0.1:3001/` is the sole Home route, and all visible he
 
 After deployment of commit `246bf33`, `https://www.aniraku.tech/` rendered the compact discovery Home with its canonical root title. `https://www.aniraku.tech/home` rendered the dedicated Aniraku-themed not-found page, including recovery links to Home, Catalog, and Random, rather than redirecting to `/`.
 
+The initial production Anime Detail check identified that the site Content Security Policy omitted the direct Miruro origin, causing a browser `TypeError` despite valid API responses. Commit `e969f6a` added the precise `https://miruro-api-v3.onrender.com` `connect-src` entry and a regression assertion. After its production deployment reached `READY`, the final live Fruits Basket route rendered direct metadata, all 25 genuine episode rows, and the direct PREQUEL and SEQUEL Relation cards.
+
+The final post-correction route check also confirmed that `https://www.aniraku.tech/` remains the canonical populated Home page and `https://www.aniraku.tech/home` remains the branded not-found experience rather than a redirect.
+
 ## Unified trending hero
 
 The locally served Home route was checked again after the hero refinement. Its populated headline used a single **Trending now** label and a combined, de-duplicated backend-derived trend feed spanning the existing series and movie results. The former **Trending anime** and **Trending movies** selector buttons were absent from the rendered hero.
