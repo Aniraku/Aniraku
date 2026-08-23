@@ -283,12 +283,16 @@ const GifGrid = styled.div`
   display: grid;
   gap: 4px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-height: none;
+  max-height: 260px;
   min-width: 0;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
 
   @media (max-width: 480px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 320px;
   }
 `
 

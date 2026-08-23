@@ -66,3 +66,5 @@
 - [x] Keep the website and native GIF picker tile-label treatment aligned and visibly readable across compact layouts.
 - [x] Replace GIF tile labels with a 1:1 two- or three-column picker grid so embedded GIF text is legible on mobile and desktop.
 - [x] Preserve each GIF’s full original aspect ratio and allow the picker to grow vertically rather than cropping media into fixed squares.
+- [x] Keep the GIF picker compact and fixed-height while making only full-ratio search results scrollable inside it.
+- [x] Keep the picker header fixed while the complete full-GIF results panel scrolls as one collection.
