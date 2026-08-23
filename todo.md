@@ -48,4 +48,5 @@
 - [x] Load Anime Detail relation cards from `https://miruro-api-v3.onrender.com/anime/{anilist_id}/relations` and retain the Relations tab.
 - [x] Remove the `/home` compatibility route and all related canonicalization logic so Home exists only at `/`.
 - [x] Redesign the site not-found page with Aniraku’s shared visual language and existing site components, while keeping the deleted `/home` path as a true not-found route.
-- [ ] Commit, push, and production-verify the approved local Home, direct-Miruro Detail, profile, scoped Watch, root-only routing, and Aniraku-themed not-found-page changes without including unrelated workspace artifacts.
+- [x] Commit, push, and production-verify the approved local Home, direct-Miruro Detail, profile, scoped Watch, root-only routing, and Aniraku-themed not-found-page changes without including unrelated workspace artifacts.
+- [x] Allow the direct Miruro origin in the production content-security policy so valid Anime Detail metadata, episodes, and relations load in browsers.
