@@ -52,7 +52,7 @@ assert.match(commentsSource, /max-height: 168px;/)
 assert.match(commentsSource, /overflow-y: auto;/)
 assert.match(commentsSource, /overscroll-behavior: contain;/)
 assert.match(commentsSource, /aspect-ratio: 1\.45;/)
-assert.match(commentsSource, /height: 100%; object-fit: cover; width: 100%;/)
+assert.match(commentsSource, /height: 100%; object-fit: contain; width: 100%;/)
 assert.doesNotMatch(commentsSource, /const GifLabel = styled\.span/)
 
 console.log('Comment GIF and spoiler regressions passed.')
