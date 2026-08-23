@@ -8,6 +8,10 @@ The page also rendered real backend-proxied records for On deck, Seasonal moment
 
 The compatibility URL `http://127.0.0.1:3001/home` was then checked and resolved to `http://127.0.0.1:3001/`. The visible header logo, header Home control, footer logo, and footer Home control all linked to `/` after the canonical-route cleanup.
 
+## Unified trending hero
+
+The locally served Home route was checked again after the hero refinement. Its populated headline used a single **Trending now** label and a combined, de-duplicated backend-derived trend feed spanning the existing series and movie results. The former **Trending anime** and **Trending movies** selector buttons were absent from the rendered hero.
+
 ## Data-policy result
 
 Home requests use the Aniraku backend proxy. Anime Detail metadata is now requested from `/api/v1/anime/:id`, and its episode list is requested separately from `/api/v1/anime/:id/episodes`; the browser does not construct episode rows or use an AniList GraphQL detail fallback.

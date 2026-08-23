@@ -28,3 +28,6 @@
 - [x] Validate canonical Home navigation, backend-only detail metadata and episodes, profile persistence, and the scoped Bonk player repair before release approval.
 - [ ] Commit and push only the approved Home, SEO, account, Anime Detail, and scoped Bonk Watch changes.
 - [ ] Verify the resulting Vercel deployment on production for desktop and mobile layout, canonical Home routing, backend-only Anime Detail, and Bonk playback behavior.
+- [x] Remove the Vercel build warnings for duplicate `width`, `minWidth`, and `boxSizing` keys in `EpisodeSidebar` without changing its layout behavior.
+- [ ] Publish and verify the warning-free corrective deployment.
+- [x] Remove the segmented Trending Anime/Movies hero control and present a single broader backend-powered trending spotlight.
