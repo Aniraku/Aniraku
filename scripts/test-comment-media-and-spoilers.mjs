@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import {
+  canSubmitComment,
+  getCommentDisplayContent,
+  isTrustedGiphyGifUrl,
+  toGiphyGif,
+} from '../src/lib/commentContent.js'
+
+const mediaUrl = 'https://media2.giphy.com/media/example/giphy.gif'
+
+assert.equal(isTrustedGiphyGifUrl(mediaUrl), true)
+assert.equal(isTrustedGiphyGifUrl('https://i.giphy.com/example.gif'), true)
+assert.equal(isTrustedGiphyGifUrl('http://media.giphy.com/example.gif'), false)
+assert.equal(isTrustedGiphyGifUrl('https://example.com/reaction.gif'), false)
+
+assert.deepEqual(getCommentDisplayContent('A legacy reaction ||GIF:https://media.giphy.com/media/legacy/giphy.gif', null), {
+  text: 'A legacy reaction',
+  gifUrl: 'https://media.giphy.com/media/legacy/giphy.gif',
+})
+assert.deepEqual(getCommentDisplayContent('New persisted reaction', mediaUrl), {
+  text: 'New persisted reaction',
+  gifUrl: mediaUrl,
+})
+assert.equal(canSubmitComment('', mediaUrl), true)
+assert.equal(canSubmitComment('A text comment', ''), true)
+assert.equal(canSubmitComment('   ', ''), false)
+
+assert.deepEqual(toGiphyGif({
+  id: 'reaction',
+  title: 'Reaction',
+  images: {
+    downsized: { url: mediaUrl },
+    fixed_width_small: { url: 'https://media1.giphy.com/media/example/200w.gif' },
+  },
+}), {
+  id: 'reaction',
+  url: mediaUrl,
+  previewUrl: 'https://media1.giphy.com/media/example/200w.gif',
+  label: 'Reaction',
+})
+
+const commentsSource = await readFile(new URL('../src/components/Comments/Comments.jsx', import.meta.url), 'utf8')
+assert.match(commentsSource, /gif_url: mediaUrl \|\| null/)
+assert.match(commentsSource, /is_spoiler: Boolean\(spoiler\)/)
+assert.match(commentsSource, /Spoiler hidden · tap to reveal/)
+assert.match(commentsSource, /aria-label="Spoiler hidden\. Activate to reveal this comment\."/)
+assert.match(commentsSource, /rating', 'g'/)
+
+console.log('Comment GIF and spoiler regressions passed.')

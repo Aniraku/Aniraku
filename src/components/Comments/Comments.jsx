@@ -1,13 +1,26 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FaRegThumbsUp, FaThumbsUp, FaTrash, FaReply } from 'react-icons/fa'
+import {
+  FaEye,
+  FaEyeSlash,
+  FaImage,
+  FaRegThumbsUp,
+  FaReply,
+  FaThumbsUp,
+  FaTimes,
+  FaTrash,
+} from 'react-icons/fa'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { canSubmitComment, getCommentDisplayContent, isTrustedGiphyGifUrl, toGiphyGif } from '../../lib/commentContent'
 import styled from 'styled-components'
+
+const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY?.trim()
+const GIPHY_API_BASE = 'https://api.giphy.com/v1/gifs'
 
 const cleanContent = (raw) => {
   const out = []
-  for (const ch of raw) {
+  for (const ch of String(raw || '')) {
     const code = ch.codePointAt(0)
     if (code >= 0xD800 && code <= 0xDFFF) continue
     out.push(ch)
@@ -21,79 +34,256 @@ const Wrapper = styled.section`
 `
 
 const Title = styled.h2`
+  color: var(--text-primary);
   font-size: 18px;
   font-weight: 700;
-  color: var(--text-primary);
   margin-bottom: 4px;
 `
 
 const Subtitle = styled.p`
-  max-width: 100%;
-  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 13px;
   margin: 0 0 16px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 `
 
-const Composer = styled.div`
+const Composer = styled.form`
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: ${p => p.$compact ? '12px' : '16px'};
+  box-sizing: border-box;
   display: flex;
   gap: 12px;
-  min-width: 0;
+  margin: ${p => p.$compact ? '12px 0 0' : '0 0 24px'};
   max-width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-  margin-bottom: 24px;
-  background: var(--bg-card);
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  position: relative;
   min-width: 0;
-  box-sizing: border-box;
+  overflow: hidden;
+  padding: ${p => p.$compact ? '12px' : '16px'};
+  position: relative;
 
   > * { min-width: 0; }
-  .comment-composer-body { flex: 1; min-width: 0; }
-  .comment-compose-row { display: flex; gap: 10px; align-items: center; min-width: 0; }
 
   @media (max-width: 480px) {
-    padding: 12px;
     gap: 10px;
-    .comment-compose-row { flex-wrap: wrap; }
-    .comment-compose-row textarea { flex: 1 1 100%; width: 100%; min-width: 0; min-height: 44px; }
-    .comment-post-btn { margin-left: auto; min-height: 38px; }
+    padding: 12px;
   }
 `
 
-/* Removed active GIF picker styles: new GIF composition is intentionally disabled while public no-auth alternatives are evaluated. */
-const LegacyGifFallback = styled.span`
-  display: inline-block;
-  margin-top: 8px;
-  color: var(--text-muted);
-  font-size: 12px;
+const ComposerBody = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+`
+
+const ComposerRow = styled.div`
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+
+  @media (max-width: 480px) {
+    flex-wrap: wrap;
+  }
+`
+
+const ComposerTools = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 `
 
 const Avatar = styled.img`
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
   background: var(--bg-elevated);
+  border-radius: 50%;
   flex-shrink: 0;
+  height: 36px;
+  object-fit: cover;
+  width: 36px;
 `
 
 const InitialAvatar = styled.div`
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  align-items: center;
   background: var(--accent);
+  border-radius: 50%;
   color: var(--bg);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-shrink: 0;
   font-size: 15px;
   font-weight: 700;
-  flex-shrink: 0;
+  height: 36px;
+  justify-content: center;
   text-transform: uppercase;
+  width: 36px;
+`
+
+const Textarea = styled.textarea`
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  flex: 1 1 auto;
+  font-family: inherit;
+  font-size: 14px;
+  min-height: 42px;
+  min-width: 0;
+  outline: none;
+  padding: 0;
+  resize: vertical;
+`
+
+const PostBtn = styled.button`
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  color: var(--bg);
+  cursor: ${p => p.$disabled ? 'wait' : 'pointer'};
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: ${p => p.$disabled ? 0.6 : 1};
+  padding: 8px 18px;
+  transition: transform 160ms ease, opacity 160ms ease;
+  white-space: nowrap;
+
+  &:not(:disabled):hover { transform: translateY(-1px); }
+  &:not(:disabled):active { transform: scale(0.97); }
+
+  @media (max-width: 480px) {
+    margin-left: auto;
+    min-height: 38px;
+  }
+`
+
+const ToolBtn = styled.button`
+  align-items: center;
+  background: ${p => p.$active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'var(--bg-elevated)'};
+  border: 1px solid ${p => p.$active ? 'color-mix(in srgb, var(--accent) 55%, var(--border))' : 'var(--border)'};
+  border-radius: 999px;
+  color: ${p => p.$active ? 'var(--accent)' : 'var(--text-secondary)'};
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+
+  &:hover { border-color: var(--accent); color: var(--accent); }
+  &:active { transform: scale(0.97); }
+`
+
+const GifPreview = styled.div`
+  align-items: flex-start;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: inline-flex;
+  gap: 8px;
+  max-width: min(260px, 100%);
+  overflow: hidden;
+  padding: 6px;
+
+  img { border-radius: 6px; display: block; height: 72px; max-width: 150px; object-fit: cover; width: auto; }
+`
+
+const RemoveGif = styled.button`
+  align-items: center;
+  align-self: stretch;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 4px;
+  &:hover { color: var(--accent); }
+`
+
+const Picker = styled.div`
+  background: color-mix(in srgb, var(--bg-card) 96%, #000);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 430px;
+  padding: 12px;
+  width: min(430px, 100%);
+`
+
+const PickerHead = styled.div`
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+`
+
+const PickerTitle = styled.strong`
+  color: var(--text-primary);
+  font-size: 13px;
+`
+
+const PickerSearch = styled.input`
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+  outline: none;
+  padding: 9px 10px;
+  width: 100%;
+  &:focus { border-color: var(--accent); }
+`
+
+const PickerClose = styled.button`
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 4px;
+  &:hover { color: var(--accent); }
+`
+
+const GifGrid = styled.div`
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-height: 220px;
+  min-width: 0;
+  overflow: auto;
+
+  @media (max-width: 480px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+`
+
+const GifOption = styled.button`
+  aspect-ratio: 1.16;
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  &:hover, &:focus-visible { border-color: var(--accent); outline: none; }
+  img { display: block; height: 100%; object-fit: cover; width: 100%; }
+`
+
+const PickerNote = styled.p`
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
 `
 
 const ErrorMsg = styled.p`
@@ -102,54 +292,22 @@ const ErrorMsg = styled.p`
   margin: 0;
 `
 
-const Textarea = styled.textarea`
-  flex: 1 1 auto;
-  min-width: 0;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  padding: 0;
-  resize: none;
-  min-height: 40px;
-  outline: none;
-  box-sizing: border-box;
-`
-
-const PostBtn = styled.button`
-  flex: 0 0 auto;
-  white-space: nowrap;
-  padding: 8px 20px;
-  background: var(--accent);
-  color: var(--bg);
-  border: none;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: ${p => p.$disabled ? 'wait' : 'pointer'};
-  opacity: ${p => p.$disabled ? 0.6 : 1};
-  transition: all 0.2s;
-  &:hover { transform: translateY(-1px); }
-  flex-shrink: 0;
-`
-
 const List = styled.div`
   display: flex;
-  min-width: 0;
-  max-width: 100%;
   flex-direction: column;
   gap: 14px;
+  max-width: 100%;
+  min-width: 0;
 `
 
 const Item = styled.div`
   background: var(--bg-card);
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 12px;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 14px 16px;
 `
 
@@ -160,98 +318,130 @@ const ItemReply = styled(Item)`
 `
 
 const ItemHead = styled.div`
-  display: flex;
-  min-width: 0;
   align-items: center;
+  display: flex;
   gap: 10px;
   margin-bottom: 8px;
+  min-width: 0;
 `
 
 const ItemName = styled(Link)`
   color: var(--text-primary);
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
   font-size: 14px;
   font-weight: 600;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-decoration: none;
   &:hover { text-decoration: underline; }
 `
 
 const ItemTime = styled.span`
   color: var(--text-muted);
-  white-space: nowrap;
   font-size: 12px;
+  white-space: nowrap;
 `
 
 const ItemBody = styled.div`
   color: var(--text-secondary);
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 1.6;
   margin: 0 0 10px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
   word-break: break-word;
 `
 
 const ItemGif = styled.img`
+  border-radius: 8px;
+  display: block;
+  margin-top: 8px;
+  max-height: 200px;
   max-width: min(300px, 100%);
   width: auto;
-  max-height: 200px;
-  border-radius: 8px;
-  margin-top: 8px;
-  display: block;
   @media (max-width: 480px) { max-width: 100%; }
 `
 
-const ItemActions = styled.div`
-  display: flex;
-  min-width: 0;
-  max-width: 100%;
-  flex-wrap: wrap;
+const SpoilerShield = styled.button`
   align-items: center;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--bg-elevated)) 0 9px, var(--bg-elevated) 9px 18px);
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 10px;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 13px;
+  gap: 8px;
+  justify-content: center;
+  margin: 0 0 10px;
+  min-height: 72px;
+  padding: 12px;
+  text-align: center;
+  width: 100%;
+  &:hover { border-color: var(--accent); color: var(--accent); }
+`
+
+const SpoilerTag = styled.div`
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+`
+
+const ItemActions = styled.div`
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
+  max-width: 100%;
+  min-width: 0;
 `
 
 const Action = styled.button`
-  display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  white-space: nowrap;
-  gap: 6px;
   background: none;
   border: none;
   color: ${p => p.$active ? 'var(--accent)' : 'var(--text-muted)'};
-  font-size: 13px;
   cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  gap: 6px;
+  min-height: 32px;
   padding: 2px 4px;
+  white-space: nowrap;
   &:hover { color: var(--accent); }
 `
 
 const Empty = styled.p`
-  max-width: 100%;
-  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 14px;
-  text-align: center;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 24px 0;
+  text-align: center;
 `
 
 const GuestBox = styled.div`
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-wrap: anywhere;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 24px;
-  text-align: center;
+  box-sizing: border-box;
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.8;
-  a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 24px;
+  text-align: center;
+  a { color: var(--accent); font-weight: 600; text-decoration: none; }
   a:hover { text-decoration: underline; }
 `
 
@@ -275,35 +465,155 @@ const AvatarBlock = ({ url, name }) => url
   ? <Avatar src={url} alt="" />
   : <InitialAvatar>{(name || 'A').charAt(0)}</InitialAvatar>
 
+function CommentComposer({ avatar, placeholder, value, onChange, gifUrl, onGifChange, spoiler, onSpoilerChange, onSubmit, busy, error, compact = false }) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [gifs, setGifs] = useState([])
+  const [gifLoading, setGifLoading] = useState(false)
+  const [gifError, setGifError] = useState('')
+  const canSubmit = canSubmitComment(value, gifUrl)
+
+  useEffect(() => {
+    if (!pickerOpen) return undefined
+    if (!GIPHY_API_KEY) {
+      setGifs([])
+      setGifError('GIF search is temporarily unavailable.')
+      return undefined
+    }
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      setGifLoading(true)
+      setGifError('')
+      try {
+        const endpoint = new URL(query.trim() ? `${GIPHY_API_BASE}/search` : `${GIPHY_API_BASE}/trending`)
+        endpoint.searchParams.set('api_key', GIPHY_API_KEY)
+        endpoint.searchParams.set('limit', '20')
+        endpoint.searchParams.set('rating', 'g')
+        if (query.trim()) {
+          endpoint.searchParams.set('q', query.trim())
+          endpoint.searchParams.set('lang', 'en')
+        }
+        const response = await fetch(endpoint, { signal: controller.signal })
+        if (!response.ok) throw new Error(`GIF service returned ${response.status}`)
+        const payload = await response.json()
+        if (!Array.isArray(payload?.data)) throw new Error('GIF service returned an invalid response')
+        setGifs(payload.data.map(toGiphyGif).filter(Boolean))
+      } catch (requestError) {
+        if (requestError?.name !== 'AbortError') {
+          setGifs([])
+          setGifError('Could not load GIFs. Please try again.')
+        }
+      } finally {
+        if (!controller.signal.aborted) setGifLoading(false)
+      }
+    }, query.trim() ? 260 : 0)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [pickerOpen, query])
+
+  const chooseGif = (gif) => {
+    onGifChange(gif.url)
+    setPickerOpen(false)
+  }
+
+  return (
+    <Composer $compact={compact} onSubmit={(event) => { event.preventDefault(); if (canSubmit) onSubmit() }}>
+      {avatar && <AvatarBlock url={avatar.url} name={avatar.name} />}
+      <ComposerBody>
+        <ComposerRow>
+          <Textarea
+            placeholder={placeholder}
+            value={value}
+            onChange={event => onChange(event.target.value)}
+            maxLength={2000}
+            rows={compact ? 1 : 2}
+          />
+          <PostBtn type="submit" $disabled={busy || !canSubmit} disabled={busy || !canSubmit}>Post</PostBtn>
+        </ComposerRow>
+        <ComposerTools>
+          <ToolBtn type="button" onClick={() => setPickerOpen(open => !open)} $active={pickerOpen || Boolean(gifUrl)} aria-expanded={pickerOpen} aria-controls="comment-gif-picker">
+            <FaImage size={13} /> GIF
+          </ToolBtn>
+          <ToolBtn type="button" onClick={() => onSpoilerChange(!spoiler)} $active={spoiler} aria-pressed={spoiler}>
+            <FaEyeSlash size={13} /> {spoiler ? 'Spoiler on' : 'Mark spoiler'}
+          </ToolBtn>
+        </ComposerTools>
+        {gifUrl && (
+          <GifPreview>
+            <img src={gifUrl} alt="Selected reaction GIF" />
+            <RemoveGif type="button" onClick={() => onGifChange('')} aria-label="Remove selected GIF"><FaTimes /></RemoveGif>
+          </GifPreview>
+        )}
+        {pickerOpen && (
+          <Picker id="comment-gif-picker" role="dialog" aria-label="Choose a reaction GIF">
+            <PickerHead>
+              <PickerTitle>Reaction GIFs</PickerTitle>
+              <PickerClose type="button" onClick={() => setPickerOpen(false)} aria-label="Close GIF picker"><FaTimes /></PickerClose>
+            </PickerHead>
+            <PickerSearch value={query} onChange={event => setQuery(event.target.value)} placeholder="Search G-rated GIFs" aria-label="Search G-rated GIFs" autoFocus />
+            {gifLoading ? <PickerNote>Loading GIFs…</PickerNote> : gifError ? <PickerNote>{gifError}</PickerNote> : gifs.length ? (
+              <GifGrid>
+                {gifs.map(gif => (
+                  <GifOption type="button" key={gif.id} onClick={() => chooseGif(gif)} title={`Use GIF: ${gif.label}`} aria-label={`Use GIF: ${gif.label}`}>
+                    <img src={gif.previewUrl} alt="" loading="lazy" />
+                  </GifOption>
+                ))}
+              </GifGrid>
+            ) : <PickerNote>No G-rated GIFs found.</PickerNote>}
+          </Picker>
+        )}
+        {error && <ErrorMsg>{error}</ErrorMsg>}
+      </ComposerBody>
+    </Composer>
+  )
+}
+
 const renderItem = (c, reply, {
-  profiles, likedIds, replyTo, replyText, busy, user,
-  toggleLike, remove, submitReply, setReplyTo, setReplyText, setPostError
+  profiles, likedIds, replyTo, replyText, replyGifUrl, replySpoiler, busy, user, revealedIds,
+  toggleLike, remove, submitReply, setReplyTo, setReplyText, setReplyGifUrl, setReplySpoiler, setPostError, toggleReveal,
 }) => {
   const Mine = reply ? ItemReply : Item
-  const contentParts = c.content.split('||GIF:').map(s => s.trim())
-  const textContent = contentParts[0]
-  const gifUrl = contentParts[1]
+  const { text: textContent, gifUrl } = getCommentDisplayContent(c.content, c.gif_url)
+  const spoilerHidden = Boolean(c.is_spoiler) && !revealedIds.has(c.id)
 
   return (
     <Mine key={c.id}>
       <ItemHead>
         <AvatarBlock url={avatarOf(profiles, c.user_id)} name={nameOf(profiles, c.user_id)} />
-        <div className="comments-item-head__meta" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <ItemName to="/profile">{nameOf(profiles, c.user_id)}</ItemName>
           <ItemTime>{timeAgo(c.created_at)}</ItemTime>
         </div>
       </ItemHead>
-      <ItemBody>
-        {textContent && <p style={{ margin: 0 }}>{textContent}</p>}
-        {gifUrl && <ItemGif src={gifUrl} alt="anime reaction" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling?.removeAttribute('hidden') }} />}
-        {gifUrl && <LegacyGifFallback hidden>Legacy GIF unavailable.</LegacyGifFallback>}
-      </ItemBody>
+      {spoilerHidden ? (
+        <SpoilerShield type="button" onClick={() => toggleReveal(c.id)} aria-label="Spoiler hidden. Activate to reveal this comment.">
+          <FaEyeSlash /> Spoiler hidden · tap to reveal
+        </SpoilerShield>
+      ) : (
+        <>
+          {c.is_spoiler && <SpoilerTag><FaEye /> Spoiler revealed</SpoilerTag>}
+          <ItemBody>
+            {textContent && <p style={{ margin: 0 }}>{textContent}</p>}
+            {gifUrl && <ItemGif src={gifUrl} alt="Animated reaction GIF" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}
+          </ItemBody>
+        </>
+      )}
       <ItemActions>
         <Action $active={likedIds.has(c.id)} onClick={() => toggleLike(c.id)} title="Like">
           {likedIds.has(c.id) ? <FaThumbsUp size={13} /> : <FaRegThumbsUp size={13} />}
           {c.likes || 0}
         </Action>
-        <Action onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyText(''); setPostError('') }}>
+        <Action onClick={() => {
+          const opening = replyTo !== c.id
+          setReplyTo(opening ? c.id : null)
+          setReplyText('')
+          setReplyGifUrl('')
+          setReplySpoiler(false)
+          setPostError('')
+        }}>
           <FaReply size={12} /> Reply
         </Action>
         {user && user.id === c.user_id && (
@@ -313,19 +623,18 @@ const renderItem = (c, reply, {
         )}
       </ItemActions>
       {replyTo === c.id && (
-        <Composer style={{ marginTop: 12, marginBottom: 0, padding: '12px' }}>
-          <div className="comments-composer__body" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            <div className="comments-composer__row" style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
-              <Textarea
-                placeholder={`Reply to ${nameOf(profiles, c.user_id)}…`}
-                value={replyText}
-                onChange={e => { setReplyText(e.target.value); setPostError('') }}
-                rows={1}
-              />
-              <PostBtn $disabled={busy || !replyText.trim()} onClick={() => submitReply(c.id)}>Post</PostBtn>
-            </div>
-          </div>
-        </Composer>
+        <CommentComposer
+          compact
+          placeholder={`Reply to ${nameOf(profiles, c.user_id)}…`}
+          value={replyText}
+          onChange={setReplyText}
+          gifUrl={replyGifUrl}
+          onGifChange={setReplyGifUrl}
+          spoiler={replySpoiler}
+          onSpoilerChange={setReplySpoiler}
+          onSubmit={() => submitReply(c.id)}
+          busy={busy}
+        />
       )}
     </Mine>
   )
@@ -338,10 +647,16 @@ const Comments = ({ animeId, episodeNumber, label }) => {
   const [myProfile, setMyProfile] = useState(null)
   const [likedIds, setLikedIds] = useState(new Set())
   const [content, setContent] = useState('')
+  const [gifUrl, setGifUrl] = useState('')
+  const [isSpoiler, setIsSpoiler] = useState(false)
   const [replyTo, setReplyTo] = useState(null)
   const [replyText, setReplyText] = useState('')
+  const [replyGifUrl, setReplyGifUrl] = useState('')
+  const [replySpoiler, setReplySpoiler] = useState(false)
+  const [revealedIds, setRevealedIds] = useState(new Set())
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [postError, setPostError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -367,9 +682,7 @@ const Comments = ({ animeId, episodeNumber, label }) => {
           .select('id, username, display_name, avatar_url')
           .in('id', ids)
         if (cancelled) return
-        if (profs) {
-          setProfiles(Object.fromEntries(profs.map(p => [p.id, p])))
-        }
+        if (profs) setProfiles(Object.fromEntries(profs.map(p => [p.id, p])))
       }
 
       if (user) {
@@ -393,29 +706,8 @@ const Comments = ({ animeId, episodeNumber, label }) => {
     return () => { cancelled = true }
   }, [animeId, episodeNumber, user])
 
-  const [postError, setPostError] = useState('')
-
-  const submit = async (e) => {
-    if (e) e.preventDefault()
-    const text = content.trim()
-    if (!text || !user || busy) return
-    setBusy(true)
-    const finalContent = text
-    const { data, error } = await supabase
-      .from('comments')
-      .insert({
-        user_id: user.id,
-        anime_id: animeId,
-        episode_number: episodeNumber || null,
-        content: cleanContent(finalContent),
-        parent_id: null,
-      })
-      .select()
-      .single()
-    setBusy(false)
-    if (error) { console.error('Comment post:', error); setPostError('Could not post your comment. Please try again.'); return }
-    setPostError('')
-    setComments(prev => [...prev, data])
+  const addProfile = () => {
+    if (!user) return
     setProfiles(prev => ({
       ...prev,
       [user.id]: prev[user.id] || {
@@ -424,39 +716,56 @@ const Comments = ({ animeId, episodeNumber, label }) => {
         avatar_url: myProfile?.avatar_url || null,
       },
     }))
-    setContent('')
   }
 
-  const submitReply = async (parentId) => {
-    const text = replyText.trim()
-    if (!text || !user || busy) return
+  const insertComment = async ({ text, mediaUrl, spoiler, parentId = null }) => {
+    const cleaned = cleanContent(text)
+    if (!canSubmitComment(cleaned, mediaUrl) || !user || busy) return null
+    if (mediaUrl && !isTrustedGiphyGifUrl(mediaUrl)) {
+      setPostError('Only GIFs selected from the picker can be attached.')
+      return null
+    }
     setBusy(true)
-    const finalContent = text
     const { data, error } = await supabase
       .from('comments')
       .insert({
         user_id: user.id,
         anime_id: animeId,
         episode_number: episodeNumber || null,
-        content: cleanContent(finalContent),
+        content: cleaned,
+        gif_url: mediaUrl || null,
+        is_spoiler: Boolean(spoiler),
         parent_id: parentId,
       })
       .select()
       .single()
     setBusy(false)
-    if (error) { console.error('Reply post:', error); setPostError('Could not post your reply. Please try again.'); return }
+    if (error) {
+      console.error('Comment post:', error)
+      setPostError('Could not post your comment. Please try again.')
+      return null
+    }
     setPostError('')
     setComments(prev => [...prev, data])
-    setProfiles(prev => ({
-      ...prev,
-      [user.id]: prev[user.id] || {
-        username: myProfile?.username || user.user_metadata?.username,
-        display_name: myProfile?.display_name || null,
-        avatar_url: myProfile?.avatar_url || null,
-      },
-    }))
+    addProfile()
+    return data
+  }
+
+  const submit = async () => {
+    const posted = await insertComment({ text: content, mediaUrl: gifUrl, spoiler: isSpoiler })
+    if (!posted) return
+    setContent('')
+    setGifUrl('')
+    setIsSpoiler(false)
+  }
+
+  const submitReply = async (parentId) => {
+    const posted = await insertComment({ text: replyText, mediaUrl: replyGifUrl, spoiler: replySpoiler, parentId })
+    if (!posted) return
     setReplyTo(null)
     setReplyText('')
+    setReplyGifUrl('')
+    setReplySpoiler(false)
   }
 
   const toggleLike = async (id) => {
@@ -480,55 +789,39 @@ const Comments = ({ animeId, episodeNumber, label }) => {
 
   const topLevel = comments.filter(c => !c.parent_id)
   const repliesOf = (id) => comments.filter(c => c.parent_id === id)
-
+  const toggleReveal = (id) => setRevealedIds(prev => new Set(prev).add(id))
   const itemProps = {
-    profiles,
-    likedIds,
-    replyTo,
-    replyText,
-    busy,
-    user,
-    toggleLike,
-    remove,
-    submitReply,
-    setReplyTo,
-    setReplyText,
-    setPostError
+    profiles, likedIds, replyTo, replyText, replyGifUrl, replySpoiler, busy, user, revealedIds,
+    toggleLike, remove, submitReply, setReplyTo, setReplyText, setReplyGifUrl, setReplySpoiler, setPostError, toggleReveal,
   }
 
   return (
     <Wrapper>
       <Title>Comments ({comments.length})</Title>
       {label && <Subtitle>{label}</Subtitle>}
-
       {user ? (
-        <Composer>
-          <AvatarBlock
-            url={myProfile?.avatar_url}
-            name={myProfile?.display_name || myProfile?.username || user.email || 'You'}
-          />
-          <div className="comment-composer-body comments-composer__body" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-            <div className="comment-compose-row comments-composer__row" style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
-              <Textarea
-                placeholder="Share your thoughts…"
-                value={content}
-                onChange={e => { setContent(e.target.value); setPostError('') }}
-                maxLength={2000}
-              />
-              <PostBtn className="comment-post-btn" type="button" $disabled={busy || !content.trim()} onClick={() => submit()}>Post</PostBtn>
-            </div>
-            {postError && <ErrorMsg style={{ marginTop: 8 }}>{postError}</ErrorMsg>}
-          </div>
-        </Composer>
+        <CommentComposer
+          avatar={{
+            url: myProfile?.avatar_url,
+            name: myProfile?.display_name || myProfile?.username || user.email || 'You',
+          }}
+          placeholder="Share your thoughts…"
+          value={content}
+          onChange={(value) => { setContent(value); setPostError('') }}
+          gifUrl={gifUrl}
+          onGifChange={(value) => { setGifUrl(value); setPostError('') }}
+          spoiler={isSpoiler}
+          onSpoilerChange={setIsSpoiler}
+          onSubmit={submit}
+          busy={busy}
+          error={postError}
+        />
       ) : (
         <GuestBox>
           <Link to="/login">Log in</Link> or <Link to="/signup">create an account</Link> to join the discussion.
         </GuestBox>
       )}
-
-      {loading ? (
-        <Empty>Loading comments…</Empty>
-      ) : topLevel.length === 0 ? (
+      {loading ? <Empty>Loading comments…</Empty> : topLevel.length === 0 ? (
         <Empty>No comments yet. Be the first to share your thoughts!</Empty>
       ) : (
         <List>
