@@ -50,3 +50,6 @@
 - [x] Redesign the site not-found page with Aniraku’s shared visual language and existing site components, while keeping the deleted `/home` path as a true not-found route.
 - [x] Commit, push, and production-verify the approved local Home, direct-Miruro Detail, profile, scoped Watch, root-only routing, and Aniraku-themed not-found-page changes without including unrelated workspace artifacts.
 - [x] Allow the direct Miruro origin in the production content-security policy so valid Anime Detail metadata, episodes, and relations load in browsers.
+- [x] Add a Flemozi-backed GIF picker to the existing comment composer without broadening playback or Anime Detail data behavior.
+- [x] Add spoiler-marking and click-to-reveal behavior for comments, including stored spoiler metadata and accessible labels.
+- [ ] Commit, push, and production-verify the approved GIF picker and spoiler-safe comment enhancement without including unrelated workspace artifacts.
