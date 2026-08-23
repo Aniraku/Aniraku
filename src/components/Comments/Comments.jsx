@@ -280,10 +280,10 @@ const PickerClose = styled.button`
 `
 
 const GifGrid = styled.div`
-  display: grid;
-  gap: 4px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-height: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -291,24 +291,22 @@ const GifGrid = styled.div`
   padding-right: 2px;
 
   @media (max-width: 480px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: 238px;
+    max-height: 420px;
   }
 `
 
 const GifOption = styled.button`
-  aspect-ratio: 1.45;
   background: var(--bg-elevated);
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
   display: block;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   padding: 0;
   position: relative;
   &:hover, &:focus-visible { border-color: var(--accent); outline: none; }
-  img { display: block; height: 100%; object-fit: contain; width: 100%; }
+  img { display: block; height: auto; object-fit: contain; width: 100%; }
 `
 
 const PickerNote = styled.p`

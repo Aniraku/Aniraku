@@ -71,3 +71,4 @@
 - [x] Restore compact GIF thumbnails and show only four to six tiles in a fixed two-row results viewport before internal scrolling.
 - [x] Keep the compact two-row scrollable viewport while showing each GIF uncropped with contain fitting.
 - [x] Use original GIPHY media and intrinsic GIF dimensions in the website picker so complete animations are not clipped or limited to thumbnail-quality previews.
+- [x] Remove forced GIF tile columns and aspect ratios so picker results render full-width at each original natural media ratio.
