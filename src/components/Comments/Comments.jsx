@@ -283,27 +283,55 @@ const GifGrid = styled.div`
   display: grid;
   gap: 4px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  max-height: 142px;
+  max-height: 176px;
   min-width: 0;
   overflow: auto;
 
   @media (max-width: 480px) {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    max-height: 132px;
+    max-height: 172px;
   }
 `
 
 const GifOption = styled.button`
-  aspect-ratio: 1.12;
+  aspect-ratio: 1.05;
   background: var(--bg-elevated);
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
+  display: block;
   min-width: 0;
   overflow: hidden;
   padding: 0;
+  position: relative;
   &:hover, &:focus-visible { border-color: var(--accent); outline: none; }
   img { display: block; height: 100%; object-fit: cover; width: 100%; }
+`
+
+const GifLabel = styled.span`
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.96), rgba(0, 0, 0, 0.74) 72%, transparent);
+  bottom: 0;
+  box-sizing: border-box;
+  color: #fff;
+  display: -webkit-box;
+  font-size: 9px;
+  font-weight: 700;
+  left: 0;
+  line-height: 1.2;
+  overflow: hidden;
+  padding: 14px 5px 4px;
+  position: absolute;
+  right: 0;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  word-break: break-word;
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+    padding: 12px 4px 4px;
+  }
 `
 
 const PickerNote = styled.p`
@@ -593,6 +621,7 @@ function CommentComposer({ avatar, placeholder, value, onChange, gifUrl, onGifCh
                 {gifs.map(gif => (
                   <GifOption type="button" key={gif.id} onClick={() => chooseGif(gif)} title={`Use GIF: ${gif.label}`} aria-label={`Use GIF: ${gif.label}`}>
                     <img src={gif.previewUrl} alt="" loading="lazy" />
+                    <GifLabel>{gif.label}</GifLabel>
                   </GifOption>
                 ))}
               </GifGrid>
