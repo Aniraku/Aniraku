@@ -29,13 +29,22 @@ export function canSubmitComment(content, gifUrl) {
 
 export function toGiphyGif(record) {
   const images = record?.images || {}
-  const url = images.original?.url || ''
+  const original = images.original || {}
+  const url = original.url || ''
   const previewUrl = images.original?.url || url
   if (!isTrustedGiphyGifUrl(url) || !isTrustedGiphyGifUrl(previewUrl)) return null
+  const width = Number(original.width)
+  const height = Number(original.height)
+  const aspectRatio = Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0
+    ? width / height
+    : 1
   return {
     id: record?.id || url,
     url,
     previewUrl,
     label: String(record?.title || record?.slug || 'Animated reaction').trim() || 'Animated reaction',
+    width: Number.isFinite(width) && width > 0 ? width : null,
+    height: Number.isFinite(height) && height > 0 ? height : null,
+    aspectRatio,
   }
 }

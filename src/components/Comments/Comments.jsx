@@ -296,17 +296,22 @@ const GifGrid = styled.div`
 `
 
 const GifOption = styled.button`
+  align-items: center;
   background: var(--bg-elevated);
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
-  display: block;
+  display: flex;
+  justify-content: center;
   min-width: 0;
-  overflow: visible;
+  min-height: 124px;
+  overflow: hidden;
   padding: 0;
   position: relative;
+  width: 100%;
+  aspect-ratio: ${p => p.$aspectRatio};
   &:hover, &:focus-visible { border-color: var(--accent); outline: none; }
-  img { display: block; height: auto; object-fit: contain; width: 100%; }
+  img { display: block; height: 100%; max-height: none; object-fit: contain; width: 100%; }
 `
 
 const PickerNote = styled.p`
@@ -594,8 +599,8 @@ function CommentComposer({ avatar, placeholder, value, onChange, gifUrl, onGifCh
             {gifLoading ? <PickerNote>Loading…</PickerNote> : gifError ? <PickerNote>{gifError}</PickerNote> : gifs.length ? (
               <GifGrid>
                 {gifs.map(gif => (
-                  <GifOption type="button" key={gif.id} onClick={() => chooseGif(gif)} title={`Use GIF: ${gif.label}`} aria-label={`Use GIF: ${gif.label}`}>
-                    <img src={gif.previewUrl} alt="" loading="lazy" />
+                  <GifOption $aspectRatio={gif.aspectRatio} type="button" key={gif.id} onClick={() => chooseGif(gif)} title={`Use GIF: ${gif.label}`} aria-label={`Use GIF: ${gif.label}`}>
+                    <img src={gif.previewUrl} alt="" loading="lazy" width={gif.width || undefined} height={gif.height || undefined} />
                   </GifOption>
                 ))}
               </GifGrid>
