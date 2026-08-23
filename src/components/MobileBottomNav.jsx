@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FaHome, FaThLarge, FaCalendarAlt, FaUser, FaArrowLeft, FaRandom } from 'react-icons/fa'
+import { FaHome, FaThLarge, FaCalendarAlt, FaUser, FaArrowLeft, FaRandom, FaHeart } from 'react-icons/fa'
 import styled from 'styled-components'
 
 const Bar = styled.nav`
@@ -83,6 +82,7 @@ const MobileBottomNav = () => {
     { icon: FaThLarge, label: 'Catalog', to: '/catalog' },
     { icon: FaCalendarAlt, label: 'Schedule', to: '/schedule' },
     { icon: FaRandom, label: 'Random', to: '/random', ariaLabel: 'Open Random Anime Pick' },
+    { icon: FaHeart, label: 'Support', action: () => window.dispatchEvent(new Event('aniraku:open-support')), ariaLabel: 'Support Aniraku' },
     { icon: FaUser, label: 'Profile', to: '/profile' },
   ]
 

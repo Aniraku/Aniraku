@@ -1,10 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import {
   FaArrowRight,
   FaBolt,
-  FaCalendarAlt,
   FaClock,
   FaFilm,
   FaFire,
@@ -26,47 +25,39 @@ const Page = styled.main`
   min-height: 100vh;
   overflow: clip;
   background:
-    radial-gradient(circle at 84% 4%, rgba(125, 92, 232, 0.15), transparent 24rem),
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 62%, var(--bg)) 0, var(--bg) 37rem);
+    radial-gradient(circle at 8% 16%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 24rem),
+    radial-gradient(circle at 94% 38%, rgba(125, 92, 232, 0.11), transparent 30rem),
+    var(--bg);
 `
 
 const Shell = styled.div`
-  width: min(100%, 1440px);
+  width: min(100%, 1480px);
   margin: 0 auto;
-  padding: calc(var(--header-h) + clamp(16px, 3vw, 38px)) var(--content-pad) clamp(28px, 5vw, 64px);
+  padding: calc(var(--header-h) + clamp(8px, 1.6vw, 20px)) var(--content-pad) clamp(36px, 5vw, 68px);
 
-  @media (max-width: 640px) { padding-top: calc(var(--header-h) + 10px); }
+  @media (max-width: 640px) { padding-top: calc(var(--header-h) + 8px); }
 `
 
-const SpotlightGrid = styled.section`
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(285px, 0.75fr);
-  gap: 14px;
-  align-items: stretch;
-
-  @media (max-width: 980px) { grid-template-columns: 1fr; }
-`
-
-const Spotlight = styled.article`
+const Hero = styled.article`
   position: relative;
   display: flex;
-  min-height: clamp(390px, 43vw, 530px);
+  min-height: clamp(360px, 38vw, 500px);
   align-items: flex-end;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border-radius: clamp(18px, 2.4vw, 30px);
   background: var(--bg-elevated);
+  box-shadow: 0 20px 70px rgba(0,0,0,0.3);
   isolation: isolate;
 
   &::before {
     position: absolute;
     inset: 0;
-    z-index: -1;
+    z-index: -2;
     background-image: ${({ $image }) => $image ? `url(${$image})` : 'none'};
     background-position: center;
     background-size: cover;
     content: '';
-    transform: scale(1.02);
+    transform: scale(1.025);
   }
 
   &::after {
@@ -74,16 +65,13 @@ const Spotlight = styled.article`
     inset: 0;
     z-index: -1;
     background:
-      linear-gradient(90deg, rgba(8,8,12,0.94) 0%, rgba(8,8,12,0.7) 44%, rgba(8,8,12,0.15) 100%),
-      linear-gradient(0deg, rgba(8,8,12,0.96) 0%, transparent 62%);
+      linear-gradient(90deg, rgba(6,6,8,0.96) 0%, rgba(6,6,8,0.83) 38%, rgba(6,6,8,0.28) 72%, rgba(6,6,8,0.16) 100%),
+      linear-gradient(0deg, rgba(6,6,8,0.94) 0%, transparent 62%);
     content: '';
   }
 
-  @media (max-width: 640px) {
-    min-height: clamp(430px, 128vw, 520px);
-    border-radius: 18px;
-    /* Use the portrait cover on phones so the Random pick remains fully
-       visible instead of cropping the subject out of the hero frame. */
+  @media (max-width: 680px) {
+    min-height: clamp(385px, 112vw, 445px);
     &::before {
       background-image: ${({ $mobileImage, $image }) => $mobileImage ? `url(${$mobileImage})` : ($image ? `url(${$image})` : 'none')};
       background-position: center top;
@@ -91,355 +79,278 @@ const Spotlight = styled.article`
       background-repeat: no-repeat;
       transform: none;
     }
-    &::after { background: linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(8,8,12,0.66) 55%, rgba(8,8,12,0.08) 100%); }
+    &::after { background: linear-gradient(0deg, rgba(6,6,8,0.98) 0%, rgba(6,6,8,0.78) 48%, rgba(6,6,8,0.08) 100%); }
   }
 `
 
-const SpotlightCopy = styled.div`
-  width: min(100%, 630px);
-  padding: clamp(22px, 4vw, 46px);
+const HeroCopy = styled.div`
+  width: min(100%, 640px);
+  padding: clamp(20px, 3.4vw, 44px);
 
-  .kicker {
+  .eyebrow {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    margin-bottom: 12px;
+    margin: 0 0 14px;
     color: var(--accent);
     font-size: 10px;
     font-weight: 850;
-    letter-spacing: 0.13em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
   }
 
   h1 {
-    max-width: 15ch;
+    display: -webkit-box;
+    max-width: min(100%, 16ch);
     margin: 0;
+    overflow: hidden;
     color: #fff;
-    font-size: clamp(31px, 5vw, 58px);
-    font-weight: 850;
-    letter-spacing: -0.06em;
-    line-height: 0.98;
+    font-size: clamp(32px, 4.8vw, 56px);
+    font-weight: 880;
+    letter-spacing: -0.065em;
+    line-height: 0.92;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
 
   .summary {
     display: -webkit-box;
-    max-width: 56ch;
-    margin: 15px 0 0;
+    max-width: 61ch;
+    margin: 12px 0 0;
     overflow: hidden;
-    color: rgba(255,255,255,0.78);
+    color: rgba(255,255,255,0.75);
     font-size: 13px;
     line-height: 1.55;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
   }
 
-  @media (max-width: 640px) {
-    padding: 20px;
-    h1 { max-width: 13ch; font-size: clamp(30px, 11vw, 44px); }
+  @media (max-width: 680px) {
+    padding: 18px;
+    h1 { max-width: min(100%, 15ch); font-size: clamp(27px, 8vw, 34px); -webkit-line-clamp: 3; }
     .summary { font-size: 12px; -webkit-line-clamp: 2; }
   }
 `
 
-const MetaRow = styled.div`
+const HeroMeta = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-top: 14px;
+  margin-top: 12px;
 
   span {
-    min-height: 24px;
     display: inline-flex;
+    min-height: 26px;
     align-items: center;
     gap: 5px;
-    padding: 0 8px;
+    padding: 0 9px;
     border: 1px solid rgba(255,255,255,0.16);
     border-radius: var(--radius-full);
-    background: rgba(0,0,0,0.28);
-    color: rgba(255,255,255,0.88);
+    background: rgba(0,0,0,0.32);
+    color: rgba(255,255,255,0.9);
     font-size: 10px;
-    font-weight: 750;
+    font-weight: 760;
   }
   svg { color: var(--accent); }
 `
 
-const SpotlightActions = styled.div`
+const HeroActions = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 20px;
+  gap: 9px;
+  margin-top: 16px;
 `
 
-const SpotlightAction = styled(Link)`
+const HeroAction = styled(Link)`
   display: inline-flex;
-  min-height: 42px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid ${({ $secondary }) => ($secondary ? 'rgba(255,255,255,0.2)' : 'var(--accent)')};
-  border-radius: 8px;
-  background: ${({ $secondary }) => ($secondary ? 'rgba(0,0,0,0.22)' : 'var(--accent)')};
+  border-radius: 9px;
+  background: ${({ $secondary }) => ($secondary ? 'rgba(0,0,0,0.24)' : 'var(--accent)')};
   color: ${({ $secondary }) => ($secondary ? '#fff' : 'var(--bg)')};
   font-size: 12px;
   font-weight: 850;
   text-decoration: none;
-  transition: transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  transition: transform 160ms var(--ease-out, ease-out), background 160ms var(--ease-out, ease-out);
   &:hover { background: ${({ $secondary }) => ($secondary ? 'rgba(255,255,255,0.14)' : 'var(--accent-dim)')}; }
   &:active { transform: scale(0.97); }
 
   @media (max-width: 430px) {
-    flex: 1 1 calc(50% - 4px);
+    flex: 1 1 calc(50% - 5px);
     &:first-child { flex-basis: 100%; }
   }
 `
 
-const OnDeck = styled.aside`
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--bg-card);
+const Section = styled.section`
+  margin-top: clamp(26px, 3.7vw, 48px);
 `
 
-const OnDeckHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid var(--border);
-
-  h2 { margin: 0; color: var(--text-primary); font-size: 15px; letter-spacing: -0.02em; }
-  p { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--text-muted); font-size: 11px; }
-  p svg { color: var(--accent); }
-  a { color: var(--text-secondary); font-size: 11px; font-weight: 750; text-decoration: none; }
-  a:hover { color: var(--text-primary); }
-`
-
-const DeckList = styled.div`
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  padding: 5px 9px 9px;
-`
-
-const DeckGroupLabel = styled.p`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 10px 8px 2px;
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  svg { color: var(--accent); }
-`
-
-const DeckItem = styled(Link)`
-  display: grid;
-  grid-template-columns: 33px minmax(0, 1fr) minmax(78px, auto);
-  gap: 10px;
-  align-items: center;
-  min-height: 70px;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
-  color: inherit;
-  text-decoration: none;
-  transition: background var(--transition-fast), transform var(--transition-fast);
-
-  &:last-child { border-bottom: 0; }
-  &:hover { border-radius: 8px; background: var(--bg-elevated); }
-  &:active { transform: scale(0.985); }
-
-  img { width: 33px; height: 46px; border-radius: 5px; object-fit: cover; background: var(--bg-elevated); }
-  h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-  p { margin: 4px 0 0; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-
-  @media (max-width: 520px) {
-    grid-template-columns: 34px minmax(0, 1fr);
-    gap: 9px;
-    img { width: 34px; height: 46px; object-fit: contain; }
-    h3 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  }
-`
-
-const DeckTime = styled.div`
-  min-width: 0;
-  text-align: right;
-  strong { display: block; color: var(--accent); font-size: 10px; font-weight: 850; white-space: nowrap; }
-  span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 9px; line-height: 1.2; }
-
-  @media (max-width: 520px) {
-    grid-column: 2;
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    text-align: left;
-    strong, span { display: inline; }
-    span { margin-top: 0; }
-  }
-`
-
-const EmptyDeck = styled.div`
-  display: grid;
-  flex: 1;
-  place-items: center;
-  padding: 24px;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-align: center;
-`
-
-const PersonalSection = styled.section`
-  margin-top: 26px;
-`
-
-const DiscoverSection = styled.section`
-  margin-top: 30px;
-  padding: clamp(18px, 2.8vw, 30px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--bg-card);
-
-  @media (max-width: 640px) { margin-top: 22px; padding: 17px; }
-`
-
-const DiscoveryRail = styled.div`
-  display: grid;
-  grid-auto-columns: minmax(138px, 1fr);
-  grid-auto-flow: column;
-  grid-template-rows: 1fr;
-  gap: 10px;
-  overflow-x: auto;
-  padding: 2px 1px 9px;
-  scrollbar-width: thin;
-  scroll-snap-type: x proximity;
-
-  @media (min-width: 980px) { grid-auto-columns: minmax(150px, 1fr); }
-`
-
-const DiscoveryCard = styled(Link)`
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  color: inherit;
-  scroll-snap-align: start;
-  text-decoration: none;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
-
-  &:hover { transform: translateY(-3px); border-color: var(--border-hover); background: var(--bg-secondary); }
-  &:active { transform: scale(0.985); }
-  img { display: block; width: 100%; aspect-ratio: 0.69; object-fit: cover; background: var(--bg-secondary); }
-  h3 { margin: 9px 9px 3px; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 780; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-  p { margin: 0 9px 10px; color: var(--text-muted); font-size: 10px; font-weight: 750; }
-`
-
-const SectionStack = styled.div`
-  display: grid;
-  gap: 14px;
-  margin-top: 30px;
-
-  @media (max-width: 640px) { gap: 12px; margin-top: 22px; }
-`
-
-const StoryGrid = styled.section`
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(270px, 0.6fr);
-  gap: 14px;
-  margin-top: 30px;
-
-  @media (max-width: 980px) { grid-template-columns: 1fr; }
-  @media (max-width: 640px) { margin-top: 22px; gap: 12px; }
-`
-
-const StoryPanel = styled.section`
-  padding: clamp(18px, 2.8vw, 30px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--bg-card);
-`
-
-const SectionTitle = styled.div`
+const SectionHeading = styled.div`
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 12px;
 
-  .eyebrow { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: 0.12em; text-transform: uppercase; }
-  h2 { margin: 0; color: var(--text-primary); font-size: clamp(21px, 2.5vw, 30px); letter-spacing: -0.04em; }
-  a { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 750; text-decoration: none; }
+  .eyebrow { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+  h2 { margin: 0; color: var(--text-primary); font-size: clamp(23px, 2.6vw, 32px); font-weight: 840; letter-spacing: -0.055em; line-height: 0.98; }
+  p { margin: 7px 0 0; color: var(--text-muted); font-size: 12px; }
+  a { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 780; text-decoration: none; white-space: nowrap; }
   a:hover { color: var(--text-primary); }
 
-  @media (max-width: 520px) {
+  @media (max-width: 560px) {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 13px;
+    h2 { font-size: 25px; }
   }
 `
 
-const EditorialGrid = styled.div`
+const PosterRail = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  @media (max-width: 600px) { grid-template-columns: 1fr; }
+  grid-auto-columns: minmax(146px, 1fr);
+  grid-auto-flow: column;
+  gap: 13px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 2px 0 14px;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar { display: none; }
+
+  @media (min-width: 900px) { grid-auto-columns: minmax(158px, 1fr); }
+  @media (max-width: 560px) { grid-auto-columns: minmax(120px, 39vw); gap: 10px; }
 `
 
-const EditorialCard = styled(Link)`
+const PosterCard = styled(Link)`
+  min-width: 0;
+  color: inherit;
+  scroll-snap-align: start;
+  text-decoration: none;
+
+  .poster {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 0.69;
+    border-radius: 12px;
+    background: var(--bg-elevated);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.16);
+  }
+  .poster::after { position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, rgba(0,0,0,0.58)); content: ''; pointer-events: none; }
+  img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 260ms var(--ease-out, ease-out); }
+  h3 { margin: 9px 2px 3px; overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 790; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+  p { margin: 0 2px; overflow: hidden; color: var(--text-muted); font-size: 10px; font-weight: 740; text-overflow: ellipsis; white-space: nowrap; }
+  &:hover img { transform: scale(1.045); }
+  &:hover h3 { color: var(--accent); }
+  &:active { transform: scale(0.98); }
+`
+
+const PosterBadge = styled.span`
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.56);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+`
+
+const SchedulePanel = styled.section`
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(170px, 0.36fr) minmax(0, 1fr);
+  gap: clamp(18px, 3vw, 44px);
+  align-items: start;
+  margin-top: clamp(26px, 3.7vw, 48px);
+  padding-top: clamp(20px, 2.5vw, 30px);
+  border-top: 1px solid var(--border);
+
+  @media (max-width: 860px) { grid-template-columns: 1fr; gap: 18px; }
+`
+
+const ScheduleIntro = styled.div`
+  .eyebrow { display: flex; align-items: center; gap: 7px; margin: 0 0 7px; color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
+  h2 { max-width: 10ch; margin: 0; color: var(--text-primary); font-size: clamp(25px, 2.8vw, 34px); font-weight: 850; letter-spacing: -0.06em; line-height: 0.95; }
+  p { margin: 9px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+  a { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; color: var(--text-primary); font-size: 12px; font-weight: 800; text-decoration: none; }
+  a:hover { color: var(--accent); }
+`
+
+const ScheduleGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  @media (max-width: 670px) { grid-template-columns: 1fr; }
+`
+
+const ScheduleItem = styled(Link)`
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
   min-height: 88px;
-  align-items: center;
   padding: 9px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--bg-card) 90%, transparent);
   color: inherit;
   text-decoration: none;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+  transition: transform 160ms var(--ease-out, ease-out), border-color 160ms var(--ease-out, ease-out), background 160ms var(--ease-out, ease-out);
 
-  &:hover { transform: translateY(-2px); border-color: var(--border-hover); background: var(--bg-secondary); }
+  img { width: 46px; height: 64px; border-radius: 6px; object-fit: cover; background: var(--bg-elevated); }
+  h3 { margin: 2px 0 0; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 780; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+  p { margin: 6px 0 0; color: var(--text-muted); font-size: 10px; }
+  strong { display: block; margin-top: 7px; color: var(--accent); font-size: 10px; font-weight: 850; }
+  &:hover { transform: translateY(-2px); border-color: var(--border-hover); background: var(--bg-elevated); }
   &:active { transform: scale(0.985); }
-  img { width: 62px; height: 72px; border-radius: 6px; object-fit: cover; background: var(--bg-secondary); }
-  h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
-  p { margin: 6px 0 0; color: var(--text-secondary); font-size: 11px; }
-  small { display: block; margin-top: 5px; color: var(--accent); font-size: 10px; font-weight: 800; }
 `
 
-const ScreeningRoom = styled.section`
+const PersonalSection = styled.section`
+  margin-top: clamp(26px, 3.7vw, 48px);
+`
+
+const FeatureGrid = styled.section`
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: clamp(22px, 4vw, 58px);
+  margin-top: clamp(26px, 3.7vw, 48px);
+
+  @media (max-width: 920px) { grid-template-columns: 1fr; }
+`
+
+const MovieFeature = styled.section`
   position: relative;
-  display: flex;
-  min-height: 100%;
-  flex-direction: column;
-  justify-content: space-between;
   overflow: hidden;
-  padding: clamp(20px, 3vw, 30px);
+  min-height: 100%;
+  padding: clamp(22px, 3.5vw, 40px);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border-radius: 18px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(125,92,232,0.2), transparent 15rem),
+    radial-gradient(circle at 100% 0%, rgba(125,92,232,0.2), transparent 16rem),
     var(--bg-card);
 
-  h2 { max-width: 11ch; margin: 8px 0 0; color: var(--text-primary); font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.05em; line-height: 1.02; }
-  p { max-width: 34ch; margin: 12px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.55; }
+  h2 { max-width: 10ch; margin: 8px 0 0; color: var(--text-primary); font-size: clamp(30px, 3.4vw, 46px); font-weight: 850; letter-spacing: -0.06em; line-height: 0.94; }
+  > p { max-width: 38ch; margin: 14px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.55; }
+  .eyebrow { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--accent); font-size: 10px; font-weight: 850; letter-spacing: 0.14em; text-transform: uppercase; }
 `
 
-const MovieList = styled.div`
+const MovieStack = styled.div`
   display: grid;
-  gap: 8px;
+  gap: 9px;
   margin-top: 24px;
 `
 
 const MovieItem = styled(Link)`
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 9px;
   align-items: center;
   padding: 7px 0;
@@ -447,53 +358,52 @@ const MovieItem = styled(Link)`
   color: inherit;
   text-decoration: none;
   &:last-child { border-bottom: 0; }
+  img { width: 32px; height: 42px; border-radius: 5px; object-fit: cover; background: var(--bg-elevated); }
+  h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+  span { color: var(--text-muted); font-size: 10px; font-weight: 750; }
   &:hover h3 { color: var(--accent); }
-  img { width: 26px; height: 34px; border-radius: 4px; object-fit: cover; background: var(--bg-elevated); }
-  h3 { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 11px; font-weight: 730; text-overflow: ellipsis; white-space: nowrap; transition: color var(--transition-fast); }
-  span { color: var(--text-muted); font-size: 10px; font-weight: 700; }
 `
 
-const GenreBand = styled.section`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: 20px;
-  padding: 16px 0 2px;
-
-  p { flex: 0 0 auto; margin: 0; color: var(--text-secondary); font-size: 12px; font-weight: 750; }
-  @media (max-width: 720px) { align-items: flex-start; flex-direction: column; }
+const MoodPanel = styled.section`
+  margin-top: clamp(26px, 3.7vw, 48px);
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  .label { margin: 0 0 12px; color: var(--text-secondary); font-size: 12px; font-weight: 780; }
 `
 
-const GenreLinks = styled.div`
+const MoodLinks = styled.div`
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 7px;
-  @media (max-width: 720px) { justify-content: flex-start; }
+  gap: 8px;
 `
 
-const GenreLink = styled(Link)`
-  min-height: 31px;
+const MoodLink = styled(Link)`
   display: inline-flex;
+  min-height: 34px;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 11px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 760;
   text-decoration: none;
-  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  transition: transform 160ms var(--ease-out, ease-out), color 160ms var(--ease-out, ease-out), border-color 160ms var(--ease-out, ease-out), background 160ms var(--ease-out, ease-out);
   &:hover { border-color: var(--accent); background: var(--bg-elevated); color: var(--text-primary); }
+  &:active { transform: scale(0.97); }
 `
 
-const LoadingSpotlight = styled.div`
-  min-height: 430px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+const EmptyHero = styled.div`
+  min-height: clamp(360px, 38vw, 500px);
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  border-radius: clamp(18px, 2.4vw, 30px);
   background: linear-gradient(110deg, var(--bg-card) 28%, var(--bg-elevated) 42%, var(--bg-card) 55%);
   background-size: 220% 100%;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
   animation: homeShimmer 1.35s linear infinite;
   @keyframes homeShimmer { to { background-position: -220% 0; } }
 `
@@ -504,6 +414,9 @@ const posterFor = (item) => item?.coverImage?.extraLarge || item?.coverImage?.la
 const detailHref = (item) => `/anime/${generateSlug(titleFor(item))}-${item.id}`
 const watchHref = (item) => `/watch/${generateSlug(titleFor(item))}-${item.id}-episode-1`
 const stripHtml = (text = '') => text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+const mediaSummary = (item) => item?.format === 'MOVIE'
+  ? 'Movie'
+  : `${item?.format || 'Anime'}${item?.episodes ? ` · ${item.episodes} eps` : ''}`
 const releaseTiming = (timestamp) => {
   if (!timestamp) return null
   const release = new Date(timestamp * 1000)
@@ -516,17 +429,20 @@ const releaseTiming = (timestamp) => {
   return { relative, stamp }
 }
 
-function MediaRail({ items, badge }) {
+function PosterRailSection({ items, meta }) {
   return (
-    <DiscoveryRail>
-      {items.slice(0, 12).map((item) => (
-        <DiscoveryCard key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`}>
-          <img src={posterFor(item)} alt="" loading="lazy" />
+    <PosterRail>
+      {items.slice(0, 14).map((item) => (
+        <PosterCard key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`}>
+          <div className="poster">
+            <img src={posterFor(item)} alt="" loading="lazy" />
+            {item.averageScore && <PosterBadge>{item.averageScore}%</PosterBadge>}
+          </div>
           <h3>{titleFor(item)}</h3>
-          <p>{badge(item)}</p>
-        </DiscoveryCard>
+          <p>{meta(item)}</p>
+        </PosterCard>
       ))}
-    </DiscoveryRail>
+    </PosterRail>
   )
 }
 
@@ -541,32 +457,32 @@ function Home() {
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
   const unifiedTrending = useMemo(() => [...trendingList, ...moviesList]
     .filter((item, index, list) => item?.id && list.findIndex((candidate) => candidate.id === item.id) === index), [trendingList, moviesList])
-
-  const featured = useMemo(
-    () => unifiedTrending[0] || airingList[0] || tvList[0] || null,
-    [unifiedTrending, airingList, tvList]
-  )
-  const upcomingReleases = useMemo(() => airingList
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const heroTrending = useMemo(() => unifiedTrending.slice(0, 10), [unifiedTrending])
+  const featured = heroTrending[featuredIndex] || heroTrending[0] || airingList[0] || tvList[0] || null
+  const freshAiring = useMemo(() => airingList.filter((item) => item?.id && item.id !== featured?.id).slice(0, 14), [airingList, featured])
+  const scheduleItems = useMemo(() => airingList
     .filter((item) => item?.id && item.id !== featured?.id && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now())
     .sort((a, b) => Number(a.nextAiringEpisode.airingAt) - Number(b.nextAiringEpisode.airingAt))
     .slice(0, 3), [airingList, featured])
-  const upcomingIds = useMemo(() => new Set(upcomingReleases.map((item) => item.id)), [upcomingReleases])
-  const popularUpcoming = useMemo(() => [...trendingList, ...tvList, ...airingList]
-    .filter((item, index, list) => item?.id && item.id !== featured?.id && !upcomingIds.has(item.id) && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now() && list.findIndex((candidate) => candidate.id === item.id) === index)
-    .sort((a, b) => (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0))
-    .slice(0, 2), [trendingList, tvList, airingList, featured, upcomingIds])
-  const editorialPicks = useMemo(() => [...trendingList, ...tvList]
-    .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
-    .slice(0, 6), [trendingList, tvList, featured])
-  const seasonalMomentum = useMemo(() => airingList
-    .filter((item) => item?.id && item.id !== featured?.id)
-    .slice(0, 12), [airingList, featured])
-  const fanFavorites = useMemo(() => [...tvList, ...trendingList]
+  const weeklyFavorites = useMemo(() => [...tvList, ...trendingList]
     .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
     .sort((a, b) => (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0))
-    .slice(0, 12), [tvList, trendingList, featured])
+    .slice(0, 14), [tvList, trendingList, featured])
 
   useEffect(() => { setHomepageSEO() }, [])
+
+  useEffect(() => {
+    setFeaturedIndex((index) => heroTrending.length ? index % heroTrending.length : 0)
+  }, [heroTrending.length])
+
+  useEffect(() => {
+    if (heroTrending.length < 2 || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined
+    const rotation = window.setInterval(() => {
+      setFeaturedIndex((index) => (index + 1) % heroTrending.length)
+    }, 8500)
+    return () => window.clearInterval(rotation)
+  }, [heroTrending.length])
 
   useEffect(() => {
     if (!user) return undefined
@@ -597,9 +513,6 @@ function Home() {
               const hasEpisode = Object.values(payload?.providers || {}).some((provider) => (provider?.episodes?.sub || []).some((item) => item.number === episode))
               if (!hasEpisode || cancelled) return
               const message = `Episode ${episode} of ${bookmark.title} is now available`
-              // The table intentionally deduplicates user/type/anime/message. Check
-              // first so normal refreshes do not turn an already-seen release into
-              // a visible 409, while the duplicate race remains harmlessly ignored.
               const { data: existing, error: lookupError } = await supabase
                 .from('notifications')
                 .select('id')
@@ -618,8 +531,6 @@ function Home() {
                 message,
                 anime_id: bookmark.id,
               })
-              // A second tab can win the check between SELECT and INSERT. The
-              // unique violation is the expected idempotency race, not an error.
               if (insertError && insertError.code !== '23505') return
             })
             .catch(() => {})
@@ -630,142 +541,98 @@ function Home() {
     return () => { cancelled = true }
   }, [user])
 
-  const spotlight = featured
-  const spotlightTitle = titleFor(spotlight)
-  const spotlightImage = imageFor(spotlight)
-  const spotlightPoster = posterFor(spotlight)
-  const spotlightEpisode = spotlight?.nextAiringEpisode?.episode
+  const spotlightEpisode = featured?.nextAiringEpisode?.episode
   return (
     <>
       <Page>
         <Shell>
+          {!homeDone ? <EmptyHero>Finding what to watch next.</EmptyHero> : featured ? (
+            <Hero key={featured.id} $image={imageFor(featured)} $mobileImage={posterFor(featured)}>
+              <HeroCopy>
+                <p className="eyebrow"><FaFire size={10} /> Trending now</p>
+                <h1>{titleFor(featured)}</h1>
+                <HeroMeta>
+                  {featured.format && <span><FaTv size={9} /> {featured.format}</span>}
+                  {featured.averageScore && <span><FaStar size={9} /> {featured.averageScore}%</span>}
+                  {featured.episodes && <span>{featured.episodes} episodes</span>}
+                  {spotlightEpisode && <span><FaBolt size={9} /> Episode {spotlightEpisode} next</span>}
+                </HeroMeta>
+                <p className="summary">{stripHtml(featured.description) || 'Explore a title currently moving through Aniraku’s discovery feed.'}</p>
+                <HeroActions>
+                  <HeroAction to={watchHref(featured)}><FaPlay size={11} /> Watch now</HeroAction>
+                  <HeroAction $secondary to={detailHref(featured)}>Details <FaArrowRight size={10} /></HeroAction>
+                </HeroActions>
+              </HeroCopy>
+            </Hero>
+          ) : <EmptyHero>Trending metadata is temporarily unavailable. Please try again shortly.</EmptyHero>}
 
-          {!homeDone || !featured ? <LoadingSpotlight /> : (
-            <SpotlightGrid>
-              <Spotlight $image={spotlightImage} $mobileImage={spotlightPoster}>
-                <SpotlightCopy>
-                  <div className="kicker"><FaFire size={10} /> Trending now</div>
-                  <h1>{spotlightTitle}</h1>
-                  <MetaRow>
-                    {spotlight?.format && <span><FaTv size={9} /> {spotlight.format}</span>}
-                    {spotlight?.averageScore && <span><FaStar size={9} /> {spotlight.averageScore}%</span>}
-                    {spotlight?.episodes && <span>{spotlight.episodes} episodes</span>}
-                    {spotlightEpisode && <span><FaBolt size={9} /> Episode {spotlightEpisode} next</span>}
-                  </MetaRow>
-                  <p className="summary">{stripHtml(spotlight?.description) || 'A hand-picked surprise from the latest anime available on Aniraku.'}</p>
-                  <SpotlightActions>
-                    {spotlight && <SpotlightAction to={watchHref(spotlight)}><FaPlay size={11} /> Start watching</SpotlightAction>}
-                    {spotlight && <SpotlightAction $secondary to={detailHref(spotlight)}>Details <FaArrowRight size={10} /></SpotlightAction>}
-                  </SpotlightActions>
-                </SpotlightCopy>
-              </Spotlight>
+          <Section>
+            <SectionHeading>
+              <div><p className="eyebrow"><FaBolt size={10} /> Fresh from the season</p><h2>Now airing.</h2><p>New episodes, ready when you are.</p></div>
+              <Link to="/catalog?status=RELEASING">All airing <FaArrowRight size={11} /></Link>
+            </SectionHeading>
+            <PosterRailSection items={freshAiring} meta={(item) => item.nextAiringEpisode?.episode ? `Episode ${item.nextAiringEpisode.episode} next` : (item.format || 'Airing')} />
+          </Section>
 
-              <OnDeck>
-                <OnDeckHeader>
-                  <div><h2>On deck</h2><p><FaClock size={10} /> Confirmed upcoming times · your local timezone</p></div>
-                  <Link to="/schedule">Full schedule</Link>
-                </OnDeckHeader>
-                <DeckList>
-                  {upcomingReleases.length || popularUpcoming.length ? (
-                    <>
-                      {upcomingReleases.length > 0 && <DeckGroupLabel><FaClock size={9} /> Next episode releases</DeckGroupLabel>}
-                      {upcomingReleases.map((item) => {
-                        const timing = releaseTiming(item.nextAiringEpisode?.airingAt)
-                        return <DeckItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`}>
-                          <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
-                          <div><h3>{titleFor(item)}</h3><p>Episode {item.nextAiringEpisode?.episode || '?'} next</p></div>
-                          <DeckTime><strong>{timing?.relative || 'Upcoming'}</strong><span>{timing?.stamp || 'Time pending'}</span></DeckTime>
-                        </DeckItem>
-                      })}
-                      {popularUpcoming.length > 0 && <DeckGroupLabel><FaStar size={9} /> Popular titles ahead</DeckGroupLabel>}
-                      {popularUpcoming.map((item) => {
-                        const timing = releaseTiming(item.nextAiringEpisode?.airingAt)
-                        return <DeckItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`}>
-                          <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
-                          <div><h3>{titleFor(item)}</h3><p>{item.nextAiringEpisode?.episode ? `Episode ${item.nextAiringEpisode.episode} next` : item.format || 'Series'}{item.averageScore ? ` · ${item.averageScore}%` : ''}</p></div>
-                          <DeckTime><strong>{timing?.relative || 'Upcoming'}</strong><span>{timing?.stamp || 'Time pending'}</span></DeckTime>
-                        </DeckItem>
-                      })}
-                    </>
-                  ) : <EmptyDeck>No confirmed upcoming release times are available right now. Check the weekly schedule for the latest metadata.</EmptyDeck>}
-                </DeckList>
-              </OnDeck>
-            </SpotlightGrid>
-          )}
-
+          <SchedulePanel aria-label="Upcoming episode schedule">
+            <ScheduleIntro>
+              <p className="eyebrow"><FaClock size={10} /> Airing next</p>
+              <h2>Keep your queue moving.</h2>
+              <p>Upcoming episodes in your local time.</p>
+              <Link to="/schedule">Full schedule <FaArrowRight size={11} /></Link>
+            </ScheduleIntro>
+            <ScheduleGrid>
+              {scheduleItems.map((item) => {
+                const timing = releaseTiming(item.nextAiringEpisode?.airingAt)
+                return <ScheduleItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`}>
+                  <img src={posterFor(item)} alt="" loading="lazy" />
+                  <div><h3>{titleFor(item)}</h3><p>Episode {item.nextAiringEpisode?.episode || '?'} next</p><strong>{timing?.relative || 'Upcoming'}{timing?.stamp ? ` · ${timing.stamp}` : ''}</strong></div>
+                </ScheduleItem>
+              })}
+            </ScheduleGrid>
+          </SchedulePanel>
 
           <PersonalSection aria-label="Continue watching"><ContinueWatching /></PersonalSection>
 
-          <SectionStack aria-label="Anime discovery">
-            <DiscoverSection>
-              <SectionTitle>
-                <div><p className="eyebrow"><FaCalendarAlt size={10} /> Seasonal momentum</p><h2>Keeping the season moving.</h2></div>
-                <Link to="/catalog?status=RELEASING">All airing <FaArrowRight size={11} /></Link>
-              </SectionTitle>
-              <MediaRail
-                items={seasonalMomentum}
-                badge={(item) => item.nextAiringEpisode?.episode ? `Episode ${item.nextAiringEpisode.episode} next` : (item.format || 'Airing')}
-              />
-            </DiscoverSection>
+          <Section>
+            <SectionHeading>
+              <div><p className="eyebrow"><FaFire size={10} /> Trending right now</p><h2>All eyes here.</h2><p>Fan favorites across series and movies.</p></div>
+              <Link to="/catalog?sort=TRENDING_DESC">Explore trends <FaArrowRight size={11} /></Link>
+            </SectionHeading>
+            <PosterRailSection items={unifiedTrending.filter((item) => item.id !== featured?.id)} meta={mediaSummary} />
+          </Section>
 
-            <DiscoverSection>
-              <SectionTitle>
-                <div><p className="eyebrow"><FaStar size={10} /> Community favorites</p><h2>High-score, high-replay series.</h2></div>
+          <FeatureGrid>
+            <div>
+              <SectionHeading>
+                <div><p className="eyebrow"><FaStar size={10} /> Top series</p><h2>Worth the binge.</h2><p>Top-rated series worth your time.</p></div>
                 <Link to="/catalog?sort=SCORE_DESC">Top rated <FaArrowRight size={11} /></Link>
-              </SectionTitle>
-              <MediaRail
-                items={fanFavorites}
-                badge={(item) => item.averageScore ? `${item.averageScore}% community score` : (item.format || 'Anime')}
-              />
-            </DiscoverSection>
-          </SectionStack>
+              </SectionHeading>
+              <PosterRailSection items={weeklyFavorites} meta={(item) => item.averageScore ? `${item.averageScore}% audience score` : (item.format || 'Series')} />
+            </div>
 
-          <StoryGrid>
-            <StoryPanel>
-              <SectionTitle>
-                <div><p className="eyebrow"><FaFire size={10} /> The conversation</p><h2>Stories worth starting.</h2></div>
-                <Link to="/catalog?sort=POPULARITY_DESC">Explore more <FaArrowRight size={11} /></Link>
-              </SectionTitle>
-              <EditorialGrid>
-                {editorialPicks.map((item) => (
-                  <EditorialCard key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`}>
-                    <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
-                    <div><h3>{titleFor(item)}</h3><p>{item.format || 'Anime'}{item.episodes ? ` · ${item.episodes} eps` : ''}</p><small>{item.averageScore ? `${item.averageScore}% community score` : 'Open series'}</small></div>
-                  </EditorialCard>
-                ))}
-              </EditorialGrid>
-            </StoryPanel>
-
-            <ScreeningRoom>
-              <div><p className="eyebrow"><FaFilm size={10} /> Screening room</p><h2>One good movie can reset the night.</h2><p>A concise selection of highly rated films, ready whenever you want a complete story.</p></div>
-              <MovieList>
-                {moviesList.slice(0, 4).map((item) => (
+            <MovieFeature>
+              <p className="eyebrow"><FaFilm size={10} /> Movie night</p>
+              <h2>One story. One sitting.</h2>
+              <p>Top-rated movies for one great sitting.</p>
+              <MovieStack>
+                {moviesList.slice(0, 5).map((item) => (
                   <MovieItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} movie`}>
-                    <img src={item.coverImage?.large || ''} alt="" loading="lazy" />
-                    <h3>{titleFor(item)}</h3><span>{item.averageScore ? `${item.averageScore}%` : 'Movie'}</span>
+                    <img src={posterFor(item)} alt="" loading="lazy" />
+                    <h3>{titleFor(item)}</h3>
+                    <span>{item.averageScore ? `${item.averageScore}%` : 'Movie'}</span>
                   </MovieItem>
                 ))}
-              </MovieList>
-            </ScreeningRoom>
-          </StoryGrid>
+              </MovieStack>
+            </MovieFeature>
+          </FeatureGrid>
 
-          <DiscoverSection>
-            <SectionTitle>
-              <div><p className="eyebrow"><FaFilm size={10} /> Movie radar</p><h2>Big stories, one sitting.</h2></div>
-              <Link to="/catalog?format=MOVIE">All movies <FaArrowRight size={11} /></Link>
-            </SectionTitle>
-            <MediaRail
-              items={moviesList}
-              badge={(item) => item.averageScore ? `${item.averageScore}% audience score` : 'Movie'}
-            />
-          </DiscoverSection>
-
-          <GenreBand>
-            <p>Browse by mood</p>
-            <GenreLinks>
-              {['Action', 'Romance', 'Comedy', 'Fantasy', 'Mystery', 'Slice of Life', 'Sports', 'Supernatural', 'Drama'].map((genre) => <GenreLink key={genre} to={`/catalog?genre=${encodeURIComponent(genre)}`}>{genre}</GenreLink>)}
-            </GenreLinks>
-          </GenreBand>
+          <MoodPanel>
+            <p className="label">Browse by mood</p>
+            <MoodLinks>
+              {['Action', 'Romance', 'Comedy', 'Fantasy', 'Mystery', 'Slice of Life', 'Sports', 'Supernatural', 'Drama'].map((genre) => <MoodLink key={genre} to={`/catalog?genre=${encodeURIComponent(genre)}`}>{genre}</MoodLink>)}
+            </MoodLinks>
+          </MoodPanel>
         </Shell>
       </Page>
       <Footer />
