@@ -30,13 +30,13 @@ assert.deepEqual(toGiphyGif({
   id: 'reaction',
   title: 'Reaction',
   images: {
-    downsized: { url: mediaUrl },
     fixed_width_small: { url: 'https://media1.giphy.com/media/example/200w.gif' },
+    original: { url: mediaUrl },
   },
 }), {
   id: 'reaction',
   url: mediaUrl,
-  previewUrl: 'https://media1.giphy.com/media/example/200w.gif',
+  previewUrl: mediaUrl,
   label: 'Reaction',
 })
 
