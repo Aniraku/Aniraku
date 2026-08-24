@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef, memo } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { anilistQuery, BROWSE_QUERY, CATALOG_SHELVES_QUERY } from '../lib/anilist'
+import { browseAnime, getTrendingAnime } from '../lib/anirakuMetadata'
 import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setCatalogSEO } from '../lib/seo'
@@ -941,14 +941,13 @@ export default function Catalog() {
   } = useInfiniteQuery({
     queryKey: ['catalog-infinite', filters],
     queryFn: async ({ pageParam = 1 }) => {
-      const variables = { page: pageParam, perPage: PER_PAGE, sort: [filters.sort || 'POPULARITY_DESC'] }
+      const variables = { page: pageParam, perPage: PER_PAGE, sort: filters.sort || 'POPULARITY_DESC' }
       if (filters.search) variables.search = filters.search
       if (filters.genre) variables.genre = filters.genre
       if (filters.format) variables.format = filters.format
       if (filters.status) variables.status = filters.status
       if (filters.year) variables.year = Number.parseInt(filters.year, 10)
-      const response = await anilistQuery(BROWSE_QUERY, variables)
-      return { media: response.data.Page.media, pageInfo: response.data.Page.pageInfo }
+      return browseAnime(variables)
     },
     getNextPageParam: (lastPage) => (lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.currentPage + 1 : undefined),
     staleTime: 300000,
@@ -957,8 +956,20 @@ export default function Catalog() {
   const { data: shelfData, isLoading: shelvesLoading, isError: shelvesError, refetch: refetchShelves } = useQuery({
     queryKey: ['catalog-shelves'],
     queryFn: async () => {
-      const response = await anilistQuery(CATALOG_SHELVES_QUERY)
-      return response.data
+      const [trending, airing, popular, movies, topRated] = await Promise.all([
+        getTrendingAnime({ page: 1, perPage: 18 }),
+        browseAnime({ page: 1, perPage: 18, status: 'RELEASING', sort: 'POPULARITY_DESC' }),
+        browseAnime({ page: 1, perPage: 18, sort: 'POPULARITY_DESC' }),
+        browseAnime({ page: 1, perPage: 18, format: 'MOVIE', sort: 'POPULARITY_DESC' }),
+        browseAnime({ page: 1, perPage: 18, sort: 'SCORE_DESC' }),
+      ])
+      return {
+        trending: { media: trending },
+        airing: { media: airing.media },
+        popular: { media: popular.media },
+        movies: { media: movies.media },
+        topRated: { media: topRated.media },
+      }
     },
     staleTime: 300000,
   })
