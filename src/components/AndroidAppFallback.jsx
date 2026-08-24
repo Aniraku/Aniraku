@@ -108,6 +108,11 @@ const AndroidAppFallback = () => {
 
         <StatusLine><i /> Android 9+ / native app available{releaseLabel ? ` · ${releaseLabel}` : ''}</StatusLine>
 
+        <ReleaseNote>
+          <b>WHAT’S NEW</b>
+          <span>Comments now follow the complete episode selector. Real episode-list recovery and compact relationship rails remain in place.</span>
+        </ReleaseNote>
+
         <PrimaryButton ref={appButtonRef} as="a" href={ANDROID_APP_INTENT} onClick={noteAppOpenAttempt}>
           <span><FaAndroid /> USE ANIRAKU APP</span><FaArrowRight />
         </PrimaryButton>
@@ -115,12 +120,12 @@ const AndroidAppFallback = () => {
         {showInstallHint && (
           <InstallHint role="status">
             <span>The app did not open. Get the latest stable build, then try again.</span>
-            <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer">VIEW {releaseLabel || 'LATEST BUILD'} <FaExternalLinkAlt /></a>
+            <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer">VIEW {releaseLabel || 'LATEST'} NOTES <FaExternalLinkAlt /></a>
           </InstallHint>
         )}
 
         <ActionRow>
-          <a href={ANDROID_APP_RELEASE_URL}><FaDownload /> VIEW {releaseLabel || 'LATEST BUILD'}</a>
+          <a href={ANDROID_APP_RELEASE_URL} target="_blank" rel="noreferrer"><FaDownload /> {releaseLabel || 'LATEST'} NOTES</a>
           <a href={ANDROID_APP_ORION_URL} target="_blank" rel="noreferrer"><FaGlobe /> ORION STORE</a>
         </ActionRow>
 
@@ -250,6 +255,19 @@ const StatusLine = styled.div`
   font-size: 0.61rem;
   letter-spacing: 0.04em;
   i { width: 7px; height: 7px; border-radius: 50%; background: #96d37b; box-shadow: 0 0 0 3px rgba(150, 211, 123, 0.13); }
+`
+
+const ReleaseNote = styled.div`
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 10px;
+  color: #bdbdb8;
+  border: 1px solid #343434;
+  background: #0d0d0d;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  b { color: #ff4d4d; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.57rem; letter-spacing: 0.08em; }
 `
 
 const PrimaryButton = styled.button`
