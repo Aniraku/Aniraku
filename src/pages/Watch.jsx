@@ -20,6 +20,7 @@ import {
   FaStar,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
+import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
@@ -1637,7 +1638,7 @@ export default function Watch() {
   })
 
   // ────────────────────────────────────────────────────────────
-  // Fetch Aniraku metadata with a Miruro-only episode list.
+  // Fetch anime + episodes (with retry + fallback to AniList)
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
@@ -1653,17 +1654,56 @@ export default function Watch() {
             { maxRetries: 2, timeoutMs: 12_000 }
           ).then((r) => (r ? r.json() : null)),
           fetchWithRetry(
-            `${API_BASE}/api/v1/miruro/episodes/${animeId}`,
+            `${API_BASE}/api/v1/anime/${animeId}/episodes`,
             { method: 'GET' },
             { maxRetries: 2, timeoutMs: 12_000 }
-          ).then((r) => (r ? r.json() : { providers: {} })),
+          ).then((r) => (r ? r.json() : { episodes: [] })),
         ])
         if (cancelled) return
-        const animeData = animeRes
-        const episodeRows = miruroEpisodeRows(epRes)
+        let animeData = animeRes
+        let epData = epRes
+        if (!animeData) {
+          const { data } = await anilistQuery(ANIME_DETAIL_QUERY, {
+            id: parseInt(animeId, 10),
+          }).catch(() => ({ data: null }))
+          if (data?.Media) {
+            animeData = { ...data.Media, id: animeId }
+            if (
+              !epData?.episodes?.length &&
+              data.Media.episodes
+            ) {
+              epData = {
+                episodes: Array.from(
+                  { length: data.Media.episodes },
+                  (_, i) => ({
+                    number: i + 1,
+                    title: `Episode ${i + 1}`,
+                    thumbnail: data.Media.coverImage?.medium || '',
+                  })
+                ),
+              }
+            }
+          }
+        }
+        // The episode endpoint can be temporarily unavailable during an
+        // upstream AniList throttle even when anime metadata succeeded. Keep a
+        // navigable chooser in that case instead of rendering an empty Watch
+        // sidebar until the backend recovers.
+        if (!epData?.episodes?.length && animeData?.episodes) {
+          epData = {
+            episodes: Array.from(
+              { length: animeData.episodes },
+              (_, i) => ({
+                number: i + 1,
+                title: `Episode ${i + 1}`,
+                thumbnail: animeData.coverImage?.medium || animeData.coverImage?.large || '',
+              })
+            ),
+          }
+        }
         if (cancelled) return
         setAnime(animeData)
-        setEpisodes(normalizeEpisodeList(episodeRows))
+        setEpisodes(normalizeEpisodeList(epData?.episodes))
         setBackendHealthy(true)
       } catch (e) {
         if (cancelled) return
@@ -1678,12 +1718,21 @@ export default function Watch() {
     }
   }, [animeId])
 
-  // Metadata comes only from Aniraku. If it lacks a MAL mapping, provider
-  // skip markers remain available but AniSkip enrichment is not requested.
+  // The stream backend may omit the MAL mapping. Hydrate it from AniList so
+  // AniSkip can still serve timestamps for the same title.
   const malId = getMalId(anime)
   useEffect(() => {
-    if (!animeId || !anime || malId) return undefined
-    return undefined
+    if (!animeId || !anime || malId) return
+    let cancelled = false
+    anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(animeId, 10) })
+      .then(({ data }) => {
+        const nextMalId = getMalId(data?.Media)
+        if (!cancelled && nextMalId) {
+          setAnime((prev) => prev ? { ...prev, idMal: nextMalId } : prev)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
   }, [animeId, anime, malId])
 
   useEffect(() => {

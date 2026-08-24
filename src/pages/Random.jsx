@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FaInfoCircle, FaPlay, FaRandom, FaRedo, FaStar } from 'react-icons/fa'
-import { browseAnime } from '../lib/anirakuMetadata'
+import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { generateSlug } from '../lib/slug'
@@ -335,15 +335,15 @@ export default function Random() {
       const variables = {
         page: Math.floor(Math.random() * 14) + 1,
         perPage: 24,
-        sort: mode.sort,
+        sort: [mode.sort],
       }
       if (mode.genre) variables.genre = mode.genre
       if (mode.format) variables.format = mode.format
 
-      const { media } = await browseAnime(variables)
+      const { data } = await anilistQuery(BROWSE_QUERY, variables)
       if (id !== requestId.current) return
 
-      const candidates = filterAdult(media, nsfwEnabled)
+      const candidates = filterAdult(data?.Page?.media || [], nsfwEnabled)
       const fresh = candidates.filter((item) => item.id !== previousId.current)
       const pool = fresh.length ? fresh : candidates
       if (!pool.length) throw new Error('No candidates')
