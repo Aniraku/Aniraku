@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
-
-const MIRURO_INFO_BASE = 'https://miruro-api-v3.onrender.com/info'
+import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -103,12 +101,9 @@ export function useGenre({ genre }) {
 
 export function useAnimeDetails(id) {
   return useQuery(['anime', id], async () => {
-    const response = await fetch(`${MIRURO_INFO_BASE}/${encodeURIComponent(id)}`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!response.ok) throw new Error(`Miruro info API returned ${response.status}`)
-    const anime = await response.json()
-    if (!anime?.id) throw new Error('Miruro info API returned no anime')
+    const response = await anilistQuery(ANIME_DETAIL_QUERY, { id: Number(id) })
+    const anime = response?.data?.Media
+    if (!anime?.id) throw new Error('Metadata resolver returned no anime')
     return anime
   }, { enabled: !!id, staleTime: 300000 })
 }

@@ -1,4 +1,5 @@
 const DEFAULT_API_BASE = 'https://api.aniraku.tech'
+const METADATA_RESOLVER_PATH = '/api/mal'
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
 
 export class AniListUnavailableError extends Error {
@@ -17,17 +18,12 @@ function reportAniListStatus(unavailable) {
 
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
+  const resolverBase = (import.meta.env.VITE_METADATA_RESOLVER_URL || '').replace(/\/$/, '')
+  const resolverEndpoint = `${resolverBase}${METADATA_RESOLVER_PATH}`
+  const apiBase = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
 
-  // Always use Aniraku's API proxy by default. It avoids browser CORS issues
-  // and protects users from exhausting AniList's client-side rate limit. A
-  // deployment may still override this endpoint through VITE_API_URL.
-  const apiBase = (
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.DEV ? '' : DEFAULT_API_BASE)
-  ).replace(/\/$/, '')
-  const endpoint = `${apiBase}/api/v1/anilist`
   try {
-    const res = await fetch(endpoint, {
+    const res = await fetch(resolverEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body,
@@ -37,16 +33,29 @@ export async function anilistQuery(query, variables = {}) {
       reportAniListStatus(false)
       return json
     }
-    const message = json?.errors?.[0]?.message || json?.error || `AniList is unavailable (${res.status}).`
-    if ((res.status === 403 && /temporarily disabled|severe stability issues/i.test(message)) || /anilist circuit open|rate limited/i.test(message)) {
+    throw new Error(json?.error?.message || `MyAnimeList metadata resolver returned ${res.status}.`)
+  } catch (error) {
+    // MAL does not permit browser CORS. The Vercel resolver owns the primary
+    // MAL request and maps its records back onto AniList IDs. Preserve the
+    // deployed Aniraku API proxy as the recovery path if that resolver or its
+    // mapping service is temporarily unavailable.
+    console.warn('MAL metadata resolver failed; using Aniraku API fallback:', error)
+    const fallback = await fetch(`${apiBase}/api/v1/anilist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body,
+    })
+    const json = await fallback.json().catch(() => ({}))
+    if (fallback.ok && json.data) {
+      reportAniListStatus(false)
+      return json
+    }
+    const message = json?.errors?.[0]?.message || json?.error || `Metadata fallback is unavailable (${fallback.status}).`
+    if ((fallback.status === 403 && /temporarily disabled|severe stability issues/i.test(message)) || /anilist circuit open|rate limited|mapping unavailable/i.test(message)) {
       reportAniListStatus(true)
       throw new AniListUnavailableError('AniList is temporarily unavailable due to an upstream stability issue. Try again shortly.')
     }
     throw new Error(message)
-  } catch (error) {
-    if (isAniListUnavailableError(error)) throw error
-    console.warn('AniList proxy fetch failed:', error)
-    throw error instanceof Error ? error : new Error('AniList backend is unavailable')
   }
 }
 

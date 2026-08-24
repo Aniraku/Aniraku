@@ -1638,7 +1638,9 @@ export default function Watch() {
   })
 
   // ────────────────────────────────────────────────────────────
-  // Fetch anime + episodes (with retry + fallback to AniList)
+  // Fetch MAL-primary metadata plus the existing AniList-ID episode contract.
+  // The shared resolver returns MAL data normalized to this route's AniList ID;
+  // backend anime metadata remains the fallback only.
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
@@ -1647,12 +1649,10 @@ export default function Watch() {
 
     const run = async () => {
       try {
-        const [animeRes, epRes] = await Promise.all([
-          fetchWithRetry(
-            `${API_BASE}/api/v1/anime/${animeId}`,
-            { method: 'GET' },
-            { maxRetries: 2, timeoutMs: 12_000 }
-          ).then((r) => (r ? r.json() : null)),
+        const [metadataRes, epRes] = await Promise.all([
+          anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(animeId, 10) })
+            .then(({ data }) => data?.Media || null)
+            .catch(() => null),
           fetchWithRetry(
             `${API_BASE}/api/v1/anime/${animeId}/episodes`,
             { method: 'GET' },
@@ -1660,29 +1660,26 @@ export default function Watch() {
           ).then((r) => (r ? r.json() : { episodes: [] })),
         ])
         if (cancelled) return
-        let animeData = animeRes
+        let animeData = metadataRes ? { ...metadataRes, id: Number(animeId) } : null
         let epData = epRes
         if (!animeData) {
-          const { data } = await anilistQuery(ANIME_DETAIL_QUERY, {
-            id: parseInt(animeId, 10),
-          }).catch(() => ({ data: null }))
-          if (data?.Media) {
-            animeData = { ...data.Media, id: animeId }
-            if (
-              !epData?.episodes?.length &&
-              data.Media.episodes
-            ) {
+          const backendResponse = await fetchWithRetry(
+            `${API_BASE}/api/v1/anime/${animeId}`,
+            { method: 'GET' },
+            { maxRetries: 2, timeoutMs: 12_000 }
+          )
+          animeData = backendResponse ? await backendResponse.json() : null
+          if (animeData?.episodes && !epData?.episodes?.length) {
               epData = {
                 episodes: Array.from(
-                  { length: data.Media.episodes },
+                  { length: animeData.episodes },
                   (_, i) => ({
                     number: i + 1,
                     title: `Episode ${i + 1}`,
-                    thumbnail: data.Media.coverImage?.medium || '',
+                    thumbnail: animeData.coverImage?.medium || '',
                   })
                 ),
               }
-            }
           }
         }
         // The episode endpoint can be temporarily unavailable during an
@@ -1718,8 +1715,8 @@ export default function Watch() {
     }
   }, [animeId])
 
-  // The stream backend may omit the MAL mapping. Hydrate it from AniList so
-  // AniSkip can still serve timestamps for the same title.
+  // The stream backend may omit the MAL mapping. Hydrate it from the shared
+  // MAL-primary resolver so AniSkip can still serve timestamps for this title.
   const malId = getMalId(anime)
   useEffect(() => {
     if (!animeId || !anime || malId) return
