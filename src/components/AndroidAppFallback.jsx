@@ -110,7 +110,7 @@ const AndroidAppFallback = () => {
 
         <ReleaseNote>
           <b>WHAT’S NEW</b>
-          <span>Comments now follow the complete episode selector. Real episode-list recovery and compact relationship rails remain in place.</span>
+          <span>Bonk now appears only with direct or proxy media, never an embedded player. Native source discovery also waits longer for late provider results.</span>
         </ReleaseNote>
 
         <PrimaryButton ref={appButtonRef} as="a" href={ANDROID_APP_INTENT} onClick={noteAppOpenAttempt}>

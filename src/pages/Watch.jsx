@@ -63,10 +63,10 @@ import {
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
-import { shouldPreferProviderPlayer } from '../lib/watchProviderPlayer'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
   filterBrowserProviders,
+  isBonkProvider,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
@@ -3020,10 +3020,10 @@ export default function Watch() {
       setShowEndedOverlay(false)
 
       const createSameProviderFailureHandler = (payload) => {
-        const embedFallback = chooseBrowserPlayableEmbed(
+        const embedFallback = !isBonkProvider(source) ? chooseBrowserPlayableEmbed(
           payload?.sources,
           isBrowserPlayableEmbedSource
-        )
+        ) : null
         let fallbackUsed = false
         return (reason) => {
           if (embedFallback && !fallbackUsed) {
@@ -3047,25 +3047,6 @@ export default function Watch() {
         const cached = getCachedStream(source)
         if (cached && cached.sources?.[0]?.url) {
           if (targetEpisode !== epNumberRef.current) return
-          const cachedProviderPlayer = shouldPreferProviderPlayer(source)
-            ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
-            : null
-          if (cachedProviderPlayer) {
-            destroyPlayer()
-            setBuffering(false)
-            setActiveEmbedUrl(cachedProviderPlayer.url)
-            applySkipSegments(normalizeProviderSkipSegments(cached))
-            setStreamLoading(false)
-            loadingRef.current = false
-            return
-          }
-          if (shouldPreferProviderPlayer(source)) {
-            setErrorType('no-source')
-            setError(`${source.label} player is unavailable for this episode.`)
-            setStreamLoading(false)
-            loadingRef.current = false
-            return
-          }
           const firstSource = cached.sources[0]
           const qualityList = buildQualityList(cached.sources)
           if (qualityList.length > 0) {
@@ -3087,7 +3068,9 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-          const cachedEmbed = chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
+          const cachedEmbed = !isBonkProvider(source)
+            ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
+            : null
 	          if (cachedEmbed) {
 	            destroyPlayer()
 	            setActiveEmbedUrl(cachedEmbed.url)
@@ -3198,37 +3181,11 @@ export default function Watch() {
         }
 
         const firstSource = data.sources[0]
-        const providerPlayer = shouldPreferProviderPlayer(source)
-          ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
-          : null
-        if (providerPlayer) {
-          destroyPlayer()
-          setBuffering(false)
-          setActiveEmbedUrl(providerPlayer.url)
-          applySkipSegments(normalizeProviderSkipSegments(data))
-          setCachedStream(source, data)
-          setStreamLoading(false)
-          loadingRef.current = false
-          setRetryAttempt(0)
-          return
-        }
-        if (shouldPreferProviderPlayer(source)) {
-          if (quiet) {
-            setStreamLoading(false)
-            loadingRef.current = false
-            reportQuietSwitchFailure(`${source.label} player is unavailable — staying on the current one`)
-            return
-          }
-          setNoStreamError(true)
-          setErrorType('no-source')
-          setError(`${source.label} player is unavailable for this episode.`)
-          setStreamLoading(false)
-          loadingRef.current = false
-          return
-        }
         const qualityList = buildQualityList(data.sources)
         if (qualityList.length === 0) {
-          const verifiedEmbed = chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
+          const verifiedEmbed = !isBonkProvider(source)
+            ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
+            : null
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
