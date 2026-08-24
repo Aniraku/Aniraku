@@ -1,4 +1,4 @@
-import { Suspense, lazy, Component, useEffect } from "react"
+import { Suspense, lazy, Component, useEffect, useState } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"
@@ -11,6 +11,7 @@ import SupportPrompt from "./components/SupportPrompt"
 import Error from "./pages/Error"
 import Home from "./pages/Home"
 import Skeleton from "./components/Loader/Skeleton"
+import { useQueryClient } from "@tanstack/react-query"
 
 class ErrorBoundary extends Component {
   state = { hasError: false, error: null }
@@ -73,6 +74,23 @@ class ErrorBoundary extends Component {
 const RouteBoundary = ({ children }) => {
   const { pathname } = useLocation()
   return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
+}
+
+const AniListAvailabilityBanner = () => {
+  const [unavailable, setUnavailable] = useState(false)
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const onStatus = (event) => setUnavailable(Boolean(event.detail?.unavailable))
+    window.addEventListener('aniraku:anilist-status', onStatus)
+    return () => window.removeEventListener('aniraku:anilist-status', onStatus)
+  }, [])
+
+  if (!unavailable) return null
+  return <div role="status" aria-live="polite" style={{ position: 'relative', zIndex: 1200, background: '#251717', borderBottom: '1px solid rgba(248,113,113,0.48)', color: '#fee2e2', padding: '10px var(--content-pad)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13, lineHeight: 1.45 }}>
+    <span><strong>AniList is temporarily unavailable.</strong> Discovery, search, and some metadata will recover automatically when the upstream service responds.</span>
+    <button type="button" onClick={() => queryClient.refetchQueries({ type: 'active' })} style={{ minHeight: 32, padding: '0 11px', border: '1px solid rgba(254,226,226,0.55)', borderRadius: 6, background: 'transparent', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Try again</button>
+  </div>
 }
 
 const Watch = lazy(() => import("./pages/Watch"))
@@ -146,6 +164,7 @@ const App = () => {
         <ErrorBoundary>
           <ScrollToTop />
           <NavBar />
+          <AniListAvailabilityBanner />
           <MobileBottomNav />
           <AndroidAppFallback />
           <SupportPrompt />

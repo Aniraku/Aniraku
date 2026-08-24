@@ -1,4 +1,19 @@
 const DEFAULT_API_BASE = 'https://api.aniraku.tech'
+const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
+
+export class AniListUnavailableError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'AniListUnavailableError'
+  }
+}
+
+export const isAniListUnavailableError = (error) => error instanceof AniListUnavailableError
+
+function reportAniListStatus(unavailable) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(ANILIST_STATUS_EVENT, { detail: { unavailable } }))
+}
 
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
@@ -12,20 +27,27 @@ export async function anilistQuery(query, variables = {}) {
   ).replace(/\/$/, '')
   const endpoint = `${apiBase}/api/v1/anilist`
   try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body,
-      })
-      if (res.ok) {
-        const json = await res.json()
-        if (json.data) return json
-      }
-    } catch (e) {
-      console.warn('AniList proxy fetch failed:', e)
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body,
+    })
+    const json = await res.json().catch(() => ({}))
+    if (res.ok && json.data) {
+      reportAniListStatus(false)
+      return json
     }
-
-  throw new Error('AniList backend is unavailable')
+    const message = json?.errors?.[0]?.message || json?.error || `AniList is unavailable (${res.status}).`
+    if ((res.status === 403 && /temporarily disabled|severe stability issues/i.test(message)) || /anilist circuit open|rate limited/i.test(message)) {
+      reportAniListStatus(true)
+      throw new AniListUnavailableError('AniList is temporarily unavailable due to an upstream stability issue. Try again shortly.')
+    }
+    throw new Error(message)
+  } catch (error) {
+    if (isAniListUnavailableError(error)) throw error
+    console.warn('AniList proxy fetch failed:', error)
+    throw error instanceof Error ? error : new Error('AniList backend is unavailable')
+  }
 }
 
 // --- Queries ---
