@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaArrowRight, FaCalendarAlt, FaClock, FaSearch, FaTimes, FaTv } from 'react-icons/fa'
-import { getSchedule } from '../lib/anirakuMetadata'
+import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setScheduleSEO } from '../lib/seo'
@@ -458,17 +458,18 @@ const Schedule = () => {
   const [searchQuery, setSearchQuery] = useState('')
 
   const { data, isLoading, error, refetch } = useQuery(['schedule'], async () => {
-    const response = await getSchedule({ page: 1, perPage: 100 })
-    return (response?.schedule || [])
-      .filter((media) => media?.airingAt)
+    const variables = { page: 1, perPage: 100, status: 'RELEASING', sort: ['POPULARITY_DESC'] }
+    const { data: response } = await anilistQuery(BROWSE_QUERY, variables)
+    return (response?.Page?.media || [])
+      .filter((media) => media.nextAiringEpisode?.airingAt)
       .map((media) => ({
         id: media.id,
         title: media.title,
         coverImage: media.coverImage,
         format: media.format,
-        episode: media.episode,
-        airingAt: media.airingAt,
-        day: media.day || dayNameFor(media.airingAt),
+        episode: media.nextAiringEpisode.episode,
+        airingAt: media.nextAiringEpisode.airingAt,
+        day: dayNameFor(media.nextAiringEpisode.airingAt),
       }))
       .sort((a, b) => a.airingAt - b.airingAt)
   }, { staleTime: 30 * 60 * 1000 })

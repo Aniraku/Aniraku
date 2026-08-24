@@ -18,7 +18,7 @@ import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { getAnimeMetadata } from '../lib/anirakuMetadata'
+import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import { generateSlug } from '../lib/slug'
 
 const Page = styled.main`
@@ -502,7 +502,8 @@ function Home() {
       const api = import.meta.env.VITE_API_URL || ''
       bookmarks.forEach((bookmark) => {
         if (lastKnown[bookmark.id] && now - lastKnown[bookmark.id].t < 21600000) return
-        getAnimeMetadata(bookmark.id).then((media) => {
+        anilistQuery(ANIME_DETAIL_QUERY, { id: bookmark.id }).then(({ data }) => {
+          const media = data?.Media
           if (!media || media.status !== 'RELEASING' || !api || cancelled) return
           const episode = media.nextAiringEpisode?.episode ? media.nextAiringEpisode.episode - 1 : (media.episodes || 0)
           if (episode <= (lastKnown[bookmark.id]?.e || 0)) return
