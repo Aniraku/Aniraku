@@ -1,55 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
-
-const MIRURO_INFO_BASE = 'https://miruro-api-v3.onrender.com/info'
+import { browseAnime, getAnimeMetadata, getTrendingAnime } from '../lib/anirakuMetadata'
 
 async function browse(variables) {
-  const { data } = await anilistQuery(BROWSE_QUERY, variables)
-  return data.Page.media || []
+  const { media } = await browseAnime(variables)
+  return media
 }
 
 async function fetchHomePageData() {
-  const { data } = await anilistQuery(`
-    query {
-      trending: Page(page: 1, perPage: 10) {
-        media(type: ANIME, sort: TRENDING_DESC) {
-          id title { romaji english native userPreferred }
-          coverImage { extraLarge large medium color }
-          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
-          format status episodes averageScore popularity genres isAdult
-        }
-      }
-      airing: Page(page: 1, perPage: 20) {
-        media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
-          id title { romaji english native userPreferred }
-          coverImage { extraLarge large medium color }
-          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
-          format status episodes averageScore popularity genres isAdult
-        }
-      }
-      movies: Page(page: 1, perPage: 20) {
-        media(type: ANIME, format: MOVIE, sort: TRENDING_DESC) {
-          id title { romaji english native userPreferred }
-          coverImage { extraLarge large medium color }
-          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
-          format status episodes averageScore popularity genres isAdult
-        }
-      }
-      topTV: Page(page: 1, perPage: 20) {
-        media(type: ANIME, format: TV, sort: SCORE_DESC) {
-          id title { romaji english native userPreferred }
-          coverImage { extraLarge large medium color }
-          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
-          format status episodes averageScore popularity genres isAdult
-        }
-      }
-    }
-  `, {})
+  const [trending, airing, movies, topTV] = await Promise.all([
+    getTrendingAnime({ page: 1, perPage: 20 }),
+    browse({ page: 1, perPage: 20, status: 'RELEASING', sort: 'POPULARITY_DESC' }),
+    browse({ page: 1, perPage: 20, format: 'MOVIE', sort: 'TRENDING_DESC' }),
+    browse({ page: 1, perPage: 20, format: 'TV', sort: 'SCORE_DESC' }),
+  ])
   return {
-    trending: data.trending.media,
-    airing: data.airing.media,
-    movies: data.movies.media,
-    topTV: data.topTV.media,
+    trending,
+    airing,
+    movies,
+    topTV,
   }
 }
 
@@ -103,12 +71,8 @@ export function useGenre({ genre }) {
 
 export function useAnimeDetails(id) {
   return useQuery(['anime', id], async () => {
-    const response = await fetch(`${MIRURO_INFO_BASE}/${encodeURIComponent(id)}`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!response.ok) throw new Error(`Miruro info API returned ${response.status}`)
-    const anime = await response.json()
-    if (!anime?.id) throw new Error('Miruro info API returned no anime')
+    const anime = await getAnimeMetadata(id)
+    if (!anime?.id) throw new Error('Aniraku metadata returned no anime')
     return anime
   }, { enabled: !!id, staleTime: 300000 })
 }

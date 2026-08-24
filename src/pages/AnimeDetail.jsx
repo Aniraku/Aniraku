@@ -10,13 +10,13 @@ import { filterAdult, isNsfw, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { supabase } from '../lib/supabase'
 import { extractIdFromSlug, generateSlug } from '../lib/slug'
 import { fetchEpisodeRatings } from '../lib/sync'
+import { getAnimeRelations } from '../lib/anirakuMetadata'
 import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 
 const MIRURO_EPISODES_BASE = 'https://miruro-api-v3.onrender.com/episodes'
-const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 
 const Page = styled.div`
   min-height: 100vh;
@@ -641,7 +641,7 @@ const AnimeDetail = () => {
   const [episodeRatings, setEpisodeRatings] = useState({})
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
-  const { data: anime, isLoading } = useAnimeDetails(id)
+  const { data: anime, isLoading, isError: animeUnavailable, error: animeError, refetch: refetchAnime } = useAnimeDetails(id)
   const similarList = useStreamable(filterAdult((anime?.recommendations?.nodes || [])
     .map((entry) => entry?.mediaRecommendation)
     .filter(Boolean), nsfwEnabled))
@@ -757,13 +757,8 @@ const AnimeDetail = () => {
       setRelations([])
       setRelationsLoading(true)
       try {
-        const response = await fetch(`${MIRURO_RELATIONS_BASE}/${encodeURIComponent(id)}/relations`, {
-          signal: controller.signal,
-          headers: { Accept: 'application/json' },
-        })
-        if (!response.ok) throw new Error(`Miruro relations API returned ${response.status}`)
-        const payload = await response.json()
-        const directRelations = (Array.isArray(payload?.relations) ? payload.relations : [])
+        const payload = await getAnimeRelations(id)
+        const directRelations = payload
           .filter((entry) => entry?.node?.id && entry.node.type === 'ANIME' && ['SEQUEL', 'PREQUEL', 'SPIN_OFF', 'SIDE_STORY', 'ADAPTATION'].includes(entry.relationType))
           .map((entry) => ({ ...entry.node, relationType: entry.relationType }))
         if (!cancelled) setRelations(directRelations)
@@ -858,6 +853,19 @@ const AnimeDetail = () => {
   }
 
   if (isLoading) return <AnimeDetailSkeleton />
+
+  if (animeUnavailable) return (
+    <Center>
+      <div style={{ textAlign: 'center', maxWidth: 420, padding: '0 20px' }}>
+        <p style={{ fontSize: 18, marginBottom: 10, color: 'var(--text-primary)' }}>Anime details are temporarily unavailable</p>
+        <p style={{ margin: '0 0 18px', color: 'var(--text-muted)', fontSize: 14, lineHeight: 1.55 }}>{animeError?.message || 'The Aniraku metadata service could not load this title. Episodes and Watch availability can recover independently.'}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => refetchAnime()} style={{ minHeight: 40, padding: '0 15px', border: 0, borderRadius: 8, background: 'var(--accent)', color: 'var(--bg)', fontWeight: 750, cursor: 'pointer' }}>Try again</button>
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 40, padding: '0 15px', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 14, textDecoration: 'none' }}>Back to Home</Link>
+        </div>
+      </div>
+    </Center>
+  )
 
   if (!anime) return (
     <>
