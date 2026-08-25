@@ -17,6 +17,7 @@
     "test:anime-detail-loading": "node scripts/test-anime-detail-loading.mjs",
     "test:watch-source-suppression": "node scripts/test-watch-source-suppression.mjs",
     "test:watch-direct-fallback": "node scripts/test-watch-direct-fallback.mjs",
+    "test:profile-title-safety": "node scripts/test-profile-title-safety.mjs",
     "test:e2e": "playwright test",
     "generate-sitemap": "node scripts/generate-sitemap.js",
     "postbuild": "echo 'SEO files generated successfully'"
