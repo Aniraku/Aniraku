@@ -11,11 +11,8 @@ export function isConfirmedUpcomingEpisode({
   episodes,
   status,
   nextAiringEpisode,
-  isMovie = false,
   hasConfirmedEpisodeList = false,
 }) {
-  if (isMovie) return false
-
   const target = Number(episodeNumber)
   if (!Number.isInteger(target) || target < 1) return false
 

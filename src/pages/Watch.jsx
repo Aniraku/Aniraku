@@ -1176,7 +1176,6 @@ export default function Watch() {
     episodes,
     status: anime?.status,
     nextAiringEpisode: anime?.nextAiringEpisode,
-    isMovie,
     hasConfirmedEpisodeList: episodes.length > 0,
   })
   const effectiveEpisodeAvailability = isPreemptivelyUpcoming
@@ -1782,7 +1781,6 @@ export default function Watch() {
             episodes: normalizedEpisodes,
             status: animeData?.status,
             nextAiringEpisode: animeData?.nextAiringEpisode,
-            isMovie: animeData?.format === 'MOVIE',
             hasConfirmedEpisodeList,
           })
             ? 'upcoming'
