@@ -1,6 +1,25 @@
 // ponytail: slug generation + ID extraction, one function each
+// Legacy browser storage and some upstream payloads can represent a title as
+// an AniList-style object. Resolve only known text fields before any string
+// operation so UI routes never crash while rendering a persisted list item.
+export function titleText(title) {
+  if (typeof title === 'string') return title
+  if (typeof title === 'number') return String(title)
+  if (!title || typeof title !== 'object' || Array.isArray(title)) return ''
+
+  const candidate = [
+    title.userPreferred,
+    title.english,
+    title.romaji,
+    title.native,
+    title.title,
+  ].find((value) => typeof value === 'string' && value.trim())
+
+  return candidate || ''
+}
+
 export function generateSlug(title) {
-  return (title || '')
+  return titleText(title)
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')

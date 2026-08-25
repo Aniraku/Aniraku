@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import Footer from '../components/Footer/Footer'
 import { AVATAR_LIST, avatarUrl, defaultAvatar } from '../lib/avatars'
 import { supabase } from '../lib/supabase'
-import { generateSlug } from '../lib/slug'
+import { generateSlug, titleText } from '../lib/slug'
 import {
   getSyncStatus,
   importProviderList,
@@ -383,17 +383,20 @@ const Profile = () => {
                 </div>
               ) : (
                 <div className="profile-bookmark-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
-                  {bookmarks.map(b => (
-                    <div key={b.id} style={{ background: 'var(--bg-card)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                      <Link to={`/anime/${generateSlug(b.title)}-${b.id}`}>
-                        <img src={b.image} alt={b.title} style={{ width: '100%', height: 200, objectFit: 'cover' }} />
-                      </Link>
-                      <div style={{ padding: 10 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</p>
-                        <button onClick={() => removeBookmark(b.id)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', marginTop: 4, padding: 0 }}>Remove</button>
-                      </div>
-                    </div>
-                  ))}
+	                  {bookmarks.map(b => {
+	                    const bookmarkTitle = titleText(b?.title) || `Anime ${b?.id || ''}`.trim()
+	                    return (
+	                    <div key={b.id} style={{ background: 'var(--bg-card)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+	                      <Link to={`/anime/${generateSlug(bookmarkTitle)}-${b.id}`}>
+	                        <img src={b.image} alt={bookmarkTitle} style={{ width: '100%', height: 200, objectFit: 'cover' }} />
+	                      </Link>
+	                      <div style={{ padding: 10 }}>
+	                        <p style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bookmarkTitle}</p>
+	                        <button onClick={() => removeBookmark(b.id)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', marginTop: 4, padding: 0 }}>Remove</button>
+	                      </div>
+	                    </div>
+	                    )
+	                  })}
                 </div>
               )}
             </div>
@@ -431,28 +434,29 @@ const Profile = () => {
                       <button onClick={clearHistory} disabled={historyBusy} style={ghostBtn}>Clear History</button>
                     </div>
                   </div>
-                  {history.map(h => {
-                    const key = historyEntryKey(h)
-                    const selected = selectedHistory.has(key)
-                    return (
+	                  {history.map(h => {
+	                    const key = historyEntryKey(h)
+	                    const selected = selectedHistory.has(key)
+	                    const historyTitle = titleText(h?.title) || `Anime ${h?.animeId || ''}`.trim()
+	                    return (
                       <div key={key} className="profile-history-item" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: selected ? 'rgba(var(--accent-rgb, 226,232,240), 0.09)' : 'var(--bg-card)', borderRadius: 8, marginBottom: 8, color: 'var(--text-primary)', border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}` }}>
                         <input
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleHistorySelection(h)}
-                          aria-label={`Select ${h.title || `Anime ${h.animeId}`} episode ${h.episode}`}
-                          style={{ flexShrink: 0 }}
-                        />
-                        <Link to={`/watch/${generateSlug(h.title)}-${h.animeId}-episode-${h.episode}`} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1, textDecoration: 'none', color: 'inherit' }}>
+	                          aria-label={`Select ${historyTitle} episode ${h.episode}`}
+	                          style={{ flexShrink: 0 }}
+	                        />
+	                        <Link to={`/watch/${generateSlug(historyTitle)}-${h.animeId}-episode-${h.episode}`} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1, textDecoration: 'none', color: 'inherit' }}>
                           {h.image && <img src={h.image} alt="" style={{ width: 40, height: 56, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />}
                           <span style={{ color: 'var(--text-muted)', fontSize: 13, minWidth: 42, flexShrink: 0 }}>Ep {h.episode}</span>
-                          <span style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.title || `Anime ${h.animeId}`}</span>
+	                          <span style={{ fontSize: 14, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{historyTitle}</span>
                           <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>{h.time ? `${Math.floor(h.time / 60)}m` : ''}</span>
                         </Link>
                         <button
                           onClick={() => removeHistoryEntries([h])}
                           disabled={historyBusy}
-                          aria-label={`Remove ${h.title || `Anime ${h.animeId}`} episode ${h.episode} from Watch History`}
+	                          aria-label={`Remove ${historyTitle} episode ${h.episode} from Watch History`}
                           title="Remove this history entry"
                           style={{ background: 'none', border: '1px solid rgba(248,113,113,0.28)', borderRadius: 6, color: '#fca5a5', padding: '6px 8px', fontSize: 12, cursor: historyBusy ? 'wait' : 'pointer', flexShrink: 0 }}
                         >
