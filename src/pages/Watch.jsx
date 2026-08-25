@@ -65,6 +65,10 @@ import {
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
+  isConfirmedUpcomingEpisode,
+  UPCOMING_EPISODE_MESSAGE,
+} from '../lib/watchEpisodeAvailability'
+import {
   filterBrowserProviders,
   isBonkProvider,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
@@ -1016,6 +1020,7 @@ export default function Watch() {
   )
   const [backendHealthy, setBackendHealthy] = useState(true)
   const [errorType, setErrorType] = useState('') // for actionable UI
+  const [episodeAvailability, setEpisodeAvailability] = useState('checking')
 
   // Embedded providers are cross-origin, so the parent page cannot inspect or
   // block their network requests. We still apply safe browser-level defenses:
@@ -1165,6 +1170,18 @@ export default function Watch() {
   const epNumber = parseInt(slugParts?.[2] || '1', 10)
   const animeId = extractIdFromSlug(baseName)
   const isMovie = anime?.format === 'MOVIE'
+  const hasCurrentAnime = anime && String(anime.id) === String(animeId)
+  const isPreemptivelyUpcoming = hasCurrentAnime && isConfirmedUpcomingEpisode({
+    episodeNumber: epNumber,
+    episodes,
+    status: anime?.status,
+    nextAiringEpisode: anime?.nextAiringEpisode,
+    isMovie,
+    hasConfirmedEpisodeList: episodes.length > 0,
+  })
+  const effectiveEpisodeAvailability = isPreemptivelyUpcoming
+    ? 'upcoming'
+    : episodeAvailability
 
   // Refs to latest values (avoid stale closures)
   const routeRef = useRef(slugId)
@@ -1688,6 +1705,13 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
+    setEpisodeAvailability('checking')
+    setServers({ sub: [], dub: [] })
+    setSuppressedQualityUrls(new Set())
+    setError('')
+    setErrorType('')
+    setNoStreamError(false)
+    setStreamLoading(true)
     let cancelled = false
     let attempts = 0
 
@@ -1708,6 +1732,7 @@ export default function Watch() {
         if (cancelled) return
         let animeData = animeRes
         let epData = epRes
+        const hasConfirmedEpisodeList = Array.isArray(epRes?.episodes) && epRes.episodes.length > 0
         if (!animeData) {
           const { data } = await anilistQuery(ANIME_DETAIL_QUERY, {
             id: parseInt(animeId, 10),
@@ -1748,12 +1773,26 @@ export default function Watch() {
           }
         }
         if (cancelled) return
+        const normalizedEpisodes = normalizeEpisodeList(epData?.episodes)
         setAnime(animeData)
-        setEpisodes(normalizeEpisodeList(epData?.episodes))
+        setEpisodes(normalizedEpisodes)
+        setEpisodeAvailability(
+          isConfirmedUpcomingEpisode({
+            episodeNumber: epNumber,
+            episodes: normalizedEpisodes,
+            status: animeData?.status,
+            nextAiringEpisode: animeData?.nextAiringEpisode,
+            isMovie: animeData?.format === 'MOVIE',
+            hasConfirmedEpisodeList,
+          })
+            ? 'upcoming'
+            : 'available'
+        )
         setBackendHealthy(true)
       } catch (e) {
         if (cancelled) return
         setBackendHealthy(false)
+        setEpisodeAvailability('available')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -1762,7 +1801,7 @@ export default function Watch() {
     return () => {
       cancelled = true
     }
-  }, [animeId])
+  }, [animeId, epNumber])
 
   // The stream backend may omit the MAL mapping. Hydrate it from AniList so
   // AniSkip can still serve timestamps for the same title.
@@ -2970,6 +3009,7 @@ export default function Watch() {
   }
 
   const warmProviderStream = useCallback((sourceId) => {
+    if (effectiveEpisodeAvailability !== 'available') return null
     const source = [...SOURCES.sub, ...SOURCES.dub].find((candidate) => candidate.id === sourceId)
     if (!source || source.id === activeSourceRef.current || getCachedStream(source)) return null
 
@@ -3010,7 +3050,7 @@ export default function Watch() {
 
     providerWarmRequestsRef.current.set(key, request)
     return request
-  }, [animeId, epNumber, SOURCES])
+  }, [animeId, epNumber, SOURCES, effectiveEpisodeAvailability])
 
   // ────────────────────────────────────────────────────────────
   // Load stream
@@ -3019,6 +3059,7 @@ export default function Watch() {
 
   const loadStream = useCallback(
     async (sourceId, forceRefresh = false, quiet = false) => {
+      if (effectiveEpisodeAvailability !== 'available') return
       // A fresh stream load means any 'ended' sync flag from a previous
       // player is stale (e.g. the user replayed the same episode).
       skipSwitchSyncRef.current = false
@@ -3355,6 +3396,7 @@ export default function Watch() {
       suppressTerminalStream,
       restoreWorkingStream,
       suppressedQualityUrls,
+      effectiveEpisodeAvailability,
     ]
   )
 
@@ -3365,11 +3407,24 @@ export default function Watch() {
     else if (activeSource) loadStream(activeSource, true)
   }, [loadStream, activeSource])
 
+  useEffect(() => {
+    if (effectiveEpisodeAvailability !== 'upcoming') return
+    streamAbortRef.current?.abort()
+    streamAbortRef.current = null
+    destroyPlayer()
+    setActiveEmbedUrl('')
+    setServers({ sub: [], dub: [] })
+    setNoStreamError(false)
+    setErrorType('upcoming')
+    setError(UPCOMING_EPISODE_MESSAGE)
+    setStreamLoading(false)
+  }, [effectiveEpisodeAvailability, destroyPlayer])
+
   // ────────────────────────────────────────────────────────────
   // Server list (with backoff retry, language fallback)
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!animeId || !epNumber) return
+    if (!animeId || !epNumber || effectiveEpisodeAvailability !== 'available') return
     let cancelled = false
     let attempt = 0
     let retryTimer = null
@@ -3441,7 +3496,7 @@ export default function Watch() {
       if (retryTimer) clearTimeout(retryTimer)
       requestControllers.forEach((controller) => controller.abort())
     }
-  }, [animeId, epNumber])
+  }, [animeId, epNumber, effectiveEpisodeAvailability])
 
   // Load stream on active source / episode change
   const loadStreamRef = useRef(loadStream)
@@ -3464,7 +3519,7 @@ export default function Watch() {
   handleProviderBlockedRef.current = handleProviderBlocked
 
   useEffect(() => {
-    if (!activeSource) return
+    if (effectiveEpisodeAvailability !== 'available' || !activeSource) return
     const epChanged = epNumber !== prevEpisodeRef.current
     prevEpisodeRef.current = epNumber
     if (epChanged) {
@@ -3503,7 +3558,7 @@ export default function Watch() {
     // Same episode, server switch: keep the old video playing and only
     // swap when the new stream is ready.
     loadStreamRef.current(activeSource, false, Boolean(artInstance.current))
-  }, [activeSource, epNumber, destroyPlayer])
+  }, [activeSource, epNumber, destroyPlayer, effectiveEpisodeAvailability])
 
   const handleSourceSwitch = useCallback(
     (sourceId) => {
@@ -4117,7 +4172,7 @@ export default function Watch() {
                   episodes go live.
                 </div>
               )}
-              <div
+              {errorType !== 'upcoming' && <div
                 style={{
                   display: 'flex',
                   gap: 10,
@@ -4186,7 +4241,7 @@ export default function Watch() {
                 >
                   Try another server
                 </button>
-              </div>
+              </div>}
             </div>
           )}
 
