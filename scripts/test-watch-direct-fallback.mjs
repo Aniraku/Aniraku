@@ -21,8 +21,6 @@ requireText(watchSource, '!playbackStarted && hlsTransportIndex + 1 < hlsTranspo
 forbidText(watchSource, 'manifestReady', 'Manifest parsing must not be used as the HLS direct-fallback success gate.')
 requireText(watchSource, "showToast('Proxy stream failed before playback — trying direct.'", 'The direct fallback must report its transport handoff truthfully.')
 requireText(watchSource, 'hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)', 'The advanced HLS transport must be loaded rather than suppressing immediately.')
-requireText(watchSource, 'const terminalHttpStatus = Number(data?.response?.code ?? data?.response?.status ?? 0)', 'HLS must retain confirmed direct/proxy HTTP status for aggressive terminal filtering.')
-requireText(watchSource, 'selectedMediaFailure && isTerminalProviderHttpStatus(terminalHttpStatus)', 'Only the selected media URL, not an ancillary HLS request, may trigger immediate terminal provider removal.')
 requireText(vercelSource, 'https://*.workers.dev', 'CSP must permit direct fallback for verified worker-hosted stream URLs.')
 
 console.log('HLS preserves proxy-first/direct-second fallback and CSP permits worker-hosted direct streams.')

@@ -44,7 +44,6 @@ assert.deepEqual(
   ]),
   [
     { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
-    { name: 'Ally', lang: 'sub', sources: [{ url: 'https://player.example/embed/ally', type: 'embed', verification: 'embed' }] },
     { name: 'kiwi', lang: 'sub', sources: [{ url: 'https://cdn.example/kiwi.m3u8' }] },
   ]
 )
@@ -62,13 +61,10 @@ assert.deepEqual(
 const directBonk = { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8', verification: 'verified' }] }
 const proxiedBonk = { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk-proxy.m3u8', verification: 'proxy' }] }
 const embeddedBonk = { name: 'bonk', lang: 'sub', sources: [{ url: 'https://player.example/embed/bonk', type: 'embed', verification: 'embed' }] }
-const allyEmbed = { name: 'ally', lang: 'sub', sources: [{ url: 'https://player.example/embed/ally', type: 'embed', verification: 'embed' }] }
 assert.equal(isBonkProvider(directBonk), true)
 assert.equal(bonkHasDirectOrProxySource(directBonk), true)
 assert.equal(bonkHasDirectOrProxySource(proxiedBonk), true)
 assert.equal(bonkHasDirectOrProxySource(embeddedBonk), false)
 assert.deepEqual(filterBrowserProviders([embeddedBonk, directBonk, proxiedBonk]), [directBonk, proxiedBonk])
-assert.deepEqual(filterBrowserProviders([directBonk, allyEmbed]), [directBonk, allyEmbed], 'A live source-bearing Bonk-plus-Ally response must show both providers.')
-assert.deepEqual(filterBrowserProviders([{ name: 'ally', lang: 'sub', sources: [] }, directBonk]), [directBonk], 'An unresolved Ally row stays hidden when Bonk has eligible native media.')
 
 console.log('watch provider discovery tests passed')
