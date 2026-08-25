@@ -31,7 +31,20 @@ assert.deepEqual(
   ]),
   [
     { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
+    { name: 'Ally', lang: 'sub', sources: [{ url: 'https://cdn.example/ally.m3u8' }] },
     { name: 'kiwi', lang: 'sub', sources: [] },
+  ]
+)
+
+assert.deepEqual(
+  filterBrowserProviders([
+    { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
+    { name: 'Ally', lang: 'sub', sources: [{ url: 'https://player.example/embed/ally', type: 'embed', verification: 'embed' }] },
+    { name: 'kiwi', lang: 'sub', sources: [{ url: 'https://cdn.example/kiwi.m3u8' }] },
+  ]),
+  [
+    { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
+    { name: 'kiwi', lang: 'sub', sources: [{ url: 'https://cdn.example/kiwi.m3u8' }] },
   ]
 )
 
