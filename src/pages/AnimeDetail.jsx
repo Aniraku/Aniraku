@@ -749,7 +749,9 @@ const AnimeDetail = () => {
   }, [id, user])
 
   React.useEffect(() => {
-    if (!anime || !id) return undefined
+    // Relations accept the route ID directly. Start alongside metadata so a
+    // fast response is not delayed behind unrelated detail rendering or SEO.
+    if (!id) return undefined
     const controller = new AbortController()
     let cancelled = false
 
@@ -780,10 +782,12 @@ const AnimeDetail = () => {
       cancelled = true
       controller.abort()
     }
-  }, [anime, id])
+  }, [id])
 
   React.useEffect(() => {
-    if (!anime || !id) return undefined
+    // Episode availability accepts the route ID directly. Resolve it in
+    // parallel with metadata so it is ready when the hero leaves its skeleton.
+    if (!id) return undefined
     const controller = new AbortController()
     let cancelled = false
 
@@ -830,7 +834,7 @@ const AnimeDetail = () => {
       cancelled = true
       controller.abort()
     }
-  }, [anime, id])
+  }, [id])
 
   const toggleBookmark = () => {
     const numericId = parseInt(id)
