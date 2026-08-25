@@ -34,6 +34,11 @@ assert.equal(shouldHideProviderAfterFailure({
 }), true, 'A confirmed 502 must immediately hide the affected provider even if it advertised another source.')
 
 assert.equal(shouldHideProviderAfterFailure({
+  status: 402,
+  mediaUrls: ['https://cdn.example/alternate.m3u8'],
+}), true, 'A confirmed 402 must immediately hide the affected provider even if it advertised another source.')
+
+assert.equal(shouldHideProviderAfterFailure({
   reason: 'hls-terminal-before-playback',
   failedUrl: 'https://cdn.example/auto.m3u8',
   mediaUrls: ['https://cdn.example/auto.m3u8', 'https://cdn.example/720.m3u8'],

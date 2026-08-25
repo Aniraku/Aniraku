@@ -31,7 +31,6 @@ assert.deepEqual(
     { name: 'kiwi', lang: 'sub', sources: [] },
   ]),
   [
-    { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
     { name: 'Ally', lang: 'sub', sources: [{ url: 'https://cdn.example/ally.m3u8' }] },
     { name: 'kiwi', lang: 'sub', sources: [] },
   ]
@@ -44,7 +43,6 @@ assert.deepEqual(
     { name: 'kiwi', lang: 'sub', sources: [{ url: 'https://cdn.example/kiwi.m3u8' }] },
   ]),
   [
-    { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
     { name: 'kiwi', lang: 'sub', sources: [{ url: 'https://cdn.example/kiwi.m3u8' }] },
   ]
 )
@@ -71,5 +69,6 @@ assert.equal(bonkHasDirectOrProxySource(embeddedBonk), false)
 assert.deepEqual(filterBrowserProviders([embeddedBonk, directBonk, proxiedBonk]), [directBonk, proxiedBonk])
 assert.equal(shouldRetainAllyBesideBonk(allyEmbed, [directBonk, allyEmbed]), true, 'Ally must survive resolver failures when Bonk is the only alternative.')
 assert.equal(shouldRetainAllyBesideBonk(allyEmbed, [directBonk, allyEmbed, kiwiMedia]), false, 'Ally remains deprioritized when another non-Bonk provider has real media.')
+assert.deepEqual(filterBrowserProviders([directBonk, allyEmbed]), [allyEmbed], 'A live Bonk-plus-Ally response must show Ally and hide Bonk.')
 
 console.log('watch provider discovery tests passed')
