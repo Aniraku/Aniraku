@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   bonkHasDirectOrProxySource,
   filterBrowserProviders,
+  shouldRetainAllyBesideBonk,
   isBonkProvider,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
@@ -61,10 +62,14 @@ assert.deepEqual(
 const directBonk = { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8', verification: 'verified' }] }
 const proxiedBonk = { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk-proxy.m3u8', verification: 'proxy' }] }
 const embeddedBonk = { name: 'bonk', lang: 'sub', sources: [{ url: 'https://player.example/embed/bonk', type: 'embed', verification: 'embed' }] }
+const allyEmbed = { name: 'ally', lang: 'sub', sources: [{ url: 'https://player.example/embed/ally', type: 'embed', verification: 'embed' }] }
+const kiwiMedia = { name: 'kiwi', lang: 'sub', sources: [{ url: 'https://cdn.example/kiwi.m3u8' }] }
 assert.equal(isBonkProvider(directBonk), true)
 assert.equal(bonkHasDirectOrProxySource(directBonk), true)
 assert.equal(bonkHasDirectOrProxySource(proxiedBonk), true)
 assert.equal(bonkHasDirectOrProxySource(embeddedBonk), false)
 assert.deepEqual(filterBrowserProviders([embeddedBonk, directBonk, proxiedBonk]), [directBonk, proxiedBonk])
+assert.equal(shouldRetainAllyBesideBonk(allyEmbed, [directBonk, allyEmbed]), true, 'Ally must survive resolver failures when Bonk is the only alternative.')
+assert.equal(shouldRetainAllyBesideBonk(allyEmbed, [directBonk, allyEmbed, kiwiMedia]), false, 'Ally remains deprioritized when another non-Bonk provider has real media.')
 
 console.log('watch provider discovery tests passed')

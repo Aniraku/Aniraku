@@ -42,7 +42,8 @@ export function shouldHideProviderAfterFailure({
   failedUrl = '',
   suppressedUrls = new Set(),
 } = {}) {
-  const terminal = TERMINAL_FAILURE_REASONS.has(reason) || isTerminalProviderHttpStatus(status)
+  if (isTerminalProviderHttpStatus(status)) return true
+  const terminal = TERMINAL_FAILURE_REASONS.has(reason)
   if (!terminal) return false
 
   return !mediaUrls.some((url) => {
