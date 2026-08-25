@@ -43,10 +43,34 @@ assert.equal(
 )
 assert.equal(
   isConfirmedUpcomingEpisode({
+    episodeNumber: 1,
+    status: 'NOT_YET_RELEASED',
+    isMovie: true,
+  }),
+  true
+)
+assert.equal(
+  isConfirmedUpcomingEpisode({
     episodeNumber: 3,
     nextAiringEpisode: { episode: 3 },
   }),
   true
+)
+assert.equal(
+  isConfirmedUpcomingEpisode({
+    episodeNumber: 1,
+    nextAiringEpisode: { episode: 1 },
+    isMovie: true,
+  }),
+  true
+)
+assert.equal(
+  isConfirmedUpcomingEpisode({
+    episodeNumber: 1,
+    status: 'FINISHED',
+    isMovie: true,
+  }),
+  false
 )
 assert.match(UPCOMING_EPISODE_MESSAGE, /Time travel still has not been invented/)
 
