@@ -67,15 +67,9 @@ import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
   filterBrowserProviders,
   isBonkProvider,
-  shouldRetainAllyBesideBonk,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
-import {
-  isProviderProbeUsable,
-  isTerminalProviderHttpStatus,
-  shouldHideProviderAfterFailure,
-} from '../lib/watchProviderVisibility'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -997,8 +991,6 @@ export default function Watch() {
   const handleProviderBlockedRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
   const providerWarmRequestsRef = useRef(new Map())
-  const providerProbeRequestsRef = useRef(new Map())
-  const probedProviderIdsRef = useRef(new Set())
   const embedFrameRef = useRef(null)
   const netHintRef = useRef(getConnectionHint())
 
@@ -1014,8 +1006,6 @@ export default function Watch() {
   const [toast, setToast] = useState(null)
   const [servers, setServers] = useState({ sub: [], dub: [] })
   const [suppressedQualityUrls, setSuppressedQualityUrls] = useState(() => new Set())
-  const [hiddenProviderIds, setHiddenProviderIds] = useState(() => new Set())
-  const [probedProviderIds, setProbedProviderIds] = useState(() => new Set())
   const [noStreamError, setNoStreamError] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
@@ -1375,43 +1365,6 @@ export default function Watch() {
     showToast('This failed stream link was removed for this episode. Refresh to request a fresh link or choose another quality manually.', { long: true })
   }, [showToast])
 
-  const isProtectedAllyFallback = useCallback((source) => (
-    shouldRetainAllyBesideBonk(source, [...servers.sub, ...servers.dub])
-  ), [servers])
-
-  // Hide a server-list row only after the stream endpoint or player has
-  // confirmed a terminal failure and no alternate media quality remains.
-  // Transient network failures, timeouts, and ancillary playlist/ad requests
-  // never reach this path and therefore cannot hide a provider.
-  const hideTerminalProvider = useCallback(({ source, payload, reason, status, failedUrl = '' }) => {
-    if (!source?.id) return
-    if (isProtectedAllyFallback(source)) return
-    const mediaUrls = buildQualityList(payload?.sources, suppressedQualityUrls).map((entry) => entry.url)
-    if (!shouldHideProviderAfterFailure({
-      reason,
-      status,
-      mediaUrls,
-      failedUrl,
-      suppressedUrls: suppressedQualityUrls,
-    })) return
-
-    setHiddenProviderIds((previous) => {
-      if (previous.has(source.id)) return previous
-      return new Set([...previous, source.id])
-    })
-    showToast(`${source.label} was removed for this episode after its stream link failed.`, { long: true })
-  }, [isProtectedAllyFallback, showToast, suppressedQualityUrls])
-
-  const restoreVisibleProvider = useCallback((sourceId) => {
-    if (!sourceId) return
-    setHiddenProviderIds((previous) => {
-      if (!previous.has(sourceId)) return previous
-      const next = new Set(previous)
-      next.delete(sourceId)
-      return next
-    })
-  }, [])
-
   const restoreWorkingStream = useCallback((urls) => {
     const restored = new Set((Array.isArray(urls) ? urls : []).filter(Boolean))
     if (restored.size > 0) {
@@ -1644,34 +1597,14 @@ export default function Watch() {
     return { sub: normalize(servers.sub, 'sub'), dub: normalize(servers.dub, 'dub') }
   }, [servers])
 
-  const VISIBLE_SOURCES = useMemo(() => ({
-    sub: SOURCES.sub.filter((source) => (probedProviderIds.has(source.id) && !hiddenProviderIds.has(source.id)) || isProtectedAllyFallback(source)),
-    dub: SOURCES.dub.filter((source) => (probedProviderIds.has(source.id) && !hiddenProviderIds.has(source.id)) || isProtectedAllyFallback(source)),
-  }), [SOURCES, hiddenProviderIds, isProtectedAllyFallback, probedProviderIds])
-
 
 	const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
-    return all.find((s) => s.id === activeSource) || null
+    return all.find((s) => s.id === activeSource) || all[0] || null
   }, [SOURCES, activeSource])
 
-  const hasSub = VISIBLE_SOURCES.sub.length > 0
-  const hasDub = VISIBLE_SOURCES.dub.length > 0
-
-  useEffect(() => {
-    const discoveredCount = SOURCES.sub.length + SOURCES.dub.length
-    const visibleCount = VISIBLE_SOURCES.sub.length + VISIBLE_SOURCES.dub.length
-    if (
-      discoveredCount > 0 &&
-      probedProviderIds.size >= discoveredCount &&
-      visibleCount === 0
-    ) {
-      setNoStreamError(true)
-      setErrorType('no-source')
-      setError('No provider returned a usable stream for this episode.')
-      setStreamLoading(false)
-    }
-  }, [SOURCES, VISIBLE_SOURCES, probedProviderIds])
+  const hasSub = SOURCES.sub.length > 0
+  const hasDub = SOURCES.dub.length > 0
 
   // Auto-select only when there is no valid current choice. SUB remains the
   // preferred first start, but a user-selected DUB source must stay selected
@@ -1679,71 +1612,9 @@ export default function Watch() {
   useEffect(() => {
     const allSources = [...SOURCES.sub, ...SOURCES.dub]
     if (allSources.some((source) => source.id === activeSource)) return
-    const preferred = VISIBLE_SOURCES.sub[0] || VISIBLE_SOURCES.dub[0]
+    const preferred = SOURCES.sub[0] || SOURCES.dub[0]
     if (preferred) setActiveSource(preferred.id)
-  }, [SOURCES, VISIBLE_SOURCES, activeSource])
-
-  // Resolve each provider through the existing stream endpoint before showing
-  // it. This confirms provider-specific 4xx/5xx and explicit no-source
-  // payloads without fetching cross-origin fragments, embeds, or ad resources.
-  useEffect(() => {
-    const sources = [...SOURCES.sub, ...SOURCES.dub]
-    if (sources.length === 0) return
-    let cancelled = false
-    const controllers = []
-
-    sources.forEach((source) => {
-      const requestKey = `${animeId}:${epNumber}:${source.id}`
-      if (providerProbeRequestsRef.current.has(requestKey) || probedProviderIdsRef.current.has(source.id)) return
-
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), 12_000)
-      controllers.push(controller)
-      providerProbeRequestsRef.current.set(requestKey, controller)
-
-      fetch(`${API_BASE}/api/v1/stream`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          animeId: parseInt(animeId, 10),
-          episode: epNumber,
-          provider: source.provider,
-          lang: source.lang,
-          quality: 'auto',
-          refresh: false,
-        }),
-        cache: 'no-store',
-      })
-        .then(async (response) => {
-          const payload = await response.json().catch(() => null)
-          if (cancelled || epNumber !== epNumberRef.current) return
-          if (!isProviderProbeUsable({ status: response.status, payload }) && !isProtectedAllyFallback(source)) {
-            setHiddenProviderIds((previous) => new Set([...previous, source.id]))
-            return
-          }
-          if (response.ok && payload?.sources?.[0]?.url) {
-            streamCacheRef.current.set(streamCacheKey(source, epNumber), { data: payload, t: Date.now() })
-          }
-        })
-        .catch(() => {
-          // No HTTP response means a transient browser/network issue. Keep the
-          // provider eligible for a later manual selection or retry.
-        })
-        .finally(() => {
-          window.clearTimeout(timeoutId)
-          providerProbeRequestsRef.current.delete(requestKey)
-          if (cancelled || epNumber !== epNumberRef.current) return
-          probedProviderIdsRef.current = new Set([...probedProviderIdsRef.current, source.id])
-          setProbedProviderIds(probedProviderIdsRef.current)
-        })
-    })
-
-    return () => {
-      cancelled = true
-      controllers.forEach((controller) => controller.abort())
-    }
-  }, [animeId, epNumber, SOURCES])
+  }, [SOURCES, activeSource])
 
   // Filtered / paged episodes
   const filteredEps = useMemo(() => {
@@ -1803,7 +1674,7 @@ export default function Watch() {
   useKeyboardShortcuts(artInstance, null, {
     onNext: goNext,
     onPrev: goPrev,
-    sources: VISIBLE_SOURCES,
+    sources: SOURCES,
     activeSource,
     setActiveSource,
     showToast,
@@ -2668,14 +2539,14 @@ export default function Watch() {
 					playbackStarted = true
 				}
 				video.addEventListener('playing', markPlaybackStarted, { once: true })
-            const fail = ({ selectedMediaFailure = true, status } = {}) => {
-              if (buildIdRef.current !== myBuildId) return
-              showToast('Stream issue — keeping the selected server.', { long: true })
-              if (onBlocked && selectedMediaFailure) {
-                onBlocked(
-                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
-                  { streamUrl: url, status }
-                )
+	            const fail = () => {
+	              if (buildIdRef.current !== myBuildId) return
+	              showToast('Stream issue — keeping the selected server.', { long: true })
+	              if (onBlocked) {
+	                onBlocked(
+	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
+	                  { streamUrl: url }
+	                )
 	              }
               else setError('Stream playback error. Try a different server.')
             }
@@ -2709,10 +2580,7 @@ export default function Watch() {
 	                fail()
                 return
 	              }
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-							const failedRequestUrl = String(data?.context?.url || data?.response?.url || '')
-							const selectedMediaFailure = !failedRequestUrl || hlsTransportPlan.some((transport) => transport.url === failedRequestUrl)
-							const terminalHttpStatus = Number(data?.response?.code ?? data?.response?.status ?? 0)
+		              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
 						// A proxy can serve the master manifest yet fail on the first
 						// playable media request. Manifest readiness is therefore not
 						// playback evidence. Before the video has actually started, make
@@ -2726,13 +2594,8 @@ export default function Watch() {
 								return
 							} catch {}
 						}
-							fail({
-								selectedMediaFailure,
-								status: selectedMediaFailure && isTerminalProviderHttpStatus(terminalHttpStatus)
-									? terminalHttpStatus
-									: undefined,
-							})
-						return
+		                fail()
+		                return
               }
 	              fail()
             })
@@ -3254,13 +3117,6 @@ export default function Watch() {
             streamUrl: details.streamUrl,
             reason,
           })
-          hideTerminalProvider({
-            source,
-            payload,
-            reason,
-            status: details.status,
-            failedUrl: details.streamUrl,
-          })
           handleProviderBlockedRef.current?.(reason)
         }
       }
@@ -3359,20 +3215,16 @@ export default function Watch() {
         clearTimeout(timeoutId)
         if (streamAbortRef.current === controller) streamAbortRef.current = null
 
-        if (res && isTerminalProviderHttpStatus(res.status)) {
-          hideTerminalProvider({
-            source,
-            reason: 'stream-http-error',
-            status: res.status,
-          })
+        if (res?.status >= 500) {
+          // Backend explicitly says "no upstream response".
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
             reportQuietSwitchFailure('Could not switch server right now — try again')
             return
           }
-          setErrorType('no-source')
-          setError(`This server returned HTTP ${res.status} and was removed for this episode.`)
+          setErrorType('backend')
+          setError('Backend is having trouble reaching this source. Try again or choose another server.')
           setStreamLoading(false)
           loadingRef.current = false
           return
@@ -3385,11 +3237,6 @@ export default function Watch() {
         if (targetEpisode !== epNumberRef.current) return
 
         if (data.error || !data.sources?.[0]?.url) {
-          hideTerminalProvider({
-            source,
-            payload: data,
-            reason: 'stream-no-source',
-          })
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
@@ -3435,11 +3282,6 @@ export default function Watch() {
             reportQuietSwitchFailure('No stream on that server — staying on the current one')
             return
           }
-          hideTerminalProvider({
-            source,
-            payload: data,
-            reason: 'all-source-urls-failed',
-          })
           setNoStreamError(true)
           setErrorType('no-source')
           setError('No video source found for this server.')
@@ -3459,7 +3301,6 @@ export default function Watch() {
 	        )
         applySkipSegments(normalizeProviderSkipSegments(data))
         setCachedStream(source, data)
-        restoreVisibleProvider(source.id)
         restoreWorkingStream(data.sources.map((entry) => entry?.url))
         quietProviderSwitchRef.current = settleQuietProviderSwitch({
           pending: quietProviderSwitchRef.current,
@@ -3512,8 +3353,6 @@ export default function Watch() {
       buildPlayer,
       applySkipSegments,
       suppressTerminalStream,
-      hideTerminalProvider,
-      restoreVisibleProvider,
       restoreWorkingStream,
       suppressedQualityUrls,
     ]
@@ -3541,10 +3380,6 @@ export default function Watch() {
     // SUB response is already available.
     setServers({ sub: [], dub: [] })
     setSuppressedQualityUrls(new Set())
-    setHiddenProviderIds(new Set())
-    setProbedProviderIds(new Set())
-    probedProviderIdsRef.current = new Set()
-    providerProbeRequestsRef.current.clear()
     const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}`
 
     const fetchServers = async () => {
@@ -3630,8 +3465,6 @@ export default function Watch() {
 
   useEffect(() => {
     if (!activeSource) return
-    const activeSourceIsVisible = [...VISIBLE_SOURCES.sub, ...VISIBLE_SOURCES.dub]
-      .some((source) => source.id === activeSource)
     const epChanged = epNumber !== prevEpisodeRef.current
     prevEpisodeRef.current = epNumber
     if (epChanged) {
@@ -3655,10 +3488,9 @@ export default function Watch() {
       // New episode: kill the current player FIRST so the old video can
       // never keep playing, then load the stream for the new episode.
       destroyPlayer()
-      if (activeSourceIsVisible) loadStreamRef.current(activeSource)
+      loadStreamRef.current(activeSource)
       return
     }
-    if (!activeSourceIsVisible) return
     const skippedReload = skipQuietProviderReloadRef.current
     if (
       skippedReload &&
@@ -3671,7 +3503,7 @@ export default function Watch() {
     // Same episode, server switch: keep the old video playing and only
     // swap when the new stream is ready.
     loadStreamRef.current(activeSource, false, Boolean(artInstance.current))
-  }, [activeSource, epNumber, destroyPlayer, VISIBLE_SOURCES])
+  }, [activeSource, epNumber, destroyPlayer])
 
   const handleSourceSwitch = useCallback(
     (sourceId) => {
@@ -4137,12 +3969,12 @@ export default function Watch() {
                   Tip: Switch servers or use the recovery options below if playback does not start.
                 </div>
               )}
-	              {slowStream && (
-	                <button
-	                  type="button"
-	                  onClick={() => {
-	                    const sources = [...VISIBLE_SOURCES.sub, ...VISIBLE_SOURCES.dub]
-	                    const others = sources.filter(
+              {slowStream && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sources = [...SOURCES.sub, ...SOURCES.dub]
+                    const others = sources.filter(
                       (s) => s.id !== activeSource
                     )
                     if (others.length > 0) {
@@ -4332,11 +4164,11 @@ export default function Watch() {
                   >
                     {noStreamError ? 'Check availability again' : 'Force refresh'}
                   </button>
-	                <button
-	                  type="button"
-	                  onClick={() => {
-	                    const sources = [...VISIBLE_SOURCES.sub, ...VISIBLE_SOURCES.dub]
-	                    const other = sources.find((s) => s.id !== activeSource)
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sources = [...SOURCES.sub, ...SOURCES.dub]
+                    const other = sources.find((s) => s.id !== activeSource)
                     if (other) handleSourceSwitch(other.id)
                     else loadStream(activeSource, true)
                   }}
@@ -4635,9 +4467,9 @@ export default function Watch() {
                     borderRadius: 6,
                   }}
                 >
-	                  {lang === 'sub' ? `SUB · ${VISIBLE_SOURCES.sub.length}` : `DUB · ${VISIBLE_SOURCES.dub.length}`}
+                  {lang === 'sub' ? `SUB · ${SOURCES.sub.length}` : `DUB · ${SOURCES.dub.length}`}
                 </span>
-                {VISIBLE_SOURCES[lang].map((source) => {
+                {SOURCES[lang].map((source) => {
                   const isActive = activeSource === source.id
                   return (
                     <button
