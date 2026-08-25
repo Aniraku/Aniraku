@@ -11,11 +11,30 @@ function serverName(server) {
   return String(server?.name || '').trim().toLowerCase()
 }
 
+export function isAllyProvider(server) {
+  const values = [server?.name, server?.provider, server?.label, server?.id]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+  return values.some((value) => /(^|[:\s_-])ally($|[:\s_-])/.test(value))
+}
+
 export function isBonkProvider(server) {
   const values = [server?.name, server?.provider, server?.label, server?.id]
     .map((value) => String(value || '').trim().toLowerCase())
     .filter(Boolean)
   return values.some((value) => /(^|[:\s_-])bonk($|[:\s_-])/.test(value))
+}
+
+/**
+ * Ally is an intentional manual embedded escape hatch for Bonk-only episodes.
+ * Resolver preflight and later terminal media outcomes must not suppress it,
+ * because Bonk can expose a source yet still fail before a usable frame.
+ */
+export function shouldRetainAllyBesideBonk(server, servers = []) {
+  if (!isAllyProvider(server)) return false
+  const group = Array.isArray(servers) ? servers : []
+  return group.some(isBonkProvider)
+    && !group.some((candidate) => !isBonkProvider(candidate) && !isAllyProvider(candidate) && serverHasSource(candidate))
 }
 
 function isNativeBonkSource(source) {

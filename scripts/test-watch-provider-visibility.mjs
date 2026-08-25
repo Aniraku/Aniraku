@@ -29,6 +29,11 @@ assert.equal(shouldHideProviderAfterFailure({
 }), true, 'A confirmed 502 stream response must hide its provider row.')
 
 assert.equal(shouldHideProviderAfterFailure({
+  status: 502,
+  mediaUrls: ['https://cdn.example/alternate.m3u8'],
+}), true, 'A confirmed 502 must immediately hide the affected provider even if it advertised another source.')
+
+assert.equal(shouldHideProviderAfterFailure({
   reason: 'hls-terminal-before-playback',
   failedUrl: 'https://cdn.example/auto.m3u8',
   mediaUrls: ['https://cdn.example/auto.m3u8', 'https://cdn.example/720.m3u8'],
@@ -50,5 +55,9 @@ assert.match(watchSource, /isProviderProbeUsable\(\{ status: response\.status, p
 assert.match(watchSource, /setHiddenProviderIds\(\(previous\) => new Set\(\[\.\.\.previous, source\.id\]\)\)/, 'A confirmed failed resolver response must hide the provider row.')
 assert.match(watchSource, /const VISIBLE_SOURCES = useMemo/, 'Provider controls must derive from terminal-filtered rows.')
 assert.match(watchSource, /const selectedMediaFailure = !failedRequestUrl/, 'Ancillary HLS subresource failures must remain distinct from selected-media failures.')
+assert.match(watchSource, /const terminalHttpStatus = Number\(data\?\.response\?\.code \?\? data\?\.response\?\.status \?\? 0\)/, 'HLS direct/proxy HTTP failures must preserve their status for provider filtering.')
+assert.match(watchSource, /status: selectedMediaFailure && isTerminalProviderHttpStatus\(terminalHttpStatus\)/, 'Only terminal selected-media HTTP failures may remove a provider immediately.')
+assert.match(watchSource, /shouldRetainAllyBesideBonk/, 'Ally must remain protected as the manual fallback when Bonk is the only alternative.')
+assert.match(watchSource, /!isProviderProbeUsable\(\{ status: response\.status, payload \}\) && !isProtectedAllyFallback\(source\)/, 'A resolver 404/502 must hide the affected provider unless it is the protected Bonk-only Ally fallback.')
 
 console.log('Watch provider visibility removes only confirmed terminal provider failures.')

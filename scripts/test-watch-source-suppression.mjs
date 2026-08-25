@@ -13,7 +13,7 @@ requireText('function buildQualityList(sources, suppressedUrls = new Set())', 'Q
 requireText('!entry.expiredToken && !suppressedUrls.has(entry.url)', 'Expired and previously terminal-failed URLs must be excluded from quality controls.')
 requireText("reason === 'hls-terminal-before-playback'", 'Only terminal HLS failures before actual playback may suppress a selected URL.')
 requireText("reason === 'csp-blocked'", 'Confirmed CSP blocks must suppress only the affected selected URL.')
-requireText("{ streamUrl: url }", 'Terminal callbacks must identify the exact failed source URL.')
+requireText("{ streamUrl: url, status }", 'Terminal callbacks must identify the exact failed source URL alongside any confirmed HTTP status.')
 requireText("blockedUrl === selectedUrl", 'CSP suppression must require an exact selected-media URL match.')
 requireText('{VISIBLE_SOURCES[lang].map((source) => {', 'Provider controls must render only providers that passed the terminal stream-response filter.')
 requireText('const VISIBLE_SOURCES = useMemo(() => ({', 'Provider visibility must be derived separately from raw discovered providers.')

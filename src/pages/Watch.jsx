@@ -67,6 +67,7 @@ import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
   filterBrowserProviders,
   isBonkProvider,
+  shouldRetainAllyBesideBonk,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
@@ -1374,12 +1375,17 @@ export default function Watch() {
     showToast('This failed stream link was removed for this episode. Refresh to request a fresh link or choose another quality manually.', { long: true })
   }, [showToast])
 
+  const isProtectedAllyFallback = useCallback((source) => (
+    shouldRetainAllyBesideBonk(source, [...servers.sub, ...servers.dub])
+  ), [servers])
+
   // Hide a server-list row only after the stream endpoint or player has
   // confirmed a terminal failure and no alternate media quality remains.
   // Transient network failures, timeouts, and ancillary playlist/ad requests
   // never reach this path and therefore cannot hide a provider.
   const hideTerminalProvider = useCallback(({ source, payload, reason, status, failedUrl = '' }) => {
     if (!source?.id) return
+    if (isProtectedAllyFallback(source)) return
     const mediaUrls = buildQualityList(payload?.sources, suppressedQualityUrls).map((entry) => entry.url)
     if (!shouldHideProviderAfterFailure({
       reason,
@@ -1394,7 +1400,7 @@ export default function Watch() {
       return new Set([...previous, source.id])
     })
     showToast(`${source.label} was removed for this episode after its stream link failed.`, { long: true })
-  }, [showToast, suppressedQualityUrls])
+  }, [isProtectedAllyFallback, showToast, suppressedQualityUrls])
 
   const restoreVisibleProvider = useCallback((sourceId) => {
     if (!sourceId) return
@@ -1639,9 +1645,9 @@ export default function Watch() {
   }, [servers])
 
   const VISIBLE_SOURCES = useMemo(() => ({
-    sub: SOURCES.sub.filter((source) => probedProviderIds.has(source.id) && !hiddenProviderIds.has(source.id)),
-    dub: SOURCES.dub.filter((source) => probedProviderIds.has(source.id) && !hiddenProviderIds.has(source.id)),
-  }), [SOURCES, hiddenProviderIds, probedProviderIds])
+    sub: SOURCES.sub.filter((source) => (probedProviderIds.has(source.id) && !hiddenProviderIds.has(source.id)) || isProtectedAllyFallback(source)),
+    dub: SOURCES.dub.filter((source) => (probedProviderIds.has(source.id) && !hiddenProviderIds.has(source.id)) || isProtectedAllyFallback(source)),
+  }), [SOURCES, hiddenProviderIds, isProtectedAllyFallback, probedProviderIds])
 
 
 	const currentSource = useMemo(() => {
@@ -1712,7 +1718,7 @@ export default function Watch() {
         .then(async (response) => {
           const payload = await response.json().catch(() => null)
           if (cancelled || epNumber !== epNumberRef.current) return
-          if (!isProviderProbeUsable({ status: response.status, payload })) {
+          if (!isProviderProbeUsable({ status: response.status, payload }) && !isProtectedAllyFallback(source)) {
             setHiddenProviderIds((previous) => new Set([...previous, source.id]))
             return
           }
@@ -2662,14 +2668,14 @@ export default function Watch() {
 					playbackStarted = true
 				}
 				video.addEventListener('playing', markPlaybackStarted, { once: true })
-	            const fail = ({ selectedMediaFailure = true } = {}) => {
-	              if (buildIdRef.current !== myBuildId) return
-	              showToast('Stream issue — keeping the selected server.', { long: true })
-	              if (onBlocked && selectedMediaFailure) {
-	                onBlocked(
-	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
-	                  { streamUrl: url }
-	                )
+            const fail = ({ selectedMediaFailure = true, status } = {}) => {
+              if (buildIdRef.current !== myBuildId) return
+              showToast('Stream issue — keeping the selected server.', { long: true })
+              if (onBlocked && selectedMediaFailure) {
+                onBlocked(
+                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
+                  { streamUrl: url, status }
+                )
 	              }
               else setError('Stream playback error. Try a different server.')
             }
@@ -2703,9 +2709,10 @@ export default function Watch() {
 	                fail()
                 return
 	              }
-	              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-						const failedRequestUrl = String(data?.context?.url || data?.response?.url || '')
-						const selectedMediaFailure = !failedRequestUrl || hlsTransportPlan.some((transport) => transport.url === failedRequestUrl)
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+							const failedRequestUrl = String(data?.context?.url || data?.response?.url || '')
+							const selectedMediaFailure = !failedRequestUrl || hlsTransportPlan.some((transport) => transport.url === failedRequestUrl)
+							const terminalHttpStatus = Number(data?.response?.code ?? data?.response?.status ?? 0)
 						// A proxy can serve the master manifest yet fail on the first
 						// playable media request. Manifest readiness is therefore not
 						// playback evidence. Before the video has actually started, make
@@ -2719,7 +2726,12 @@ export default function Watch() {
 								return
 							} catch {}
 						}
-						fail({ selectedMediaFailure })
+							fail({
+								selectedMediaFailure,
+								status: selectedMediaFailure && isTerminalProviderHttpStatus(terminalHttpStatus)
+									? terminalHttpStatus
+									: undefined,
+							})
 						return
               }
 	              fail()
@@ -3246,6 +3258,7 @@ export default function Watch() {
             source,
             payload,
             reason,
+            status: details.status,
             failedUrl: details.streamUrl,
           })
           handleProviderBlockedRef.current?.(reason)
