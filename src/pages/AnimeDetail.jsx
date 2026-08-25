@@ -14,8 +14,8 @@ import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
+import { API_BASE } from '../config'
 
-const MIRURO_EPISODES_BASE = 'https://miruro-api-v3.onrender.com/episodes'
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 
 const Page = styled.div`
@@ -795,29 +795,23 @@ const AnimeDetail = () => {
       setEpisodesFallback(false)
       setEpisodesLoading(true)
       try {
-        const response = await fetch(`${MIRURO_EPISODES_BASE}/${encodeURIComponent(id)}`, {
+        const response = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(id)}/episodes`, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         })
-        if (!response.ok) throw new Error(`Miruro episode API returned ${response.status}`)
+        if (!response.ok) throw new Error(`Aniraku episode API returned ${response.status}`)
         const payload = await response.json()
-        const byNumber = new Map()
-        Object.values(payload?.providers || {}).forEach((provider) => {
-          Object.values(provider?.episodes || {}).forEach((episodeList) => {
-            if (!Array.isArray(episodeList)) return
-            episodeList.forEach((episode) => {
-              const number = Number(episode?.number)
-              if (!Number.isFinite(number) || number < 1 || byNumber.has(number)) return
-              byNumber.set(number, {
-                ...episode,
-                number,
-                thumbnail: episode.thumbnail || episode.image || '',
-              })
-            })
-          })
-        })
-        const directEpisodes = [...byNumber.values()].sort((a, b) => a.number - b.number)
-        if (!directEpisodes.length) throw new Error('Miruro episode API returned no episodes')
+        const sourceEpisodes = Array.isArray(payload) ? payload : payload?.episodes
+        if (!Array.isArray(sourceEpisodes)) throw new Error('Aniraku episode API returned an invalid response')
+        const directEpisodes = sourceEpisodes.filter(Boolean).map((episode, index) => ({
+          ...episode,
+          number: index + 1,
+          originalNumber: episode.number,
+          thumbnail: episode.thumbnail || episode.image || '',
+          filler: Boolean(episode.filler ?? episode.isFiller),
+          recap: Boolean(episode.recap),
+        }))
+        if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
         if (!cancelled) setEpisodes(directEpisodes)
       } catch (error) {
         if (error?.name === 'AbortError' || cancelled) return
@@ -1038,7 +1032,7 @@ const AnimeDetail = () => {
               <>
                 {episodesFallback && (
                   <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
-                    Miruro’s episode list is unavailable right now. Aniraku will not create a guessed episode list; check again shortly.
+                    Aniraku’s episode list is unavailable right now. Aniraku will not create a guessed episode list; check again shortly.
                   </div>
                 )}
                 {hasEpisodes && hiddenEpCount > 0 && (

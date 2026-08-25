@@ -20,6 +20,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import { generateSlug } from '../lib/slug'
+import { API_BASE } from '../config'
 
 const Page = styled.main`
   min-height: 100vh;
@@ -499,18 +500,18 @@ function Home() {
       let lastKnown = {}
       try { lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}') || {} } catch { /* stale local storage is non-fatal */ }
       const now = Date.now()
-      const api = import.meta.env.VITE_API_URL || ''
       bookmarks.forEach((bookmark) => {
         if (lastKnown[bookmark.id] && now - lastKnown[bookmark.id].t < 21600000) return
         anilistQuery(ANIME_DETAIL_QUERY, { id: bookmark.id }).then(({ data }) => {
           const media = data?.Media
-          if (!media || media.status !== 'RELEASING' || !api || cancelled) return
+          if (!media || media.status !== 'RELEASING' || cancelled) return
           const episode = media.nextAiringEpisode?.episode ? media.nextAiringEpisode.episode - 1 : (media.episodes || 0)
           if (episode <= (lastKnown[bookmark.id]?.e || 0)) return
-          fetch(`${api}/api/v1/miruro/episodes/${bookmark.id}`)
+          fetch(`${API_BASE}/api/v1/anime/${bookmark.id}/episodes`)
             .then((response) => response.ok ? response.json() : Promise.reject())
             .then(async (payload) => {
-              const hasEpisode = Object.values(payload?.providers || {}).some((provider) => (provider?.episodes?.sub || []).some((item) => item.number === episode))
+              const episodes = Array.isArray(payload) ? payload : payload?.episodes
+              const hasEpisode = Array.isArray(episodes) && episodes.some((item, index) => Number(item?.number ?? index + 1) === episode)
               if (!hasEpisode || cancelled) return
               const message = `Episode ${episode} of ${bookmark.title} is now available`
               const { data: existing, error: lookupError } = await supabase
