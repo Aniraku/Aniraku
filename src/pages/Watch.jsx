@@ -380,7 +380,22 @@ function hasExpiredEmbeddedToken(url) {
   }
   // The small grace period avoids rejecting a token while a provider clock is
   // only seconds ahead; multi-day-old URLs such as the reported source fail.
-  return newest > 0 && Date.now() > newest + 30_000
+  if (newest > 0 && Date.now() > newest + 30_000) return true
+
+  // Several CDNs expose UNIX expiry values instead of a readable timestamp.
+  // Treat only clearly named, valid epoch values as definitive expiry; unknown
+  // query parameters never remove a potentially playable source.
+  try {
+    const params = new URL(String(url || '')).searchParams
+    for (const [key, raw] of params.entries()) {
+      if (!/^(?:exp|expires|expiry|token_expiry|tokenexpires)$/i.test(key)) continue
+      const value = Number(raw)
+      if (!Number.isFinite(value)) continue
+      const timestamp = value >= 1e12 ? value : value >= 1e9 ? value * 1000 : 0
+      if (timestamp > 0 && Date.now() > timestamp + 30_000) return true
+    }
+  } catch {}
+  return false
 }
 
 function getSourcePlaybackType(source) {
@@ -431,7 +446,7 @@ function isBrowserPlayableEmbedSource(source) {
 	return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
 }
 
-function buildQualityList(sources) {
+function buildQualityList(sources, suppressedUrls = new Set()) {
 	const seenUrls = new Set()
 	const entries = (Array.isArray(sources) ? sources : [])
 		// Backend verification tags are advisory snapshots, not a playback
@@ -463,7 +478,7 @@ function buildQualityList(sources) {
   // usable URL after the list endpoint has marked it stale. Only an expired
   // signed token is definitive enough to omit before playback/failover.
   return entries
-    .filter((entry) => !entry.expiredToken)
+    .filter((entry) => !entry.expiredToken && !suppressedUrls.has(entry.url))
     // Prefer the provider's own Auto/adaptive
     // URL and then the highest numeric quality without inventing a new URL.
     .sort((a, b) => {
@@ -959,6 +974,7 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
+  const cspViolationCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
   const epSidebarRef = useRef(null)
@@ -989,6 +1005,7 @@ export default function Watch() {
   const [epSearch, setEpSearch] = useState('')
   const [toast, setToast] = useState(null)
   const [servers, setServers] = useState({ sub: [], dub: [] })
+  const [suppressedQualityUrls, setSuppressedQualityUrls] = useState(() => new Set())
   const [noStreamError, setNoStreamError] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
@@ -1331,6 +1348,35 @@ export default function Watch() {
     setToast({ msg, ...opts })
     clearTimeout(toastTimerRef.current)
     toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
+  }, [])
+
+  // Suppress only an exact failed media URL for this episode after a confirmed
+  // terminal pre-start failure. The provider remains selectable when it has
+  // another real source, and the app never changes the selected provider.
+  const suppressTerminalStream = useCallback(({ streamUrl, reason }) => {
+    const terminalProviderFailure = reason === 'hls-terminal-before-manifest' || reason === 'native-media-error' || reason === 'csp-blocked'
+    if (!terminalProviderFailure) return
+    if (streamUrl) {
+      setSuppressedQualityUrls((previous) => {
+        if (previous.has(streamUrl)) return previous
+        return new Set([...previous, streamUrl])
+      })
+    }
+    showToast('This failed stream link was removed for this episode. Refresh to request a fresh link or choose another quality manually.', { long: true })
+  }, [showToast])
+
+  const restoreWorkingStream = useCallback((urls) => {
+    const restored = new Set((Array.isArray(urls) ? urls : []).filter(Boolean))
+    if (restored.size > 0) {
+      setSuppressedQualityUrls((previous) => {
+        const next = new Set(previous)
+        let changed = false
+        restored.forEach((url) => {
+          if (next.delete(url)) changed = true
+        })
+        return changed ? next : previous
+      })
+    }
   }, [])
 
   const skipSegmentNow = useCallback((type) => {
@@ -1955,6 +2001,8 @@ export default function Watch() {
     setBuffering(false)
     bufferIndicatorCleanupRef.current?.()
     bufferIndicatorCleanupRef.current = null
+    cspViolationCleanupRef.current?.()
+    cspViolationCleanupRef.current = null
     if (dashInstance.current) {
       try {
         dashInstance.current.reset()
@@ -2016,6 +2064,22 @@ export default function Watch() {
         Math.random().toString(36).slice(2) + Date.now().toString(36)
 	      const proxied = (u) =>
 	        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+	      // Browser policy violations name the blocked URL. Suppress a control
+	      // only when that URL is the selected media URL, never for an unrelated
+	      // playlist ad, analytics resource, or other subrequest.
+	      if (typeof document !== 'undefined') {
+	        const selectedUrl = String(streamUrl)
+	        const onPolicyViolation = (event) => {
+	          if (buildIdRef.current !== myBuildId) return
+	          const directive = String(event?.violatedDirective || event?.effectiveDirective || '')
+	          const blockedUrl = String(event?.blockedURI || '')
+	          const blocksSelectedMedia = /^(?:media-src|connect-src|default-src)/.test(directive) &&
+	            (blockedUrl === selectedUrl || blockedUrl.startsWith(`${selectedUrl}?`) || blockedUrl.startsWith(`${selectedUrl}#`))
+	          if (blocksSelectedMedia) onBlocked?.('csp-blocked', { streamUrl: selectedUrl })
+	        }
+	        document.addEventListener('securitypolicyviolation', onPolicyViolation)
+	        cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
+	      }
 			const activeQuality = Array.isArray(qualityList)
 				? qualityList.find((quality) => quality?.url === streamUrl)
 				: null
@@ -2475,8 +2539,11 @@ export default function Watch() {
 	              if (buildIdRef.current !== myBuildId) return
 	              showToast('Stream issue — keeping the selected server.', { long: true })
 	              if (onBlocked) {
-	                onBlocked('playback-error')
-              }
+	                onBlocked(
+	                  manifestReady ? 'playback-error' : 'hls-terminal-before-manifest',
+	                  { streamUrl: url }
+	                )
+	              }
               else setError('Stream playback error. Try a different server.')
             }
 	            hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -3025,7 +3092,7 @@ export default function Watch() {
           isBrowserPlayableEmbedSource
         ) : null
         let fallbackUsed = false
-        return (reason) => {
+        return (reason, details = {}) => {
           if (embedFallback && !fallbackUsed) {
             fallbackUsed = true
             destroyPlayer()
@@ -3037,6 +3104,10 @@ export default function Watch() {
             showToast(`${source.label} direct media is unavailable — using its compatible player.`, { long: true })
             return
           }
+          suppressTerminalStream({
+            streamUrl: details.streamUrl,
+            reason,
+          })
           handleProviderBlockedRef.current?.(reason)
         }
       }
@@ -3048,7 +3119,7 @@ export default function Watch() {
         if (cached && cached.sources?.[0]?.url) {
           if (targetEpisode !== epNumberRef.current) return
           const firstSource = cached.sources[0]
-          const qualityList = buildQualityList(cached.sources)
+          const qualityList = buildQualityList(cached.sources, suppressedQualityUrls)
           if (qualityList.length > 0) {
             const onBlocked = createSameProviderFailureHandler(cached)
             buildPlayer(
@@ -3181,7 +3252,7 @@ export default function Watch() {
         }
 
         const firstSource = data.sources[0]
-        const qualityList = buildQualityList(data.sources)
+        const qualityList = buildQualityList(data.sources, suppressedQualityUrls)
         if (qualityList.length === 0) {
           const verifiedEmbed = !isBonkProvider(source)
             ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
@@ -3221,6 +3292,7 @@ export default function Watch() {
 	        )
         applySkipSegments(normalizeProviderSkipSegments(data))
         setCachedStream(source, data)
+        restoreWorkingStream(data.sources.map((entry) => entry?.url))
         quietProviderSwitchRef.current = settleQuietProviderSwitch({
           pending: quietProviderSwitchRef.current,
           sourceId,
@@ -3271,6 +3343,9 @@ export default function Watch() {
       showToast,
       buildPlayer,
       applySkipSegments,
+      suppressTerminalStream,
+      restoreWorkingStream,
+      suppressedQualityUrls,
     ]
   )
 
@@ -3295,6 +3370,7 @@ export default function Watch() {
     // A previous episode's DUB list must never remain selectable while its new
     // SUB response is already available.
     setServers({ sub: [], dub: [] })
+    setSuppressedQualityUrls(new Set())
     const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}`
 
     const fetchServers = async () => {
@@ -3364,11 +3440,16 @@ export default function Watch() {
 
 	  // A playback issue never changes the selected provider. The visible server
 	  // controls remain the only way to select another provider.
-	  const handleProviderBlocked = useCallback(() => {
+	  const handleProviderBlocked = useCallback((reason) => {
 	    const now = Date.now()
 	    if (now - lastBlockCycleRef.current < 3_000) return
 	    lastBlockCycleRef.current = now
-	    showToast('Stream issue — choose another server manually if needed.', { long: true })
+	    showToast(
+      reason === 'hls-terminal-before-manifest' || reason === 'native-media-error' || reason === 'csp-blocked'
+        ? 'This source could not start. Choose another server manually or refresh for a new link.'
+        : 'Stream issue — choose another server manually if needed.',
+      { long: true }
+    )
 	  }, [showToast])
 
   handleProviderBlockedRef.current = handleProviderBlocked
