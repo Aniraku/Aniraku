@@ -1354,7 +1354,7 @@ export default function Watch() {
   // terminal pre-start failure. The provider remains selectable when it has
   // another real source, and the app never changes the selected provider.
   const suppressTerminalStream = useCallback(({ streamUrl, reason }) => {
-    const terminalProviderFailure = reason === 'hls-terminal-before-manifest' || reason === 'native-media-error' || reason === 'csp-blocked'
+    const terminalProviderFailure = reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
     if (!terminalProviderFailure) return
     if (streamUrl) {
       setSuppressedQualityUrls((previous) => {
@@ -2534,13 +2534,17 @@ export default function Watch() {
               },
             })
 	            let mediaRetries = 0
-				let manifestReady = false
+				let playbackStarted = false
+				const markPlaybackStarted = () => {
+					playbackStarted = true
+				}
+				video.addEventListener('playing', markPlaybackStarted, { once: true })
 	            const fail = () => {
 	              if (buildIdRef.current !== myBuildId) return
 	              showToast('Stream issue — keeping the selected server.', { long: true })
 	              if (onBlocked) {
 	                onBlocked(
-	                  manifestReady ? 'playback-error' : 'hls-terminal-before-manifest',
+	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
 	                  { streamUrl: url }
 	                )
 	              }
@@ -2575,11 +2579,17 @@ export default function Watch() {
                 }
 	                fail()
                 return
-              }
-	              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-						if (!manifestReady && hlsTransportIndex + 1 < hlsTransportPlan.length) {
+	              }
+		              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+						// A proxy can serve the master manifest yet fail on the first
+						// playable media request. Manifest readiness is therefore not
+						// playback evidence. Before the video has actually started, make
+						// the bounded direct retry instead of staying in proxy recovery.
+						if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
 							hlsTransportIndex += 1
 							try {
+								mediaRetries = 0
+								showToast('Proxy stream failed before playback — trying direct.', { long: true })
 								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
 								return
 							} catch {}
@@ -2590,8 +2600,7 @@ export default function Watch() {
 	              fail()
             })
 	            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-						manifestReady = true
-	              const levels = (hls.levels || [])
+			              const levels = (hls.levels || [])
 	                .map((level, index) => ({
 	                  index,
 	                  height: Number(level?.height || 0),
@@ -3445,7 +3454,7 @@ export default function Watch() {
 	    if (now - lastBlockCycleRef.current < 3_000) return
 	    lastBlockCycleRef.current = now
 	    showToast(
-      reason === 'hls-terminal-before-manifest' || reason === 'native-media-error' || reason === 'csp-blocked'
+	    reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
         ? 'This source could not start. Choose another server manually or refresh for a new link.'
         : 'Stream issue — choose another server manually if needed.',
       { long: true }
