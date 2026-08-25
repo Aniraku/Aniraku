@@ -1,7 +1,8 @@
 export const PROVIDER_DISCOVERY_RETRY_DELAYS_MS = [0, 4_000, 8_000, 12_000]
 
-// Ally is a degraded browser fallback. Do not offer it while another returned
-// server has a source, but retain it if it is the sole source-bearing option.
+// Ally is a degraded browser fallback. Do not offer it while another non-Bonk
+// server has a source, but retain it if it is the sole source-bearing option
+// or the only alternative is Bonk.
 // This is deliberately a control-list decision, not source filtering: an
 // actively playing server is never rebuilt or switched by this helper.
 const BROWSER_DEPRIORITIZED_PROVIDER_NAMES = new Set(['ally'])
@@ -46,10 +47,16 @@ export function filterBrowserProviders(servers = []) {
     // when its resolver supplied direct or proxy-capable media; every other
     // provider retains the established Direct → Proxy → Embed behavior.
     .filter((server) => !isBonkProvider(server) || bonkHasDirectOrProxySource(server))
-  const hasPlayableAlternative = candidates.some((server) => (
-    !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server)) && serverHasSource(server)
+  // Bonk may expose a direct/proxy source but still be unable to start for a
+  // particular episode. Do not let Bonk alone hide Ally: the user can then
+  // manually choose Ally's verified embedded fallback. Ally is still hidden
+  // when another non-Bonk, non-deprioritized provider has a real source.
+  const hasNonBonkPlayableAlternative = candidates.some((server) => (
+    !isBonkProvider(server)
+      && !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server))
+      && serverHasSource(server)
   ))
-  if (!hasPlayableAlternative) return candidates
+  if (!hasNonBonkPlayableAlternative) return candidates
   return candidates.filter((server) => !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server)))
 }
 
