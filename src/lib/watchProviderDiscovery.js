@@ -66,17 +66,24 @@ export function filterBrowserProviders(servers = []) {
     // when its resolver supplied direct or proxy-capable media; every other
     // provider retains the established Direct → Proxy → Embed behavior.
     .filter((server) => !isBonkProvider(server) || bonkHasDirectOrProxySource(server))
+  // Ally is the preferred fallback where both provider families resolve. This
+  // deliberately restores the earlier control-list behavior: use Ally rather
+  // than offering Bonk beside it, because Bonk's older direct/proxy streams
+  // frequently fail after discovery. No player is rebuilt by this filter.
+  const allyPreferredCandidates = candidates.some(isAllyProvider) && candidates.some(isBonkProvider)
+    ? candidates.filter((server) => !isBonkProvider(server))
+    : candidates
   // Bonk may expose a direct/proxy source but still be unable to start for a
   // particular episode. Do not let Bonk alone hide Ally: the user can then
   // manually choose Ally's verified embedded fallback. Ally is still hidden
   // when another non-Bonk, non-deprioritized provider has a real source.
-  const hasNonBonkPlayableAlternative = candidates.some((server) => (
+  const hasNonBonkPlayableAlternative = allyPreferredCandidates.some((server) => (
     !isBonkProvider(server)
       && !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server))
       && serverHasSource(server)
   ))
-  if (!hasNonBonkPlayableAlternative) return candidates
-  return candidates.filter((server) => !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server)))
+  if (!hasNonBonkPlayableAlternative) return allyPreferredCandidates
+  return allyPreferredCandidates.filter((server) => !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server)))
 }
 
 export function mergeProviderServers(existing = [], incoming = []) {
