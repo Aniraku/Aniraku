@@ -17,6 +17,8 @@ import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
 
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
+const EPISODE_RETRY_BASE_MS = 1_500
+const EPISODE_RETRY_MAX_MS = 15_000
 
 const Page = styled.div`
   min-height: 100vh;
@@ -632,7 +634,6 @@ const AnimeDetail = () => {
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [activeTab, setActiveTab] = useState('episodes')
   const [episodes, setEpisodes] = useState([])
-  const [episodesFallback, setEpisodesFallback] = useState(false)
   const [episodesLoading, setEpisodesLoading] = useState(false)
   const [relations, setRelations] = useState([])
   const [relationsLoading, setRelationsLoading] = useState(false)
@@ -790,10 +791,22 @@ const AnimeDetail = () => {
     if (!id) return undefined
     const controller = new AbortController()
     let cancelled = false
+    let retryTimer = null
+    let retryAttempt = 0
+
+    setEpisodes([])
+    setEpisodesLoading(true)
+
+    const scheduleRetry = () => {
+      const delay = Math.min(
+        EPISODE_RETRY_BASE_MS * (2 ** Math.min(retryAttempt, 4)),
+        EPISODE_RETRY_MAX_MS
+      )
+      retryAttempt += 1
+      retryTimer = window.setTimeout(loadEpisodes, delay)
+    }
 
     const loadEpisodes = async () => {
-      setEpisodesFallback(false)
-      setEpisodesLoading(true)
       try {
         const response = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(id)}/episodes`, {
           signal: controller.signal,
@@ -812,13 +825,14 @@ const AnimeDetail = () => {
           recap: Boolean(episode.recap),
         }))
         if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
-        if (!cancelled) setEpisodes(directEpisodes)
+        if (!cancelled) {
+          retryAttempt = 0
+          setEpisodes(directEpisodes)
+          setEpisodesLoading(false)
+        }
       } catch (error) {
         if (error?.name === 'AbortError' || cancelled) return
-        setEpisodes([])
-        setEpisodesFallback(true)
-      } finally {
-        if (!cancelled) setEpisodesLoading(false)
+        scheduleRetry()
       }
     }
 
@@ -826,6 +840,7 @@ const AnimeDetail = () => {
     setActiveTab('episodes')
     return () => {
       cancelled = true
+      if (retryTimer) window.clearTimeout(retryTimer)
       controller.abort()
     }
   }, [id])
@@ -938,7 +953,7 @@ const AnimeDetail = () => {
     ? episodes.filter(ep => !ep.filler && !ep.recap)
     : episodes
   const tabs = []
-  if (hasEpisodes || episodesLoading || episodesFallback) {
+  if (hasEpisodes || episodesLoading) {
     tabs.push({
       key: 'episodes',
       label: isMovie
@@ -1030,11 +1045,6 @@ const AnimeDetail = () => {
 
             {activeTab === 'episodes' && (
               <>
-                {episodesFallback && (
-                  <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
-                    Aniraku’s episode list is unavailable right now. Aniraku will not create a guessed episode list; check again shortly.
-                  </div>
-                )}
                 {hasEpisodes && hiddenEpCount > 0 && (
                   <FilterBtn $active={hideFillers} onClick={() => setHideFillers(p => !p)}>
                     {hideFillers ? '✓ Showing canon only' : 'Hide filler & recap'}
