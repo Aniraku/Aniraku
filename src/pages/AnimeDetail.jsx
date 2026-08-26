@@ -15,7 +15,6 @@ import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
-import { enrichEpisodesWithKitsu } from '../lib/kitsuEpisodes'
 
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 const EPISODE_RETRY_BASE_MS = 1_500
@@ -826,10 +825,9 @@ const AnimeDetail = () => {
           recap: Boolean(episode.recap),
         }))
         if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
-        const kitsuEpisodes = await enrichEpisodesWithKitsu(id, directEpisodes, { signal: controller.signal })
         if (!cancelled) {
           retryAttempt = 0
-          setEpisodes(kitsuEpisodes)
+          setEpisodes(directEpisodes)
           setEpisodesLoading(false)
         }
       } catch (error) {
@@ -1071,7 +1069,7 @@ const AnimeDetail = () => {
                         <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
                         <EpNum>{num}</EpNum>
                         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ep.title || `Episode ${num}`}
+                          {ep.title || 'Untitled episode'}
                         </span>
                         {!!ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
                         {!!ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}

@@ -1,5 +1,5 @@
 const DEFAULT_API_BASE = 'https://api.aniraku.tech'
-const METADATA_RESOLVER_PATH = '/api/kitsu'
+const METADATA_RESOLVER_PATH = '/api/mal'
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
 
 export class AniListUnavailableError extends Error {
@@ -220,12 +220,13 @@ export async function anilistQuery(query, variables = {}) {
       reportAniListStatus(false)
       return json
     }
-    throw new Error(json?.error?.message || `Kitsu metadata resolver returned ${res.status}.`)
+    throw new Error(json?.error?.message || `MyAnimeList metadata resolver returned ${res.status}.`)
   } catch (error) {
-    // Kitsu is Preview's primary metadata source and maps every displayed
-    // record back onto its verified AniList ID. Preserve the deployed Aniraku
-    // API proxy as a recovery path if Kitsu is temporarily unavailable.
-    console.warn('Kitsu metadata resolver failed; using Aniraku API fallback:', error)
+    // MAL does not permit browser CORS. The Vercel resolver owns the primary
+    // MAL request and maps its records back onto AniList IDs. Preserve the
+    // deployed Aniraku API proxy as the recovery path if that resolver or its
+    // mapping service is temporarily unavailable.
+    console.warn('MAL metadata resolver failed; using Aniraku API fallback:', error)
     const fallback = await fetch(`${apiBase}/api/v1/anilist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
