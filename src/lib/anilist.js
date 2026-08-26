@@ -16,11 +16,89 @@ function reportAniListStatus(unavailable) {
   window.dispatchEvent(new CustomEvent(ANILIST_STATUS_EVENT, { detail: { unavailable } }))
 }
 
+function anirakuApiBase() {
+  return (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
+}
+
+function titleFromSchedule(value) {
+  if (value && typeof value === 'object') {
+    const romaji = String(value.romaji || value.english || value.native || '').trim()
+    const english = String(value.english || romaji || '').trim()
+    const native = String(value.native || romaji || '').trim()
+    return { romaji, english, native, userPreferred: english || romaji || native || 'Unknown title' }
+  }
+  const title = String(value || '').trim() || 'Unknown title'
+  return { romaji: title, english: title, native: title, userPreferred: title }
+}
+
+async function mapScheduleMalIdsToAniList(apiBase, malIds) {
+  const ids = [...new Set(malIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50)
+  if (!ids.length) return new Map()
+
+  const response = await fetch(`${apiBase}/api/v1/anilist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      query: 'query ($ids: [Int]) { Page(perPage: 50) { media(idMal_in: $ids, type: ANIME) { id idMal } } }',
+      variables: { ids },
+    }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(`Schedule ID mapping is unavailable (${response.status}).`)
+  return new Map((payload?.data?.Page?.media || []).flatMap((media) => {
+    const malId = Number(media?.idMal)
+    const anilistId = Number(media?.id)
+    return Number.isInteger(malId) && malId > 0 && Number.isInteger(anilistId) && anilistId > 0 ? [[malId, anilistId]] : []
+  }))
+}
+
+/**
+ * Schedule and displayed next-airing data are intentionally sourced from the
+ * existing Aniraku API. The Preview branch retains MAL-first discovery and
+ * detail metadata; the mapping step only converts the API schedule's MAL IDs
+ * into the verified AniList IDs already used by route and playback contracts.
+ */
+export async function getAnirakuSchedule({ page = 1, perPage = 50 } = {}) {
+  const safePage = Math.max(1, Math.floor(Number(page) || 1))
+  const safePerPage = Math.min(50, Math.max(1, Math.floor(Number(perPage) || 50)))
+  const apiBase = anirakuApiBase()
+  const response = await fetch(`${apiBase}/api/v1/schedule?page=${safePage}&perPage=${safePerPage}`, {
+    headers: { Accept: 'application/json' },
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(`Schedule is unavailable (${response.status}).`)
+
+  const source = Array.isArray(payload?.schedule) ? payload.schedule : []
+  const idMap = await mapScheduleMalIdsToAniList(apiBase, source.map((item) => item?.id))
+  const schedule = source.flatMap((item) => {
+    const malId = Number(item?.id)
+    const id = idMap.get(malId)
+    const episode = Number(item?.episode)
+    const airingAt = Number(item?.airingAt)
+    if (!id || !Number.isInteger(episode) || episode < 1 || !Number.isInteger(airingAt) || airingAt < 1) return []
+    return [{
+      id,
+      idMal: malId,
+      title: titleFromSchedule(item?.title),
+      coverImage: item?.coverImage && typeof item.coverImage === 'object' ? item.coverImage : {},
+      format: String(item?.format || '').trim() || null,
+      nextAiringEpisode: { episode, airingAt },
+    }]
+  })
+
+  return {
+    schedule,
+    pageInfo: payload?.pageInfo && typeof payload.pageInfo === 'object'
+      ? payload.pageInfo
+      : { currentPage: safePage, perPage: safePerPage, hasNextPage: false, total: schedule.length },
+  }
+}
+
 export async function anilistQuery(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
   const resolverBase = (import.meta.env.VITE_METADATA_RESOLVER_URL || '').replace(/\/$/, '')
   const resolverEndpoint = `${resolverBase}${METADATA_RESOLVER_PATH}`
-  const apiBase = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
+  const apiBase = anirakuApiBase()
 
   try {
     const res = await fetch(resolverEndpoint, {

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY } from '../lib/anilist'
+import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY, getAnirakuSchedule } from '../lib/anilist'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -7,7 +7,8 @@ async function browse(variables) {
 }
 
 async function fetchHomePageData() {
-  const { data } = await anilistQuery(`
+  const [metadata, scheduleData] = await Promise.all([
+    anilistQuery(`
     query {
       trending: Page(page: 1, perPage: 10) {
         media(type: ANIME, sort: TRENDING_DESC) {
@@ -42,12 +43,25 @@ async function fetchHomePageData() {
         }
       }
     }
-  `, {})
+  `, {}),
+    getAnirakuSchedule({ page: 1, perPage: 12 }).catch((error) => {
+      console.warn('Preview next-airing schedule is unavailable:', error)
+      return { schedule: [] }
+    }),
+  ])
+  const { data } = metadata
+  const schedule = Array.isArray(scheduleData?.schedule) ? scheduleData.schedule : []
+  const nextAiringById = new Map(schedule.map((item) => [item.id, item.nextAiringEpisode]))
+  const withScheduledNextAiring = (media) => (media || []).map((item) => {
+    const nextAiringEpisode = nextAiringById.get(item?.id)
+    return nextAiringEpisode ? { ...item, nextAiringEpisode } : item
+  })
   return {
-    trending: data.trending.media,
-    airing: data.airing.media,
-    movies: data.movies.media,
-    topTV: data.topTV.media,
+    trending: withScheduledNextAiring(data.trending.media),
+    airing: withScheduledNextAiring(data.airing.media),
+    movies: withScheduledNextAiring(data.movies.media),
+    topTV: withScheduledNextAiring(data.topTV.media),
+    schedule,
   }
 }
 

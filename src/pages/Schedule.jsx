@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaArrowRight, FaCalendarAlt, FaClock, FaSearch, FaTimes, FaTv } from 'react-icons/fa'
-import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
+import { getAnirakuSchedule } from '../lib/anilist'
 import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setScheduleSEO } from '../lib/seo'
@@ -458,9 +458,8 @@ const Schedule = () => {
   const [searchQuery, setSearchQuery] = useState('')
 
   const { data, isLoading, error, refetch } = useQuery(['schedule'], async () => {
-    const variables = { page: 1, perPage: 100, status: 'RELEASING', sort: ['POPULARITY_DESC'] }
-    const { data: response } = await anilistQuery(BROWSE_QUERY, variables)
-    return (response?.Page?.media || [])
+    const { schedule } = await getAnirakuSchedule({ page: 1, perPage: 50 })
+    return schedule
       .filter((media) => media.nextAiringEpisode?.airingAt)
       .map((media) => ({
         id: media.id,

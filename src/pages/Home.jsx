@@ -449,7 +449,7 @@ function PosterRailSection({ items, meta }) {
 
 function Home() {
   const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
-  const { trending = [], airing = [], movies = [], topTV = [] } = homeData
+  const { trending = [], airing = [], movies = [], topTV = [], schedule = [] } = homeData
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
   const trendingList = useStreamable(filterAdult(trending, nsfwEnabled))
@@ -462,10 +462,10 @@ function Home() {
   const heroTrending = useMemo(() => unifiedTrending.slice(0, 10), [unifiedTrending])
   const featured = heroTrending[featuredIndex] || heroTrending[0] || airingList[0] || tvList[0] || null
   const freshAiring = useMemo(() => airingList.filter((item) => item?.id && item.id !== featured?.id).slice(0, 14), [airingList, featured])
-  const scheduleItems = useMemo(() => airingList
+  const scheduleItems = useMemo(() => schedule
     .filter((item) => item?.id && item.id !== featured?.id && Number(item?.nextAiringEpisode?.airingAt) * 1000 >= Date.now())
     .sort((a, b) => Number(a.nextAiringEpisode.airingAt) - Number(b.nextAiringEpisode.airingAt))
-    .slice(0, 3), [airingList, featured])
+    .slice(0, 3), [schedule, featured])
   const weeklyFavorites = useMemo(() => [...tvList, ...trendingList]
     .filter((item, index, list) => item?.id && item.id !== featured?.id && list.findIndex((candidate) => candidate.id === item.id) === index)
     .sort((a, b) => (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0))

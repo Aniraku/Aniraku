@@ -2,9 +2,11 @@
 
 <img src="./public/icons/icon-512.png" width="96" alt="Aniraku icon" />
 
-# Aniraku
+# Aniraku — MAL Preview Branch
 
 Open-source anime discovery and viewing for people who want to find something, watch it, and come back without losing their place.
+
+> **Testing branch.** This branch is the dedicated MyAnimeList (MAL) metadata preview. It does not replace the production website or its custom domain.
 
 <a href="https://test.aniraku.tech/">Open the web app</a>
 &nbsp; · &nbsp;
@@ -46,7 +48,7 @@ The main flow is:
 
 `discover` → `watch` → `remember`
 
-The catalog uses AniList metadata, schedules, recommendations, and search. The player supports adaptive playback, provider fallback, subtitles, dubs, quality selection, seeking, and intro/outro skipping where the data is available. Progress and personal context remain attached to the title instead of disappearing after playback.
+The Preview catalog, search, title metadata, and mapping flow are **MAL-first** through the branch-local resolver. Only the visible Schedule and Next Airing data path uses the existing Aniraku API at `GET /api/v1/schedule`; those returned MAL records are mapped to verified AniList IDs before existing routes and playback contracts consume them. The player supports adaptive playback, provider fallback, subtitles, dubs, quality selection, seeking, and intro/outro skipping where the data is available. Progress and personal context remain attached to the title instead of disappearing after playback.
 
 ## Open the project
 
@@ -65,14 +67,14 @@ The catalog uses AniList metadata, schedules, recommendations, and search. The p
 
 ## Built with
 
-`React` · `Vite` · `TanStack Query` · `styled-components` · `Artplayer` · `HLS.js` · `AniList` · `Supabase`
+`React` · `Vite` · `TanStack Query` · `styled-components` · `Artplayer` · `HLS.js` · `MyAnimeList` · `Aniraku API` · `Supabase`
 
 The frontend lives in `src/`. The playback, provider coordination, and synchronization boundary is maintained separately in [Aniraku-Backend](https://github.com/Aniraku/Aniraku-Backend).
 
 ## Run locally
 
 ```bash
-git clone https://github.com/Aniraku/Aniraku.git
+git clone --branch preview/mal-v4.4.1-beta https://github.com/Aniraku/Aniraku.git
 cd Aniraku
 npm install
 npm run dev
@@ -86,6 +88,8 @@ npm run build
 npm run test:bots
 npm run test:e2e
 ```
+
+For this Preview branch, confirm `api/mal.js` remains present, preserve its MAL-first resolver behavior, and keep the Aniraku API limited to Schedule and Next Airing data unless the branch contract is explicitly changed.
 
 | Command | Purpose |
 |:--|:--|
