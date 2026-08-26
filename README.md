@@ -6,7 +6,7 @@
 
 Open-source anime discovery and viewing for people who want to find something, watch it, and come back without losing their place.
 
-<a href="https://www.aniraku.tech/">Open the web app</a>
+<a href="https://test.aniraku.tech/">Open the web app</a>
 &nbsp; · &nbsp;
 <a href="https://github.com/Aniraku/Aniraku-Backend">Backend</a>
 &nbsp; · &nbsp;
