@@ -110,7 +110,7 @@ const AndroidAppFallback = () => {
 
         <ReleaseNote>
           <b>WHAT’S NEW</b>
-          <span>Bonk now appears only with direct or proxy media, never an embedded player. Native source discovery also waits longer for late provider results.</span>
+          <span>Future releases now stop before provider search, with a clear availability message for upcoming episodes and movies.</span>
         </ReleaseNote>
 
         <PrimaryButton ref={appButtonRef} as="a" href={ANDROID_APP_INTENT} onClick={noteAppOpenAttempt}>
