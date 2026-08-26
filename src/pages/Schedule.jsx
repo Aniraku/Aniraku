@@ -451,14 +451,24 @@ const SkeletonCard = styled.div`
 
 const dayNameFor = (timestamp) => DAYS[new Date(timestamp * 1000).getDay() === 0 ? 6 : new Date(timestamp * 1000).getDay() - 1]
 
+function localCalendarWeek() {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  return { start, startAt: Math.floor(start.getTime() / 1000), endAt: Math.floor(end.getTime() / 1000) }
+}
+
 const Schedule = () => {
   const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1
+  const week = useMemo(() => localCalendarWeek(), [])
   const [activeDay, setActiveDay] = useState(DAYS[todayIndex])
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data, isLoading, error, refetch } = useQuery(['schedule'], async () => {
-    const { schedule } = await getAnirakuSchedule({ page: 1, perPage: 50 })
+  const { data, isLoading, error, refetch } = useQuery(['schedule', week.startAt, week.endAt], async () => {
+    const { schedule } = await getAnirakuSchedule({ page: 1, perPage: 100, startAt: week.startAt, endAt: week.endAt })
     return schedule
       .filter((media) => media.nextAiringEpisode?.airingAt)
       .map((media) => ({
@@ -481,12 +491,9 @@ const Schedule = () => {
   useEffect(() => { setScheduleSEO() }, [])
 
   const dayOptions = useMemo(() => {
-    const weekStart = new Date()
-    weekStart.setHours(0, 0, 0, 0)
-    weekStart.setDate(weekStart.getDate() - todayIndex)
     return DAYS.map((day, index) => {
-      const date = new Date(weekStart)
-      date.setDate(weekStart.getDate() + index)
+      const date = new Date(week.start)
+      date.setDate(week.start.getDate() + index)
       return {
         day,
         label: day.slice(0, 3),
@@ -495,7 +502,7 @@ const Schedule = () => {
         isToday: index === todayIndex,
       }
     })
-  }, [todayIndex])
+  }, [todayIndex, week.start])
 
   const { nsfwEnabled } = useNsfw()
   const streamed = useStreamable(filterAdult(Array.isArray(data) ? data : [], nsfwEnabled))

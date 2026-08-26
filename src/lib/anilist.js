@@ -32,10 +32,10 @@ function titleFromSchedule(value) {
 }
 
 const ANIRAKU_AIRING_SCHEDULE_QUERY = `
-  query ($page: Int!, $perPage: Int!) {
+  query ($page: Int!, $perPage: Int!, $startAt: Int, $endAt: Int) {
     Page(page: $page, perPage: $perPage) {
       pageInfo { currentPage hasNextPage total }
-      airingSchedules(notYetAired: true, sort: [TIME]) {
+      airingSchedules(airingAt_greater: $startAt, airingAt_lesser: $endAt, sort: [TIME]) {
         airingAt
         episode
         media { id idMal title { romaji english native userPreferred } coverImage { extraLarge large medium color } format }
@@ -65,11 +65,11 @@ async function mapScheduleMalIdsToAniList(apiBase, malIds) {
   }))
 }
 
-async function getAnirakuAiringScheduleFallback(apiBase, page, perPage) {
+async function getAnirakuAiringScheduleFallback(apiBase, page, perPage, { startAt, endAt } = {}) {
   const response = await fetch(`${apiBase}/api/v1/anilist`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query: ANIRAKU_AIRING_SCHEDULE_QUERY, variables: { page, perPage } }),
+    body: JSON.stringify({ query: ANIRAKU_AIRING_SCHEDULE_QUERY, variables: { page, perPage, startAt, endAt } }),
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(`Schedule fallback is unavailable (${response.status}).`)
@@ -103,10 +103,20 @@ async function getAnirakuAiringScheduleFallback(apiBase, page, perPage) {
  * detail metadata; the mapping step only converts the API schedule's MAL IDs
  * into the verified AniList IDs already used by route and playback contracts.
  */
-export async function getAnirakuSchedule({ page = 1, perPage = 50 } = {}) {
+export async function getAnirakuSchedule({ page = 1, perPage = 50, startAt, endAt } = {}) {
   const safePage = Math.max(1, Math.floor(Number(page) || 1))
-  const safePerPage = Math.min(50, Math.max(1, Math.floor(Number(perPage) || 50)))
+  const safePerPage = Math.min(100, Math.max(1, Math.floor(Number(perPage) || 50)))
   const apiBase = anirakuApiBase()
+  const safeStartAt = Math.floor(Number(startAt))
+  const safeEndAt = Math.floor(Number(endAt))
+  const boundedWindow = Number.isInteger(safeStartAt) && Number.isInteger(safeEndAt) && safeStartAt > 0 && safeEndAt > safeStartAt
+
+  // The REST Schedule endpoint has no date-bound parameters and only provides
+  // future rows. A full local calendar week needs verified past and future
+  // release rows, so it is intentionally sourced from the existing Aniraku
+  // GraphQL proxy rather than from MAL or a direct AniList browser request.
+  if (boundedWindow) return getAnirakuAiringScheduleFallback(apiBase, safePage, safePerPage, { startAt: safeStartAt, endAt: safeEndAt })
+
   const response = await fetch(`${apiBase}/api/v1/schedule?page=${safePage}&perPage=${safePerPage}`, {
     headers: { Accept: 'application/json' },
   })
