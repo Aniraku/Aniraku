@@ -44,6 +44,21 @@ const ANIRAKU_AIRING_SCHEDULE_QUERY = `
   }
 `
 
+const ANIRAKU_CALENDAR_WEEK_QUERY = `
+  query ($page: Int!, $perPage: Int!) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { currentPage hasNextPage total }
+      media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
+        id idMal
+        title { romaji english native userPreferred }
+        coverImage { extraLarge large medium color }
+        format
+        nextAiringEpisode { episode airingAt }
+      }
+    }
+  }
+`
+
 async function mapScheduleMalIdsToAniList(apiBase, malIds) {
   const ids = [...new Set(malIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50)
   if (!ids.length) return new Map()
@@ -97,6 +112,37 @@ async function getAnirakuAiringScheduleFallback(apiBase, page, perPage, { startA
   }
 }
 
+async function getAnirakuCalendarWeek(apiBase, page, perPage, { startAt, endAt }) {
+  const response = await fetch(`${apiBase}/api/v1/anilist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query: ANIRAKU_CALENDAR_WEEK_QUERY, variables: { page, perPage } }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(`Weekly Schedule is unavailable (${response.status}).`)
+  const pageData = payload?.data?.Page
+  const schedule = (pageData?.media || []).flatMap((media) => {
+    const id = Number(media?.id)
+    const episode = Number(media?.nextAiringEpisode?.episode)
+    const airingAt = Number(media?.nextAiringEpisode?.airingAt)
+    if (!Number.isInteger(id) || id < 1 || !Number.isInteger(episode) || episode < 1 || !Number.isInteger(airingAt) || airingAt < startAt || airingAt >= endAt) return []
+    return [{
+      id,
+      idMal: Number.isInteger(Number(media?.idMal)) ? Number(media.idMal) : null,
+      title: titleFromSchedule(media?.title),
+      coverImage: media?.coverImage && typeof media.coverImage === 'object' ? media.coverImage : {},
+      format: String(media?.format || '').trim() || null,
+      nextAiringEpisode: { episode, airingAt },
+    }]
+  })
+  return {
+    schedule,
+    pageInfo: pageData?.pageInfo && typeof pageData.pageInfo === 'object'
+      ? pageData.pageInfo
+      : { currentPage: page, perPage, hasNextPage: false, total: schedule.length },
+  }
+}
+
 /**
  * Schedule and displayed next-airing data are intentionally sourced from the
  * existing Aniraku API. The Preview branch retains MAL-first discovery and
@@ -111,11 +157,10 @@ export async function getAnirakuSchedule({ page = 1, perPage = 50, startAt, endA
   const safeEndAt = Math.floor(Number(endAt))
   const boundedWindow = Number.isInteger(safeStartAt) && Number.isInteger(safeEndAt) && safeStartAt > 0 && safeEndAt > safeStartAt
 
-  // The REST Schedule endpoint has no date-bound parameters and only provides
-  // future rows. A full local calendar week needs verified past and future
-  // release rows, so it is intentionally sourced from the existing Aniraku
-  // GraphQL proxy rather than from MAL or a direct AniList browser request.
-  if (boundedWindow) return getAnirakuAiringScheduleFallback(apiBase, safePage, safePerPage, { startAt: safeStartAt, endAt: safeEndAt })
+  // Mirror production Schedule: its seven-day rail uses Aniraku's
+  // popular-releasing titles and each title's next confirmed airing event.
+  // This excludes previously released rows without direct AniList browser traffic.
+  if (boundedWindow) return getAnirakuCalendarWeek(apiBase, safePage, safePerPage, { startAt: safeStartAt, endAt: safeEndAt })
 
   const response = await fetch(`${apiBase}/api/v1/schedule?page=${safePage}&perPage=${safePerPage}`, {
     headers: { Accept: 'application/json' },
