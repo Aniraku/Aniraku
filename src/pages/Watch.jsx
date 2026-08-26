@@ -63,10 +63,14 @@ import {
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
-import { shouldPreferProviderPlayer } from '../lib/watchProviderPlayer'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import {
+  isConfirmedUpcomingEpisode,
+  UPCOMING_EPISODE_MESSAGE,
+} from '../lib/watchEpisodeAvailability'
+import {
   filterBrowserProviders,
+  isBonkProvider,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
@@ -380,7 +384,22 @@ function hasExpiredEmbeddedToken(url) {
   }
   // The small grace period avoids rejecting a token while a provider clock is
   // only seconds ahead; multi-day-old URLs such as the reported source fail.
-  return newest > 0 && Date.now() > newest + 30_000
+  if (newest > 0 && Date.now() > newest + 30_000) return true
+
+  // Several CDNs expose UNIX expiry values instead of a readable timestamp.
+  // Treat only clearly named, valid epoch values as definitive expiry; unknown
+  // query parameters never remove a potentially playable source.
+  try {
+    const params = new URL(String(url || '')).searchParams
+    for (const [key, raw] of params.entries()) {
+      if (!/^(?:exp|expires|expiry|token_expiry|tokenexpires)$/i.test(key)) continue
+      const value = Number(raw)
+      if (!Number.isFinite(value)) continue
+      const timestamp = value >= 1e12 ? value : value >= 1e9 ? value * 1000 : 0
+      if (timestamp > 0 && Date.now() > timestamp + 30_000) return true
+    }
+  } catch {}
+  return false
 }
 
 function getSourcePlaybackType(source) {
@@ -431,7 +450,7 @@ function isBrowserPlayableEmbedSource(source) {
 	return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
 }
 
-function buildQualityList(sources) {
+function buildQualityList(sources, suppressedUrls = new Set()) {
 	const seenUrls = new Set()
 	const entries = (Array.isArray(sources) ? sources : [])
 		// Backend verification tags are advisory snapshots, not a playback
@@ -463,7 +482,7 @@ function buildQualityList(sources) {
   // usable URL after the list endpoint has marked it stale. Only an expired
   // signed token is definitive enough to omit before playback/failover.
   return entries
-    .filter((entry) => !entry.expiredToken)
+    .filter((entry) => !entry.expiredToken && !suppressedUrls.has(entry.url))
     // Prefer the provider's own Auto/adaptive
     // URL and then the highest numeric quality without inventing a new URL.
     .sort((a, b) => {
@@ -959,6 +978,7 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
+  const cspViolationCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
   const epSidebarRef = useRef(null)
@@ -989,6 +1009,7 @@ export default function Watch() {
   const [epSearch, setEpSearch] = useState('')
   const [toast, setToast] = useState(null)
   const [servers, setServers] = useState({ sub: [], dub: [] })
+  const [suppressedQualityUrls, setSuppressedQualityUrls] = useState(() => new Set())
   const [noStreamError, setNoStreamError] = useState(false)
   const [theaterMode, setTheaterMode] = useState(false)
   const [resumePos, setResumePos] = useState(null)
@@ -999,6 +1020,7 @@ export default function Watch() {
   )
   const [backendHealthy, setBackendHealthy] = useState(true)
   const [errorType, setErrorType] = useState('') // for actionable UI
+  const [episodeAvailability, setEpisodeAvailability] = useState('checking')
 
   // Embedded providers are cross-origin, so the parent page cannot inspect or
   // block their network requests. We still apply safe browser-level defenses:
@@ -1148,6 +1170,17 @@ export default function Watch() {
   const epNumber = parseInt(slugParts?.[2] || '1', 10)
   const animeId = extractIdFromSlug(baseName)
   const isMovie = anime?.format === 'MOVIE'
+  const hasCurrentAnime = anime && String(anime.id) === String(animeId)
+  const isPreemptivelyUpcoming = hasCurrentAnime && isConfirmedUpcomingEpisode({
+    episodeNumber: epNumber,
+    episodes,
+    status: anime?.status,
+    nextAiringEpisode: anime?.nextAiringEpisode,
+    hasConfirmedEpisodeList: episodes.length > 0,
+  })
+  const effectiveEpisodeAvailability = isPreemptivelyUpcoming
+    ? 'upcoming'
+    : episodeAvailability
 
   // Refs to latest values (avoid stale closures)
   const routeRef = useRef(slugId)
@@ -1331,6 +1364,35 @@ export default function Watch() {
     setToast({ msg, ...opts })
     clearTimeout(toastTimerRef.current)
     toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
+  }, [])
+
+  // Suppress only an exact failed media URL for this episode after a confirmed
+  // terminal pre-start failure. The provider remains selectable when it has
+  // another real source, and the app never changes the selected provider.
+  const suppressTerminalStream = useCallback(({ streamUrl, reason }) => {
+    const terminalProviderFailure = reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
+    if (!terminalProviderFailure) return
+    if (streamUrl) {
+      setSuppressedQualityUrls((previous) => {
+        if (previous.has(streamUrl)) return previous
+        return new Set([...previous, streamUrl])
+      })
+    }
+    showToast('This failed stream link was removed for this episode. Refresh to request a fresh link or choose another quality manually.', { long: true })
+  }, [showToast])
+
+  const restoreWorkingStream = useCallback((urls) => {
+    const restored = new Set((Array.isArray(urls) ? urls : []).filter(Boolean))
+    if (restored.size > 0) {
+      setSuppressedQualityUrls((previous) => {
+        const next = new Set(previous)
+        let changed = false
+        restored.forEach((url) => {
+          if (next.delete(url)) changed = true
+        })
+        return changed ? next : previous
+      })
+    }
   }, [])
 
   const skipSegmentNow = useCallback((type) => {
@@ -1644,6 +1706,13 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
+    setEpisodeAvailability('checking')
+    setServers({ sub: [], dub: [] })
+    setSuppressedQualityUrls(new Set())
+    setError('')
+    setErrorType('')
+    setNoStreamError(false)
+    setStreamLoading(true)
     let cancelled = false
     let attempts = 0
 
@@ -1662,6 +1731,7 @@ export default function Watch() {
         if (cancelled) return
         let animeData = metadataRes ? { ...metadataRes, id: Number(animeId) } : null
         let epData = epRes
+        const hasConfirmedEpisodeList = Array.isArray(epRes?.episodes) && epRes.episodes.length > 0
         if (!animeData) {
           const backendResponse = await fetchWithRetry(
             `${API_BASE}/api/v1/anime/${animeId}`,
@@ -1699,12 +1769,25 @@ export default function Watch() {
           }
         }
         if (cancelled) return
+        const normalizedEpisodes = normalizeEpisodeList(epData?.episodes)
         setAnime(animeData)
-        setEpisodes(normalizeEpisodeList(epData?.episodes))
+        setEpisodes(normalizedEpisodes)
+        setEpisodeAvailability(
+          isConfirmedUpcomingEpisode({
+            episodeNumber: epNumber,
+            episodes: normalizedEpisodes,
+            status: animeData?.status,
+            nextAiringEpisode: animeData?.nextAiringEpisode,
+            hasConfirmedEpisodeList,
+          })
+            ? 'upcoming'
+            : 'available'
+        )
         setBackendHealthy(true)
       } catch (e) {
         if (cancelled) return
         setBackendHealthy(false)
+        setEpisodeAvailability('available')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -1713,7 +1796,7 @@ export default function Watch() {
     return () => {
       cancelled = true
     }
-  }, [animeId])
+  }, [animeId, epNumber])
 
   // The stream backend may omit the MAL mapping. Hydrate it from the shared
   // MAL-primary resolver so AniSkip can still serve timestamps for this title.
@@ -1952,6 +2035,8 @@ export default function Watch() {
     setBuffering(false)
     bufferIndicatorCleanupRef.current?.()
     bufferIndicatorCleanupRef.current = null
+    cspViolationCleanupRef.current?.()
+    cspViolationCleanupRef.current = null
     if (dashInstance.current) {
       try {
         dashInstance.current.reset()
@@ -2013,6 +2098,22 @@ export default function Watch() {
         Math.random().toString(36).slice(2) + Date.now().toString(36)
 	      const proxied = (u) =>
 	        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+	      // Browser policy violations name the blocked URL. Suppress a control
+	      // only when that URL is the selected media URL, never for an unrelated
+	      // playlist ad, analytics resource, or other subrequest.
+	      if (typeof document !== 'undefined') {
+	        const selectedUrl = String(streamUrl)
+	        const onPolicyViolation = (event) => {
+	          if (buildIdRef.current !== myBuildId) return
+	          const directive = String(event?.violatedDirective || event?.effectiveDirective || '')
+	          const blockedUrl = String(event?.blockedURI || '')
+	          const blocksSelectedMedia = /^(?:media-src|connect-src|default-src)/.test(directive) &&
+	            (blockedUrl === selectedUrl || blockedUrl.startsWith(`${selectedUrl}?`) || blockedUrl.startsWith(`${selectedUrl}#`))
+	          if (blocksSelectedMedia) onBlocked?.('csp-blocked', { streamUrl: selectedUrl })
+	        }
+	        document.addEventListener('securitypolicyviolation', onPolicyViolation)
+	        cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
+	      }
 			const activeQuality = Array.isArray(qualityList)
 				? qualityList.find((quality) => quality?.url === streamUrl)
 				: null
@@ -2467,13 +2568,20 @@ export default function Watch() {
               },
             })
 	            let mediaRetries = 0
-				let manifestReady = false
+				let playbackStarted = false
+				const markPlaybackStarted = () => {
+					playbackStarted = true
+				}
+				video.addEventListener('playing', markPlaybackStarted, { once: true })
 	            const fail = () => {
 	              if (buildIdRef.current !== myBuildId) return
 	              showToast('Stream issue — keeping the selected server.', { long: true })
 	              if (onBlocked) {
-	                onBlocked('playback-error')
-              }
+	                onBlocked(
+	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
+	                  { streamUrl: url }
+	                )
+	              }
               else setError('Stream playback error. Try a different server.')
             }
 	            hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -2505,11 +2613,17 @@ export default function Watch() {
                 }
 	                fail()
                 return
-              }
-	              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-						if (!manifestReady && hlsTransportIndex + 1 < hlsTransportPlan.length) {
+	              }
+		              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+						// A proxy can serve the master manifest yet fail on the first
+						// playable media request. Manifest readiness is therefore not
+						// playback evidence. Before the video has actually started, make
+						// the bounded direct retry instead of staying in proxy recovery.
+						if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
 							hlsTransportIndex += 1
 							try {
+								mediaRetries = 0
+								showToast('Proxy stream failed before playback — trying direct.', { long: true })
 								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
 								return
 							} catch {}
@@ -2520,8 +2634,7 @@ export default function Watch() {
 	              fail()
             })
 	            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-						manifestReady = true
-	              const levels = (hls.levels || [])
+			              const levels = (hls.levels || [])
 	                .map((level, index) => ({
 	                  index,
 	                  height: Number(level?.height || 0),
@@ -2891,6 +3004,7 @@ export default function Watch() {
   }
 
   const warmProviderStream = useCallback((sourceId) => {
+    if (effectiveEpisodeAvailability !== 'available') return null
     const source = [...SOURCES.sub, ...SOURCES.dub].find((candidate) => candidate.id === sourceId)
     if (!source || source.id === activeSourceRef.current || getCachedStream(source)) return null
 
@@ -2931,7 +3045,7 @@ export default function Watch() {
 
     providerWarmRequestsRef.current.set(key, request)
     return request
-  }, [animeId, epNumber, SOURCES])
+  }, [animeId, epNumber, SOURCES, effectiveEpisodeAvailability])
 
   // ────────────────────────────────────────────────────────────
   // Load stream
@@ -2940,6 +3054,7 @@ export default function Watch() {
 
   const loadStream = useCallback(
     async (sourceId, forceRefresh = false, quiet = false) => {
+      if (effectiveEpisodeAvailability !== 'available') return
       // A fresh stream load means any 'ended' sync flag from a previous
       // player is stale (e.g. the user replayed the same episode).
       skipSwitchSyncRef.current = false
@@ -3017,12 +3132,12 @@ export default function Watch() {
       setShowEndedOverlay(false)
 
       const createSameProviderFailureHandler = (payload) => {
-        const embedFallback = chooseBrowserPlayableEmbed(
+        const embedFallback = !isBonkProvider(source) ? chooseBrowserPlayableEmbed(
           payload?.sources,
           isBrowserPlayableEmbedSource
-        )
+        ) : null
         let fallbackUsed = false
-        return (reason) => {
+        return (reason, details = {}) => {
           if (embedFallback && !fallbackUsed) {
             fallbackUsed = true
             destroyPlayer()
@@ -3034,6 +3149,10 @@ export default function Watch() {
             showToast(`${source.label} direct media is unavailable — using its compatible player.`, { long: true })
             return
           }
+          suppressTerminalStream({
+            streamUrl: details.streamUrl,
+            reason,
+          })
           handleProviderBlockedRef.current?.(reason)
         }
       }
@@ -3044,27 +3163,8 @@ export default function Watch() {
         const cached = getCachedStream(source)
         if (cached && cached.sources?.[0]?.url) {
           if (targetEpisode !== epNumberRef.current) return
-          const cachedProviderPlayer = shouldPreferProviderPlayer(source)
-            ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
-            : null
-          if (cachedProviderPlayer) {
-            destroyPlayer()
-            setBuffering(false)
-            setActiveEmbedUrl(cachedProviderPlayer.url)
-            applySkipSegments(normalizeProviderSkipSegments(cached))
-            setStreamLoading(false)
-            loadingRef.current = false
-            return
-          }
-          if (shouldPreferProviderPlayer(source)) {
-            setErrorType('no-source')
-            setError(`${source.label} player is unavailable for this episode.`)
-            setStreamLoading(false)
-            loadingRef.current = false
-            return
-          }
           const firstSource = cached.sources[0]
-          const qualityList = buildQualityList(cached.sources)
+          const qualityList = buildQualityList(cached.sources, suppressedQualityUrls)
           if (qualityList.length > 0) {
             const onBlocked = createSameProviderFailureHandler(cached)
             buildPlayer(
@@ -3084,7 +3184,9 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-          const cachedEmbed = chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
+          const cachedEmbed = !isBonkProvider(source)
+            ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
+            : null
 	          if (cachedEmbed) {
 	            destroyPlayer()
 	            setActiveEmbedUrl(cachedEmbed.url)
@@ -3195,37 +3297,11 @@ export default function Watch() {
         }
 
         const firstSource = data.sources[0]
-        const providerPlayer = shouldPreferProviderPlayer(source)
-          ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
-          : null
-        if (providerPlayer) {
-          destroyPlayer()
-          setBuffering(false)
-          setActiveEmbedUrl(providerPlayer.url)
-          applySkipSegments(normalizeProviderSkipSegments(data))
-          setCachedStream(source, data)
-          setStreamLoading(false)
-          loadingRef.current = false
-          setRetryAttempt(0)
-          return
-        }
-        if (shouldPreferProviderPlayer(source)) {
-          if (quiet) {
-            setStreamLoading(false)
-            loadingRef.current = false
-            reportQuietSwitchFailure(`${source.label} player is unavailable — staying on the current one`)
-            return
-          }
-          setNoStreamError(true)
-          setErrorType('no-source')
-          setError(`${source.label} player is unavailable for this episode.`)
-          setStreamLoading(false)
-          loadingRef.current = false
-          return
-        }
-        const qualityList = buildQualityList(data.sources)
+        const qualityList = buildQualityList(data.sources, suppressedQualityUrls)
         if (qualityList.length === 0) {
-          const verifiedEmbed = chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
+          const verifiedEmbed = !isBonkProvider(source)
+            ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
+            : null
           if (verifiedEmbed) {
             destroyPlayer()
             setActiveEmbedUrl(verifiedEmbed.url)
@@ -3261,6 +3337,7 @@ export default function Watch() {
 	        )
         applySkipSegments(normalizeProviderSkipSegments(data))
         setCachedStream(source, data)
+        restoreWorkingStream(data.sources.map((entry) => entry?.url))
         quietProviderSwitchRef.current = settleQuietProviderSwitch({
           pending: quietProviderSwitchRef.current,
           sourceId,
@@ -3311,6 +3388,10 @@ export default function Watch() {
       showToast,
       buildPlayer,
       applySkipSegments,
+      suppressTerminalStream,
+      restoreWorkingStream,
+      suppressedQualityUrls,
+      effectiveEpisodeAvailability,
     ]
   )
 
@@ -3321,11 +3402,24 @@ export default function Watch() {
     else if (activeSource) loadStream(activeSource, true)
   }, [loadStream, activeSource])
 
+  useEffect(() => {
+    if (effectiveEpisodeAvailability !== 'upcoming') return
+    streamAbortRef.current?.abort()
+    streamAbortRef.current = null
+    destroyPlayer()
+    setActiveEmbedUrl('')
+    setServers({ sub: [], dub: [] })
+    setNoStreamError(false)
+    setErrorType('upcoming')
+    setError(UPCOMING_EPISODE_MESSAGE)
+    setStreamLoading(false)
+  }, [effectiveEpisodeAvailability, destroyPlayer])
+
   // ────────────────────────────────────────────────────────────
   // Server list (with backoff retry, language fallback)
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!animeId || !epNumber) return
+    if (!animeId || !epNumber || effectiveEpisodeAvailability !== 'available') return
     let cancelled = false
     let attempt = 0
     let retryTimer = null
@@ -3335,6 +3429,7 @@ export default function Watch() {
     // A previous episode's DUB list must never remain selectable while its new
     // SUB response is already available.
     setServers({ sub: [], dub: [] })
+    setSuppressedQualityUrls(new Set())
     const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}`
 
     const fetchServers = async () => {
@@ -3396,7 +3491,7 @@ export default function Watch() {
       if (retryTimer) clearTimeout(retryTimer)
       requestControllers.forEach((controller) => controller.abort())
     }
-  }, [animeId, epNumber])
+  }, [animeId, epNumber, effectiveEpisodeAvailability])
 
   // Load stream on active source / episode change
   const loadStreamRef = useRef(loadStream)
@@ -3404,17 +3499,22 @@ export default function Watch() {
 
 	  // A playback issue never changes the selected provider. The visible server
 	  // controls remain the only way to select another provider.
-	  const handleProviderBlocked = useCallback(() => {
+	  const handleProviderBlocked = useCallback((reason) => {
 	    const now = Date.now()
 	    if (now - lastBlockCycleRef.current < 3_000) return
 	    lastBlockCycleRef.current = now
-	    showToast('Stream issue — choose another server manually if needed.', { long: true })
+	    showToast(
+	    reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
+        ? 'This source could not start. Choose another server manually or refresh for a new link.'
+        : 'Stream issue — choose another server manually if needed.',
+      { long: true }
+    )
 	  }, [showToast])
 
   handleProviderBlockedRef.current = handleProviderBlocked
 
   useEffect(() => {
-    if (!activeSource) return
+    if (effectiveEpisodeAvailability !== 'available' || !activeSource) return
     const epChanged = epNumber !== prevEpisodeRef.current
     prevEpisodeRef.current = epNumber
     if (epChanged) {
@@ -3453,7 +3553,7 @@ export default function Watch() {
     // Same episode, server switch: keep the old video playing and only
     // swap when the new stream is ready.
     loadStreamRef.current(activeSource, false, Boolean(artInstance.current))
-  }, [activeSource, epNumber, destroyPlayer])
+  }, [activeSource, epNumber, destroyPlayer, effectiveEpisodeAvailability])
 
   const handleSourceSwitch = useCallback(
     (sourceId) => {
@@ -4067,7 +4167,7 @@ export default function Watch() {
                   episodes go live.
                 </div>
               )}
-              <div
+              {errorType !== 'upcoming' && <div
                 style={{
                   display: 'flex',
                   gap: 10,
@@ -4136,7 +4236,7 @@ export default function Watch() {
                 >
                   Try another server
                 </button>
-              </div>
+              </div>}
             </div>
           )}
 

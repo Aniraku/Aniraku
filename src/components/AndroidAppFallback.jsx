@@ -110,7 +110,7 @@ const AndroidAppFallback = () => {
 
         <ReleaseNote>
           <b>WHAT’S NEW</b>
-          <span>Comments now follow the complete episode selector. Real episode-list recovery and compact relationship rails remain in place.</span>
+          <span>Future releases now stop before provider search, with a clear availability message for upcoming episodes and movies.</span>
         </ReleaseNote>
 
         <PrimaryButton ref={appButtonRef} as="a" href={ANDROID_APP_INTENT} onClick={noteAppOpenAttempt}>

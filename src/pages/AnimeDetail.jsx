@@ -14,9 +14,11 @@ import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
+import { API_BASE } from '../config'
 
-const MIRURO_EPISODES_BASE = 'https://miruro-api-v3.onrender.com/episodes'
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
+const EPISODE_RETRY_BASE_MS = 1_500
+const EPISODE_RETRY_MAX_MS = 15_000
 
 const Page = styled.div`
   min-height: 100vh;
@@ -632,7 +634,6 @@ const AnimeDetail = () => {
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
   const [activeTab, setActiveTab] = useState('episodes')
   const [episodes, setEpisodes] = useState([])
-  const [episodesFallback, setEpisodesFallback] = useState(false)
   const [episodesLoading, setEpisodesLoading] = useState(false)
   const [relations, setRelations] = useState([])
   const [relationsLoading, setRelationsLoading] = useState(false)
@@ -749,7 +750,9 @@ const AnimeDetail = () => {
   }, [id, user])
 
   React.useEffect(() => {
-    if (!anime || !id) return undefined
+    // Relations accept the route ID directly. Start alongside metadata so a
+    // fast response is not delayed behind unrelated detail rendering or SEO.
+    if (!id) return undefined
     const controller = new AbortController()
     let cancelled = false
 
@@ -780,47 +783,56 @@ const AnimeDetail = () => {
       cancelled = true
       controller.abort()
     }
-  }, [anime, id])
+  }, [id])
 
   React.useEffect(() => {
-    if (!anime || !id) return undefined
+    // Episode availability accepts the route ID directly. Resolve it in
+    // parallel with metadata so it is ready when the hero leaves its skeleton.
+    if (!id) return undefined
     const controller = new AbortController()
     let cancelled = false
+    let retryTimer = null
+    let retryAttempt = 0
+
+    setEpisodes([])
+    setEpisodesLoading(true)
+
+    const scheduleRetry = () => {
+      const delay = Math.min(
+        EPISODE_RETRY_BASE_MS * (2 ** Math.min(retryAttempt, 4)),
+        EPISODE_RETRY_MAX_MS
+      )
+      retryAttempt += 1
+      retryTimer = window.setTimeout(loadEpisodes, delay)
+    }
 
     const loadEpisodes = async () => {
-      setEpisodesFallback(false)
-      setEpisodesLoading(true)
       try {
-        const response = await fetch(`${MIRURO_EPISODES_BASE}/${encodeURIComponent(id)}`, {
+        const response = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(id)}/episodes`, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         })
-        if (!response.ok) throw new Error(`Miruro episode API returned ${response.status}`)
+        if (!response.ok) throw new Error(`Aniraku episode API returned ${response.status}`)
         const payload = await response.json()
-        const byNumber = new Map()
-        Object.values(payload?.providers || {}).forEach((provider) => {
-          Object.values(provider?.episodes || {}).forEach((episodeList) => {
-            if (!Array.isArray(episodeList)) return
-            episodeList.forEach((episode) => {
-              const number = Number(episode?.number)
-              if (!Number.isFinite(number) || number < 1 || byNumber.has(number)) return
-              byNumber.set(number, {
-                ...episode,
-                number,
-                thumbnail: episode.thumbnail || episode.image || '',
-              })
-            })
-          })
-        })
-        const directEpisodes = [...byNumber.values()].sort((a, b) => a.number - b.number)
-        if (!directEpisodes.length) throw new Error('Miruro episode API returned no episodes')
-        if (!cancelled) setEpisodes(directEpisodes)
+        const sourceEpisodes = Array.isArray(payload) ? payload : payload?.episodes
+        if (!Array.isArray(sourceEpisodes)) throw new Error('Aniraku episode API returned an invalid response')
+        const directEpisodes = sourceEpisodes.filter(Boolean).map((episode, index) => ({
+          ...episode,
+          number: index + 1,
+          originalNumber: episode.number,
+          thumbnail: episode.thumbnail || episode.image || '',
+          filler: Boolean(episode.filler ?? episode.isFiller),
+          recap: Boolean(episode.recap),
+        }))
+        if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
+        if (!cancelled) {
+          retryAttempt = 0
+          setEpisodes(directEpisodes)
+          setEpisodesLoading(false)
+        }
       } catch (error) {
         if (error?.name === 'AbortError' || cancelled) return
-        setEpisodes([])
-        setEpisodesFallback(true)
-      } finally {
-        if (!cancelled) setEpisodesLoading(false)
+        scheduleRetry()
       }
     }
 
@@ -828,9 +840,10 @@ const AnimeDetail = () => {
     setActiveTab('episodes')
     return () => {
       cancelled = true
+      if (retryTimer) window.clearTimeout(retryTimer)
       controller.abort()
     }
-  }, [anime, id])
+  }, [id])
 
   const toggleBookmark = () => {
     const numericId = parseInt(id)
@@ -940,7 +953,7 @@ const AnimeDetail = () => {
     ? episodes.filter(ep => !ep.filler && !ep.recap)
     : episodes
   const tabs = []
-  if (hasEpisodes || episodesLoading || episodesFallback) {
+  if (hasEpisodes || episodesLoading) {
     tabs.push({
       key: 'episodes',
       label: isMovie
@@ -1032,11 +1045,6 @@ const AnimeDetail = () => {
 
             {activeTab === 'episodes' && (
               <>
-                {episodesFallback && (
-                  <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#fde68a', fontSize: 12 }} role="status">
-                    Miruro’s episode list is unavailable right now. Aniraku will not create a guessed episode list; check again shortly.
-                  </div>
-                )}
                 {hasEpisodes && hiddenEpCount > 0 && (
                   <FilterBtn $active={hideFillers} onClick={() => setHideFillers(p => !p)}>
                     {hideFillers ? '✓ Showing canon only' : 'Hide filler & recap'}

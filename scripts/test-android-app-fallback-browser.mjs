@@ -19,10 +19,10 @@ try {
   await androidPage.getByRole('dialog', { name: /Use the Aniraku app/i }).waitFor({ timeout: 8_000 })
   const appOpenLink = androidPage.getByRole('link', { name: /USE ANIRAKU APP/i })
   assert.equal(await appOpenLink.getAttribute('href'), ANDROID_APP_INTENT)
-  const downloadLink = androidPage.getByRole('link', { name: /V4\.4\.2 NOTES/i })
+  const downloadLink = androidPage.getByRole('link', { name: /V4\.6 NOTES/i })
   assert.equal(await downloadLink.count(), 1)
   assert.equal(await downloadLink.getAttribute('href'), ANDROID_APP_RELEASE_URL)
-  assert.equal(await androidPage.getByText(/Comments now follow the complete episode selector/i).count(), 1)
+  assert.equal(await androidPage.getByText(/Future releases now stop before provider search/i).count(), 1)
   assert.equal(await androidPage.getByRole('button', { name: /CONTINUE ON WEB/i }).count(), 1)
   if (process.env.ANIRAKU_FALLBACK_SCREENSHOT) {
     await androidPage.screenshot({ path: process.env.ANIRAKU_FALLBACK_SCREENSHOT, fullPage: false })
