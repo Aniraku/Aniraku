@@ -15,12 +15,6 @@ import {
 } from '../lib/androidAppFallback'
 
 const APP_OPEN_TIMEOUT_MS = 1250
-const GITHUB_LATEST_RELEASE_API = 'https://api.github.com/repos/Aniraku/Aniraku-App/releases/latest'
-
-function formatReleaseLabel(value) {
-  const tag = String(value || '').trim()
-  return /^v?\d+(?:\.\d+){1,3}(?:[-.][\w]+)?$/i.test(tag) ? tag.toUpperCase().replace(/^V/, 'V') : null
-}
 
 function getCompatibility() {
   if (typeof window === 'undefined') return false
@@ -37,7 +31,7 @@ const AndroidAppFallback = () => {
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
   const [showInstallHint, setShowInstallHint] = useState(false)
-  const [releaseLabel, setReleaseLabel] = useState(ANDROID_APP_RELEASE_VERSION)
+  const releaseLabel = ANDROID_APP_RELEASE_VERSION
   const appButtonRef = useRef(null)
 
   useEffect(() => {
@@ -49,18 +43,6 @@ const AndroidAppFallback = () => {
     const timer = window.setTimeout(() => setOpen(true), 850)
     return () => window.clearTimeout(timer)
   }, [pathname])
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    const controller = new AbortController()
-    fetch(GITHUB_LATEST_RELEASE_API, { signal: controller.signal, headers: { Accept: 'application/vnd.github+json' } })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((release) => setReleaseLabel(formatReleaseLabel(release?.tag_name)))
-      .catch(() => setReleaseLabel(ANDROID_APP_RELEASE_VERSION))
-
-    return () => controller.abort()
-  }, [open])
 
   useEffect(() => {
     if (!open) return undefined
