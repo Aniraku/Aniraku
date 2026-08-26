@@ -16,6 +16,7 @@ import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
 import { enrichEpisodesWithKitsu } from '../lib/kitsuEpisodes'
+import { artworkVars, bannerSource, posterSource } from '../lib/artwork'
 
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 const EPISODE_RETRY_BASE_MS = 1_500
@@ -36,6 +37,7 @@ const PageBackground = styled.div`
   pointer-events: none;
   opacity: 0.34;
   background-image:
+    radial-gradient(circle at 78% 16%, color-mix(in srgb, var(--art-tone, var(--accent)) 30%, transparent), transparent 32%),
     linear-gradient(to bottom, rgba(4, 7, 14, 0.16) 0%, rgba(4, 7, 14, 0.72) 58%, var(--bg) 94%),
     url(${p => p.$src});
   background-size: cover;
@@ -69,7 +71,9 @@ const BannerImg = styled.img`
 const BannerOverlay = styled.div`
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 50%, var(--bg) 100%);
+  background:
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--art-tone, var(--accent)) 28%, transparent), transparent 30%),
+    linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 50%, var(--bg) 100%);
 `
 
 const BannerContent = styled.div`
@@ -91,6 +95,7 @@ const Cover = styled.img`
   width: 150px;
   height: 210px;
   object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 48%, rgba(255,255,255,0.14));
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   flex-shrink: 0;
@@ -966,14 +971,14 @@ const AnimeDetail = () => {
   if (hasRelations || relationsLoading) tabs.push({ key: 'relations', label: 'Relations' })
 
   return (
-    <Page className="anime-detail-page">
-      <PageBackground $src={anime.bannerImage || anime.coverImage?.extraLarge || anime.coverImage?.large || ''} />
+    <Page className="anime-detail-page" style={artworkVars(anime)}>
+      <PageBackground $src={bannerSource(anime)} />
       <main style={{ position: 'relative', zIndex: 1 }}>
       <Banner>
-        <BannerImg src={anime.bannerImage || anime.coverImage?.extraLarge || anime.coverImage?.large || ''} alt="" />
+        <BannerImg src={bannerSource(anime)} alt="" />
         <BannerOverlay />
         <BannerContent>
-          <Cover src={anime.coverImage?.large || ''} alt={title} />
+          <Cover src={posterSource(anime)} alt={title} />
           <Info>
             <Title>{title}</Title>
             <Meta>

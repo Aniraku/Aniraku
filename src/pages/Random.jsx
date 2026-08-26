@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FaInfoCircle, FaPlay, FaRandom, FaRedo, FaStar } from 'react-icons/fa'
 import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
+import { artworkVars, posterSource } from '../lib/artwork'
 import { filterAdult, useNsfw } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { generateSlug } from '../lib/slug'
@@ -369,7 +370,7 @@ export default function Random() {
     findPick(mode)
   }
 
-  const image = anime?.coverImage?.extraLarge || anime?.coverImage?.large || anime?.coverImage?.medium || ''
+  const image = posterSource(anime)
   const description = textOf(anime?.description) || 'Open the title to see its full synopsis, release information, and available episodes.'
 
   return (
@@ -392,7 +393,7 @@ export default function Random() {
           <Roll type="button" onClick={() => findPick()} disabled={loading}><FaRandom size={12} /> New pick</Roll>
         </Controls>
 
-        <Panel aria-live="polite" aria-busy={loading}>
+        <Panel aria-live="polite" aria-busy={loading} style={anime ? artworkVars(anime) : undefined}>
           {anime && (
             <>
               <Poster to={detailHref(anime)} aria-label={`Open ${titleOf(anime)} details`}>

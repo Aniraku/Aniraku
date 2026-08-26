@@ -4,6 +4,7 @@ import { M } from './main.style'
 import { FaRocket, FaList, FaBookOpen, FaDesktop, FaUsers, FaGlobe, FaUserShield } from 'react-icons/fa'
 import { useTrendingAnime } from '../hooks/useAnime'
 import { generateSlug } from '../lib/slug'
+import { artworkVars, posterSource } from '../lib/artwork'
 
 const features1 = [
   { icon: FaRocket, title: 'Quick Sessions', desc: 'Jump into anime fast with instant playback and minimal buffering.' },
@@ -94,8 +95,8 @@ const Main = () => {
                 {col1.map((anime, idx) => {
                   const t = anime.title?.english || anime.title?.romaji || 'Unknown'
                   return (
-                    <M.CarouselCard to={`/anime/${generateSlug(t)}-${anime.id}`} key={anime.id || idx}>
-                      <M.CarouselCardImg src={anime.coverImage?.medium || anime.coverImage?.large || ''} alt="" />
+                    <M.CarouselCard to={`/anime/${generateSlug(t)}-${anime.id}`} key={anime.id || idx} style={artworkVars(anime)}>
+                      <M.CarouselCardImg src={posterSource(anime)} alt="" />
                       <M.CarouselCardInfo>
                         <M.CarouselCardTitle>{t}</M.CarouselCardTitle>
                         <M.CarouselCardMeta>{anime.format || 'TV'} · {anime.episodes || '?'} eps</M.CarouselCardMeta>
@@ -109,8 +110,8 @@ const Main = () => {
                 {col2.map((anime, idx) => {
                   const t = anime.title?.english || anime.title?.romaji || 'Unknown'
                   return (
-                    <M.CarouselCard to={`/anime/${generateSlug(t)}-${anime.id}`} key={anime.id || idx}>
-                      <M.CarouselCardImg src={anime.coverImage?.medium || anime.coverImage?.large || ''} alt="" />
+                    <M.CarouselCard to={`/anime/${generateSlug(t)}-${anime.id}`} key={anime.id || idx} style={artworkVars(anime)}>
+                      <M.CarouselCardImg src={posterSource(anime)} alt="" />
                       <M.CarouselCardInfo>
                         <M.CarouselCardTitle>{t}</M.CarouselCardTitle>
                         <M.CarouselCardMeta>{anime.format || 'TV'} · {anime.episodes || '?'} eps</M.CarouselCardMeta>

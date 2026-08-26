@@ -7,6 +7,7 @@ import { useTrendingAnime } from "../../hooks/useAnime";
 import { filterAdult, useNsfw, useStreamable } from "../../hooks/useNsfw";
 import { generateSlug } from "../../lib/slug";
 import { L } from "../Loader/loader.style";
+import { artworkVars, bannerSource } from '../../lib/artwork'
 
 const SkeletonSlide = () => (
   <H.Slides>
@@ -80,9 +81,9 @@ const Hero = () => {
       navigation={{ nextEl: ".btn-next", prevEl: ".btn-prev" }}
     >
       {items.slice(0, 5).map((item, idx) => (
-        <H.Slides key={item.id || idx}>
+        <H.Slides key={item.id || idx} style={artworkVars(item)}>
           <H.ImgContainer>
-            <H.Img src={item.coverImage?.large || item.coverImage?.extraLarge || ''} alt={item.title?.english || item.title?.romaji || ''} />
+            <H.Img src={bannerSource(item)} alt={item.title?.english || item.title?.romaji || ''} />
           </H.ImgContainer>
           <H.Content>
             <H.Rank><p>#{idx + 1} Spotlight</p></H.Rank>

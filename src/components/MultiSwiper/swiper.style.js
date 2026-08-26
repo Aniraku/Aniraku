@@ -109,6 +109,7 @@ S.LinkImg = styled(Link)`
   padding-bottom: 0;
   height: auto;
   margin-bottom: 0;
+  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 32%, var(--border));
   border-radius: 0 6px 6px 0;
   overflow: hidden;
 
@@ -125,6 +126,7 @@ S.SwiperImg = styled.img`
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: saturate(1.04) contrast(1.02);
 `
 S.NavBtn = styled.div`
   position: absolute;

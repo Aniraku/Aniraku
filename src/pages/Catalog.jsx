@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fa'
 import { AnimeCardSkeleton } from '../components/Skeletons/Skeletons'
 import styled, { keyframes } from 'styled-components'
+import { artworkVars, posterSources } from '../lib/artwork'
 
 const PER_PAGE = 24
 const SEARCH_DEBOUNCE_MS = 500
@@ -21,11 +22,6 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 const fmt = (value = '') => value.replace(/_/g, ' ')
 const titleOf = (anime) => anime?.title?.english || anime?.title?.romaji || anime?.title?.userPreferred || 'Unknown title'
-const posterSources = (anime) => [...new Set([
-  anime?.coverImage?.extraLarge,
-  anime?.coverImage?.large,
-  anime?.coverImage?.medium,
-].filter(Boolean))]
 const imageOf = (anime) => posterSources(anime)[0]
 const detailHref = (anime) => `/anime/${generateSlug(titleOf(anime))}-${anime.id}`
 const cleanDescription = (value = '') => value
@@ -616,6 +612,7 @@ const Poster = styled.div`
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 30%, var(--border));
   background: var(--bg-card);
   box-shadow: 0 8px 20px rgba(0,0,0,0.32);
   transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 200ms ease;
@@ -628,6 +625,15 @@ const Poster = styled.div`
     inset: 40% 0 0;
     pointer-events: none;
     background: linear-gradient(to top, rgba(0,0,0,0.82), transparent);
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--art-tone, var(--accent)) 26%, transparent), transparent 48%);
   }
 `
 
@@ -820,7 +826,7 @@ const CatalogRailCard = memo(function CatalogRailCard({ anime }) {
   ].filter(Boolean).join(' • ')
 
   return (
-    <RailCard to={detailHref(anime)} aria-label={`Open ${title}`}>
+    <RailCard to={detailHref(anime)} aria-label={`Open ${title}`} style={artworkVars(anime)}>
       <Poster className="poster">
         <PosterArtwork anime={anime} title={title} />
         <PosterMeta>
@@ -845,7 +851,7 @@ const CatalogGridCard = memo(function CatalogGridCard({ anime }) {
   ].filter(Boolean).join(' • ')
 
   return (
-    <GridCard to={detailHref(anime)} aria-label={`Open ${title}`}>
+    <GridCard to={detailHref(anime)} aria-label={`Open ${title}`} style={artworkVars(anime)}>
       <GridPoster className="poster">
         <PosterArtwork anime={anime} title={title} />
         <PosterMeta>

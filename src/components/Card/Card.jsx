@@ -5,6 +5,7 @@ import { generateSlug } from "../../lib/slug"
 import { useLocalStorage } from "../../hooks/useLocalStorage"
 import { useAuth } from "../../hooks/useAuth"
 import { supabase } from "../../lib/supabase"
+import { artworkVars, posterSource } from "../../lib/artwork"
 
 const Card = ({ data }) => {
   const [bookmarks, setBookmarks] = useLocalStorage('aniraku-bookmarks', [])
@@ -14,7 +15,7 @@ const Card = ({ data }) => {
 
   const id = data.id || data.mal_id
   const title = data.title?.english || data.title?.romaji || data.title?.userPreferred || data.title || 'Unknown'
-  const poster = data.coverImage?.large || data.images?.jpg?.image_url || ''
+  const poster = posterSource(data) || data.images?.jpg?.image_url || ''
   const score = data.averageScore || data.score
   const episodes = data.episodes
   const format = data.format
@@ -50,7 +51,7 @@ const Card = ({ data }) => {
   }
 
   return (
-    <C.Card style={{ '--media-color': accentColor }}>
+    <C.Card style={{ '--media-color': accentColor, ...artworkVars(data) }}>
       <Link to={`/anime/${slug}-${id}`} title={`View ${title} details`}>
         <C.Poster>
           {poster ? (

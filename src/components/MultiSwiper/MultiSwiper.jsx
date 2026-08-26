@@ -4,6 +4,7 @@ import { S } from './swiper.style'
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import { useTrendingAnime } from '../../hooks/useAnime'
 import { generateSlug } from '../../lib/slug'
+import { artworkVars, posterSource } from '../../lib/artwork'
 
 const skeletonItems = Array.from({ length: 6 }, (_, i) => i)
 
@@ -28,13 +29,13 @@ const MultiSwiper = () => {
         {isFetched
           ? items.map((item, idx) => (
             <S.SwiperSlide key={item.id || idx}>
-              <S.Item>
+              <S.Item style={artworkVars(item)}>
                 <S.Number>
                   <S.SpanNum>{idx + 1 >= 10 ? idx + 1 : '0' + (idx + 1)}</S.SpanNum>
                   <S.ItemName>{item.title?.english || item.title?.romaji || item.title?.userPreferred}</S.ItemName>
                 </S.Number>
                 <S.LinkImg to={`/anime/${generateSlug(item.title?.english || item.title?.romaji || '')}-${item.id}`}>
-                  <S.SwiperImg src={item.coverImage?.large || item.coverImage?.extraLarge || ''} alt="" />
+                  <S.SwiperImg src={posterSource(item)} alt="" />
                 </S.LinkImg>
               </S.Item>
             </S.SwiperSlide>

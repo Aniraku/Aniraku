@@ -14,10 +14,20 @@ C.Poster = styled.div`
   padding-bottom: 140%;
   border-radius: var(--radius-md);
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 32%, rgba(255,255,255,0.1));
   background: var(--bg-card);
   cursor: pointer;
   transition: transform var(--transition-normal);
   z-index: 1;
+
+  &::before {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--art-tone, var(--accent)) 28%, transparent), transparent 44%);
+    content: '';
+    pointer-events: none;
+  }
 
   &:active {
     transform: scale(0.97);
