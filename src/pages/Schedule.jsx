@@ -451,17 +451,29 @@ const SkeletonCard = styled.div`
 
 const dayNameFor = (timestamp) => DAYS[new Date(timestamp * 1000).getDay() === 0 ? 6 : new Date(timestamp * 1000).getDay() - 1]
 
+function upcomingScheduleWindow() {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  return { start, startAt: Math.floor(start.getTime() / 1000), endAt: Math.floor(end.getTime() / 1000) }
+}
+
 const Schedule = () => {
-  const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1
-  const [activeDay, setActiveDay] = useState(DAYS[todayIndex])
+  const window = useMemo(() => upcomingScheduleWindow(), [])
+  const todayDay = dayNameFor(window.startAt)
+  const [activeDay, setActiveDay] = useState(todayDay)
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data, isLoading, error, refetch } = useQuery(['schedule'], async () => {
+  const { data, isLoading, error, refetch } = useQuery(['schedule', window.startAt, window.endAt], async () => {
     const variables = { page: 1, perPage: 100, status: 'RELEASING', sort: ['POPULARITY_DESC'] }
     const { data: response } = await anilistQuery(BROWSE_QUERY, variables)
     return (response?.Page?.media || [])
-      .filter((media) => media.nextAiringEpisode?.airingAt)
+      .filter((media) => {
+        const airingAt = Number(media.nextAiringEpisode?.airingAt)
+        return Number.isInteger(airingAt) && airingAt >= window.startAt && airingAt < window.endAt
+      })
       .map((media) => ({
         id: media.id,
         title: media.title,
@@ -482,21 +494,19 @@ const Schedule = () => {
   useEffect(() => { setScheduleSEO() }, [])
 
   const dayOptions = useMemo(() => {
-    const weekStart = new Date()
-    weekStart.setHours(0, 0, 0, 0)
-    weekStart.setDate(weekStart.getDate() - todayIndex)
-    return DAYS.map((day, index) => {
-      const date = new Date(weekStart)
-      date.setDate(weekStart.getDate() + index)
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(window.start)
+      date.setDate(window.start.getDate() + index)
+      const day = dayNameFor(Math.floor(date.getTime() / 1000))
       return {
         day,
         label: day.slice(0, 3),
         date: date.toLocaleDateString([], { day: 'numeric' }),
         fullDate: date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }),
-        isToday: index === todayIndex,
+        isToday: index === 0,
       }
     })
-  }, [todayIndex])
+  }, [window.start])
 
   const { nsfwEnabled } = useNsfw()
   const streamed = useStreamable(filterAdult(Array.isArray(data) ? data : [], nsfwEnabled))
@@ -518,10 +528,10 @@ const Schedule = () => {
     if (item.day !== activeDay) return false
     return !searchQuery || normalizeSearchText(titleFor(item)).includes(normalizeSearchText(searchQuery))
   })
-  const dayCounts = useMemo(() => Object.fromEntries(DAYS.map((day) => [day, streamed.filter((item) => item.day === day).length])), [streamed])
+  const dayCounts = useMemo(() => Object.fromEntries(dayOptions.map(({ day }) => [day, streamed.filter((item) => item.day === day).length])), [dayOptions, streamed])
   const activeDate = dayOptions.find((item) => item.day === activeDay)
   const upcomingOnActiveDay = dayItems.find((item) => item.airingAt * 1000 >= Date.now()) || dayItems[0]
-  const resetToToday = () => { setActiveDay(DAYS[todayIndex]); setSearchInput('') }
+  const resetToToday = () => { setActiveDay(todayDay); setSearchInput('') }
 
   return (
     <>
@@ -531,14 +541,14 @@ const Schedule = () => {
             <div>
               <div className="eyebrow"><FaCalendarAlt size={12} /> Weekly anime planner</div>
               <h1>Plan the shows you want to catch.</h1>
-              <p>Choose a day, see every release in local time, and jump straight to the title when you are ready.</p>
+              <p>Today appears first, followed by the next six local dates and their confirmed upcoming releases.</p>
             </div>
             <TimezonePill><FaTv size={13} /> Your device timezone</TimezonePill>
           </PlannerHeader>
 
           <PlannerLayout>
             <WeekPanel>
-              <WeekPanelHeader><h2>This week</h2><span>{streamed.length} releases</span></WeekPanelHeader>
+              <WeekPanelHeader><h2>Next 7 days</h2><span>{streamed.length} releases</span></WeekPanelHeader>
               <DayRail aria-label="Select a day of the week">
                 {dayOptions.map((option) => (
                   <DayButton key={option.day} type="button" $active={activeDay === option.day} aria-pressed={activeDay === option.day} onClick={() => setActiveDay(option.day)}>
