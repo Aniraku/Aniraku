@@ -1446,13 +1446,15 @@ export default function Watch() {
   const saveRating = useCallback(
     async (score) => {
       if (epRatingSaving || !animeId || !epNumber) return
+      const selectedScore = Math.round(Number(score))
+      if (!Number.isInteger(selectedScore) || selectedScore < 1 || selectedScore > 10) return
       setEpRatingSaving(true)
       setEpRatingSaved(false)
-      const next = { ...epRatings, [epNumber]: score }
+      const next = { ...epRatings, [epNumber]: selectedScore }
       setEpRatings(next)
       let ok = false
       if (user) {
-        ok = await saveEpisodeRating(animeId, epNumber, score)
+        ok = await saveEpisodeRating(animeId, epNumber, selectedScore)
       } else {
         try {
           localStorage.setItem(
@@ -1463,11 +1465,7 @@ export default function Watch() {
         } catch {}
       }
       if (ok) {
-        const scores = Object.values(next).filter((s) => typeof s === 'number')
-        const avg = scores.length
-          ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-          : 0
-        if (avg >= 1 && avg <= 10) {
+        if (selectedScore >= 1 && selectedScore <= 10) {
           if (syncConnectedRef.current === null) {
             const data = await getSyncStatus()
             if (data) {
@@ -1483,7 +1481,7 @@ export default function Watch() {
                 updateSyncScore({
                   provider: p,
                   animeId: parseInt(animeId, 10),
-                  score: avg,
+                  score: selectedScore,
                 })
               )
             ).then((results) => {
@@ -1492,7 +1490,7 @@ export default function Watch() {
               ).length
               if (done > 0) {
                 showToast(
-                  `Score ${avg}/10 synced to ${providers
+                  `Score ${selectedScore}/10 synced to ${providers
                     .map((p) => PROVIDER_LABELS[p])
                     .join(' & ')}`,
                   { icon: 'check' }
