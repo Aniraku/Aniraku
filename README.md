@@ -52,7 +52,7 @@ The Preview catalog, search, title metadata, and mapping flow are **MAL-first** 
 
 ## Open the project
 
-<a href="https://www.aniraku.tech/"><img src="https://img.shields.io/badge/OPEN%20ANIRAKU-Visit%20the%20live%20site-3B82F6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open Aniraku live site" /></a>
+<a href="https://test.aniraku.tech/"><img src="https://img.shields.io/badge/OPEN%20ANIRAKU-Visit%20the%20live%20site-3B82F6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open Aniraku live site" /></a>
 <a href="https://github.com/Aniraku/Aniraku-App"><img src="https://img.shields.io/badge/ANDROID-App%20repository-111827?style=for-the-badge&logo=android&logoColor=3DDC84" alt="Open Aniraku Android repository" /></a>
 
 ## Main areas
