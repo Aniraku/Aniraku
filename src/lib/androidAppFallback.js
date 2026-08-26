@@ -4,8 +4,8 @@ export const ANDROID_APP_PACKAGE = 'aniraku.anime.app'
 // resolve it to the installed app. Keep a browser fallback in the intent for
 // the verified public Android release; update this pair alongside every
 // published direct-distribution build.
-export const ANDROID_APP_RELEASE_VERSION = 'V4.5'
-export const ANDROID_APP_RELEASE_URL = 'https://github.com/Aniraku/Aniraku-App/releases/tag/v4.5'
+export const ANDROID_APP_RELEASE_VERSION = 'V4.6'
+export const ANDROID_APP_RELEASE_URL = 'https://github.com/Aniraku/Aniraku-App/releases/tag/v4.6'
 export const ANDROID_APP_INTENT = `intent://auth#Intent;scheme=aniraku;package=${ANDROID_APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(ANDROID_APP_RELEASE_URL)};end`
 export const ANDROID_APP_ORION_URL = 'https://rookieenough.github.io/Orion-Data/redirect.html?id=aniraku'
 export const ANDROID_FALLBACK_DISMISS_KEY = 'aniraku:android-app-fallback:hide-until'
