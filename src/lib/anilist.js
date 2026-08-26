@@ -31,6 +31,19 @@ function titleFromSchedule(value) {
   return { romaji: title, english: title, native: title, userPreferred: title }
 }
 
+const ANIRAKU_AIRING_SCHEDULE_QUERY = `
+  query ($page: Int!, $perPage: Int!) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { currentPage hasNextPage total }
+      airingSchedules(notYetAired: true, sort: [TIME]) {
+        airingAt
+        episode
+        media { id idMal title { romaji english native userPreferred } coverImage { extraLarge large medium color } format }
+      }
+    }
+  }
+`
+
 async function mapScheduleMalIdsToAniList(apiBase, malIds) {
   const ids = [...new Set(malIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50)
   if (!ids.length) return new Map()
@@ -52,6 +65,38 @@ async function mapScheduleMalIdsToAniList(apiBase, malIds) {
   }))
 }
 
+async function getAnirakuAiringScheduleFallback(apiBase, page, perPage) {
+  const response = await fetch(`${apiBase}/api/v1/anilist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query: ANIRAKU_AIRING_SCHEDULE_QUERY, variables: { page, perPage } }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(`Schedule fallback is unavailable (${response.status}).`)
+  const pageData = payload?.data?.Page
+  const schedule = (pageData?.airingSchedules || []).flatMap((item) => {
+    const media = item?.media
+    const id = Number(media?.id)
+    const episode = Number(item?.episode)
+    const airingAt = Number(item?.airingAt)
+    if (!Number.isInteger(id) || id < 1 || !Number.isInteger(episode) || episode < 1 || !Number.isInteger(airingAt) || airingAt < 1) return []
+    return [{
+      id,
+      idMal: Number.isInteger(Number(media?.idMal)) ? Number(media.idMal) : null,
+      title: titleFromSchedule(media?.title),
+      coverImage: media?.coverImage && typeof media.coverImage === 'object' ? media.coverImage : {},
+      format: String(media?.format || '').trim() || null,
+      nextAiringEpisode: { episode, airingAt },
+    }]
+  })
+  return {
+    schedule,
+    pageInfo: pageData?.pageInfo && typeof pageData.pageInfo === 'object'
+      ? pageData.pageInfo
+      : { currentPage: page, perPage, hasNextPage: false, total: schedule.length },
+  }
+}
+
 /**
  * Schedule and displayed next-airing data are intentionally sourced from the
  * existing Aniraku API. The Preview branch retains MAL-first discovery and
@@ -69,7 +114,12 @@ export async function getAnirakuSchedule({ page = 1, perPage = 50 } = {}) {
   if (!response.ok) throw new Error(`Schedule is unavailable (${response.status}).`)
 
   const source = Array.isArray(payload?.schedule) ? payload.schedule : []
-  const idMap = await mapScheduleMalIdsToAniList(apiBase, source.map((item) => item?.id))
+  let idMap = new Map()
+  try {
+    idMap = await mapScheduleMalIdsToAniList(apiBase, source.map((item) => item?.id))
+  } catch (error) {
+    console.warn('Preview Schedule MAL-ID mapping is unavailable; trying Aniraku schedule fallback:', error)
+  }
   const schedule = source.flatMap((item) => {
     const malId = Number(item?.id)
     const id = idMap.get(malId)
@@ -86,12 +136,16 @@ export async function getAnirakuSchedule({ page = 1, perPage = 50 } = {}) {
     }]
   })
 
-  return {
-    schedule,
-    pageInfo: payload?.pageInfo && typeof payload.pageInfo === 'object'
-      ? payload.pageInfo
-      : { currentPage: safePage, perPage: safePerPage, hasNextPage: false, total: schedule.length },
+  if (schedule.length) {
+    return {
+      schedule,
+      pageInfo: payload?.pageInfo && typeof payload.pageInfo === 'object'
+        ? payload.pageInfo
+        : { currentPage: safePage, perPage: safePerPage, hasNextPage: false, total: schedule.length },
+    }
   }
+
+  return getAnirakuAiringScheduleFallback(apiBase, safePage, safePerPage)
 }
 
 export async function anilistQuery(query, variables = {}) {

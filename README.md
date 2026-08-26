@@ -48,7 +48,7 @@ The main flow is:
 
 `discover` → `watch` → `remember`
 
-The Preview catalog, search, title metadata, and mapping flow are **MAL-first** through the branch-local resolver. Only the visible Schedule and Next Airing data path uses the existing Aniraku API at `GET /api/v1/schedule`; those returned MAL records are mapped to verified AniList IDs before existing routes and playback contracts consume them. The player supports adaptive playback, provider fallback, subtitles, dubs, quality selection, seeking, and intro/outro skipping where the data is available. Progress and personal context remain attached to the title instead of disappearing after playback.
+The Preview catalog, search, title metadata, and mapping flow are **MAL-first** through the branch-local resolver. Only the visible Schedule and Next Airing data path uses the existing Aniraku API: it first requests `GET /api/v1/schedule` and, if that endpoint has no usable rows, requests the existing Aniraku GraphQL proxy for real upcoming entries. Those returned records retain verified AniList IDs before existing routes and playback contracts consume them. The player supports adaptive playback, provider fallback, subtitles, dubs, quality selection, seeking, and intro/outro skipping where the data is available. Progress and personal context remain attached to the title instead of disappearing after playback.
 
 ## Open the project
 
