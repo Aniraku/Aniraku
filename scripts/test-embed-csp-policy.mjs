@@ -8,7 +8,8 @@ const csp = globalHeaders.find((header) => header.key === 'Content-Security-Poli
 assert.match(csp, /frame-src 'self' https:/)
 assert.match(csp, /frame-ancestors 'none'/)
 assert.match(csp, /script-src 'self'/)
-assert.match(csp, /connect-src[^;]*https:\/\/miruro-api-v3\.onrender\.com/)
+assert.match(csp, /connect-src[^;]*https:\/\/miruro\.aniraku\.tech/)
+assert.doesNotMatch(csp, /miruro-api-v3\.onrender\.com/)
 assert.match(csp, /connect-src[^;]*https:\/\/api\.giphy\.com/)
 assert.doesNotMatch(csp, /frame-src \*/)
 
