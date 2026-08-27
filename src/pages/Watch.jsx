@@ -74,6 +74,7 @@ import {
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
+import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -1771,8 +1772,21 @@ export default function Watch() {
         }
         if (cancelled) return
         const normalizedEpisodes = normalizeEpisodeList(epData?.episodes)
+        const isMovieFormat = animeData?.format === 'MOVIE'
+        const fallbackThumbnail = isMovieFormat
+          ? animeData?.bannerImage || animeData?.coverImage?.large || animeData?.coverImage?.medium || ''
+          : animeData?.coverImage?.large || animeData?.coverImage?.medium || animeData?.bannerImage || ''
+        const fallbackTitle = isMovieFormat
+          ? animeData?.title?.english || animeData?.title?.romaji || animeData?.title?.userPreferred || ''
+          : ''
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, {
+          fallbackThumbnail,
+          fallbackTitle,
+          isMovie: isMovieFormat,
+        })
+        if (cancelled) return
         setAnime(animeData)
-        setEpisodes(normalizedEpisodes)
+        setEpisodes(verifiedEpisodes)
         setEpisodeAvailability(
           isConfirmedUpcomingEpisode({
             episodeNumber: epNumber,

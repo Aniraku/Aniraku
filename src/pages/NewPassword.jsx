@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import Footer from '../components/Footer/Footer'
 
 const Wrapper = styled.main`
   min-height: 100vh;
@@ -236,8 +237,9 @@ const NewPassword = () => {
   const complete = phase === 'complete'
 
   return (
-    <Wrapper id="main">
-      <Box>
+    <>
+      <Wrapper id="main">
+        <Box>
         <Back to={complete ? '/login' : '/auth/forgot-password'}>&larr; Back to sign in</Back>
         <Card aria-live="polite">
           <Mark aria-hidden="true">A</Mark>
@@ -274,8 +276,10 @@ const NewPassword = () => {
             <Button type="button" onClick={() => navigate('/auth/forgot-password', { replace: true })}>Request a new link</Button>
           )}
         </Card>
-      </Box>
-    </Wrapper>
+        </Box>
+      </Wrapper>
+      <Footer compact />
+    </>
   )
 }
 
