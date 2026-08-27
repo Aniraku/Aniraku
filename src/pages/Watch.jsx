@@ -1022,6 +1022,10 @@ export default function Watch() {
   const [backendHealthy, setBackendHealthy] = useState(true)
   const [errorType, setErrorType] = useState('') // for actionable UI
   const [episodeAvailability, setEpisodeAvailability] = useState('checking')
+  // Keep a title-level unavailable confirmation across same-title route
+  // changes. The Next button replaces only the episode segment, so a new
+  // fetch must not briefly reset a known NOT_YET_RELEASED title to available.
+  const confirmedUnreleasedAnimeIdsRef = useRef(new Set())
 
   // Embedded providers are cross-origin, so the parent page cannot inspect or
   // block their network requests. We still apply safe browser-level defenses:
@@ -1172,13 +1176,14 @@ export default function Watch() {
   const animeId = extractIdFromSlug(baseName)
   const isMovie = anime?.format === 'MOVIE'
   const hasCurrentAnime = anime && String(anime.id) === String(animeId)
-  const isPreemptivelyUpcoming = hasCurrentAnime && isConfirmedUpcomingEpisode({
+  const hasConfirmedUnreleasedTitle = confirmedUnreleasedAnimeIdsRef.current.has(String(animeId))
+  const isPreemptivelyUpcoming = hasConfirmedUnreleasedTitle || (hasCurrentAnime && isConfirmedUpcomingEpisode({
     episodeNumber: epNumber,
     episodes,
     status: anime?.status,
     nextAiringEpisode: anime?.nextAiringEpisode,
     hasConfirmedEpisodeList: episodes.length > 0,
-  })
+  }))
   const effectiveEpisodeAvailability = isPreemptivelyUpcoming
     ? 'upcoming'
     : episodeAvailability
@@ -1779,14 +1784,15 @@ export default function Watch() {
         const fallbackTitle = isMovieFormat
           ? animeData?.title?.english || animeData?.title?.romaji || animeData?.title?.userPreferred || ''
           : ''
-        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, {
-          fallbackThumbnail,
-          fallbackTitle,
-          isMovie: isMovieFormat,
-        })
-        if (cancelled) return
+        if (String(animeData?.status || '').toUpperCase() === 'NOT_YET_RELEASED') {
+          confirmedUnreleasedAnimeIdsRef.current.add(String(animeId))
+        } else {
+          confirmedUnreleasedAnimeIdsRef.current.delete(String(animeId))
+        }
+        // Availability and provider safety are authoritative Aniraku metadata
+        // decisions. Do not defer them behind optional TMDB display enrichment.
         setAnime(animeData)
-        setEpisodes(verifiedEpisodes)
+        setEpisodes(normalizedEpisodes)
         setEpisodeAvailability(
           isConfirmedUpcomingEpisode({
             episodeNumber: epNumber,
@@ -1799,10 +1805,21 @@ export default function Watch() {
             : 'available'
         )
         setBackendHealthy(true)
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, {
+          fallbackThumbnail,
+          fallbackTitle,
+          isMovie: isMovieFormat,
+        }).catch(() => normalizedEpisodes)
+        if (cancelled) return
+        setEpisodes(verifiedEpisodes)
       } catch (e) {
         if (cancelled) return
         setBackendHealthy(false)
-        setEpisodeAvailability('available')
+        setEpisodeAvailability(
+          confirmedUnreleasedAnimeIdsRef.current.has(String(animeId))
+            ? 'upcoming'
+            : 'available'
+        )
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -3961,7 +3978,7 @@ export default function Watch() {
 
 
           {/* Buffering indicator */}
-          {buffering && !streamLoading && !activeEmbedUrl && (
+          {effectiveEpisodeAvailability !== 'upcoming' && buffering && !streamLoading && !activeEmbedUrl && (
             <div
               aria-live="polite"
               role="status"
@@ -3990,7 +4007,7 @@ export default function Watch() {
           )}
 
           {/* Loading */}
-          {streamLoading && (
+          {effectiveEpisodeAvailability !== 'upcoming' && streamLoading && (
             <div
               className="watch-loading"
               role="status"
@@ -4492,7 +4509,9 @@ export default function Watch() {
           }}
         >
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: error ? '#f87171' : streamLoading ? '#fbbf24' : '#34d399' }} />
-			{error
+			{effectiveEpisodeAvailability === 'upcoming'
+				? UPCOMING_EPISODE_MESSAGE
+				: error
 				? 'Playback needs attention. Choose a recovery option or another server.'
 				: streamLoading
 				? 'Preparing a stream…'
