@@ -1,4 +1,5 @@
 const TMDB_BATCH_SIZE = 100
+const TMDB_BATCH_CONCURRENCY = 3
 
 function positiveInteger(value) {
   const parsed = Number(value)
@@ -19,6 +20,13 @@ function hasSourceProvidedPoster(value) {
 
 function isGenericEpisodeLabel(value) {
   return /^(?:(?:episode|ep)\s*)?\d+(?:\s*(?:[·.-]\s*\d+\s*[ps]))?$/i.test(text(value))
+}
+
+function isPublishedEpisodeTitle(value) {
+  const title = text(value)
+  return Boolean(title)
+    && !isGenericEpisodeLabel(title)
+    && !/^(?:tba|tbd|untitled|unknown)$/i.test(title)
 }
 
 function trustedAvailability(availability) {
@@ -60,34 +68,51 @@ function neutralEpisode(episode, index) {
   }
 }
 
-export function mergeTmdbEpisodeMetadata(availability, metadata, { fallbackThumbnail = '', fallbackTitle = '', isMovie = false } = {}) {
+export function mergeTmdbEpisodeMetadata(availability, metadata, { fallbackThumbnail = '', fallbackTitle = '', isMovie = false, mappedNumbers = [] } = {}) {
   const verifiedFallbackThumbnail = hasSourceProvidedPoster(fallbackThumbnail) ? text(fallbackThumbnail) : null
   const normalizedFallbackTitle = text(fallbackTitle)
   const verifiedMovieFallbackTitle = isMovie && normalizedFallbackTitle && !isGenericEpisodeLabel(normalizedFallbackTitle)
     ? normalizedFallbackTitle
     : null
-  const byNumber = new Map(
-    (Array.isArray(metadata) ? metadata : [])
-      .filter((entry) => positiveInteger(entry?.number))
-      .map((entry) => [Number(entry.number), entry]),
-  )
+  const exactMappedNumbers = new Set((Array.isArray(mappedNumbers) ? mappedNumbers : [])
+    .map(positiveInteger)
+    .filter(Boolean))
+  const entriesByNumber = new Map()
+  ;(Array.isArray(metadata) ? metadata : [])
+    .filter((entry) => positiveInteger(entry?.number) && isPublishedEpisodeTitle(entry?.title))
+    .forEach((entry) => {
+      const number = Number(entry.number)
+      const entries = entriesByNumber.get(number) || []
+      entries.push(entry)
+      entriesByNumber.set(number, entries)
+    })
+  // A correctly formed resolver payload has one record for each canonical
+  // source position. If a malformed response supplies several candidates, do
+  // not choose one by order; treat it as unresolved and preserve safety.
+  const byNumber = new Map([...entriesByNumber.entries()]
+    .filter(([, entries]) => entries.length === 1)
+    .map(([number, [entry]]) => [number, entry]))
   return trustedAvailability(availability).map((episode, index) => {
     const neutral = neutralEpisode(episode, index)
     const tmdb = byNumber.get(neutral.number)
     if (!tmdb) {
+      const exactMappingHadNoRecord = exactMappedNumbers.has(neutral.number)
       return {
-        ...episode,
+        ...(exactMappingHadNoRecord ? neutral : episode),
         // A one-row movie uses its already loaded, source-provided movie name
         // only when no exact TMDB movie mapping can supply a title. TV rows
         // remain neutral rather than borrowing a series title as episode data.
-        title: episode.title || verifiedMovieFallbackTitle,
-        thumbnail: episode.thumbnail || verifiedFallbackThumbnail,
+        title: exactMappingHadNoRecord ? verifiedMovieFallbackTitle : (episode.title || verifiedMovieFallbackTitle),
+        thumbnail: exactMappingHadNoRecord ? verifiedFallbackThumbnail : (episode.thumbnail || verifiedFallbackThumbnail),
       }
     }
     return {
       ...neutral,
       title: text(tmdb.title) || episode.title,
-      thumbnail: hasVerifiedTmdbThumbnail(tmdb.thumbnail) ? text(tmdb.thumbnail) : (episode.thumbnail || verifiedFallbackThumbnail),
+      // Once exact TMDB metadata exists, do not retain a possibly copied
+      // provider still from another related season. Use only its verified
+      // still or the already authoritative title-level art fallback.
+      thumbnail: hasVerifiedTmdbThumbnail(tmdb.thumbnail) ? text(tmdb.thumbnail) : verifiedFallbackThumbnail,
       description: text(tmdb.description) || null,
     }
   })
@@ -106,25 +131,36 @@ export async function enrichEpisodesWithTmdb(anilistId, availability, {
   const baseline = mergeTmdbEpisodeMetadata(availability, [], fallback)
   if (!id || !baseline.length) return baseline
 
-  // Query TMDB only for display fields that the source payload cannot prove are
-  // trustworthy. This retains One Piece's verified catalog and avoids a 100+
-  // chunk resolver fan-out on every long-running title page.
-  const unresolved = baseline.filter((episode) => !episode.title || !episode.thumbnail)
-  if (!unresolved.length) return baseline
-
   const metadata = []
-  for (let offset = 0; offset < unresolved.length; offset += TMDB_BATCH_SIZE) {
-    const numbers = unresolved.slice(offset, offset + TMDB_BATCH_SIZE).map((episode) => episode.number)
+  const mappedNumbers = []
+  // All positions are checked, not merely visibly incomplete source rows. A
+  // source can contain a unique but wrong label copied from a related season;
+  // exact TMDB data is the authoritative display replacement when mapped.
+  // Each request remains bounded by the server's 100-number contract, with no
+  // fixed total-episode or fixed-season ceiling.
+  const batches = []
+  for (let offset = 0; offset < baseline.length; offset += TMDB_BATCH_SIZE) {
+    batches.push(baseline.slice(offset, offset + TMDB_BATCH_SIZE).map((episode) => episode.number))
+  }
+  const requestBatch = async (numbers) => {
     const target = `${baseUrl}/api/tmdb-episodes?anilistId=${encodeURIComponent(id)}&episodes=${encodeURIComponent(numbers.join(','))}`
     try {
       const response = await fetchImpl(target, { headers: { Accept: 'application/json' }, signal })
       const payload = await response.json().catch(() => ({}))
-      if (!response.ok || Number(payload?.anilistId) !== id || payload?.source !== 'tmdb') return baseline
-      if (Array.isArray(payload.episodes)) metadata.push(...payload.episodes)
+      if (!response.ok || Number(payload?.anilistId) !== id || payload?.source !== 'tmdb') return null
+      return payload
     } catch (error) {
       if (error?.name === 'AbortError') throw error
-      return baseline
+      return null
     }
   }
-  return mergeTmdbEpisodeMetadata(availability, metadata, fallback)
+  for (let offset = 0; offset < batches.length; offset += TMDB_BATCH_CONCURRENCY) {
+    const payloads = await Promise.all(batches.slice(offset, offset + TMDB_BATCH_CONCURRENCY).map(requestBatch))
+    if (payloads.some((payload) => !payload)) return baseline
+    for (const payload of payloads) {
+      if (Array.isArray(payload.episodes)) metadata.push(...payload.episodes)
+      if (Array.isArray(payload.mapped)) mappedNumbers.push(...payload.mapped)
+    }
+  }
+  return mergeTmdbEpisodeMetadata(availability, metadata, { ...fallback, mappedNumbers })
 }

@@ -101,6 +101,7 @@ try {
     description: 'Verified season 23 metadata.',
     airdate: null,
   }])
+  assert.deepEqual(season23Result.mapped, [1156])
   assert.deepEqual(season23Result.missing, [])
 
   const responseState = { statusCode: null, headers: {}, body: null }
@@ -129,6 +130,7 @@ try {
     },
   ])
   assert.deepEqual(responseState.body.missing, [])
+  assert.deepEqual(responseState.body.mapped, [1156, 1176])
 } finally {
   globalThis.fetch = originalFetch
   if (originalToken === undefined) delete process.env.TMDB_READ_ACCESS_TOKEN
@@ -154,6 +156,7 @@ assert.deepEqual(episode, {
   airdate: '2026-07-25',
 })
 assert.equal(__test__.toTmdbEpisodeMetadata({ episode_number: 46, name: 'Episode 46' }, 6, 46), null)
+assert.equal(__test__.toTmdbEpisodeMetadata({ episode_number: 42, name: 'A Different Episode' }, 1, 41), null)
 
 const [movieMapping] = __test__.extractTmdbMovieMappings({
   data: {

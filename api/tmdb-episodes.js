@@ -356,6 +356,11 @@ async function resolveEpisodes(anilistId, episodeNumbers) {
     },
     cacheSeconds: Math.floor(EPISODE_TTL_MS / 1000),
     episodes,
+    // These are the canonical source positions covered by exactly one
+    // AniBridge rule. The client uses this only to avoid retaining a display
+    // label or still from a different related entry when TMDB has no verified
+    // record for an otherwise exact mapped position.
+    mapped: episodeNumbers.filter((number) => Boolean(requestedMappings.get(number))),
     missing: episodeNumbers.filter((number) => !found.has(number)),
   }
 }
