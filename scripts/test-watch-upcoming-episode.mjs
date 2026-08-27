@@ -43,6 +43,15 @@ assert.equal(
 )
 assert.equal(
   isConfirmedUpcomingEpisode({
+    episodeNumber: 2,
+    episodes: Array.from({ length: 12 }, (_, index) => ({ number: index + 1 })),
+    status: 'NOT_YET_RELEASED',
+    hasConfirmedEpisodeList: true,
+  }),
+  true
+)
+assert.equal(
+  isConfirmedUpcomingEpisode({
     episodeNumber: 1,
     status: 'NOT_YET_RELEASED',
     isMovie: true,
@@ -80,5 +89,20 @@ assert.match(source, /effectiveEpisodeAvailability !== 'upcoming'/)
 assert.match(source, /setErrorType\('upcoming'\)/)
 assert.match(source, /setError\(UPCOMING_EPISODE_MESSAGE\)/)
 assert.match(source, /errorType !== 'upcoming'/)
+assert.match(source, /confirmedUnreleasedAnimeIdsRef/)
+assert.match(source, /confirmedUnreleasedAnimeIdsRef\.current\.add\(String\(animeId\)\)/)
+assert.match(source, /effectiveEpisodeAvailability === 'upcoming'\s*\? UPCOMING_EPISODE_MESSAGE/)
+assert.ok(
+  source.indexOf("confirmedUnreleasedAnimeIdsRef.current.add(String(animeId))") < source.indexOf('await enrichEpisodesWithTmdb'),
+  'Future availability must be confirmed before optional TMDB display enrichment can settle.'
+)
+assert.ok(
+  source.indexOf('setEpisodeAvailability(\n          isConfirmedUpcomingEpisode') < source.indexOf('await enrichEpisodesWithTmdb'),
+  'Provider discovery must receive the availability decision before optional display enrichment.'
+)
+assert.match(source, /enrichEpisodesWithTmdb\(animeId, normalizedEpisodes, \{[\s\S]*?\}\)\.catch\(\(\) => normalizedEpisodes\)/)
+assert.match(source, /confirmedUnreleasedAnimeIdsRef\.current\.has\(String\(animeId\)\)\s*\? 'upcoming'\s*:\s*'available'/)
+assert.match(source, /effectiveEpisodeAvailability !== 'upcoming' && streamLoading/)
+assert.match(source, /effectiveEpisodeAvailability !== 'upcoming' && buffering/)
 
 console.log('Watch upcoming-episode guard tests passed')

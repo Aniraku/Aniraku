@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const root = new URL('..', import.meta.url)
-const [home, mobileNav] = await Promise.all([
+const [home, homeData, mobileNav] = await Promise.all([
   readFile(new URL('src/pages/Home.jsx', root), 'utf8'),
+  readFile(new URL('src/hooks/useAnime.js', root), 'utf8'),
   readFile(new URL('src/components/MobileBottomNav.jsx', root), 'utf8'),
 ])
 
@@ -20,6 +21,13 @@ assert.match(home, /key=\{mediaKey\(item\)\}/)
 assert.match(home, /const freshAiring = useMemo\(\(\) => uniqueMedia\(airingList\), \[airingList\]\)/)
 assert.match(home, /const popularItems = useMemo\(\(\) => uniqueMedia\(\[\.\.\.trendingList, \.\.\.moviesList\]\), \[trendingList, moviesList\]\)/)
 assert.doesNotMatch(home, /freshAiring = useMemo\([^\n]+featured/)
+assert.match(home, /const unreleasedList = useStreamable\(filterAdult\(upcoming, nsfwEnabled\)\)/)
+assert.match(home, /const upcomingList = useMemo\(\(\) => uniqueMedia\(unreleasedList\)/)
+assert.match(home, /item\?\.status === 'NOT_YET_RELEASED'/)
+assert.doesNotMatch(home, /const upcomingList = useMemo\(\(\) => uniqueMedia\(schedule\)/)
+assert.match(homeData, /upcoming: Page\(page: 1, perPage: 20\)/)
+assert.match(homeData, /status: NOT_YET_RELEASED/)
+assert.match(homeData, /upcoming: data\.upcoming\?\.media \|\| \[\]/)
 assert.match(home, /groupHomeScheduleRows/)
 assert.match(home, /initialPopulatedScheduleDayIndex/)
 assert.match(home, /userSelectedScheduleDay\.current = true/)

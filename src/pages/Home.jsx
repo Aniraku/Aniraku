@@ -538,11 +538,12 @@ function CompactList({ items, label, emptyLabel = 'More titles will appear here 
 
 function Home() {
   const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
-  const { trending = [], airing = [], movies = [], topTV = [], schedule = [] } = homeData
+  const { trending = [], airing = [], upcoming = [], movies = [], topTV = [], schedule = [] } = homeData
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
   const trendingList = useStreamable(filterAdult(trending, nsfwEnabled))
   const airingList = useStreamable(filterAdult(airing, nsfwEnabled))
+  const unreleasedList = useStreamable(filterAdult(upcoming, nsfwEnabled))
   const moviesList = useStreamable(filterAdult(movies, nsfwEnabled))
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
   const finishedList = useMemo(() => uniqueMedia([...tvList, ...trendingList]
@@ -559,7 +560,9 @@ function Home() {
   // Featured rotation affects only the hero. Discovery and supporting shelves
   // retain stable item order and identity so titles, art, keys, and links
   // never appear to swap as the hero advances.
-  const upcomingList = useMemo(() => uniqueMedia(schedule).slice(0, 6), [schedule])
+  const upcomingList = useMemo(() => uniqueMedia(unreleasedList)
+    .filter((item) => item?.status === 'NOT_YET_RELEASED')
+    .slice(0, 6), [unreleasedList])
   const freshAiring = useMemo(() => uniqueMedia(airingList), [airingList])
   const popularItems = useMemo(() => uniqueMedia([...trendingList, ...moviesList]), [trendingList, moviesList])
   const topItems = useMemo(() => uniqueMedia(tvList), [tvList])

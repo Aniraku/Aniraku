@@ -28,6 +28,14 @@ async function fetchHomePageData() {
           format status episodes averageScore popularity genres isAdult
         }
       }
+      upcoming: Page(page: 1, perPage: 20) {
+        media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) {
+          id title { romaji english native userPreferred }
+          coverImage { extraLarge large medium color }
+          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
+          format status episodes averageScore popularity genres isAdult
+        }
+      }
       movies: Page(page: 1, perPage: 20) {
         media(type: ANIME, format: MOVIE, sort: TRENDING_DESC) {
           id title { romaji english native userPreferred }
@@ -61,6 +69,7 @@ async function fetchHomePageData() {
   return {
     trending: withScheduledNextAiring(data.trending.media),
     airing: withScheduledNextAiring(data.airing.media),
+    upcoming: data.upcoming?.media || [],
     movies: withScheduledNextAiring(data.movies.media),
     topTV: withScheduledNextAiring(data.topTV.media),
     schedule,
