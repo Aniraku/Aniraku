@@ -17,7 +17,7 @@ import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
 import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
-const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
+const MIRURO_RELATIONS_BASE = 'https://miruro.aniraku.tech/anime'
 const EPISODE_RETRY_BASE_MS = 1_500
 const EPISODE_RETRY_MAX_MS = 15_000
 
