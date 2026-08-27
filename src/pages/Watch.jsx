@@ -21,6 +21,7 @@ import {
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
+import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
@@ -1712,6 +1713,7 @@ export default function Watch() {
     setNoStreamError(false)
     setStreamLoading(true)
     let cancelled = false
+    const controller = new AbortController()
     let attempts = 0
 
     const run = async () => {
@@ -1768,12 +1770,14 @@ export default function Watch() {
         }
         if (cancelled) return
         const normalizedEpisodes = normalizeEpisodeList(epData?.episodes)
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, { signal: controller.signal })
+        if (cancelled) return
         setAnime(animeData)
-        setEpisodes(normalizedEpisodes)
+        setEpisodes(verifiedEpisodes)
         setEpisodeAvailability(
           isConfirmedUpcomingEpisode({
             episodeNumber: epNumber,
-            episodes: normalizedEpisodes,
+            episodes: verifiedEpisodes,
             status: animeData?.status,
             nextAiringEpisode: animeData?.nextAiringEpisode,
             hasConfirmedEpisodeList,
@@ -1793,6 +1797,7 @@ export default function Watch() {
     run()
     return () => {
       cancelled = true
+      controller.abort()
     }
   }, [animeId, epNumber])
 

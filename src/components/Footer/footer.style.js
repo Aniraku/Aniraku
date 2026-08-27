@@ -107,6 +107,28 @@ F.Disclaimer = styled.p`
   line-height: 1.65;
 `
 
+F.TmdbAttribution = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .67rem;
+  line-height: 1.45;
+
+  img {
+    width: 44px;
+    height: auto;
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 680px) {
+    justify-content: center;
+    max-width: 340px;
+  }
+`
+
 F.Socials = styled.div`
   display: flex;
   flex-wrap: wrap;

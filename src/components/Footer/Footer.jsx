@@ -82,12 +82,16 @@ const Footer = ({ compact = false }) => {
     <F.Footer id="footer">
       {/* Desktop grid */}
       <F.DesktopGrid>
-        <F.Col>
-          <Logo to="/" height={36} showText />
-          <F.Disclaimer>
-            Aniraku is an open-source media client. We do not host, store, or upload video files.
-            Stream links are resolved from publicly available third-party sources at playback time.
-          </F.Disclaimer>
+          <F.Col>
+            <Logo to="/" height={36} showText />
+            <F.Disclaimer>
+              Aniraku is an open-source media client. We do not host, store, or upload video files.
+              Stream links are resolved from publicly available third-party sources at playback time.
+            </F.Disclaimer>
+            <F.TmdbAttribution>
+              <img src="https://www.themoviedb.org/assets/2/v4/logos/primary-green.svg" alt="TMDB" />
+              <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
+            </F.TmdbAttribution>
           <F.Socials>
             <F.SocialLink href="https://github.com/Aniraku/Aniraku" target="_blank" rel="noreferrer" aria-label="GitHub"><FaGithub size={18} /></F.SocialLink>
             <F.SocialLink href="https://discord.gg/aniraku" target="_blank" rel="noreferrer" aria-label="Discord"><FaDiscord size={18} /></F.SocialLink>
@@ -146,6 +150,10 @@ const Footer = ({ compact = false }) => {
           <F.MobileDot>·</F.MobileDot>
           <F.MobileLink as="a" href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Report an issue</F.MobileLink>
         </F.MobileLinks>
+        <F.TmdbAttribution>
+          <img src="https://www.themoviedb.org/assets/2/v4/logos/primary-green.svg" alt="TMDB" />
+          <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
+        </F.TmdbAttribution>
         <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0 · No media hosting</F.Copyright>
       </F.MobileFooter>
 

@@ -15,6 +15,7 @@ import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
+import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 const EPISODE_RETRY_BASE_MS = 1_500
@@ -825,9 +826,10 @@ const AnimeDetail = () => {
           recap: Boolean(episode.recap),
         }))
         if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(id, directEpisodes, { signal: controller.signal })
         if (!cancelled) {
           retryAttempt = 0
-          setEpisodes(directEpisodes)
+          setEpisodes(verifiedEpisodes)
           setEpisodesLoading(false)
         }
       } catch (error) {
