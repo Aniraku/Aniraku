@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 const source = await readFile(resolve('src/pages/AnimeDetail.jsx'), 'utf8')
+const metadataSource = await readFile(resolve('src/lib/anilist.js'), 'utf8')
 const relationsStart = source.indexOf('const loadRelations = async () =>')
 const episodesStart = source.indexOf('const loadEpisodes = async () =>')
 const relationsEnd = source.indexOf('const toggleBookmark = () =>')
@@ -25,4 +26,14 @@ for (const [name, effect] of [['relations', relationsEffect], ['episodes', episo
   }
 }
 
-console.log('Anime Detail supplemental requests start from the route ID without metadata serialization.')
+if (!metadataSource.includes('recommendations(perPage: 12) { nodes { mediaRecommendation { id')) {
+  throw new Error('Anime Detail metadata must request the Similar Anime recommendation records.')
+}
+if (!source.includes('const similarList = useStreamable(filterAdult((anime?.recommendations?.nodes || [])')) {
+  throw new Error('Anime Detail must retain its existing safe Similar Anime list derivation.')
+}
+if (!source.includes('<SectionTitle>Similar Anime</SectionTitle>') || !source.includes('{similarList.map(item => <RecCard key={item.id} item={item} />)}')) {
+  throw new Error('Anime Detail must render the Similar Anime recommendation grid when verified results exist.')
+}
+
+console.log('Anime Detail supplemental requests and Similar Anime recommendation coverage are present.')
