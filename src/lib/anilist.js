@@ -314,6 +314,7 @@ export const ANIME_DETAIL_QUERY = `
       bannerImage format status episodes duration genres averageScore popularity description season seasonYear
       nextAiringEpisode { episode airingAt }
       relations { edges { relationType node { id title { romaji english } coverImage { large medium } format type } } }
+      recommendations(perPage: 12) { nodes { mediaRecommendation { id title { romaji english userPreferred } coverImage { extraLarge large medium color } format episodes averageScore status genres isAdult } } }
       streamingEpisodes { title thumbnail url }
     }
   }
