@@ -2,6 +2,7 @@ const TMDB_API_BASE = 'https://api.themoviedb.org/3'
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w780'
 const ANIBRIDGE_MAPPINGS_API = 'https://mappings.anibridge.eliasbenb.dev/api/v3/mappings'
 const MAX_EPISODE_NUMBERS = 100
+const MAPPING_RESPONSE_LIMIT = 100
 const REQUEST_TIMEOUT_MS = 10_000
 const MAPPING_TTL_MS = 24 * 60 * 60_000
 const EPISODE_TTL_MS = 5 * 60_000
@@ -171,8 +172,12 @@ async function requestJson(url, options, unavailableCode, unavailableMessage) {
   }
 }
 
+function mappingRequestUrl(anilistId) {
+  return `${ANIBRIDGE_MAPPINGS_API}?provider=anilist&id=${encodeURIComponent(anilistId)}&limit=${MAPPING_RESPONSE_LIMIT}`
+}
+
 async function getMapping(anilistId) {
-  const url = `${ANIBRIDGE_MAPPINGS_API}?provider=anilist&id=${encodeURIComponent(anilistId)}&limit=20`
+  const url = mappingRequestUrl(anilistId)
   return cached(cacheKey('anibridge-mapping', anilistId), MAPPING_TTL_MS, () => requestJson(
     url,
     { headers: { Accept: 'application/json' } },
@@ -317,4 +322,4 @@ export default async function handler(request, response) {
   }
 }
 
-export const __test__ = { extractTmdbMovieMappings, extractTmdbShowMappings, isPublishedTitle, mapEpisodeNumber, parseEpisodeNumbers, safeStillUrl, selectTmdbMappingForEpisode, toTmdbEpisodeMetadata, toTmdbMovieMetadata }
+export const __test__ = { extractTmdbMovieMappings, extractTmdbShowMappings, isPublishedTitle, mapEpisodeNumber, mappingRequestUrl, parseEpisodeNumbers, safeStillUrl, selectTmdbMappingForEpisode, toTmdbEpisodeMetadata, toTmdbMovieMetadata }

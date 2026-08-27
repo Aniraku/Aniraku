@@ -5,6 +5,7 @@ const numbers = __test__.parseEpisodeNumbers('3,1,3,2')
 assert.deepEqual(numbers, [1, 2, 3])
 assert.throws(() => __test__.parseEpisodeNumbers('0,nope'), /positive episode numbers/)
 assert.throws(() => __test__.parseEpisodeNumbers(Array.from({ length: 101 }, (_, index) => index + 1).join(',')), /at most 100/)
+assert.match(__test__.mappingRequestUrl(21), /provider=anilist&id=21&limit=100$/)
 
 const [mapping] = __test__.extractTmdbShowMappings({
   data: {
@@ -24,10 +25,14 @@ const longRunningMappings = __test__.extractTmdbShowMappings({
     'anilist:21': {
       'tmdb_show:37854:s1': { '1-61': '1-61' },
       'tmdb_show:37854:s2': { '62-77': '62-77' },
+      'tmdb_show:37854:s19': { '804-877': '1-74' },
+      'tmdb_show:37854:s20': { '878-891': '1-14' },
+      'tmdb_show:37854:s21': { '892-1088': '1-197' },
+      'tmdb_show:37854:s22': { '1089-': '1-' },
     },
   },
 }, 21)
-assert.equal(longRunningMappings.length, 2)
+assert.equal(longRunningMappings.length, 6)
 assert.equal(__test__.mapEpisodeNumber(longRunningMappings[0].ranges, 1), 1)
 assert.equal(__test__.mapEpisodeNumber(longRunningMappings[1].ranges, 70), 70)
 assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 1), {
@@ -35,6 +40,15 @@ assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 1), {
 })
 assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 70), {
   type: 'tv', showId: 37854, seasonNumber: 2, ranges: { '62-77': '62-77' }, tmdbNumber: 70,
+})
+assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 878), {
+  type: 'tv', showId: 37854, seasonNumber: 20, ranges: { '878-891': '1-14' }, tmdbNumber: 1,
+})
+assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 892), {
+  type: 'tv', showId: 37854, seasonNumber: 21, ranges: { '892-1088': '1-197' }, tmdbNumber: 1,
+})
+assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 1089), {
+  type: 'tv', showId: 37854, seasonNumber: 22, ranges: { '1089-': '1-' }, tmdbNumber: 1,
 })
 assert.equal(__test__.selectTmdbMappingForEpisode([
   { showId: 1, seasonNumber: 1, ranges: { '1-10': '1-10' } },
