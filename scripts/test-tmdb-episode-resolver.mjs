@@ -6,7 +6,7 @@ assert.deepEqual(numbers, [1, 2, 3])
 assert.throws(() => __test__.parseEpisodeNumbers('0,nope'), /positive episode numbers/)
 assert.throws(() => __test__.parseEpisodeNumbers(Array.from({ length: 101 }, (_, index) => index + 1).join(',')), /at most 100/)
 
-const mapping = __test__.extractTmdbShowMapping({
+const [mapping] = __test__.extractTmdbShowMappings({
   data: {
     'anilist:185874': {
       'tmdb_show:30984:s2': { '1-': '41-' },
@@ -18,8 +18,28 @@ assert.equal(__test__.mapEpisodeNumber(mapping.ranges, 1), 41)
 assert.equal(__test__.mapEpisodeNumber(mapping.ranges, 5), 45)
 assert.equal(__test__.mapEpisodeNumber({ '1-12': '1-6,8-13' }, 7), 8)
 assert.equal(__test__.mapEpisodeNumber({ '1-12': '1-24|2' }, 1), null)
-assert.throws(() => __test__.extractTmdbShowMapping({ data: {} }, 185874), /verified AniList-to-TMDB mapping/)
-assert.throws(() => __test__.extractTmdbShowMapping({ data: { 'anilist:1': { 'tmdb_show:1:s1': {}, 'tmdb_show:2:s1': {} } } }, 1), /multiple TMDB television mappings/)
+assert.throws(() => __test__.extractTmdbShowMappings({ data: {} }, 185874), /verified AniList-to-TMDB mapping/)
+const longRunningMappings = __test__.extractTmdbShowMappings({
+  data: {
+    'anilist:21': {
+      'tmdb_show:37854:s1': { '1-61': '1-61' },
+      'tmdb_show:37854:s2': { '62-77': '62-77' },
+    },
+  },
+}, 21)
+assert.equal(longRunningMappings.length, 2)
+assert.equal(__test__.mapEpisodeNumber(longRunningMappings[0].ranges, 1), 1)
+assert.equal(__test__.mapEpisodeNumber(longRunningMappings[1].ranges, 70), 70)
+assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 1), {
+  showId: 37854, seasonNumber: 1, ranges: { '1-61': '1-61' }, tmdbNumber: 1,
+})
+assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 70), {
+  showId: 37854, seasonNumber: 2, ranges: { '62-77': '62-77' }, tmdbNumber: 70,
+})
+assert.equal(__test__.selectTmdbMappingForEpisode([
+  { showId: 1, seasonNumber: 1, ranges: { '1-10': '1-10' } },
+  { showId: 2, seasonNumber: 1, ranges: { '5-15': '1-11' } },
+], 5), null)
 
 const episode = __test__.toTmdbEpisodeMetadata({
   episode_number: 41,

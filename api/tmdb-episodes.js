@@ -104,7 +104,7 @@ function mapEpisodeNumber(rangeMap, anilistEpisode) {
   return null
 }
 
-function extractTmdbShowMapping(payload, anilistId) {
+function extractTmdbShowMappings(payload, anilistId) {
   const source = payload?.data?.[`anilist:${anilistId}`]
   if (!source || typeof source !== 'object') {
     throw new ResolverError('TMDB_MAPPING_NOT_FOUND', 'No verified AniList-to-TMDB mapping exists for this anime.', 404)
@@ -122,10 +122,17 @@ function extractTmdbShowMapping(payload, anilistId) {
   if (!matches.length) {
     throw new ResolverError('TMDB_TV_MAPPING_NOT_FOUND', 'No verified TMDB television episode mapping exists for this anime.', 404)
   }
-  if (matches.length !== 1) {
-    throw new ResolverError('TMDB_MAPPING_AMBIGUOUS', 'This anime has multiple TMDB television mappings, so episode metadata is withheld.', 409)
-  }
-  return matches[0]
+  return matches
+}
+
+function selectTmdbMappingForEpisode(mappings, anilistEpisode) {
+  const candidates = (Array.isArray(mappings) ? mappings : [])
+    .map((mapping) => ({ ...mapping, tmdbNumber: mapEpisodeNumber(mapping?.ranges, anilistEpisode) }))
+    .filter((candidate) => candidate.tmdbNumber)
+  // Multiple season rules may exist for one anime (for example long-running
+  // series). They are valid when only one covers the requested position. If
+  // two rules cover that position, withhold metadata rather than guessing.
+  return candidates.length === 1 ? candidates[0] : null
 }
 
 async function requestJson(url, options, unavailableCode, unavailableMessage) {
@@ -184,29 +191,41 @@ function toTmdbEpisodeMetadata(entry, anilistNumber, tmdbNumber) {
 
 async function resolveEpisodes(anilistId, episodeNumbers) {
   const mappingPayload = await getMapping(anilistId)
-  const mapping = extractTmdbShowMapping(mappingPayload, anilistId)
-  const requestedMappings = new Map(episodeNumbers.map((number) => [number, mapEpisodeNumber(mapping.ranges, number)]))
-  const tmdbNumbers = new Set([...requestedMappings.values()].filter(Boolean))
-  if (!tmdbNumbers.size) {
+  const mappings = extractTmdbShowMappings(mappingPayload, anilistId)
+  const requestedMappings = new Map(episodeNumbers.map((number) => [number, selectTmdbMappingForEpisode(mappings, number)]))
+  const activeMappings = [...new Map(
+    [...requestedMappings.values()]
+      .filter(Boolean)
+      .map((mapping) => [`${mapping.showId}:${mapping.seasonNumber}`, mapping]),
+  ).values()]
+  if (!activeMappings.length) {
     return { anilistId, source: 'tmdb', cacheSeconds: Math.floor(EPISODE_TTL_MS / 1000), episodes: [], missing: episodeNumbers }
   }
 
-  const season = await getTmdbSeason(mapping.showId, mapping.seasonNumber)
-  if (Number(season?.season_number) !== mapping.seasonNumber) {
-    throw new ResolverError('TMDB_SEASON_MISMATCH', 'TMDB returned an unexpected season for the verified mapping.', 502)
+  const tmdbEpisodes = new Map()
+  for (const mapping of activeMappings) {
+    const season = await getTmdbSeason(mapping.showId, mapping.seasonNumber)
+    if (Number(season?.season_number) !== mapping.seasonNumber) {
+      throw new ResolverError('TMDB_SEASON_MISMATCH', 'TMDB returned an unexpected season for the verified mapping.', 502)
+    }
+    for (const entry of Array.isArray(season?.episodes) ? season.episodes : []) {
+      tmdbEpisodes.set(`${mapping.showId}:${mapping.seasonNumber}:${Number(entry?.episode_number)}`, entry)
+    }
   }
-  const tmdbEpisodes = new Map((Array.isArray(season?.episodes) ? season.episodes : [])
-    .filter((entry) => tmdbNumbers.has(Number(entry?.episode_number)))
-    .map((entry) => [Number(entry.episode_number), entry]))
   const episodes = episodeNumbers
-    .map((number) => toTmdbEpisodeMetadata(tmdbEpisodes.get(requestedMappings.get(number)), number, requestedMappings.get(number)))
+    .map((number) => {
+      const mapping = requestedMappings.get(number)
+      return mapping
+        ? toTmdbEpisodeMetadata(tmdbEpisodes.get(`${mapping.showId}:${mapping.seasonNumber}:${mapping.tmdbNumber}`), number, mapping.tmdbNumber)
+        : null
+    })
     .filter(Boolean)
   const found = new Set(episodes.map((episode) => episode.number))
 
   return {
     anilistId,
     source: 'tmdb',
-    mapping: { provider: 'anibridge', showId: mapping.showId, seasonNumber: mapping.seasonNumber },
+    mapping: { provider: 'anibridge', segments: activeMappings.map(({ showId, seasonNumber }) => ({ showId, seasonNumber })) },
     cacheSeconds: Math.floor(EPISODE_TTL_MS / 1000),
     episodes,
     missing: episodeNumbers.filter((number) => !found.has(number)),
@@ -240,4 +259,4 @@ export default async function handler(request, response) {
   }
 }
 
-export const __test__ = { extractTmdbShowMapping, isPublishedTitle, mapEpisodeNumber, parseEpisodeNumbers, safeStillUrl, toTmdbEpisodeMetadata }
+export const __test__ = { extractTmdbShowMappings, isPublishedTitle, mapEpisodeNumber, parseEpisodeNumbers, safeStillUrl, selectTmdbMappingForEpisode, toTmdbEpisodeMetadata }
