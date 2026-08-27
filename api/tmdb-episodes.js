@@ -151,6 +151,24 @@ function selectTmdbMappingForEpisode(mappings, anilistEpisode) {
   return candidates.length === 1 ? candidates[0] : null
 }
 
+function hasOpenEndedSourceRange(rangeMap, anilistEpisode) {
+  const number = positiveInteger(anilistEpisode)
+  if (!number || !rangeMap || typeof rangeMap !== 'object') return false
+  return Object.keys(rangeMap).some((sourceRangeValue) => {
+    const sourceRange = parseRange(sourceRangeValue)
+    return sourceRange && sourceRange.end === null && number >= sourceRange.start
+  })
+}
+
+function continuationSeasonNumbers(show, afterSeasonNumber) {
+  const after = positiveInteger(afterSeasonNumber)
+  if (!after) return []
+  return [...new Set((Array.isArray(show?.seasons) ? show.seasons : [])
+    .map((season) => positiveInteger(season?.season_number))
+    .filter((seasonNumber) => seasonNumber && seasonNumber > after))]
+    .sort((left, right) => left - right)
+}
+
 async function requestJson(url, options, unavailableCode, unavailableMessage) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -198,6 +216,18 @@ async function getTmdbSeason(showId, seasonNumber) {
   ))
 }
 
+async function getTmdbShow(showId) {
+  const token = text(process.env.TMDB_READ_ACCESS_TOKEN)
+  if (!token) throw new ResolverError('TMDB_NOT_CONFIGURED', 'TMDB episode metadata is not configured for this preview.', 503)
+  const url = `${TMDB_API_BASE}/tv/${encodeURIComponent(showId)}?language=en-US`
+  return cached(cacheKey('tmdb-show', showId), EPISODE_TTL_MS, () => requestJson(
+    url,
+    { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
+    'TMDB_UNAVAILABLE',
+    'TMDB episode metadata is unavailable.',
+  ))
+}
+
 async function getTmdbMovie(movieId) {
   const token = text(process.env.TMDB_READ_ACCESS_TOKEN)
   if (!token) throw new ResolverError('TMDB_NOT_CONFIGURED', 'TMDB episode metadata is not configured for this preview.', 503)
@@ -228,7 +258,7 @@ function toTmdbMovieMetadata(entry, anilistNumber, tmdbNumber) {
   return {
     number: anilistNumber,
     title: text(entry.title),
-    thumbnail: safeStillUrl(entry.backdrop_path) || null,
+    thumbnail: safeStillUrl(entry.backdrop_path) || safeStillUrl(entry.poster_path) || null,
     description: text(entry.overview) || null,
     airdate: text(entry.release_date) || null,
   }
@@ -269,13 +299,48 @@ async function resolveEpisodes(anilistId, episodeNumbers) {
       tmdbMetadata.set(`tv:${mapping.showId}:${mapping.seasonNumber}:${Number(entry?.episode_number)}`, entry)
     }
   }
+  // A maintained mapping can retain an open-ended range while TMDB starts a
+  // newer season. For tail positions the mapped season does not contain,
+  // inspect later seasons reported by the same exact TMDB show. An entry is
+  // accepted only when its TMDB episode number equals the mapping target.
+  const continuationGroups = new Map()
+  for (const number of episodeNumbers) {
+    const mapping = requestedMappings.get(number)
+    if (mapping?.type !== 'tv' || !hasOpenEndedSourceRange(mapping.ranges, number)) continue
+    const directKey = `tv:${mapping.showId}:${mapping.seasonNumber}:${mapping.tmdbNumber}`
+    if (tmdbMetadata.has(directKey)) continue
+    const groupKey = `${mapping.showId}:${mapping.seasonNumber}`
+    const group = continuationGroups.get(groupKey) || { showId: mapping.showId, afterSeasonNumber: mapping.seasonNumber, targetNumbers: new Set() }
+    group.targetNumbers.add(mapping.tmdbNumber)
+    continuationGroups.set(groupKey, group)
+  }
+  for (const group of continuationGroups.values()) {
+    const show = await getTmdbShow(group.showId)
+    const pending = new Set(group.targetNumbers)
+    for (const seasonNumber of continuationSeasonNumbers(show, group.afterSeasonNumber)) {
+      const season = await getTmdbSeason(group.showId, seasonNumber)
+      for (const entry of Array.isArray(season?.episodes) ? season.episodes : []) {
+        const entryNumber = Number(entry?.episode_number)
+        if (!pending.has(entryNumber)) continue
+        tmdbMetadata.set(`tv:continuation:${group.showId}:${entryNumber}`, entry)
+        pending.delete(entryNumber)
+      }
+      if (!pending.size) break
+    }
+  }
+
   const episodes = episodeNumbers
     .map((number) => {
       const mapping = requestedMappings.get(number)
       if (!mapping) return null
       return mapping.type === 'movie'
         ? toTmdbMovieMetadata(tmdbMetadata.get(`movie:${mapping.movieId}:1`), number, mapping.tmdbNumber)
-        : toTmdbEpisodeMetadata(tmdbMetadata.get(`tv:${mapping.showId}:${mapping.seasonNumber}:${mapping.tmdbNumber}`), number, mapping.tmdbNumber)
+        : toTmdbEpisodeMetadata(
+          tmdbMetadata.get(`tv:${mapping.showId}:${mapping.seasonNumber}:${mapping.tmdbNumber}`)
+            || tmdbMetadata.get(`tv:continuation:${mapping.showId}:${mapping.tmdbNumber}`),
+          number,
+          mapping.tmdbNumber,
+        )
     })
     .filter(Boolean)
   const found = new Set(episodes.map((episode) => episode.number))
@@ -322,4 +387,4 @@ export default async function handler(request, response) {
   }
 }
 
-export const __test__ = { extractTmdbMovieMappings, extractTmdbShowMappings, isPublishedTitle, mapEpisodeNumber, mappingRequestUrl, parseEpisodeNumbers, safeStillUrl, selectTmdbMappingForEpisode, toTmdbEpisodeMetadata, toTmdbMovieMetadata }
+export const __test__ = { continuationSeasonNumbers, extractTmdbMovieMappings, extractTmdbShowMappings, hasOpenEndedSourceRange, isPublishedTitle, mapEpisodeNumber, mappingRequestUrl, parseEpisodeNumbers, resolveEpisodes, safeStillUrl, selectTmdbMappingForEpisode, toTmdbEpisodeMetadata, toTmdbMovieMetadata }

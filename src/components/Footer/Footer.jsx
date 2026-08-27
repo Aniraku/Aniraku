@@ -5,6 +5,8 @@ import { Link } from 'react-router-dom'
 import Logo from '../Logo'
 import { FaGithub, FaDiscord } from 'react-icons/fa'
 
+const TMDB_LOGO_URL = 'https://www.themoviedb.org/assets/v4/logos/v2/blue_long_2-9665a76b1ae401a510ec1e0ca40ddcb3b0cfe45f1d51b77a308fea0845885648.svg'
+
 const letters = [
   'All', '#', '0-9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -45,41 +47,74 @@ const resourceLinks = [
 ]
 
 const CompactContent = styled.div`
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
   width: min(100%, 920px);
   margin: 0 auto;
-  padding: 22px clamp(16px, 4vw, 38px);
+  padding: 14px clamp(4px, 2vw, 14px);
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 12px;
-  @media (max-width: 620px) { flex-direction: column; align-items: flex-start; }
-  nav { display: flex; flex-wrap: wrap; gap: 10px; }
+  @media (max-width: 720px) { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px 10px; }
   a { color: var(--text-secondary); text-decoration: none; }
   a:hover { color: var(--text-primary); }
 `
 
-const Footer = ({ compact = false }) => {
+const CompactBrand = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+
+  @media (max-width: 720px) { flex-direction: column; gap: 4px; }
+`
+
+const CompactAttribution = styled.p`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  max-width: 390px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+  text-align: left;
+
+  img { width: 42px; height: auto; flex: 0 0 auto; }
+  @media (max-width: 720px) { text-align: center; }
+`
+
+const Footer = ({ compact = true }) => {
   if (compact) {
     return (
-      <F.Footer id="footer">
-        <CompactContent>
-          <Logo to="/" height={28} showText />
-          <nav aria-label="Legal and support links">
+      <F.Footer id="footer" $compact>
+          <CompactContent>
+            <CompactBrand><Logo to="/" height={25} showText /><span>© 2026 Aniraku</span></CompactBrand>
+            <CompactAttribution>
+              <img src={TMDB_LOGO_URL} alt="TMDB" />
+              <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
+            </CompactAttribution>
+            <nav aria-label="Legal and support links">
+            <Link to="/catalog">Catalog</Link>
+            <Link to="/schedule">Schedule</Link>
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
             <Link to="/dmca">DMCA</Link>
             <a href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Support</a>
           </nav>
-          <span>© 2026 Aniraku</span>
         </CompactContent>
       </F.Footer>
     )
   }
   return (
-    <F.Footer id="footer">
+    <F.Footer id="footer" $compact={false}>
       {/* Desktop grid */}
       <F.DesktopGrid>
           <F.Col>
@@ -89,7 +124,7 @@ const Footer = ({ compact = false }) => {
               Stream links are resolved from publicly available third-party sources at playback time.
             </F.Disclaimer>
             <F.TmdbAttribution>
-              <img src="https://www.themoviedb.org/assets/2/v4/logos/primary-green.svg" alt="TMDB" />
+              <img src={TMDB_LOGO_URL} alt="TMDB" />
               <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
             </F.TmdbAttribution>
           <F.Socials>
@@ -151,7 +186,7 @@ const Footer = ({ compact = false }) => {
           <F.MobileLink as="a" href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Report an issue</F.MobileLink>
         </F.MobileLinks>
         <F.TmdbAttribution>
-          <img src="https://www.themoviedb.org/assets/2/v4/logos/primary-green.svg" alt="TMDB" />
+          <img src={TMDB_LOGO_URL} alt="TMDB" />
           <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
         </F.TmdbAttribution>
         <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0 · No media hosting</F.Copyright>

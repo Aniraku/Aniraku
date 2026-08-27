@@ -13,6 +13,10 @@ function hasVerifiedTmdbThumbnail(value) {
   return /^https:\/\/image\.tmdb\.org\/t\/p\/(?:original|[wh]\d+)\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/i.test(text(value))
 }
 
+function hasSourceProvidedPoster(value) {
+  return /^https:\/\/[^\s]+$/i.test(text(value))
+}
+
 function isGenericEpisodeLabel(value) {
   return /^(?:(?:episode|ep)\s*)?\d+(?:\s*(?:[·.-]\s*\d+\s*[ps]))?$/i.test(text(value))
 }
@@ -56,7 +60,12 @@ function neutralEpisode(episode, index) {
   }
 }
 
-export function mergeTmdbEpisodeMetadata(availability, metadata) {
+export function mergeTmdbEpisodeMetadata(availability, metadata, { fallbackThumbnail = '', fallbackTitle = '', isMovie = false } = {}) {
+  const verifiedFallbackThumbnail = hasSourceProvidedPoster(fallbackThumbnail) ? text(fallbackThumbnail) : null
+  const normalizedFallbackTitle = text(fallbackTitle)
+  const verifiedMovieFallbackTitle = isMovie && normalizedFallbackTitle && !isGenericEpisodeLabel(normalizedFallbackTitle)
+    ? normalizedFallbackTitle
+    : null
   const byNumber = new Map(
     (Array.isArray(metadata) ? metadata : [])
       .filter((entry) => positiveInteger(entry?.number))
@@ -65,19 +74,36 @@ export function mergeTmdbEpisodeMetadata(availability, metadata) {
   return trustedAvailability(availability).map((episode, index) => {
     const neutral = neutralEpisode(episode, index)
     const tmdb = byNumber.get(neutral.number)
-    if (!tmdb) return episode
+    if (!tmdb) {
+      return {
+        ...episode,
+        // A one-row movie uses its already loaded, source-provided movie name
+        // only when no exact TMDB movie mapping can supply a title. TV rows
+        // remain neutral rather than borrowing a series title as episode data.
+        title: episode.title || verifiedMovieFallbackTitle,
+        thumbnail: episode.thumbnail || verifiedFallbackThumbnail,
+      }
+    }
     return {
       ...neutral,
       title: text(tmdb.title) || episode.title,
-      thumbnail: hasVerifiedTmdbThumbnail(tmdb.thumbnail) ? text(tmdb.thumbnail) : episode.thumbnail,
+      thumbnail: hasVerifiedTmdbThumbnail(tmdb.thumbnail) ? text(tmdb.thumbnail) : (episode.thumbnail || verifiedFallbackThumbnail),
       description: text(tmdb.description) || null,
     }
   })
 }
 
-export async function enrichEpisodesWithTmdb(anilistId, availability, { fetchImpl = fetch, signal, baseUrl = '' } = {}) {
+export async function enrichEpisodesWithTmdb(anilistId, availability, {
+  fetchImpl = fetch,
+  signal,
+  baseUrl = '',
+  fallbackThumbnail = '',
+  fallbackTitle = '',
+  isMovie = false,
+} = {}) {
   const id = positiveInteger(anilistId)
-  const baseline = mergeTmdbEpisodeMetadata(availability, [])
+  const fallback = { fallbackThumbnail, fallbackTitle, isMovie }
+  const baseline = mergeTmdbEpisodeMetadata(availability, [], fallback)
   if (!id || !baseline.length) return baseline
 
   // Query TMDB only for display fields that the source payload cannot prove are
@@ -100,5 +126,5 @@ export async function enrichEpisodesWithTmdb(anilistId, availability, { fetchImp
       return baseline
     }
   }
-  return mergeTmdbEpisodeMetadata(availability, metadata)
+  return mergeTmdbEpisodeMetadata(availability, metadata, fallback)
 }

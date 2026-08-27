@@ -371,7 +371,7 @@ const EpisodeRow = styled(Link)`
 const EpThumb = styled.img`
   width: 60px;
   height: 34px;
-  object-fit: contain;
+  object-fit: cover;
   border-radius: 4px;
   flex-shrink: 0;
   background: var(--bg-card);
@@ -658,6 +658,19 @@ const AnimeDetail = () => {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   const { data: anime, isLoading } = useAnimeDetails(id)
+  const isMovieFormat = anime?.format === 'MOVIE'
+  const episodeFallbackThumbnail = anime?.format === 'MOVIE'
+    ? anime?.bannerImage || anime?.coverImage?.large || anime?.coverImage?.medium || ''
+    : anime?.coverImage?.large || anime?.coverImage?.medium || anime?.bannerImage || ''
+  const episodeFallbackTitle = isMovieFormat
+    ? anime?.title?.english || anime?.title?.romaji || anime?.title?.userPreferred || ''
+    : ''
+  const episodeFallbackRef = React.useRef({ thumbnail: '', title: '', isMovie: false })
+  episodeFallbackRef.current = {
+    thumbnail: episodeFallbackThumbnail,
+    title: episodeFallbackTitle,
+    isMovie: isMovieFormat,
+  }
   const similarList = useStreamable(filterAdult((anime?.recommendations?.nodes || [])
     .map((entry) => entry?.mediaRecommendation)
     .filter(Boolean), nsfwEnabled))
@@ -840,7 +853,16 @@ const AnimeDetail = () => {
           recap: Boolean(episode.recap),
         }))
         if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
-        const verifiedEpisodes = await enrichEpisodesWithTmdb(id, directEpisodes, { signal: controller.signal })
+        // Episode availability starts from the stable route ID. Read the latest
+        // already loaded source artwork/title without serializing this request
+        // behind general metadata.
+        const fallback = episodeFallbackRef.current
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(id, directEpisodes, {
+          signal: controller.signal,
+          fallbackThumbnail: fallback.thumbnail,
+          fallbackTitle: fallback.title,
+          isMovie: fallback.isMovie,
+        })
         if (!cancelled) {
           retryAttempt = 0
           setEpisodes(verifiedEpisodes)
@@ -1082,8 +1104,8 @@ const AnimeDetail = () => {
                         to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}
                         data-watched={activity ? 'true' : 'false'}
                       >
-                        {ep.thumbnail
-                          ? <EpThumb src={ep.thumbnail} alt="" loading="lazy" />
+                        {ep.thumbnail || episodeFallbackThumbnail
+                          ? <EpThumb src={ep.thumbnail || episodeFallbackThumbnail} alt="" loading="lazy" />
                           : <EpThumbPlaceholder aria-hidden="true">EP</EpThumbPlaceholder>}
                         <EpNum>{num}</EpNum>
                         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

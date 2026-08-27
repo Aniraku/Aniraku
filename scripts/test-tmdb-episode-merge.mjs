@@ -52,14 +52,42 @@ assert.equal(selectivelyEnriched[0].title, "I'm Luffy! The Man Who Will Become t
 assert.equal(selectivelyEnriched[1].title, 'A Verified One Piece Title')
 
 const fallback = await enrichEpisodesWithTmdb(185874, availability, {
+  fallbackThumbnail: 'https://cdn.myanimelist.net/images/anime/poster.jpg',
   fetchImpl: async () => new Response('{}', { status: 503 }),
 })
 assert.equal(fallback[0].title, null)
-assert.equal(fallback[0].thumbnail, null)
+assert.equal(fallback[0].thumbnail, 'https://cdn.myanimelist.net/images/anime/poster.jpg')
+assert.equal(fallback[1].title, null)
+assert.equal(fallback[1].thumbnail, 'https://cdn.myanimelist.net/images/anime/poster.jpg')
 
 const retainedFallback = await enrichEpisodesWithTmdb(21, verifiedAvailability, {
   fetchImpl: async () => new Response('{}', { status: 503 }),
 })
 assert.equal(retainedFallback[0].title, "I'm Luffy! The Man Who Will Become the Pirate King!")
 assert.equal(retainedFallback[1].title, null)
+
+const missingMovieMetadata = await enrichEpisodesWithTmdb(199, [{
+  number: 1,
+  title: 'Episode 1',
+  thumbnail: '',
+  serverId: 'movie-episode',
+}], {
+  isMovie: true,
+  fallbackTitle: 'Spirited Away',
+  fallbackThumbnail: 'https://cdn.myanimelist.net/images/anime/movie-banner.jpg',
+  fetchImpl: async () => new Response('{}', { status: 503 }),
+})
+assert.equal(missingMovieMetadata[0].number, 1)
+assert.equal(missingMovieMetadata[0].serverId, 'movie-episode')
+assert.equal(missingMovieMetadata[0].title, 'Spirited Away')
+assert.equal(missingMovieMetadata[0].thumbnail, 'https://cdn.myanimelist.net/images/anime/movie-banner.jpg')
+
+const missingTvMetadata = await enrichEpisodesWithTmdb(185874, [{ number: 1, title: 'Episode 1', thumbnail: '' }], {
+  isMovie: false,
+  fallbackTitle: 'Not an episode title',
+  fallbackThumbnail: 'https://cdn.myanimelist.net/images/anime/tv-poster.jpg',
+  fetchImpl: async () => new Response('{}', { status: 503 }),
+})
+assert.equal(missingTvMetadata[0].title, null)
+assert.equal(missingTvMetadata[0].thumbnail, 'https://cdn.myanimelist.net/images/anime/tv-poster.jpg')
 console.log('TMDB episode merge contract passed.')

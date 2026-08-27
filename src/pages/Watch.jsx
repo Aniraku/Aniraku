@@ -23,6 +23,7 @@ import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 import Comments from '../components/Comments/Comments'
+import Footer from '../components/Footer/Footer'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -1770,7 +1771,17 @@ export default function Watch() {
         }
         if (cancelled) return
         const normalizedEpisodes = normalizeEpisodeList(epData?.episodes)
-        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, { signal: controller.signal })
+        const episodeFallbackThumbnail = animeData?.format === 'MOVIE'
+          ? animeData?.bannerImage || animeData?.coverImage?.large || animeData?.coverImage?.medium || ''
+          : animeData?.coverImage?.large || animeData?.coverImage?.medium || animeData?.bannerImage || ''
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, {
+          signal: controller.signal,
+          fallbackThumbnail: episodeFallbackThumbnail,
+          fallbackTitle: animeData?.format === 'MOVIE'
+            ? animeData?.title?.english || animeData?.title?.romaji || animeData?.title?.userPreferred || ''
+            : '',
+          isMovie: animeData?.format === 'MOVIE',
+        })
         if (cancelled) return
         setAnime(animeData)
         setEpisodes(verifiedEpisodes)
@@ -4861,6 +4872,8 @@ export default function Watch() {
           )}
         </div>
       </div>
+
+      <Footer compact />
 
       {/* Comments FAB */}
       {anime && !commentsVisible && (

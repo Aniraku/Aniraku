@@ -7,6 +7,8 @@ async function browse(variables) {
 }
 
 async function fetchHomePageData() {
+  const now = Math.floor(Date.now() / 1000)
+  const weekEnd = now + (7 * 24 * 60 * 60)
   const [metadata, scheduleData] = await Promise.all([
     anilistQuery(`
     query {
@@ -44,7 +46,7 @@ async function fetchHomePageData() {
       }
     }
   `, {}),
-    getAnirakuSchedule({ page: 1, perPage: 12 }).catch((error) => {
+    getAnirakuSchedule({ page: 1, perPage: 100, startAt: now, endAt: weekEnd }).catch((error) => {
       console.warn('Preview next-airing schedule is unavailable:', error)
       return { schedule: [] }
     }),
