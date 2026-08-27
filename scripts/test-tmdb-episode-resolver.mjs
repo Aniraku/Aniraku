@@ -13,7 +13,7 @@ const [mapping] = __test__.extractTmdbShowMappings({
     },
   },
 }, 185874)
-assert.deepEqual(mapping, { showId: 30984, seasonNumber: 2, ranges: { '1-': '41-' } })
+assert.deepEqual(mapping, { type: 'tv', showId: 30984, seasonNumber: 2, ranges: { '1-': '41-' } })
 assert.equal(__test__.mapEpisodeNumber(mapping.ranges, 1), 41)
 assert.equal(__test__.mapEpisodeNumber(mapping.ranges, 5), 45)
 assert.equal(__test__.mapEpisodeNumber({ '1-12': '1-6,8-13' }, 7), 8)
@@ -31,10 +31,10 @@ assert.equal(longRunningMappings.length, 2)
 assert.equal(__test__.mapEpisodeNumber(longRunningMappings[0].ranges, 1), 1)
 assert.equal(__test__.mapEpisodeNumber(longRunningMappings[1].ranges, 70), 70)
 assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 1), {
-  showId: 37854, seasonNumber: 1, ranges: { '1-61': '1-61' }, tmdbNumber: 1,
+  type: 'tv', showId: 37854, seasonNumber: 1, ranges: { '1-61': '1-61' }, tmdbNumber: 1,
 })
 assert.deepEqual(__test__.selectTmdbMappingForEpisode(longRunningMappings, 70), {
-  showId: 37854, seasonNumber: 2, ranges: { '62-77': '62-77' }, tmdbNumber: 70,
+  type: 'tv', showId: 37854, seasonNumber: 2, ranges: { '62-77': '62-77' }, tmdbNumber: 70,
 })
 assert.equal(__test__.selectTmdbMappingForEpisode([
   { showId: 1, seasonNumber: 1, ranges: { '1-10': '1-10' } },
@@ -56,5 +56,23 @@ assert.deepEqual(episode, {
   airdate: '2026-07-25',
 })
 assert.equal(__test__.toTmdbEpisodeMetadata({ episode_number: 46, name: 'Episode 46' }, 6, 46), null)
+
+const [movieMapping] = __test__.extractTmdbMovieMappings({
+  data: {
+    'anilist:199': {
+      'tmdb_movie:129': { '1': '1' },
+    },
+  },
+}, 199)
+assert.deepEqual(movieMapping, { type: 'movie', movieId: 129, ranges: { 1: '1' } })
+assert.deepEqual(__test__.selectTmdbMappingForEpisode([movieMapping], 1), {
+  type: 'movie', movieId: 129, ranges: { 1: '1' }, tmdbNumber: 1,
+})
+assert.deepEqual(__test__.toTmdbMovieMetadata({
+  title: 'Spirited Away', overview: 'A verified movie synopsis.', release_date: '2001-07-20', backdrop_path: '/abcde.jpg',
+}, 1, 1), {
+  number: 1, title: 'Spirited Away', thumbnail: 'https://image.tmdb.org/t/p/w780/abcde.jpg', description: 'A verified movie synopsis.', airdate: '2001-07-20',
+})
+assert.equal(__test__.toTmdbMovieMetadata({ title: 'Spirited Away' }, 1, 2), null)
 assert.equal(__test__.safeStillUrl('https://untrusted.example/image.jpg'), '')
 console.log('TMDB episode resolver contract passed.')
