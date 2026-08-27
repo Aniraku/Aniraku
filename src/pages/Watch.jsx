@@ -21,7 +21,6 @@ import {
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
-import { enrichEpisodesWithKitsu } from '../lib/kitsuEpisodes'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
@@ -1768,9 +1767,7 @@ export default function Watch() {
           }
         }
         if (cancelled) return
-        const normalizedAvailability = normalizeEpisodeList(epData?.episodes)
-        const normalizedEpisodes = await enrichEpisodesWithKitsu(animeId, normalizedAvailability)
-        if (cancelled) return
+        const normalizedEpisodes = normalizeEpisodeList(epData?.episodes)
         setAnime(animeData)
         setEpisodes(normalizedEpisodes)
         setEpisodeAvailability(
