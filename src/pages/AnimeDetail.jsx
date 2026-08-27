@@ -378,6 +378,20 @@ const EpThumb = styled.img`
   @media (max-width: 560px) { width: 46px; height: 28px; }
 `
 
+const EpThumbPlaceholder = styled.span`
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 34px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  @media (max-width: 560px) { width: 46px; height: 28px; font-size: 9px; }
+`
+
 const EpNum = styled.span`
   width: 24px;
   text-align: right;
@@ -1068,10 +1082,12 @@ const AnimeDetail = () => {
                         to={`/watch/${generateSlug(title)}-${id}-episode-${num}`}
                         data-watched={activity ? 'true' : 'false'}
                       >
-                        <EpThumb src={ep.thumbnail || ''} alt="" loading="lazy" />
+                        {ep.thumbnail
+                          ? <EpThumb src={ep.thumbnail} alt="" loading="lazy" />
+                          : <EpThumbPlaceholder aria-hidden="true">EP</EpThumbPlaceholder>}
                         <EpNum>{num}</EpNum>
                         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ep.title || 'Untitled episode'}
+                          {ep.title || `Episode ${num}`}
                         </span>
                         {!!ep.filler && <EpBadge $type="filler">FILLER</EpBadge>}
                         {!!ep.recap && <EpBadge $type="recap">RECAP</EpBadge>}

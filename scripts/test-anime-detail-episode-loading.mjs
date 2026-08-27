@@ -24,5 +24,8 @@ assert.doesNotMatch(source, /Loading the verified episode list from Aniraku’s 
 assert.doesNotMatch(source, /EPISODE_BACKEND_GRACE_MS/)
 assert.doesNotMatch(source, /getEpisodeBackendAttemptPlan/)
 assert.doesNotMatch(source, /Array\.from\(\{ length: count \}/)
+assert.match(source, /<EpThumbPlaceholder aria-hidden="true">EP<\/EpThumbPlaceholder>/)
+assert.match(source, /ep\.title \|\| `Episode \$\{num\}`/)
+assert.doesNotMatch(source, /src=\{ep\.thumbnail \|\| ''\}/)
 
 console.log('Anime Detail episode-loading tests passed')
