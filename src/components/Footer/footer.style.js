@@ -4,15 +4,15 @@ import { Link } from 'react-router-dom'
 export const F = {}
 
 F.Footer = styled.footer`
-  margin-top: clamp(16px, 2.5vw, 32px);
-  padding: clamp(28px, 5vw, 64px) var(--page-gutter) calc(24px + var(--safe-bottom));
+  margin-top: ${({ $compact }) => ($compact ? 'clamp(12px, 2vw, 22px)' : 'clamp(16px, 2.5vw, 32px)')};
+  padding: ${({ $compact }) => ($compact ? '0 var(--page-gutter) calc(14px + var(--safe-bottom))' : 'clamp(28px, 5vw, 64px) var(--page-gutter) calc(24px + var(--safe-bottom))')};
   border-top: 1px solid rgba(255,255,255,.09);
   background: linear-gradient(180deg, rgba(15,15,17,.82), #0a0a0b 60%);
   color-scheme: dark;
 
   @media (max-width: 768px) {
     margin-top: 20px;
-    padding-bottom: calc(96px + var(--safe-bottom));
+    padding-bottom: ${({ $compact }) => ($compact ? 'calc(74px + var(--safe-bottom))' : 'calc(96px + var(--safe-bottom))')};
   }
 `
 
@@ -105,6 +105,28 @@ F.Disclaimer = styled.p`
   color: var(--text-muted);
   font-size: .78rem;
   line-height: 1.65;
+`
+
+F.TmdbAttribution = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .67rem;
+  line-height: 1.45;
+
+  img {
+    width: 44px;
+    height: auto;
+    flex: 0 0 auto;
+  }
+
+  @media (max-width: 680px) {
+    justify-content: center;
+    max-width: 340px;
+  }
 `
 
 F.Socials = styled.div`

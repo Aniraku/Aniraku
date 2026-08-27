@@ -1,7 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { anilistQuery, BROWSE_QUERY } from '../lib/anilist'
-
-const MIRURO_INFO_BASE = 'https://miruro-api-v3.onrender.com/info'
+import { anilistQuery, ANIME_DETAIL_QUERY, BROWSE_QUERY, getAnirakuSchedule } from '../lib/anilist'
 
 async function browse(variables) {
   const { data } = await anilistQuery(BROWSE_QUERY, variables)
@@ -9,7 +7,10 @@ async function browse(variables) {
 }
 
 async function fetchHomePageData() {
-  const { data } = await anilistQuery(`
+  const now = Math.floor(Date.now() / 1000)
+  const weekEnd = now + (7 * 24 * 60 * 60)
+  const [metadata, scheduleData] = await Promise.all([
+    anilistQuery(`
     query {
       trending: Page(page: 1, perPage: 10) {
         media(type: ANIME, sort: TRENDING_DESC) {
@@ -44,12 +45,25 @@ async function fetchHomePageData() {
         }
       }
     }
-  `, {})
+  `, {}),
+    getAnirakuSchedule({ page: 1, perPage: 100, startAt: now, endAt: weekEnd }).catch((error) => {
+      console.warn('Preview next-airing schedule is unavailable:', error)
+      return { schedule: [] }
+    }),
+  ])
+  const { data } = metadata
+  const schedule = Array.isArray(scheduleData?.schedule) ? scheduleData.schedule : []
+  const nextAiringById = new Map(schedule.map((item) => [item.id, item.nextAiringEpisode]))
+  const withScheduledNextAiring = (media) => (media || []).map((item) => {
+    const nextAiringEpisode = nextAiringById.get(item?.id)
+    return nextAiringEpisode ? { ...item, nextAiringEpisode } : item
+  })
   return {
-    trending: data.trending.media,
-    airing: data.airing.media,
-    movies: data.movies.media,
-    topTV: data.topTV.media,
+    trending: withScheduledNextAiring(data.trending.media),
+    airing: withScheduledNextAiring(data.airing.media),
+    movies: withScheduledNextAiring(data.movies.media),
+    topTV: withScheduledNextAiring(data.topTV.media),
+    schedule,
   }
 }
 
@@ -103,12 +117,9 @@ export function useGenre({ genre }) {
 
 export function useAnimeDetails(id) {
   return useQuery(['anime', id], async () => {
-    const response = await fetch(`${MIRURO_INFO_BASE}/${encodeURIComponent(id)}`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!response.ok) throw new Error(`Miruro info API returned ${response.status}`)
-    const anime = await response.json()
-    if (!anime?.id) throw new Error('Miruro info API returned no anime')
+    const response = await anilistQuery(ANIME_DETAIL_QUERY, { id: Number(id) })
+    const anime = response?.data?.Media
+    if (!anime?.id) throw new Error('Metadata resolver returned no anime')
     return anime
   }, { enabled: !!id, staleTime: 300000 })
 }

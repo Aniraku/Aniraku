@@ -15,6 +15,7 @@ import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
+import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
 const MIRURO_RELATIONS_BASE = 'https://miruro-api-v3.onrender.com/anime'
 const EPISODE_RETRY_BASE_MS = 1_500
@@ -643,6 +644,19 @@ const AnimeDetail = () => {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   const { data: anime, isLoading } = useAnimeDetails(id)
+  const isMovieFormat = anime?.format === 'MOVIE'
+  const episodeFallbackThumbnail = isMovieFormat
+    ? anime?.bannerImage || anime?.coverImage?.large || anime?.coverImage?.medium || ''
+    : anime?.coverImage?.large || anime?.coverImage?.medium || anime?.bannerImage || ''
+  const episodeFallbackTitle = isMovieFormat
+    ? anime?.title?.english || anime?.title?.romaji || anime?.title?.userPreferred || ''
+    : ''
+  const episodeFallbackRef = React.useRef({ thumbnail: '', title: '', isMovie: false })
+  episodeFallbackRef.current = {
+    thumbnail: episodeFallbackThumbnail,
+    title: episodeFallbackTitle,
+    isMovie: isMovieFormat,
+  }
   const similarList = useStreamable(filterAdult((anime?.recommendations?.nodes || [])
     .map((entry) => entry?.mediaRecommendation)
     .filter(Boolean), nsfwEnabled))
@@ -825,9 +839,20 @@ const AnimeDetail = () => {
           recap: Boolean(episode.recap),
         }))
         if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
+        // Preserve canonical availability data and request exact TMDB display
+        // metadata in bounded batches. This ref avoids serializing episode
+        // availability behind general metadata while retaining source artwork
+        // and the verified movie-title fallback.
+        const fallback = episodeFallbackRef.current
+        const verifiedEpisodes = await enrichEpisodesWithTmdb(id, directEpisodes, {
+          signal: controller.signal,
+          fallbackThumbnail: fallback.thumbnail,
+          fallbackTitle: fallback.title,
+          isMovie: fallback.isMovie,
+        })
         if (!cancelled) {
           retryAttempt = 0
-          setEpisodes(directEpisodes)
+          setEpisodes(verifiedEpisodes)
           setEpisodesLoading(false)
         }
       } catch (error) {

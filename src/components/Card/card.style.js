@@ -26,7 +26,7 @@ C.Poster = styled.div`
 
   @media (hover: hover) and (pointer: fine) {
     &:hover {
-      transform: scale(1.08);
+      transform: translateY(-7px);
       z-index: 10;
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-lg);
@@ -44,8 +44,8 @@ C.Image = styled.img`
   transition: filter 0.3s, transform 0.3s;
 
   ${C.Poster}:hover & {
-    filter: brightness(1) saturate(1.2);
-    transform: scale(1.03);
+    filter: brightness(1) saturate(1.1);
+    transform: scale(1.025);
   }
 `;
 
@@ -215,7 +215,8 @@ C.Name = styled.h3`
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.4;
-  font-weight: 500;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

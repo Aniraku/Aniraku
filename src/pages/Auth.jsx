@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import styled from 'styled-components'
+import CompactFooter from '../components/Footer/Footer'
 
 const Wrapper = styled.main`
   min-height: 100dvh;
@@ -152,7 +153,7 @@ const Submit = styled.button`
   opacity: ${p => p.$loading ? 0.7 : 1};
 `
 
-const Footer = styled.p`
+const AuthFooter = styled.p`
   text-align: center;
   margin: 20px 0 0;
   color: var(--text-muted);
@@ -321,8 +322,9 @@ const Auth = ({ mode }) => {
       : 'Join Aniraku to keep your watch history, ratings, and bookmarks in sync.'
 
   return (
-    <Wrapper id="main">
-      <Box>
+    <>
+      <Wrapper id="main">
+        <Box>
         <Back to={isForgot ? '/login' : '/'}>&larr; {isForgot ? 'Back to sign in' : 'Back to Home'}</Back>
         <Card>
           <Title>{title}</Title>
@@ -389,15 +391,17 @@ const Auth = ({ mode }) => {
             </form>
           )}
 
-          <Footer>
+          <AuthFooter>
             {isForgot ? 'Remember your password? ' : isLogin ? "Don’t have an account? " : 'Already have an account? '}
             <Link to={isForgot ? '/login' : isLogin ? '/signup' : '/login'}>
               {isForgot ? 'Sign in' : isLogin ? 'Sign up' : 'Sign in'}
             </Link>
-          </Footer>
+          </AuthFooter>
         </Card>
-      </Box>
-    </Wrapper>
+        </Box>
+      </Wrapper>
+      <CompactFooter />
+    </>
   )
 }
 
