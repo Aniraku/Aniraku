@@ -22,7 +22,6 @@ import {
 import { API_BASE, PROXY_BASE } from '../config'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import { enrichEpisodesWithKitsu } from '../lib/kitsuEpisodes'
-import { artworkTone, bannerSource } from '../lib/artwork'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
 import { supabase } from '../lib/supabase'
@@ -3870,7 +3869,7 @@ export default function Watch() {
       )}
 
       {/* Banner backdrop ambiance */}
-      {anime && (
+      {anime?.bannerImage && (
         <div
           aria-hidden="true"
           className="watch-backdrop"
@@ -3879,7 +3878,7 @@ export default function Watch() {
             inset: 0,
             zIndex: 0,
             pointerEvents: 'none',
-            backgroundImage: `radial-gradient(circle at 78% 16%, color-mix(in srgb, ${artworkTone(anime)} 28%, transparent), transparent 34%), linear-gradient(to bottom, rgba(5,8,16,0.45) 0%, rgba(5,8,16,0.85) 60%, var(--bg) 92%), url(${bannerSource(anime)})`,
+            backgroundImage: `linear-gradient(to bottom, rgba(5,8,16,0.45) 0%, rgba(5,8,16,0.85) 60%, var(--bg) 92%), url(${anime.bannerImage})`,
             backgroundSize: compactWatchLayout ? 'cover, 100% auto' : 'cover',
             backgroundPosition: compactWatchLayout ? 'center, center top' : 'center 30%',
             backgroundRepeat: 'no-repeat',

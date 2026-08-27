@@ -2,11 +2,10 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { F } from './featured.style'
 import { generateSlug } from '../../lib/slug'
-import { posterSource } from '../../lib/artwork'
 
 const CardItem = ({ data }) => {
   const title = data.title?.english || data.title?.romaji || data.title_english || data.title || 'Unknown'
-  const image = posterSource(data) || data.images?.webp?.image_url || ''
+  const image = data.coverImage?.large || data.images?.webp?.image_url || ''
   const episodes = data.episodes || '?'
   const format = data.format || data.type || ''
   const slug = generateSlug(title)

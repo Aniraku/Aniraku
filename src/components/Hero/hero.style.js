@@ -48,16 +48,14 @@ H.ImgContainer = styled.div`
       rgba(var(--bg-rgb, 14,14,17), 0) 80%,
       var(--bg) 100%
     );
-    background:
-      radial-gradient(circle at 82% 24%, color-mix(in srgb, var(--art-tone, var(--accent)) 34%, transparent), transparent 28%),
-      linear-gradient(
-        90deg,
-        var(--bg) 0,
-        rgba(var(--bg-rgb, 14,14,17), 0.6) 40%,
-        rgba(var(--bg-rgb, 14,14,17), 0) 60%,
-        rgba(var(--bg-rgb, 14,14,17), 0) 80%,
-        var(--bg) 100%
-      );
+    background: linear-gradient(
+      90deg,
+      var(--bg) 0,
+      rgba(var(--bg-rgb, 14,14,17), 0.6) 40%,
+      rgba(var(--bg-rgb, 14,14,17), 0) 60%,
+      rgba(var(--bg-rgb, 14,14,17), 0) 80%,
+      var(--bg) 100%
+    );
   }
 
   &::after {
@@ -143,7 +141,7 @@ H.Content = styled.div`
   }
 `;
 H.Rank = styled.div`
-  color: var(--art-tone, var(--accent));
+  color: var(--accent);
   font-size: 14px;
   font-family: var(--font-body);
   font-weight: bolder;
@@ -238,7 +236,7 @@ H.WatchLink = styled(Link)`
   align-items: center;
   gap: 0.3em;
   padding: 0.7rem 1em;
-  background-color: var(--art-tone, var(--accent));
+  background-color: var(--accent);
   color: #111;
   font-size: 18px;
   border-radius: 30px;

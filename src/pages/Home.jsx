@@ -21,7 +21,6 @@ import { supabase } from '../lib/supabase'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import { generateSlug } from '../lib/slug'
 import { API_BASE } from '../config'
-import { artworkVars, bannerSource, posterSource } from '../lib/artwork'
 
 const Page = styled.main`
   min-height: 100vh;
@@ -67,7 +66,6 @@ const Hero = styled.article`
     inset: 0;
     z-index: -1;
     background:
-      radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--art-tone, var(--accent)) 34%, transparent), transparent 30%),
       linear-gradient(90deg, rgba(6,6,8,0.96) 0%, rgba(6,6,8,0.83) 38%, rgba(6,6,8,0.28) 72%, rgba(6,6,8,0.16) 100%),
       linear-gradient(0deg, rgba(6,6,8,0.94) 0%, transparent 62%);
     content: '';
@@ -242,12 +240,10 @@ const PosterCard = styled(Link)`
     overflow: hidden;
     aspect-ratio: 0.69;
     border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 30%, var(--border));
     background: var(--bg-elevated);
     box-shadow: 0 10px 28px rgba(0,0,0,0.16);
   }
   .poster::after { position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, rgba(0,0,0,0.58)); content: ''; pointer-events: none; }
-  .poster::before { position: absolute; inset: 0; z-index: 1; background: linear-gradient(145deg, color-mix(in srgb, var(--art-tone, var(--accent)) 26%, transparent), transparent 48%); content: ''; pointer-events: none; }
   img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 260ms var(--ease-out, ease-out); }
   h3 { margin: 9px 2px 3px; overflow: hidden; color: var(--text-primary); font-size: 13px; font-weight: 790; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
   p { margin: 0 2px; overflow: hidden; color: var(--text-muted); font-size: 10px; font-weight: 740; text-overflow: ellipsis; white-space: nowrap; }
@@ -414,8 +410,8 @@ const EmptyHero = styled.div`
 `
 
 const titleFor = (item) => item?.title?.english || item?.title?.romaji || item?.title?.userPreferred || 'Unknown title'
-const imageFor = (item) => bannerSource(item)
-const posterFor = (item) => posterSource(item)
+const imageFor = (item) => item?.bannerImage || item?.coverImage?.extraLarge || item?.coverImage?.large || ''
+const posterFor = (item) => item?.coverImage?.extraLarge || item?.coverImage?.large || item?.coverImage?.medium || ''
 const detailHref = (item) => `/anime/${generateSlug(titleFor(item))}-${item.id}`
 const watchHref = (item) => `/watch/${generateSlug(titleFor(item))}-${item.id}-episode-1`
 const stripHtml = (text = '') => text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -438,7 +434,7 @@ function PosterRailSection({ items, meta }) {
   return (
     <PosterRail>
       {items.slice(0, 14).map((item) => (
-        <PosterCard key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`} style={artworkVars(item)}>
+        <PosterCard key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)}`}>
           <div className="poster">
             <img src={posterFor(item)} alt="" loading="lazy" />
             {item.averageScore && <PosterBadge>{item.averageScore}%</PosterBadge>}
@@ -552,7 +548,7 @@ function Home() {
       <Page>
         <Shell>
           {!homeDone ? <EmptyHero>Finding what to watch next.</EmptyHero> : featured ? (
-            <Hero key={featured.id} $image={imageFor(featured)} $mobileImage={posterFor(featured)} style={artworkVars(featured)}>
+            <Hero key={featured.id} $image={imageFor(featured)} $mobileImage={posterFor(featured)}>
               <HeroCopy>
                 <p className="eyebrow"><FaFire size={10} /> Trending now</p>
                 <h1>{titleFor(featured)}</h1>
@@ -589,7 +585,7 @@ function Home() {
             <ScheduleGrid>
               {scheduleItems.map((item) => {
                 const timing = releaseTiming(item.nextAiringEpisode?.airingAt)
-                return <ScheduleItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`} style={artworkVars(item)}>
+                return <ScheduleItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} · ${timing?.stamp || 'Upcoming release'}`}>
                   <img src={posterFor(item)} alt="" loading="lazy" />
                   <div><h3>{titleFor(item)}</h3><p>Episode {item.nextAiringEpisode?.episode || '?'} next</p><strong>{timing?.relative || 'Upcoming'}{timing?.stamp ? ` · ${timing.stamp}` : ''}</strong></div>
                 </ScheduleItem>
@@ -622,7 +618,7 @@ function Home() {
               <p>Top-rated movies for one great sitting.</p>
               <MovieStack>
                 {moviesList.slice(0, 5).map((item) => (
-                  <MovieItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} movie`} style={artworkVars(item)}>
+                  <MovieItem key={item.id} to={detailHref(item)} title={`Open ${titleFor(item)} movie`}>
                     <img src={posterFor(item)} alt="" loading="lazy" />
                     <h3>{titleFor(item)}</h3>
                     <span>{item.averageScore ? `${item.averageScore}%` : 'Movie'}</span>

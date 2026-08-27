@@ -2,19 +2,18 @@ import React from 'react'
 import { C } from './card.style'
 import { Link } from 'react-router-dom'
 import { generateSlug } from '../../lib/slug'
-import { artworkVars, posterSource } from '../../lib/artwork'
 
 const CardTwo = ({ data }) => {
   if (!data) return null
 
   const id = data.id || data.mal_id
   const title = data.title?.english || data.title?.romaji || data.title?.userPreferred || data.title || 'Unknown'
-  const poster = posterSource(data) || data.images?.jpg?.image_url || ''
+  const poster = data.coverImage?.large || data.images?.jpg?.image_url || ''
   const score = data.averageScore || data.score
   const slug = generateSlug(title)
 
   return (
-    <C.Card style={artworkVars(data)}>
+    <C.Card>
       <Link to={`/anime/${slug}-${id}`}>
         <C.Poster>
           {poster ? <C.Image src={poster} alt={title} /> : <div style={{ width: '100%', height: '100%', background: '#2a2c31', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>No Image</div>}

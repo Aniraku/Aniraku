@@ -24,34 +24,6 @@ function text(value) {
   return String(value || '').trim()
 }
 
-function httpsImage(value) {
-  const candidate = text(value)
-  return /^https:\/\//i.test(candidate) ? candidate : ''
-}
-
-function stableIndex(seed, count) {
-  if (!count) return 0
-  let hash = 2166136261
-  for (const character of text(seed)) {
-    hash ^= character.charCodeAt(0)
-    hash = Math.imul(hash, 16777619)
-  }
-  return (hash >>> 0) % count
-}
-
-function artworkTone(seed) {
-  const hue = stableIndex(`${seed}:tone`, 360)
-  return `hsl(${hue} 72% 58%)`
-}
-
-function posterOptions(node) {
-  const options = [node?.main_picture?.large || node?.main_picture?.medium]
-  for (const picture of Array.isArray(node?.pictures) ? node.pictures : []) {
-    options.push(picture?.large || picture?.medium)
-  }
-  return [...new Set(options.map(httpsImage).filter(Boolean))]
-}
-
 function cacheKey(prefix, value) {
   return `${prefix}:${JSON.stringify(value)}`
 }
@@ -123,25 +95,22 @@ async function mapMalIdsToAniList(malIds) {
   const ids = [...new Set(malIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50)
   if (!ids.length) return new Map()
   const data = await aniListRequest(
-    'query ($ids: [Int]) { Page(perPage: 50) { media(idMal_in: $ids, type: ANIME) { id idMal bannerImage } } }',
+    'query ($ids: [Int]) { Page(perPage: 50) { media(idMal_in: $ids, type: ANIME) { id idMal } } }',
     { ids },
     24 * 60 * 60_000,
   )
-  return new Map((data?.Page?.media || [])
-    .filter((item) => item?.id && item?.idMal)
-    .map((item) => [item.idMal, { anilistId: item.id, bannerImage: httpsImage(item.bannerImage) }]))
+  return new Map((data?.Page?.media || []).filter((item) => item?.id && item?.idMal).map((item) => [item.idMal, item.id]))
 }
 
-async function getAniListMapping(anilistId) {
+async function getMalIdForAniListId(anilistId) {
   const data = await aniListRequest(
-    'query ($id: Int) { Media(id: $id, type: ANIME) { id idMal bannerImage } }',
+    'query ($id: Int) { Media(id: $id, type: ANIME) { id idMal } }',
     { id: Number(anilistId) },
     24 * 60 * 60_000,
   )
-  const media = data?.Media
-  const malId = Number(media?.idMal)
+  const malId = Number(data?.Media?.idMal)
   if (!Number.isInteger(malId) || malId <= 0) throw new ResolverError('MAL_MAPPING_NOT_FOUND', 'This title does not have a verified MyAnimeList mapping.', 404)
-  return { malId, bannerImage: httpsImage(media?.bannerImage) }
+  return malId
 }
 
 function malStatus(status) {
@@ -152,14 +121,11 @@ function malFormat(type) {
   return ({ tv: 'TV', movie: 'MOVIE', ova: 'OVA', ona: 'ONA', special: 'SPECIAL', tv_special: 'TV_SPECIAL', music: 'MUSIC' })[type] || 'TV'
 }
 
-function toAniListMedia(node, anilistId, anilistBannerImage = '') {
+function toAniListMedia(node, anilistId) {
   const malId = Number(node?.id)
   const mean = Number(node?.mean)
   const title = text(node?.title) || 'Unknown Anime'
-  const options = posterOptions(node)
-  const selectedPosterIndex = stableIndex(`${anilistId}:${malId}:${title}`, options.length)
-  const large = options[selectedPosterIndex] || ''
-  const bannerImage = httpsImage(anilistBannerImage) || large || null
+  const large = node?.main_picture?.large || node?.main_picture?.medium || ''
   return {
     id: anilistId,
     idMal: malId,
@@ -169,14 +135,8 @@ function toAniListMedia(node, anilistId, anilistBannerImage = '') {
       native: text(node?.alternative_titles?.ja) || title,
       userPreferred: title,
     },
-    coverImage: { extraLarge: large, large, medium: large, color: artworkTone(`${anilistId}:${malId}:${title}`) },
-    bannerImage,
-    artwork: {
-      provider: 'myanimelist',
-      posterOptions: options,
-      selectedPosterIndex,
-      hasOfficialBanner: Boolean(httpsImage(anilistBannerImage)),
-    },
+    coverImage: { extraLarge: large, large, medium: node?.main_picture?.medium || large, color: null },
+    bannerImage: node?.pictures?.[0]?.large || null,
     description: text(node?.synopsis),
     format: malFormat(node?.media_type),
     status: malStatus(node?.status),
@@ -198,17 +158,17 @@ async function normalizeMalNodes(nodes) {
   const mapping = await mapMalIdsToAniList(nodes.map((node) => node?.id))
   return nodes
     .map((node) => {
-      const mappingEntry = mapping.get(Number(node?.id))
-      return mappingEntry?.anilistId ? toAniListMedia(node, mappingEntry.anilistId, mappingEntry.bannerImage) : null
+      const anilistId = mapping.get(Number(node?.id))
+      return anilistId ? toAniListMedia(node, anilistId) : null
     })
     .filter(Boolean)
 }
 
 async function getMediaByAniListId(anilistId) {
-  const mapping = await getAniListMapping(anilistId)
+  const malId = await getMalIdForAniListId(anilistId)
   const fields = 'alternative_titles,start_date,synopsis,mean,rank,popularity,num_list_users,nsfw,media_type,status,num_episodes,start_season,average_episode_duration,rating,pictures,genres'
-  const node = await malRequest(`/anime/${mapping.malId}?fields=${encodeURIComponent(fields)}`, 15 * 60_000)
-  return toAniListMedia(node, Number(anilistId), mapping.bannerImage)
+  const node = await malRequest(`/anime/${malId}?fields=${encodeURIComponent(fields)}`, 15 * 60_000)
+  return toAniListMedia(node, Number(anilistId))
 }
 
 function pageInfo(page, perPage, total) {
@@ -222,7 +182,7 @@ async function browseMal(variables = {}) {
   const perPage = Math.min(50, Math.max(1, Number(variables.perPage) || 20))
   const limit = variables.format ? Math.min(50, perPage * 2) : perPage
   const offset = (page - 1) * limit
-  const fields = 'alternative_titles,mean,popularity,num_list_users,media_type,status,num_episodes,start_season,genres,rating,pictures'
+  const fields = 'alternative_titles,mean,popularity,num_list_users,media_type,status,num_episodes,start_season,genres,rating'
   let path
   if (text(variables.search)) {
     path = `/anime?q=${encodeURIComponent(text(variables.search))}&limit=${limit}&offset=${offset}&fields=${encodeURIComponent(fields)}`
@@ -287,4 +247,4 @@ export default async function handler(request, response) {
   }
 }
 
-export const __test__ = { ResolverError, malFormat, malStatus, httpsImage, posterOptions, stableIndex, toAniListMedia, pageInfo, resolveGraphQL }
+export const __test__ = { ResolverError, malFormat, malStatus, toAniListMedia, pageInfo, resolveGraphQL }

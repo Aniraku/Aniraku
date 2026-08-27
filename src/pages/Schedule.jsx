@@ -8,7 +8,6 @@ import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import Footer from '../components/Footer/Footer'
 import { setScheduleSEO } from '../lib/seo'
 import { generateSlug } from '../lib/slug'
-import { artworkVars, posterSource } from '../lib/artwork'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -278,15 +277,15 @@ const FeaturedRelease = styled(Link)`
   margin: 18px 0;
   padding: 12px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 46%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--border));
   border-radius: 14px;
   background:
-    linear-gradient(100deg, color-mix(in srgb, var(--art-tone, var(--accent)) 12%, var(--bg-card)) 0%, var(--bg-card) 75%);
+    linear-gradient(100deg, color-mix(in srgb, var(--accent) 12%, var(--bg-card)) 0%, var(--bg-card) 75%);
   color: inherit;
   text-decoration: none;
   transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 
-  &:hover { transform: translateY(-2px); border-color: var(--art-tone, var(--accent)); background: linear-gradient(100deg, color-mix(in srgb, var(--art-tone, var(--accent)) 18%, var(--bg-card)) 0%, var(--bg-card) 75%); }
+  &:hover { transform: translateY(-2px); border-color: var(--accent); background: linear-gradient(100deg, color-mix(in srgb, var(--accent) 18%, var(--bg-card)) 0%, var(--bg-card) 75%); }
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   @media (max-width: 620px) { grid-template-columns: 66px minmax(0, 1fr); gap: 12px; }
@@ -297,7 +296,6 @@ const FeaturedPoster = styled.div`
   height: 108px;
   overflow: hidden;
   border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 34%, var(--border));
   background: var(--bg-elevated);
   img { display: block; width: 100%; height: 100%; object-fit: cover; }
   @media (max-width: 620px) { width: 66px; height: 82px; }
@@ -362,7 +360,7 @@ const TimelineCard = styled(Link)`
   min-height: 78px;
   align-items: center;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 22%, var(--border));
+  border: 1px solid var(--border);
   border-radius: 11px;
   background: var(--bg-card);
   color: inherit;
@@ -397,7 +395,6 @@ const Poster = styled.div`
   height: 62px;
   overflow: hidden;
   border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--art-tone, var(--accent)) 34%, var(--border));
   background: var(--bg-elevated);
   img { display: block; width: 100%; height: 100%; object-fit: cover; }
   @media (max-width: 620px) { width: 46px; height: 56px; }
@@ -586,8 +583,8 @@ const Schedule = () => {
               ) : (
                 <>
                   {upcomingOnActiveDay && (
-                    <FeaturedRelease to={`/anime/${generateSlug(titleFor(upcomingOnActiveDay))}-${upcomingOnActiveDay.id}`} title={`Open ${titleFor(upcomingOnActiveDay)}`} style={artworkVars(upcomingOnActiveDay)}>
-                      <FeaturedPoster>{posterSource(upcomingOnActiveDay) ? <img src={posterSource(upcomingOnActiveDay)} alt="" loading="eager" /> : null}</FeaturedPoster>
+                    <FeaturedRelease to={`/anime/${generateSlug(titleFor(upcomingOnActiveDay))}-${upcomingOnActiveDay.id}`} title={`Open ${titleFor(upcomingOnActiveDay)}`}>
+                      <FeaturedPoster>{upcomingOnActiveDay.coverImage?.large ? <img src={upcomingOnActiveDay.coverImage.large} alt="" loading="eager" /> : null}</FeaturedPoster>
                       <FeaturedCopy>
                         <div className="label"><FaClock size={10} /> {relativeTime(upcomingOnActiveDay.airingAt)}</div>
                         <h3>{titleFor(upcomingOnActiveDay)}</h3>
@@ -605,9 +602,9 @@ const Schedule = () => {
                     {dayItems.map((item) => {
                       const title = titleFor(item)
                       return (
-                        <TimelineCard key={item.id} to={`/anime/${generateSlug(title)}-${item.id}`} title={`Open ${title}`} style={artworkVars(item)}>
+                        <TimelineCard key={item.id} to={`/anime/${generateSlug(title)}-${item.id}`} title={`Open ${title}`}>
                           <TimelineTime><strong>{formatTime(item.airingAt)}</strong><span>{relativeTime(item.airingAt)}</span></TimelineTime>
-                          <Poster>{posterSource(item) ? <img src={posterSource(item)} alt="" loading="lazy" /> : null}</Poster>
+                          <Poster>{item.coverImage?.large ? <img src={item.coverImage.large} alt="" loading="lazy" /> : null}</Poster>
                           <AiringInfo><h3>{title}</h3><p><span className="episode">Episode {item.episode}</span> · {item.format || 'TV'}</p></AiringInfo>
                           <ViewDetails>View title <FaArrowRight size={9} /></ViewDetails>
                         </TimelineCard>
