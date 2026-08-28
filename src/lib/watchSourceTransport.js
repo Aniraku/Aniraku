@@ -1,6 +1,7 @@
-export function createMediaTransportPlan({ verification, directUrl, proxyUrl }) {
+export function createMediaTransportPlan({ verification, directUrl, proxyUrl, proxyOnly = false }) {
   const direct = { mode: 'direct', url: directUrl }
   const proxy = { mode: 'proxy', url: proxyUrl }
+  if (proxyOnly) return [proxy]
 
   // Keep the established proxy-first startup path for every source, including
   // advisory-unverified Kiwi HLS URLs. Some Kiwi CDNs require the resolver's
