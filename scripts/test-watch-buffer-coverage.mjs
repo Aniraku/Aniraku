@@ -12,6 +12,10 @@ assert.match(
 )
 assert.match(watchSource, /video\.preload = getNativeMediaBufferPolicy\(\)\.preload/)
 assert.match(watchSource, /preload: getNativeMediaBufferPolicy\(\)\.preload/)
+const nativePreloadAssignments = watchSource.match(/video\.preload = getNativeMediaBufferPolicy\(\)\.preload/g) || []
+assert.ok(nativePreloadAssignments.length >= 3)
+assert.match(watchSource, /video\.preload = getNativeMediaBufferPolicy\(\)\.preload\s+video\.src = hlsTransportPlan\[hlsTransportIndex\]\.url/)
+assert.match(watchSource, /video\.preload = getNativeMediaBufferPolicy\(\)\.preload\s+video\.src = proxiedH\(url\)/)
 assert.match(watchSource, /buffer: getDashBufferPolicy\(netHintRef\.current\)/)
 
 const hlsPrefetches = watchSource.match(/startFragPrefetch: true/g) || []
