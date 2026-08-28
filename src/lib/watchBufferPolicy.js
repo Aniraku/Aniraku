@@ -1,36 +1,36 @@
-const MEBIBYTE = 1024 * 1024
 const TERMINAL_HLS_HTTP_STATUSES = new Set([401, 403, 404, 410, 429])
 
+export const CONTINUOUS_BUFFER_SECONDS = Number.POSITIVE_INFINITY
+// dash.js performs ABR utility math with its target, so use a finite target
+// large enough to cover any normal VOD episode instead of feeding it Infinity.
+export const DASH_CONTINUOUS_BUFFER_SECONDS = 24 * 60 * 60
+
 /**
- * Returns bounded hls.js buffering settings. Media Source data is held in the
- * browser, so these values deliberately reserve meaningful forward playback
- * without allowing a low-bitrate stream to grow memory usage indefinitely.
+ * Return continuous VOD buffering settings for hls.js. A MediaSource has no
+ * portable "cache this entire episode" switch, so Infinity tells hls.js not to
+ * stop loading or intentionally prune by a short time/byte window. The browser
+ * and MediaSource implementation may still evict data under memory pressure.
  */
 export function getHlsBufferPolicy(_connection = {}) {
   return {
-    // A predictable VOD reserve: 120 seconds forward and 120 seconds behind
-    // the playhead. hls.js treats these as targets and still obeys browser MSE
-    // limits when a device cannot retain the complete target.
-    maxBufferLength: 120,
-    maxMaxBufferLength: 120,
-    maxBufferSize: 128 * MEBIBYTE,
-    backBufferLength: 120,
+    maxBufferLength: CONTINUOUS_BUFFER_SECONDS,
+    maxMaxBufferLength: CONTINUOUS_BUFFER_SECONDS,
+    maxBufferSize: Number.POSITIVE_INFINITY,
+    backBufferLength: CONTINUOUS_BUFFER_SECONDS,
+    frontBufferFlushThreshold: CONTINUOUS_BUFFER_SECONDS,
     maxBufferHole: 0.75,
   }
 }
 
 /**
- * HLS fragments are immutable media chunks for a specific tokenized URL. Ask
- * the browser to reuse a matching HTTP-cache entry when the origin permits it.
- * Manifests retain the normal cache policy so token refresh and ABR updates are
- * not served from a stale playlist.
+ * HLS media fragments are immutable chunks for a specific tokenized URL. Ask
+ * the browser to reuse them when the current playback session requests the
+ * same URL again. Playlists and manifests stay fresh because signed URLs and
+ * adaptive-bitrate updates must not be served from stale cache entries.
  */
 export function getHlsRequestCacheMode(context = {}) {
-  // MSE provides the explicit 120-second playback reserve. Forcing all VOD
-  // fragments into the browser HTTP cache made the full episode look buffered
-  // and could retain far more media than the player target. Normal caching
-  // honors the origin's headers and allows browser eviction.
-  return 'default'
+  const isFragment = Boolean(context?.frag || context?.part) || context?.type === 'fragment'
+  return isFragment ? 'force-cache' : 'default'
 }
 
 /**
@@ -97,19 +97,19 @@ export function getNativeMediaBufferPolicy() {
 }
 
 /**
- * Express the same bounded connection-aware reserve through dash.js's forward
- * and backward buffer settings. Startup stays prompt while VOD keeps building
- * a meaningful reserve for smooth playback.
+ * Express continuous VOD buffering through dash.js. Startup remains prompt,
+ * then the scheduler keeps loading until the media timeline is complete. The
+ * browser may still evict old ranges if the device is under memory pressure.
  */
 export function getDashBufferPolicy(connection = {}) {
   const hls = getHlsBufferPolicy(connection)
   return {
-    initialBufferLevel: Math.min(6, hls.maxBufferLength),
-    bufferTimeDefault: hls.maxBufferLength,
-    bufferTimeAtTopQuality: hls.maxBufferLength,
-    bufferTimeAtTopQualityLongForm: hls.maxBufferLength,
+    initialBufferLevel: 6,
+    bufferTimeDefault: DASH_CONTINUOUS_BUFFER_SECONDS,
+    bufferTimeAtTopQuality: DASH_CONTINUOUS_BUFFER_SECONDS,
+    bufferTimeAtTopQualityLongForm: DASH_CONTINUOUS_BUFFER_SECONDS,
     longFormContentDurationThreshold: 600,
-    bufferToKeep: hls.backBufferLength,
+    bufferToKeep: DASH_CONTINUOUS_BUFFER_SECONDS,
     bufferPruningInterval: 15,
     fastSwitchEnabled: true,
   }
