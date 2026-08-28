@@ -1,6 +1,7 @@
-// The indicator mirrors the full media buffer. The browser/MediaSource may
-// still evict ranges under memory pressure, but the player no longer hides
-// valid buffered data behind an artificial 120-second window.
+// Keep this as an explicit full-range policy for callers that need to project
+// browser-reported media ranges onto the timeline. The browser/MediaSource may
+// still evict ranges under memory pressure, but the player does not impose a
+// short artificial cache window.
 export const PLAYBACK_CACHE_SECONDS = Number.POSITIVE_INFINITY
 export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
@@ -60,69 +61,4 @@ export function getPlayableBufferedTimelineSegments(
   })
   if (!hasForwardPlayableRange) return []
   return getBufferedTimelineSegments(ranges, { currentTime, duration, cacheSeconds })
-}
-
-function getVideoRanges(video) {
-  const ranges = []
-  const buffered = video?.buffered
-  if (!buffered) return ranges
-  for (let index = 0; index < buffered.length; index += 1) {
-    ranges.push({ start: buffered.start(index), end: buffered.end(index) })
-  }
-  return ranges
-}
-
-/**
- * Install a passive visual buffer layer behind ArtPlayer's played position and
- * seek marker. It mirrors the full buffered timeline, never changes the video
- * buffer, and never intercepts pointer input.
- */
-export function createBufferedTimelineIndicator(video, progressInner) {
-  if (!video || !progressInner || typeof document === 'undefined') return () => {}
-
-  const layer = document.createElement('div')
-  layer.className = 'watch-buffer-indicator'
-  layer.setAttribute('aria-hidden', 'true')
-  progressInner.append(layer)
-
-  const render = () => {
-    const segments = getPlayableBufferedTimelineSegments(getVideoRanges(video), {
-      currentTime: video.currentTime,
-      duration: video.duration,
-      readyState: video.readyState,
-    })
-    layer.dataset.ready = segments.length > 0 ? 'true' : 'false'
-    layer.replaceChildren(
-      ...segments.flatMap((segment) => {
-        const bar = document.createElement('span')
-        bar.className = 'watch-buffer-indicator-segment'
-        bar.style.left = `${segment.leftPercent}%`
-        bar.style.width = `${segment.widthPercent}%`
-
-        const endpoint = document.createElement('span')
-        endpoint.className = 'watch-buffer-indicator-endpoint'
-        endpoint.style.left = `${segment.leftPercent + segment.widthPercent}%`
-        return [bar, endpoint]
-      })
-    )
-  }
-
-  const events = [
-    'progress',
-    'loadedmetadata',
-    'durationchange',
-    'timeupdate',
-    'seeking',
-    'waiting',
-    'stalled',
-    'canplay',
-    'playing',
-  ]
-  events.forEach((event) => video.addEventListener(event, render))
-  render()
-
-  return () => {
-    events.forEach((event) => video.removeEventListener(event, render))
-    layer.remove()
-  }
 }
