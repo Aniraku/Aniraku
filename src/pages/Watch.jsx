@@ -5132,6 +5132,29 @@ export default function Watch() {
           background: rgba(226, 232, 240, 0.44);
           box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
         }
+        .watch-art-mount .watch-buffer-indicator-label {
+          position: absolute;
+          top: 50%;
+          right: 4px;
+          z-index: 2;
+          padding: 2px 5px;
+          border: 1px solid rgba(74, 222, 128, 0.5);
+          border-radius: 4px;
+          background: rgba(7, 11, 20, 0.88);
+          color: #86efac;
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          line-height: 1;
+          pointer-events: none;
+          transform: translateY(-50%);
+          transition: opacity 160ms ease, color 160ms ease, border-color 160ms ease;
+        }
+        .watch-art-mount .watch-buffer-indicator-label[data-ready='false'] {
+          border-color: rgba(148, 163, 184, 0.45);
+          color: #cbd5e1;
+          opacity: 0.78;
+        }
         .watch-art-mount .watch-timeline-track {
           position: relative;
         }
