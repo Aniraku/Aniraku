@@ -2536,7 +2536,7 @@ export default function Watch() {
 	            } catch {}
 	          }
             // Kiwi is verified on the native proxy-first HLS branch. Ally and
-            // other manifests remain on hls.js, whose bounded buffer and media
+            // other manifests remain on hls.js, whose continuous VOD buffer and media
             // recovery avoid falling through to an expired embed page.
             if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
 	              try {
@@ -2577,9 +2577,9 @@ export default function Watch() {
             const bufferPolicy = getHlsBufferPolicy(netHintRef.current)
             const hls = new Hls({
               enableWorker: false,
-              // Hold a substantial forward reserve for VOD playback. The
-              // policy scales down on constrained networks and remains bounded
-              // to let the browser's MediaSource eviction protect device RAM.
+              // Keep loading the complete VOD timeline. The browser's
+              // MediaSource implementation may still evict data under memory
+              // pressure, but hls.js no longer stops at an artificial window.
               ...bufferPolicy,
               startFragPrefetch: true,
               lowLatencyMode: false,
@@ -2587,7 +2587,7 @@ export default function Watch() {
 
               forceKeyFrameOnDiscontinuity: true,
               // hls.js retains the active MediaSource and its forward buffer
-              // while it performs these bounded per-request retries. ArtPlayer
+              // while it performs these per-request retries. ArtPlayer
               // must not reload the source during that recovery window.
               ...getHlsLoadPolicies(),
               defaultAudioCodec: 'mp4a.40.2',
@@ -2628,7 +2628,7 @@ export default function Watch() {
               if (buildIdRef.current !== myBuildId) return
               if (!data.fatal) return
               // Signed URL and throttle responses are terminal. Every other
-              // transient request has already used hls.js' bounded retry policy;
+              // transient request has already used hls.js' retry policy;
               // do not call startLoad() here because that restarts loading and
               // can discard the buffer the viewer already earned.
 	              // MP4 mis-classified as HLS
@@ -2658,7 +2658,7 @@ export default function Watch() {
 						// A proxy can serve the master manifest yet fail on the first
 						// playable media request. Manifest readiness is therefore not
 						// playback evidence. Before the video has actually started, make
-						// the bounded direct retry instead of staying in proxy recovery.
+						// the direct retry instead of staying in proxy recovery.
 						if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
 							hlsTransportIndex += 1
 							try {
@@ -2759,7 +2759,7 @@ export default function Watch() {
 	              }
 	            })
 	            hls.on(Hls.Events.BUFFER_APPENDING, () => {
-              // could be used to show buffering indicator if needed
+              // could be used to show the buffering indicator if needed
             })
 	            try {
 	              hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
@@ -5107,7 +5107,7 @@ export default function Watch() {
           min-width: 64px;
         }
         /* A YouTube-like downloaded-range cue, clipped to the intended
-           120-second cache window. It sits behind ArtPlayer's red played line
+           full buffered ranges. It sits behind ArtPlayer's red played line
            and thumb, never captures input, and keeps the Nothing-style signal
            red reserved for the actual playback position. */
         .watch-art-mount .art-control-progress-inner {

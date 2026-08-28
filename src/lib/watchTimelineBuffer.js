@@ -1,4 +1,7 @@
-export const PLAYBACK_CACHE_SECONDS = 120
+// The indicator mirrors the full media buffer. The browser/MediaSource may
+// still evict ranges under memory pressure, but the player no longer hides
+// valid buffered data behind an artificial 120-second window.
+export const PLAYBACK_CACHE_SECONDS = Number.POSITIVE_INFINITY
 export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
 function finite(value, fallback = 0) {
@@ -7,8 +10,10 @@ function finite(value, fallback = 0) {
 }
 
 /**
- * Clamp the visible cache indication to the requested playback window instead
- * of drawing an unrestricted browser HTTP cache as if it were seekable media.
+ * Convert browser-reported buffered ranges into timeline percentages. With
+ * the default infinite window, every valid buffered range is shown; callers can
+ * still pass a finite cacheSeconds value when a bounded view is explicitly
+ * desired.
  */
 export function getBufferedTimelineSegments(
   ranges = [],
@@ -39,7 +44,8 @@ export function getBufferedTimelineSegments(
 /**
  * A downloaded TimeRanges entry is not sufficient proof that a stalled video
  * can resume. Only show the cache layer while the media element reports
- * future decodable data at the current position.
+ * future decodable data at the current position, while retaining every
+ * browser-reported range instead of clipping it to a short cache window.
  */
 export function getPlayableBufferedTimelineSegments(
   ranges = [],
@@ -67,8 +73,9 @@ function getVideoRanges(video) {
 }
 
 /**
- * Install a passive visual cache layer behind ArtPlayer's played position and
- * seek marker. It never changes the video buffer or intercepts pointer input.
+ * Install a passive visual buffer layer behind ArtPlayer's played position and
+ * seek marker. It mirrors the full buffered timeline, never changes the video
+ * buffer, and never intercepts pointer input.
  */
 export function createBufferedTimelineIndicator(video, progressInner) {
   if (!video || !progressInner || typeof document === 'undefined') return () => {}
