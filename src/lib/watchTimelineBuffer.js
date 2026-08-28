@@ -80,37 +80,29 @@ function getVideoRanges(video) {
 export function createBufferedTimelineIndicator(video, progressInner) {
   if (!video || !progressInner || typeof document === 'undefined') return () => {}
 
-    const layer = document.createElement('div')
+  const layer = document.createElement('div')
   layer.className = 'watch-buffer-indicator'
   layer.setAttribute('aria-hidden', 'true')
+  progressInner.append(layer)
 
-  const label = document.createElement('span')
-  label.className = 'watch-buffer-indicator-label'
-  label.textContent = 'CACHE'
-  label.title = 'Continuous playback cache'
-  label.setAttribute('aria-label', 'Continuous playback cache indicator')
-  label.setAttribute('aria-hidden', 'true')
-
-  progressInner.append(layer, label)
   const render = () => {
-
     const segments = getPlayableBufferedTimelineSegments(getVideoRanges(video), {
       currentTime: video.currentTime,
       duration: video.duration,
       readyState: video.readyState,
     })
     layer.dataset.ready = segments.length > 0 ? 'true' : 'false'
-    label.dataset.ready = segments.length > 0 ? 'true' : 'false'
-    label.title = segments.length > 0
-      ? 'Continuous playback cache is available on the timeline'
-      : 'Continuous playback cache is loading'
     layer.replaceChildren(
-      ...segments.map((segment) => {
+      ...segments.flatMap((segment) => {
         const bar = document.createElement('span')
         bar.className = 'watch-buffer-indicator-segment'
         bar.style.left = `${segment.leftPercent}%`
         bar.style.width = `${segment.widthPercent}%`
-        return bar
+
+        const endpoint = document.createElement('span')
+        endpoint.className = 'watch-buffer-indicator-endpoint'
+        endpoint.style.left = `${segment.leftPercent + segment.widthPercent}%`
+        return [bar, endpoint]
       })
     )
   }
@@ -132,6 +124,5 @@ export function createBufferedTimelineIndicator(video, progressInner) {
   return () => {
     events.forEach((event) => video.removeEventListener(event, render))
     layer.remove()
-    label.remove()
   }
 }
