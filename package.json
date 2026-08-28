@@ -16,6 +16,7 @@
     "test:kiwi-resolver": "node scripts/test-kiwi-resolver.mjs",
     "test:anime-detail-loading": "node scripts/test-anime-detail-loading.mjs",
     "test:watch-source-suppression": "node scripts/test-watch-source-suppression.mjs",
+    "test:watch-timeline-hover": "node scripts/test-watch-timeline-hover.mjs",
     "test:watch-direct-fallback": "node scripts/test-watch-direct-fallback.mjs",
     "test:profile-title-safety": "node scripts/test-profile-title-safety.mjs",
     "test:e2e": "playwright test",

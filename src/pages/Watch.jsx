@@ -64,6 +64,7 @@ import {
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
+import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
 import {
   isConfirmedUpcomingEpisode,
   UPCOMING_EPISODE_MESSAGE,
@@ -979,6 +980,8 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
+  const timelineHoverCleanupRef = useRef(null)
+  const timelineHoverRefreshRef = useRef(null)
   const cspViolationCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
@@ -1144,6 +1147,7 @@ export default function Watch() {
     const merged = mergeSkipSegments(skipSegmentsRef.current, incoming)
     skipSegmentsRef.current = merged
     setSkipSegments(merged)
+    timelineHoverRefreshRef.current?.()
     return merged
   }, [])
 
@@ -1850,6 +1854,7 @@ export default function Watch() {
   useEffect(() => {
     skipSegmentsRef.current = { intro: null, outro: null }
     setSkipSegments(skipSegmentsRef.current)
+    timelineHoverRefreshRef.current?.()
     autoSkippedRef.current = { intro: false, outro: false }
     const clearedFailures = { intro: false, outro: false }
     autoSkipFailuresRef.current = clearedFailures
@@ -2067,6 +2072,9 @@ export default function Watch() {
     setBuffering(false)
     bufferIndicatorCleanupRef.current?.()
     bufferIndicatorCleanupRef.current = null
+    timelineHoverCleanupRef.current?.()
+    timelineHoverCleanupRef.current = null
+    timelineHoverRefreshRef.current = null
     cspViolationCleanupRef.current?.()
     cspViolationCleanupRef.current = null
     if (dashInstance.current) {
@@ -2802,6 +2810,13 @@ export default function Watch() {
         art.video,
         progressInner
       )
+      const timelineHoverPreview = createTimelineHoverPreview(
+        art.video,
+        progressInner,
+        () => skipSegmentsRef.current
+      )
+      timelineHoverCleanupRef.current = timelineHoverPreview.cleanup
+      timelineHoverRefreshRef.current = timelineHoverPreview.refresh
 
       // ArtPlayer retries a video error by assigning art.url again. That
       // recreates the custom HLS source and flushes the MediaSource buffer.
@@ -5112,6 +5127,62 @@ export default function Watch() {
           border-radius: 999px;
           background: rgba(226, 232, 240, 0.44);
           box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+        .watch-art-mount .watch-timeline-track {
+          position: relative;
+        }
+        .watch-art-mount .watch-timeline-markers {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .watch-art-mount .watch-timeline-marker {
+          position: absolute;
+          top: 50%;
+          height: 5px;
+          min-width: 2px;
+          transform: translateY(-50%);
+          border-radius: 999px;
+          opacity: 0.9;
+          box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
+        }
+        .watch-art-mount .watch-timeline-marker-intro {
+          background: #facc15;
+        }
+        .watch-art-mount .watch-timeline-marker-outro {
+          background: #a78bfa;
+        }
+        .watch-timeline-hover-tooltip {
+          position: fixed;
+          z-index: 2147483647;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          max-width: min(220px, calc(100vw - 16px));
+          padding: 5px 8px;
+          border: 1px solid rgba(148, 163, 184, 0.4);
+          border-radius: 6px;
+          background: rgba(7, 11, 20, 0.96);
+          color: #f8fafc;
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.36);
+          font-size: 11px;
+          line-height: 1.2;
+          white-space: nowrap;
+          pointer-events: none;
+          transform: translate(-50%, -100%);
+        }
+        .watch-timeline-hover-tooltip[hidden] {
+          display: none;
+        }
+        .watch-timeline-tooltip-time {
+          color: #fff;
+          font-variant-numeric: tabular-nums;
+        }
+        .watch-timeline-tooltip-range {
+          color: #cbd5e1;
+          font-size: 10px;
         }
         .watch-art-mount .art-progress-loaded {
           background: transparent !important;
