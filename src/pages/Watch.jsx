@@ -5121,39 +5121,34 @@ export default function Watch() {
           position: absolute;
           inset: 0;
           pointer-events: none;
-          z-index: 1;
+          z-index: 2;
         }
         .watch-art-mount .watch-buffer-indicator-segment {
           position: absolute;
           top: 50%;
-          height: 3px;
+          height: 7px;
+          min-width: 2px;
           transform: translateY(-50%);
+          border: 1px solid rgba(125, 211, 252, 0.9);
           border-radius: 999px;
-          background: rgba(226, 232, 240, 0.44);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+          background: linear-gradient(90deg, rgba(56, 189, 248, 0.55), rgba(34, 211, 238, 0.88));
+          box-shadow: 0 0 5px rgba(34, 211, 238, 0.48);
+          transition: width 160ms ease, left 160ms ease;
         }
-        .watch-art-mount .watch-buffer-indicator-label {
+        .watch-art-mount .watch-buffer-indicator[data-ready='false'] {
+          opacity: 0.45;
+        }
+        .watch-art-mount .watch-buffer-indicator-endpoint {
           position: absolute;
           top: 50%;
-          right: 4px;
-          z-index: 2;
-          padding: 2px 5px;
-          border: 1px solid rgba(74, 222, 128, 0.5);
-          border-radius: 4px;
-          background: rgba(7, 11, 20, 0.88);
-          color: #86efac;
-          font-size: 8px;
-          font-weight: 800;
-          letter-spacing: 0.08em;
-          line-height: 1;
-          pointer-events: none;
-          transform: translateY(-50%);
-          transition: opacity 160ms ease, color 160ms ease, border-color 160ms ease;
-        }
-        .watch-art-mount .watch-buffer-indicator-label[data-ready='false'] {
-          border-color: rgba(148, 163, 184, 0.45);
-          color: #cbd5e1;
-          opacity: 0.78;
+          z-index: 1;
+          width: 4px;
+          height: 13px;
+          border-radius: 999px;
+          background: #e0f2fe;
+          box-shadow: 0 0 7px rgba(56, 189, 248, 0.95);
+          transform: translate(-50%, -50%);
+          transition: left 160ms ease;
         }
         .watch-art-mount .watch-timeline-track {
           position: relative;
