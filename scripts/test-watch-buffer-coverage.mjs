@@ -5,6 +5,10 @@ const watchSource = readFileSync(
   new URL('../src/pages/Watch.jsx', import.meta.url),
   'utf8'
 )
+const timelineBufferSource = readFileSync(
+  new URL('../src/lib/watchTimelineBuffer.js', import.meta.url),
+  'utf8'
+)
 
 assert.match(
   watchSource,
@@ -23,7 +27,9 @@ assert.equal(hlsPrefetches.length, 2)
 assert.match(watchSource, /createBufferedTimelineIndicator/)
 assert.match(watchSource, /bufferIndicatorCleanupRef/)
 assert.match(watchSource, /shouldPreferNativeHls\(url\) && video\.canPlayType\('application\/vnd\.apple\.mpegurl'\)/)
-assert.match(watchSource, /watch-buffer-indicator-segment/)
+assert.match(timelineBufferSource, /watch-buffer-indicator-segment/)
+assert.match(timelineBufferSource, /watch-buffer-indicator-label/)
+assert.match(timelineBufferSource, /label\.textContent = 'CACHE'/)
 assert.match(watchSource, /video\.removeAttribute\('crossorigin'\)/)
 
 console.log('watch all-source buffer coverage tests passed')
