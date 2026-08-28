@@ -24,6 +24,14 @@ assert.deepEqual(
 )
 
 assert.deepEqual(
+  mergeProviderServers(
+    [{ name: 'bonk', provider: 'miruro', lang: 'sub', sources: ['fresh'] }],
+    [{ name: 'bonk', provider: 'miruro', lang: 'sub', sources: [] }]
+  ),
+  [{ name: 'bonk', provider: 'miruro', lang: 'sub', sources: ['fresh'] }]
+)
+
+assert.deepEqual(
   filterBrowserProviders([
     { name: 'bonk', lang: 'sub', sources: [{ url: 'https://cdn.example/bonk.m3u8' }] },
     { name: 'Ally', lang: 'sub', sources: [{ url: 'https://cdn.example/ally.m3u8' }] },
