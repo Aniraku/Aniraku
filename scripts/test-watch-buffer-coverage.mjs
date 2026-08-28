@@ -5,11 +5,6 @@ const watchSource = readFileSync(
   new URL('../src/pages/Watch.jsx', import.meta.url),
   'utf8'
 )
-const timelineBufferSource = readFileSync(
-  new URL('../src/lib/watchTimelineBuffer.js', import.meta.url),
-  'utf8'
-)
-
 assert.match(
   watchSource,
   /getDashBufferPolicy,[\s\S]*getNativeMediaBufferPolicy,[\s\S]*from '\.\.\/lib\/watchBufferPolicy'/
@@ -24,12 +19,10 @@ assert.match(watchSource, /buffer: getDashBufferPolicy\(netHintRef\.current\)/)
 
 const hlsPrefetches = watchSource.match(/startFragPrefetch: true/g) || []
 assert.equal(hlsPrefetches.length, 2)
-assert.match(watchSource, /createBufferedTimelineIndicator/)
-assert.match(watchSource, /bufferIndicatorCleanupRef/)
+assert.match(watchSource, /art-control-progress-inner \.art-progress-loaded/)
+assert.match(watchSource, /background: rgba\(148, 163, 184, 0\.72\) !important/)
+assert.doesNotMatch(watchSource, /watch-buffer-indicator-label|watch-buffer-indicator-endpoint/)
 assert.match(watchSource, /shouldPreferNativeHls\(url\) && video\.canPlayType\('application\/vnd\.apple\.mpegurl'\)/)
-assert.match(timelineBufferSource, /watch-buffer-indicator-segment/)
-assert.match(timelineBufferSource, /watch-buffer-indicator-endpoint/)
-assert.match(timelineBufferSource, /endpoint\.style\.left/)
 assert.match(watchSource, /video\.removeAttribute\('crossorigin'\)/)
 
 console.log('watch all-source buffer coverage tests passed')

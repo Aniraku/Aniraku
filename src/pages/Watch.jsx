@@ -63,7 +63,6 @@ import {
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
-import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
 import {
   isConfirmedUpcomingEpisode,
@@ -979,7 +978,6 @@ export default function Watch() {
   const artInstance = useRef(null)
   const hlsInstance = useRef(null)
   const dashInstance = useRef(null)
-  const bufferIndicatorCleanupRef = useRef(null)
   const timelineHoverCleanupRef = useRef(null)
   const timelineHoverRefreshRef = useRef(null)
   const cspViolationCleanupRef = useRef(null)
@@ -2070,8 +2068,6 @@ export default function Watch() {
     // A native media event may have raised the indicator immediately before an
     // iframe handoff. Never allow that stale event to cover the next player.
     setBuffering(false)
-    bufferIndicatorCleanupRef.current?.()
-    bufferIndicatorCleanupRef.current = null
     timelineHoverCleanupRef.current?.()
     timelineHoverCleanupRef.current = null
     timelineHoverRefreshRef.current = null
@@ -2810,10 +2806,6 @@ export default function Watch() {
       const progressInner = art.video
         ?.closest('.art-video-player')
         ?.querySelector('.art-control-progress-inner')
-      bufferIndicatorCleanupRef.current = createBufferedTimelineIndicator(
-        art.video,
-        progressInner
-      )
       const timelineHoverPreview = createTimelineHoverPreview(
         art.video,
         progressInner,
@@ -5110,45 +5102,19 @@ export default function Watch() {
         .watch-art-mount .art-video-player .art-controls-quality {
           min-width: 64px;
         }
-        /* A YouTube-like downloaded-range cue, clipped to the intended
-           full buffered ranges. It sits behind ArtPlayer's red played line
-           and thumb, never captures input, and keeps the Nothing-style signal
-           red reserved for the actual playback position. */
+        /* Artplayer's loaded-progress line is the cache indicator. It stays
+           thin and gray beneath the red played line, reflects video.buffered,
+           and never captures input or changes seek behavior. */
         .watch-art-mount .art-control-progress-inner {
           overflow: hidden;
         }
-        .watch-art-mount .watch-buffer-indicator {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          z-index: 2;
-        }
-        .watch-art-mount .watch-buffer-indicator-segment {
-          position: absolute;
+        .watch-art-mount .art-control-progress-inner .art-progress-loaded {
+          z-index: 10;
+          height: 2px;
           top: 50%;
-          height: 7px;
-          min-width: 2px;
           transform: translateY(-50%);
-          border: 1px solid rgba(125, 211, 252, 0.9);
-          border-radius: 999px;
-          background: linear-gradient(90deg, rgba(56, 189, 248, 0.55), rgba(34, 211, 238, 0.88));
-          box-shadow: 0 0 5px rgba(34, 211, 238, 0.48);
-          transition: width 160ms ease, left 160ms ease;
-        }
-        .watch-art-mount .watch-buffer-indicator[data-ready='false'] {
-          opacity: 0.45;
-        }
-        .watch-art-mount .watch-buffer-indicator-endpoint {
-          position: absolute;
-          top: 50%;
-          z-index: 1;
-          width: 4px;
-          height: 13px;
-          border-radius: 999px;
-          background: #e0f2fe;
-          box-shadow: 0 0 7px rgba(56, 189, 248, 0.95);
-          transform: translate(-50%, -50%);
-          transition: left 160ms ease;
+          background: rgba(148, 163, 184, 0.72) !important;
+          box-shadow: 0 0 2px rgba(226, 232, 240, 0.22);
         }
         .watch-art-mount .watch-timeline-track {
           position: relative;
@@ -5205,9 +5171,6 @@ export default function Watch() {
         .watch-timeline-tooltip-range {
           color: #cbd5e1;
           font-size: 10px;
-        }
-        .watch-art-mount .art-progress-loaded {
-          background: transparent !important;
         }
         .watch-art-mount .art-progress-played,
         .watch-art-mount .art-progress-indicator {
