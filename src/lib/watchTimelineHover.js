@@ -1,3 +1,8 @@
+export const TIMELINE_MARKER_DEFINITIONS = Object.freeze({
+  intro: Object.freeze({ label: 'Intro', color: 'rgba(99, 102, 241, 0.42)' }),
+  outro: Object.freeze({ label: 'Outro', color: 'rgba(244, 63, 94, 0.42)' }),
+})
+
 function finite(value, fallback = 0) {
   const number = Number(value)
   return Number.isFinite(number) ? number : fallback
@@ -18,14 +23,14 @@ export function getTimelineMarkers(segments = {}, duration = 0) {
   const total = finite(duration)
   if (total <= 0) return []
 
-  return ['intro', 'outro']
+  return Object.keys(TIMELINE_MARKER_DEFINITIONS)
     .map((type) => {
       const start = Math.max(0, finite(segments?.[type]?.start, -1))
       const end = Math.min(total, finite(segments?.[type]?.end, -1))
       if (start < 0 || end <= start) return null
       return {
         type,
-        label: type === 'intro' ? 'Intro' : 'Outro',
+        label: TIMELINE_MARKER_DEFINITIONS[type].label,
         start,
         end,
         leftPercent: (start / total) * 100,
@@ -54,7 +59,7 @@ function createMarkerElement(marker) {
   element.style.top = '0'
   element.style.bottom = '0'
   element.style.pointerEvents = 'none'
-  element.style.background = marker.type === 'intro' ? 'rgba(99, 102, 241, 0.42)' : 'rgba(244, 63, 94, 0.42)'
+  element.style.background = TIMELINE_MARKER_DEFINITIONS[marker.type].color
   element.style.left = `${marker.leftPercent}%`
   element.style.width = `${marker.widthPercent}%`
   return element

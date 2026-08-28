@@ -1,4 +1,6 @@
-export const PLAYBACK_CACHE_SECONDS = 120
+// Keep the full browser-reported buffered range visible; there is no artificial
+// forward cache-window cap.
+export const PLAYBACK_CACHE_SECONDS = Number.POSITIVE_INFINITY
 export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
 function finite(value, fallback = 0) {
@@ -18,7 +20,9 @@ export function getBufferedTimelineSegments(
   if (total <= 0) return []
 
   const current = Math.min(total, Math.max(0, finite(currentTime)))
-  const limit = Math.max(1, finite(cacheSeconds, PLAYBACK_CACHE_SECONDS))
+  const limit = cacheSeconds === Number.POSITIVE_INFINITY
+    ? Number.POSITIVE_INFINITY
+    : Math.max(1, finite(cacheSeconds, PLAYBACK_CACHE_SECONDS))
   const windowStart = Math.max(0, current - limit)
   const windowEnd = Math.min(total, current + limit)
 
