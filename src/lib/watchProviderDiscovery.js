@@ -65,8 +65,11 @@ export function mergeProviderServers(existing = [], incoming = []) {
   for (const server of [...existing, ...incoming]) {
     if (!server?.name) continue
     const key = `${server.provider || 'miruro'}:${server.name}:${server.lang || ''}`
-    // A later resolver response supersedes the older payload for the same
-    // provider while retaining every provider already found for this episode.
+    const previous = merged.get(key)
+    // Empty retry payloads mean “not resolved yet”, not “remove the provider”.
+    // Keep a previously source-bearing payload until a later response actually
+    // replaces it with fresh sources.
+    if (previous && serverHasSource(previous) && !serverHasSource(server)) continue
     merged.set(key, server)
   }
   return [...merged.values()]

@@ -64,6 +64,7 @@ import {
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
+import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
 import {
   isConfirmedUpcomingEpisode,
   UPCOMING_EPISODE_MESSAGE,
@@ -979,6 +980,7 @@ export default function Watch() {
   const hlsInstance = useRef(null)
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
+  const timelineHoverCleanupRef = useRef(null)
   const cspViolationCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
@@ -1104,6 +1106,7 @@ export default function Watch() {
   // wins when present; AniSkip supplies anime-wide coverage by MAL ID.
   const [skipSegments, setSkipSegments] = useState({ intro: null, outro: null })
   const skipSegmentsRef = useRef({ intro: null, outro: null })
+  const anilistSeoHydratedRef = useRef(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [autoSkip, setAutoSkip] = useState(() => {
     try {
@@ -1601,17 +1604,20 @@ export default function Watch() {
           return getSourcePlaybackType(source) !== 'embed' && source?.url && !hasExpiredEmbeddedToken(source.url)
         })
         const embedSources = initialSources.filter(isPlayableEmbedSource)
-		const playableSources = [...mediaSources, ...embedSources]
-		if (playableSources.length === 0) return null
-		return {
-			id: key,
-			label: name,
-			provider: name,
-			providerFamily: family,
-			lang,
-			initialSources: playableSources,
-			headers: server?.headers || {},
-		}
+        const playableSources = [...mediaSources, ...embedSources]
+        // Keep provider rows even when this resolver response has no sources.
+        // A later retry can hydrate the same provider, and the UI should not
+        // make it disappear while other providers are still resolving.
+        return {
+          id: key,
+          label: name,
+          provider: name,
+          providerFamily: family,
+          lang,
+          initialSources: playableSources,
+          headers: server?.headers || {},
+        }
+
       }).filter(Boolean)
     }
     return { sub: normalize(servers.sub, 'sub'), dub: normalize(servers.dub, 'dub') }
@@ -1830,22 +1836,22 @@ export default function Watch() {
     }
   }, [animeId, epNumber])
 
-  // The stream backend may omit the MAL mapping. Hydrate it from AniList so
-  // AniSkip can still serve timestamps for the same title.
+  // Use the frontend AniList record as the canonical metadata source for SEO
+  // and timestamp mapping, while retaining backend episode/availability fields.
   const malId = getMalId(anime)
   useEffect(() => {
-    if (!animeId || !anime || malId) return
+    if (!animeId || !anime || anilistSeoHydratedRef.current === String(animeId)) return
+    anilistSeoHydratedRef.current = String(animeId)
     let cancelled = false
     anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(animeId, 10) })
       .then(({ data }) => {
-        const nextMalId = getMalId(data?.Media)
-        if (!cancelled && nextMalId) {
-          setAnime((prev) => prev ? { ...prev, idMal: nextMalId } : prev)
+        if (!cancelled && data?.Media) {
+          setAnime((prev) => prev ? { ...prev, ...data.Media, id: prev.id || animeId } : prev)
         }
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [animeId, anime, malId])
+  }, [animeId, anime?.id])
 
   useEffect(() => {
     skipSegmentsRef.current = { intro: null, outro: null }
@@ -2067,6 +2073,8 @@ export default function Watch() {
     setBuffering(false)
     bufferIndicatorCleanupRef.current?.()
     bufferIndicatorCleanupRef.current = null
+    timelineHoverCleanupRef.current?.cleanup?.()
+    timelineHoverCleanupRef.current = null
     cspViolationCleanupRef.current?.()
     cspViolationCleanupRef.current = null
     if (dashInstance.current) {
@@ -2801,6 +2809,11 @@ export default function Watch() {
       bufferIndicatorCleanupRef.current = createBufferedTimelineIndicator(
         art.video,
         progressInner
+      )
+      timelineHoverCleanupRef.current = createTimelineHoverPreview(
+        art.video,
+        progressInner,
+        () => skipSegmentsRef.current
       )
 
       // ArtPlayer retries a video error by assigning art.url again. That
