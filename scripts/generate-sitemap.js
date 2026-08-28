@@ -2,18 +2,9 @@ import fs from 'fs'
 import path from 'path'
 import { generateSlug } from '../src/lib/slug.js'
 
-// Prefer the build-time env var (Vercel injects VITE_API_URL), fall back to
-// the local .env, then to the production Azure API.
-const readEnv = (key) => {
-  if (process.env[key]) return process.env[key]
-  try {
-    const env = fs.readFileSync(path.resolve('.env'), 'utf8')
-    const m = env.match(new RegExp(`^${key}=(.*)$`, 'm'))
-    return m ? m[1].trim() : ''
-  } catch { return '' }
-}
-const API_BASE = `${readEnv('VITE_API_URL') || 'https://api.aniraku.tech'}/api/v1`
-const ANILIST_PROXY = `${API_BASE}/anilist`
+// Sitemap generation is a build-time client of the public AniList endpoint.
+// It must not route metadata through the shared Aniraku backend IP.
+const ANILIST_ENDPOINT = process.env.VITE_ANILIST_GRAPHQL_URL || 'https://graphql.anilist.co'
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
 const PER_PAGE = 50
@@ -113,10 +104,10 @@ function sleep(ms) {
 }
 
 /**
- * Send a GraphQL query to the AniList proxy endpoint.
+ * Send a GraphQL query directly to AniList for build-time sitemap generation.
  */
 async function graphqlFetch(query, variables = {}) {
-  const res = await fetch(ANILIST_PROXY, {
+  const res = await fetch(ANILIST_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -131,7 +122,7 @@ async function graphqlFetch(query, variables = {}) {
 }
 
 /**
- * Wake-up ping: fetch 1 item from the backend to trigger cold start.
+ * Warm-up ping: fetch 1 item directly from AniList before generating URLs.
  */
 async function wakeUpPing() {
   try {
@@ -148,21 +139,21 @@ async function wakeUpPing() {
 }
 
 /**
- * Wait until the backend wakes up, polling every WAKEUP_POLL_INTERVAL_MS
+ * Wait until AniList responds, polling every WAKEUP_POLL_INTERVAL_MS
  * for up to WAKEUP_TIMEOUT_MS.
  */
-async function waitForBackend() {
+async function waitForAniList() {
   const startTime = Date.now()
   let attempt = 0
 
   while (Date.now() - startTime < WAKEUP_TIMEOUT_MS) {
     attempt++
     const elapsed = Math.round((Date.now() - startTime) / 1000)
-    process.stdout.write(`  Waiting for backend... attempt ${attempt} (${elapsed}s elapsed)\r`)
+    process.stdout.write(`  Waiting for AniList... attempt ${attempt} (${elapsed}s elapsed)\r`)
 
     const alive = await wakeUpPing()
     if (alive) {
-      console.log(`  Backend is awake after ${elapsed}s!`)
+      console.log(`  AniList responded after ${elapsed}s!`)
       return true
     }
 
@@ -170,12 +161,12 @@ async function waitForBackend() {
   }
 
   const totalElapsed = Math.round((Date.now() - startTime) / 1000)
-  console.log(`  Backend did not respond within ${WAKEUP_TIMEOUT_MS / 1000}s (${totalElapsed}s).`)
+  console.log(`  AniList did not respond within ${WAKEUP_TIMEOUT_MS / 1000}s (${totalElapsed}s).`)
   return false
 }
 
 /**
- * Fetch a single page of anime from the backend.
+ * Fetch a single page of anime directly from AniList.
  */
 async function fetchPage(page) {
   for (let attempt = 1; attempt <= FETCH_RETRIES; attempt++) {
@@ -237,14 +228,14 @@ async function fetchAllPages() {
 const today = new Date().toISOString().slice(0, 10)
 
 console.log('Generating sitemaps...')
-console.log(`Backend proxy: ${ANILIST_PROXY}`)
+console.log(`AniList endpoint: ${ANILIST_ENDPOINT}`)
 
-// Step 1: Wake up the backend (wait up to 5 minutes)
-console.log('\n--- Step 1: Waking up backend (max 5 min wait) ---')
-const backendReady = await waitForBackend()
+// Step 1: Confirm direct AniList availability (wait up to 5 minutes)
+console.log('\n--- Step 1: Checking AniList (max 5 min wait) ---')
+const anilistReady = await waitForAniList()
 
-if (!backendReady) {
-  console.log('\nBackend is still asleep. Generating static-only sitemap.')
+if (!anilistReady) {
+  console.log('\nAniList is still unavailable. Generating static-only sitemap.')
 
   const staticUrls = STATIC_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority))
   const staticSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'static.xml'), staticUrls)
