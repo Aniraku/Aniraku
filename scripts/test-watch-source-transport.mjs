@@ -22,6 +22,9 @@ assert.deepEqual(createMediaTransportPlan({ ...common, verification: '' }), [
   { mode: 'proxy', url: common.proxyUrl },
   { mode: 'direct', url: common.directUrl },
 ])
+assert.deepEqual(createMediaTransportPlan({ ...common, proxyOnly: true }), [
+  { mode: 'proxy', url: common.proxyUrl },
+])
 
 assert.equal(shouldTryHlsFallback('https://cdn.example/video/master.m3u8?token=one'), true)
 assert.equal(shouldTryHlsFallback('https://a1.mp4upload.com/video.mp4'), false)

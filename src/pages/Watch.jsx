@@ -2157,17 +2157,23 @@ export default function Watch() {
 			const activeQuality = Array.isArray(qualityList)
 				? qualityList.find((quality) => quality?.url === streamUrl)
 				: null
-			const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
+			      const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
+      const selectedSource = [...SOURCES.sub, ...SOURCES.dub].find(
+        (candidate) => candidate.id === activeSource
+      )
+      const bonkProxyOnly = isBonkProvider(selectedSource)
+      // Browser-native media playback — proxy first, direct as fallback for
+      // normal providers. Bonk is intentionally restricted to proxy transport.
 
-      // Browser-native media playback — proxy first, direct as fallback.
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
 	      const playAsNative = async (video, url, art) => {
 			const transportPlan = createMediaTransportPlan({
 				verification: sourceVerification,
 				directUrl: url,
-				proxyUrl: proxied(url),
-			})
+        proxyUrl: proxied(url),
+        proxyOnly: bonkProxyOnly,
+      })
 	        let transportIndex = 0
 	        let hlsTried = false
         const tryUrl = (target, withCors) => {
@@ -3015,6 +3021,7 @@ export default function Watch() {
       setAutoNextPreference,
       setAutoSkipPreference,
       skipSegmentNow,
+      SOURCES,
     ]
   )
 
