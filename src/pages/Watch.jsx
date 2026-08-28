@@ -2539,8 +2539,10 @@ export default function Watch() {
             // other manifests remain on hls.js, whose continuous VOD buffer and media
             // recovery avoid falling through to an expired embed page.
             if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
-	              try {
-	                video.src = hlsTransportPlan[hlsTransportIndex].url
+	                            try {
+                video.preload = getNativeMediaBufferPolicy().preload
+                video.src = hlsTransportPlan[hlsTransportIndex].url
+
 	                if (pendingHandoffRef.current?.shouldPlay !== false) {
 	                  const p = video.play()
 	                  if (p && typeof p.catch === 'function') p.catch(() => {})
@@ -2563,8 +2565,10 @@ export default function Watch() {
             }
 	            if (!Hls.isSupported()) {
 	              // last-resort native
-	              try {
-	                video.src = proxiedH(url)
+	                            try {
+                video.preload = getNativeMediaBufferPolicy().preload
+                video.src = proxiedH(url)
+
 	                if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
 	              } catch {}
               return
