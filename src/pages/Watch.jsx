@@ -43,6 +43,7 @@ import {
   getHlsBufferPolicy,
   getHlsLoadPolicies,
   getHlsRequestCacheMode,
+  getNativeMediaBufferPolicy,
 } from '../lib/watchBufferPolicy'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 import {
@@ -352,10 +353,10 @@ function getQualityPresentation(value) {
 }
 
 function qualityOptionHtml(presentation) {
-        const badge = presentation.badge
-                ? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
-                : ''
-        return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
+	const badge = presentation.badge
+		? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
+		: ''
+	return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
 }
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
@@ -403,26 +404,26 @@ function hasExpiredEmbeddedToken(url) {
 }
 
 function getSourcePlaybackType(source) {
-        const rawType = String(source?.type || source?.mime || '').trim().toLowerCase()
-        const url = String(source?.url || '').toLowerCase()
-        if (rawType === 'embed' || rawType === 'iframe' || rawType === 'page' || rawType.includes('embed')) return 'embed'
-        if (rawType === 'hls' || rawType === 'm3u8' || rawType.includes('mpegurl') || /\.m3u8(?:$|[?#])/.test(url)) return 'hls'
-        if (rawType === 'dash' || rawType === 'mpd' || rawType.includes('dash+xml') || /\.mpd(?:$|[?#])/.test(url)) return 'dash'
-        if (rawType === 'mp4' || rawType === 'm4v' || rawType.includes('video/mp4') || /\.(?:mp4|m4v)(?:$|[?#])/.test(url)) return 'mp4'
-        if (rawType === 'webm' || rawType.includes('video/webm') || /\.webm(?:$|[?#])/.test(url)) return 'webm'
-        if (rawType === 'ogg' || rawType === 'ogv' || rawType.includes('video/ogg') || rawType.includes('audio/ogg') || /\.(?:ogg|ogv)(?:$|[?#])/.test(url)) return 'ogg'
-        if (rawType === 'mpeg' || rawType === 'mpg' || rawType.includes('video/mpeg') || /\.(?:mpeg|mpg)(?:$|[?#])/.test(url)) return 'mpeg'
-        // A live URL with no reliable extension is still attempted through the
-        // browser's native media element; the backend has already probed it.
-        return 'native'
+	const rawType = String(source?.type || source?.mime || '').trim().toLowerCase()
+	const url = String(source?.url || '').toLowerCase()
+	if (rawType === 'embed' || rawType === 'iframe' || rawType === 'page' || rawType.includes('embed')) return 'embed'
+	if (rawType === 'hls' || rawType === 'm3u8' || rawType.includes('mpegurl') || /\.m3u8(?:$|[?#])/.test(url)) return 'hls'
+	if (rawType === 'dash' || rawType === 'mpd' || rawType.includes('dash+xml') || /\.mpd(?:$|[?#])/.test(url)) return 'dash'
+	if (rawType === 'mp4' || rawType === 'm4v' || rawType.includes('video/mp4') || /\.(?:mp4|m4v)(?:$|[?#])/.test(url)) return 'mp4'
+	if (rawType === 'webm' || rawType.includes('video/webm') || /\.webm(?:$|[?#])/.test(url)) return 'webm'
+	if (rawType === 'ogg' || rawType === 'ogv' || rawType.includes('video/ogg') || rawType.includes('audio/ogg') || /\.(?:ogg|ogv)(?:$|[?#])/.test(url)) return 'ogg'
+	if (rawType === 'mpeg' || rawType === 'mpg' || rawType.includes('video/mpeg') || /\.(?:mpeg|mpg)(?:$|[?#])/.test(url)) return 'mpeg'
+	// A live URL with no reliable extension is still attempted through the
+	// browser's native media element; the backend has already probed it.
+	return 'native'
 }
 
 function isKiwiEmbedUrl(url) {
-        return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
+	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
 }
 
 function getSourceVerification(source) {
-        return String(source?.verification || source?.Verification || '').trim().toLowerCase()
+	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
 
 // Embed verification is normally supplied by the API. Some provider responses
@@ -430,48 +431,48 @@ function getSourceVerification(source) {
 // selectable instead of removing the whole provider row. A definitive dead
 // verdict or an expired signed token is still rejected.
 function isPlayableEmbedSource(source) {
-        if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
-        return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
+	if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
+	return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
 }
 
 function isKiwiEmbedSource(source) {
-        if (!isPlayableEmbedSource(source)) return false
-        try {
-                const target = new URL(source.url)
-                return target.protocol === 'https:' && target.hostname === 'kwik.cx' && /^\/e\/[A-Za-z0-9_-]{6,128}$/.test(target.pathname)
-        } catch {
-                return false
-        }
+	if (!isPlayableEmbedSource(source)) return false
+	try {
+		const target = new URL(source.url)
+		return target.protocol === 'https:' && target.hostname === 'kwik.cx' && /^\/e\/[A-Za-z0-9_-]{6,128}$/.test(target.pathname)
+	} catch {
+		return false
+	}
 }
 
 // Kwik denies being framed by third-party pages. Do not turn a recoverable
 // Kiwi direct-source failure into a browser iframe that must be rejected.
 function isBrowserPlayableEmbedSource(source) {
-        return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
+	return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
 }
 
 function buildQualityList(sources, suppressedUrls = new Set()) {
-        const seenUrls = new Set()
-        const entries = (Array.isArray(sources) ? sources : [])
-                // Backend verification tags are advisory snapshots, not a playback
-                // permission model. Keep every non-embed media URL so providers such as
-                // Kiwi remain playable when their current CDN verdict is stale.
-                .filter((src) => getSourcePlaybackType(src) !== 'embed' && src?.url)
-                .map((src, sourceIndex) => {
-                        const presentation = getQualityPresentation(src.quality)
-                        return {
-                                src,
-                                sourceIndex,
-                                        presentation,
-                                        html: qualityOptionHtml(presentation),
-                                        url: src.url,
-                                // Provider metadata and URL classification are both considered so
-                                // mislabeled streams use the correct ArtPlayer loader.
-                                type: getSourcePlaybackType(src),
-                                verification: getSourceVerification(src),
-                                        expiredToken: hasExpiredEmbeddedToken(src.url),
-                        }
-                })
+	const seenUrls = new Set()
+	const entries = (Array.isArray(sources) ? sources : [])
+		// Backend verification tags are advisory snapshots, not a playback
+		// permission model. Keep every non-embed media URL so providers such as
+		// Kiwi remain playable when their current CDN verdict is stale.
+		.filter((src) => getSourcePlaybackType(src) !== 'embed' && src?.url)
+		.map((src, sourceIndex) => {
+			const presentation = getQualityPresentation(src.quality)
+			return {
+				src,
+				sourceIndex,
+					presentation,
+					html: qualityOptionHtml(presentation),
+					url: src.url,
+				// Provider metadata and URL classification are both considered so
+				// mislabeled streams use the correct ArtPlayer loader.
+				type: getSourcePlaybackType(src),
+				verification: getSourceVerification(src),
+					expiredToken: hasExpiredEmbeddedToken(src.url),
+			}
+		})
     .filter((entry) => {
       if (seenUrls.has(entry.url)) return false
       seenUrls.add(entry.url)
@@ -494,17 +495,17 @@ function buildQualityList(sources, suppressedUrls = new Set()) {
       }
       return a.sourceIndex - b.sourceIndex
     })
-            .map((entry, index) => ({
-              default: index === 0,
-              html: entry.html,
-              url: entry.url,
-              type: entry.type,
-                        verification: entry.verification,
-                        label: entry.presentation.label,
-                qualityKey: entry.presentation.key,
-                qualityRank: entry.presentation.rank,
-                isAuto: entry.presentation.isAuto,
-        }))
+	    .map((entry, index) => ({
+	      default: index === 0,
+	      html: entry.html,
+	      url: entry.url,
+	      type: entry.type,
+			verification: entry.verification,
+			label: entry.presentation.label,
+		qualityKey: entry.presentation.key,
+		qualityRank: entry.presentation.rank,
+		isAuto: entry.presentation.isAuto,
+	}))
 }
 
 function seekControlHtml(direction) {
@@ -722,61 +723,6 @@ function getConnectionHint() {
     rtt: c.rtt || 0,
     saveData: !!c.saveData,
   }
-}
-
-// ────────────────────────────────────────────────────────────────
-// Continuous playback cache policy
-// ────────────────────────────────────────────────────────────────
-// The shared watchBufferPolicy caps the forward buffer to a short
-// window and lets already-watched media be evicted, which shows up as
-// constant re-buffering on long episodes and segments being re-fetched
-// that the viewer already downloaded. These overrides switch every
-// playback engine to a continuous cache: fragments keep loading ahead
-// of the playhead for as long as the browser allows, watched media
-// stays buffered for instant seek-backs, and immutable VOD segments
-// are reused from the HTTP cache whenever they are requested again.
-// MediaSource eviction in the browser remains the final safety valve
-// for device RAM on constrained devices.
-
-// hls.js — keep filling the MediaSource buffer continuously instead of
-// stopping after a short window. maxMaxBufferLength is the hard ceiling
-// hls.js honors, so it is raised together with maxBufferLength, and the
-// byte cap is lifted so a full episode fits. backBufferLength stays
-// unbounded so already-watched media is never eagerly flushed.
-const CONTINUOUS_HLS_BUFFER_POLICY = {
-  maxBufferLength: 600,                 // 10 minutes of forward buffer minimum
-  maxMaxBufferLength: 3600,             // hard ceiling: an entire episode
-  maxBufferSize: 360 * 1000 * 1000,     // 360MB of cached media per stream
-  backBufferLength: Infinity,           // never flush already-watched media
-}
-
-// dash.js — buffer far ahead and keep the back buffer alive so seeks
-// back into the episode replay from RAM instead of the network.
-const CONTINUOUS_DASH_BUFFER_POLICY = {
-  fastSwitchEnabled: true,
-  bufferTimeDefault: 60,                  // 1 minute of forward buffer
-  stableBufferTime: 60,
-  bufferTimeAtTopQuality: 300,            // 5 minutes at top quality
-  bufferTimeAtTopQualityLongForm: 1200,   // 20 minutes for full episodes
-  longFormContentDurationThreshold: 600,
-  bufferToKeep: 21600,                    // keep 6h of played media
-  bufferPruningInterval: 60,
-}
-
-// Native <video> — 'auto' lets the browser download and keep as much of
-// the file as it wants while playback progresses.
-const CONTINUOUS_NATIVE_PRELOAD = 'auto'
-
-// hls.js fetchSetup — VOD fragments are immutable, so always reuse the
-// browser-cached copy when one exists. Manifests, playlists, keys and
-// anything non-segmental stay under the shared policy so signed URLs and
-// live ABR updates are never masked by a stale response.
-function getContinuousHlsRequestCacheMode(context) {
-  const isMediaSegment =
-    context?.type === 'fragment' ||
-    Boolean(context?.frag) ||
-    Boolean(context?.part)
-  return isMediaSegment ? 'force-cache' : getHlsRequestCacheMode(context)
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -1404,7 +1350,7 @@ export default function Watch() {
     lastBlockCycleRef.current = 0
     recoveryBusyRef.current = false
     streamRetries.current = {}
-        }, [animeId, epNumber])
+	}, [animeId, epNumber])
 
   // Keep the active episode row visible in the sidebar.
   useEffect(() => {
@@ -1655,24 +1601,24 @@ export default function Watch() {
           return getSourcePlaybackType(source) !== 'embed' && source?.url && !hasExpiredEmbeddedToken(source.url)
         })
         const embedSources = initialSources.filter(isPlayableEmbedSource)
-                const playableSources = [...mediaSources, ...embedSources]
-                if (playableSources.length === 0) return null
-                return {
-                        id: key,
-                        label: name,
-                        provider: name,
-                        providerFamily: family,
-                        lang,
-                        initialSources: playableSources,
-                        headers: server?.headers || {},
-                }
+		const playableSources = [...mediaSources, ...embedSources]
+		if (playableSources.length === 0) return null
+		return {
+			id: key,
+			label: name,
+			provider: name,
+			providerFamily: family,
+			lang,
+			initialSources: playableSources,
+			headers: server?.headers || {},
+		}
       }).filter(Boolean)
     }
     return { sub: normalize(servers.sub, 'sub'), dub: normalize(servers.dub, 'dub') }
   }, [servers])
 
 
-        const currentSource = useMemo(() => {
+	const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
     return all.find((s) => s.id === activeSource) || all[0] || null
   }, [SOURCES, activeSource])
@@ -2182,40 +2128,40 @@ export default function Watch() {
       // The backend strips "rn" before dialing the CDN.
       const nonce =
         Math.random().toString(36).slice(2) + Date.now().toString(36)
-              const proxied = (u) =>
-                `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
-              // Browser policy violations name the blocked URL. Suppress a control
-              // only when that URL is the selected media URL, never for an unrelated
-              // playlist ad, analytics resource, or other subrequest.
-              if (typeof document !== 'undefined') {
-                const selectedUrl = String(streamUrl)
-                const onPolicyViolation = (event) => {
-                  if (buildIdRef.current !== myBuildId) return
-                  const directive = String(event?.violatedDirective || event?.effectiveDirective || '')
-                  const blockedUrl = String(event?.blockedURI || '')
-                  const blocksSelectedMedia = /^(?:media-src|connect-src|default-src)/.test(directive) &&
-                    (blockedUrl === selectedUrl || blockedUrl.startsWith(`${selectedUrl}?`) || blockedUrl.startsWith(`${selectedUrl}#`))
-                  if (blocksSelectedMedia) onBlocked?.('csp-blocked', { streamUrl: selectedUrl })
-                }
-                document.addEventListener('securitypolicyviolation', onPolicyViolation)
-                cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
-              }
-                        const activeQuality = Array.isArray(qualityList)
-                                ? qualityList.find((quality) => quality?.url === streamUrl)
-                                : null
-                        const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
+	      const proxied = (u) =>
+	        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+	      // Browser policy violations name the blocked URL. Suppress a control
+	      // only when that URL is the selected media URL, never for an unrelated
+	      // playlist ad, analytics resource, or other subrequest.
+	      if (typeof document !== 'undefined') {
+	        const selectedUrl = String(streamUrl)
+	        const onPolicyViolation = (event) => {
+	          if (buildIdRef.current !== myBuildId) return
+	          const directive = String(event?.violatedDirective || event?.effectiveDirective || '')
+	          const blockedUrl = String(event?.blockedURI || '')
+	          const blocksSelectedMedia = /^(?:media-src|connect-src|default-src)/.test(directive) &&
+	            (blockedUrl === selectedUrl || blockedUrl.startsWith(`${selectedUrl}?`) || blockedUrl.startsWith(`${selectedUrl}#`))
+	          if (blocksSelectedMedia) onBlocked?.('csp-blocked', { streamUrl: selectedUrl })
+	        }
+	        document.addEventListener('securitypolicyviolation', onPolicyViolation)
+	        cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
+	      }
+			const activeQuality = Array.isArray(qualityList)
+				? qualityList.find((quality) => quality?.url === streamUrl)
+				: null
+			const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
 
       // Browser-native media playback — proxy first, direct as fallback.
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
-              const playAsNative = async (video, url, art) => {
-                        const transportPlan = createMediaTransportPlan({
-                                verification: sourceVerification,
-                                directUrl: url,
-                                proxyUrl: proxied(url),
-                        })
-                let transportIndex = 0
-                let hlsTried = false
+	      const playAsNative = async (video, url, art) => {
+			const transportPlan = createMediaTransportPlan({
+				verification: sourceVerification,
+				directUrl: url,
+				proxyUrl: proxied(url),
+			})
+	        let transportIndex = 0
+	        let hlsTried = false
         const tryUrl = (target, withCors) => {
           try {
             if (withCors) {
@@ -2227,8 +2173,7 @@ export default function Watch() {
               // considered.
               video.removeAttribute('crossorigin')
             }
-            // Continuous cache: buffer the whole file as the browser allows.
-            video.preload = CONTINUOUS_NATIVE_PRELOAD
+            video.preload = getNativeMediaBufferPolicy().preload
             video.src = target
             video.load()
             const p = video.play()
@@ -2252,8 +2197,6 @@ export default function Watch() {
           const hls = new Hls({
             enableWorker: false,
             ...getHlsBufferPolicy(netHintRef.current),
-            // Continuous cache overrides the bounded forward buffer.
-            ...CONTINUOUS_HLS_BUFFER_POLICY,
             ...getHlsLoadPolicies(),
             startFragPrefetch: true,
             lowLatencyMode: false,
@@ -2279,46 +2222,46 @@ export default function Watch() {
                 return
               } catch {}
             }
-                    if (onBlocked) onBlocked('playback-error')
+	            if (onBlocked) onBlocked('playback-error')
           })
           return true
         }
 
-                tryUrl(transportPlan[transportIndex].url, transportPlan[transportIndex].mode === 'proxy')
-                video.onerror = async () => {
-                  if (buildIdRef.current !== myBuildId) return
-                  if (transportIndex + 1 < transportPlan.length) {
-                    transportIndex += 1
-                    showToast(
-                                        transportPlan[transportIndex].mode === 'direct'
-                                                ? 'Trying direct playback…'
-                                                : 'Trying the media proxy…'
-                                )
-                    tryUrl(
-                                        transportPlan[transportIndex].url,
-                                        transportPlan[transportIndex].mode === 'proxy'
-                                )
-                    return
-                  }
+	        tryUrl(transportPlan[transportIndex].url, transportPlan[transportIndex].mode === 'proxy')
+	        video.onerror = async () => {
+	          if (buildIdRef.current !== myBuildId) return
+	          if (transportIndex + 1 < transportPlan.length) {
+	            transportIndex += 1
+	            showToast(
+					transportPlan[transportIndex].mode === 'direct'
+						? 'Trying direct playback…'
+						: 'Trying the media proxy…'
+				)
+	            tryUrl(
+					transportPlan[transportIndex].url,
+					transportPlan[transportIndex].mode === 'proxy'
+				)
+	            return
+	          }
           if (shouldTryHlsFallback(url) && await tryHls()) return
-                  showToast('Direct playback failed — choose another server if needed.', { long: true })
+	          showToast('Direct playback failed — choose another server if needed.', { long: true })
           if (onBlocked) onBlocked('native-media-error')
           else setError('Stream playback error. Try a different server.')
         }
       }
 
-              // Recovery after ArtPlayer's reconnect loop is intentionally manual.
-              // Auto-changing a representation or provider made healthy servers look
-              // blocked and replaced a viewer's selected playback path unexpectedly.
-              const recoverPlayback = () => {
-                if (buildIdRef.current !== myBuildId) return
-                if (recoveryBusyRef.current) return
-                recoveryBusyRef.current = true
-                recoveryBusyRef.current = false
-                showToast('Playback interrupted — choose another server manually.', {
-                  long: true,
-                })
-                if (onBlocked) onBlocked('playback-error')
+	      // Recovery after ArtPlayer's reconnect loop is intentionally manual.
+	      // Auto-changing a representation or provider made healthy servers look
+	      // blocked and replaced a viewer's selected playback path unexpectedly.
+	      const recoverPlayback = () => {
+	        if (buildIdRef.current !== myBuildId) return
+	        if (recoveryBusyRef.current) return
+	        recoveryBusyRef.current = true
+	        recoveryBusyRef.current = false
+	        showToast('Playback interrupted — choose another server manually.', {
+	          long: true,
+	        })
+	        if (onBlocked) onBlocked('playback-error')
         else setError('Stream playback error. Try a different server.')
       }
 
@@ -2359,7 +2302,7 @@ export default function Watch() {
           (navigator.language || 'en').toLowerCase() === 'zh-cn' ? 'zh-cn' : 'en',
         moreVideoAttr: {
           crossOrigin: 'anonymous',
-          preload: CONTINUOUS_NATIVE_PRELOAD,
+          preload: getNativeMediaBufferPolicy().preload,
           playsInline: true,
           'webkit-playsinline': 'true',
           'x5-playsinline': 'true',
@@ -2491,12 +2434,7 @@ export default function Watch() {
               const player = dash.MediaPlayer().create()
               player.updateSettings?.({
                 streaming: {
-                  // Continuous cache: keep buffering ahead for the whole
-                  // episode and retain already-played media.
-                  buffer: {
-                    ...getDashBufferPolicy(netHintRef.current),
-                    ...CONTINUOUS_DASH_BUFFER_POLICY,
-                  },
+                  buffer: getDashBufferPolicy(netHintRef.current),
                 },
               })
               const dashProxy = (request) => {
@@ -2521,85 +2459,85 @@ export default function Watch() {
               if (buildIdRef.current === myBuildId) onBlocked?.('dash-error')
             }
           },
-                  m3u8: async (video, url, art) => {
-                    const proxiedH = proxied
-                    const referer = (headers && headers.Referer) || ''
-                                const hlsTransportPlan = createMediaTransportPlan({
-                                        verification: sourceVerification,
-                                        directUrl: url,
-                                        proxyUrl: proxiedH(url),
-                                })
-                                let hlsTransportIndex = 0
-                          const updateNativeHlsQualities = async () => {
-                            try {
-                              const response = await fetch(hlsTransportPlan[hlsTransportIndex].url, { cache: 'no-store' })
-                      if (!response.ok) return
-                      const lines = (await response.text()).split(/\r?\n/)
-                      const variants = []
-                      for (let index = 0; index < lines.length; index += 1) {
-                        const streamInfo = lines[index]
-                        if (!streamInfo.startsWith('#EXT-X-STREAM-INF:')) continue
-                        const child = lines.slice(index + 1).find((line) => line && !line.startsWith('#'))
-                        const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
-                        if (!child || !height) continue
-                        const childCandidate = new URL(child, window.location.origin)
-                        const childUrl = childCandidate.origin === new URL(PROXY_BASE).origin && childCandidate.pathname.endsWith('/proxy')
-                          ? childCandidate.searchParams.get('url') || new URL(child, url).toString()
-                          : new URL(child, url).toString()
-                        if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
-                      }
-                      variants.sort((a, b) => b.height - a.height)
-                      if (variants.length < 2 || !art?.setting?.update) return
-                      const nativeQualityList = [
-                        {
-                          default: true,
-                          html: qualityOptionHtml(getQualityPresentation('auto')),
-                          url,
-                          type: 'hls',
-                        },
-                        ...variants.map((variant) => ({
-                          default: false,
-                          html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
-                          url: variant.url,
-                          type: 'hls',
-                        })),
-                      ]
-                      art.setting.update({
-                        name: 'quality',
-                        width: 220,
-                        html: 'Quality',
-                        selector: [
-                          { default: true, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
-                          ...variants.map((variant) => ({
-                            default: false,
-                            html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
-                            value: variant.url,
-                          })),
-                        ],
-                        onSelect: (item) => {
-                          const selected = item.value === 'auto'
-                            ? nativeQualityList[0]
-                            : variants.find((variant) => item.html.includes(`${variant.height}p`))
-                          const next = selected?.url || url
-                          const resumeAt = Number(video.currentTime || 0)
-                          if (resumeAt > 0) pendingResumeRef.current = resumeAt
-                          buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
-                          return item.html
-                        },
-                      })
-                    } catch {}
-                  }
+	          m3u8: async (video, url, art) => {
+	            const proxiedH = proxied
+	            const referer = (headers && headers.Referer) || ''
+				const hlsTransportPlan = createMediaTransportPlan({
+					verification: sourceVerification,
+					directUrl: url,
+					proxyUrl: proxiedH(url),
+				})
+				let hlsTransportIndex = 0
+		          const updateNativeHlsQualities = async () => {
+		            try {
+		              const response = await fetch(hlsTransportPlan[hlsTransportIndex].url, { cache: 'no-store' })
+	              if (!response.ok) return
+	              const lines = (await response.text()).split(/\r?\n/)
+	              const variants = []
+	              for (let index = 0; index < lines.length; index += 1) {
+	                const streamInfo = lines[index]
+	                if (!streamInfo.startsWith('#EXT-X-STREAM-INF:')) continue
+	                const child = lines.slice(index + 1).find((line) => line && !line.startsWith('#'))
+	                const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
+	                if (!child || !height) continue
+	                const childCandidate = new URL(child, window.location.origin)
+	                const childUrl = childCandidate.origin === new URL(PROXY_BASE).origin && childCandidate.pathname.endsWith('/proxy')
+	                  ? childCandidate.searchParams.get('url') || new URL(child, url).toString()
+	                  : new URL(child, url).toString()
+	                if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
+	              }
+	              variants.sort((a, b) => b.height - a.height)
+	              if (variants.length < 2 || !art?.setting?.update) return
+	              const nativeQualityList = [
+	                {
+	                  default: true,
+	                  html: qualityOptionHtml(getQualityPresentation('auto')),
+	                  url,
+	                  type: 'hls',
+	                },
+	                ...variants.map((variant) => ({
+	                  default: false,
+	                  html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
+	                  url: variant.url,
+	                  type: 'hls',
+	                })),
+	              ]
+	              art.setting.update({
+	                name: 'quality',
+	                width: 220,
+	                html: 'Quality',
+	                selector: [
+	                  { default: true, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
+	                  ...variants.map((variant) => ({
+	                    default: false,
+	                    html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
+	                    value: variant.url,
+	                  })),
+	                ],
+	                onSelect: (item) => {
+	                  const selected = item.value === 'auto'
+	                    ? nativeQualityList[0]
+	                    : variants.find((variant) => item.html.includes(`${variant.height}p`))
+	                  const next = selected?.url || url
+	                  const resumeAt = Number(video.currentTime || 0)
+	                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
+	                  buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
+	                  return item.html
+	                },
+	              })
+	            } catch {}
+	          }
             // Kiwi is verified on the native proxy-first HLS branch. Ally and
             // other manifests remain on hls.js, whose bounded buffer and media
             // recovery avoid falling through to an expired embed page.
             if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
-                      try {
-                        video.src = hlsTransportPlan[hlsTransportIndex].url
-                        if (pendingHandoffRef.current?.shouldPlay !== false) {
-                          const p = video.play()
-                          if (p && typeof p.catch === 'function') p.catch(() => {})
-                        }
-                      void updateNativeHlsQualities()
+	              try {
+	                video.src = hlsTransportPlan[hlsTransportIndex].url
+	                if (pendingHandoffRef.current?.shouldPlay !== false) {
+	                  const p = video.play()
+	                  if (p && typeof p.catch === 'function') p.catch(() => {})
+	                }
+	              void updateNativeHlsQualities()
               } catch {
                 // fall through to hls.js
               }
@@ -2615,12 +2553,12 @@ export default function Watch() {
               }
               return
             }
-                    if (!Hls.isSupported()) {
-                      // last-resort native
-                      try {
-                        video.src = proxiedH(url)
-                        if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
-                      } catch {}
+	            if (!Hls.isSupported()) {
+	              // last-resort native
+	              try {
+	                video.src = proxiedH(url)
+	                if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
+	              } catch {}
               return
             }
             if (art.hls) {
@@ -2628,16 +2566,12 @@ export default function Watch() {
                 art.hls.destroy()
               } catch {}
             }
-            // Continuous cache: start from the shared policy, then grow the
-            // forward buffer to a full episode and keep already-watched media.
-            // MediaSource eviction still protects device RAM as the last
-            // line of defense on constrained devices.
-            const bufferPolicy = {
-              ...getHlsBufferPolicy(netHintRef.current),
-              ...CONTINUOUS_HLS_BUFFER_POLICY,
-            }
+            const bufferPolicy = getHlsBufferPolicy(netHintRef.current)
             const hls = new Hls({
               enableWorker: false,
+              // Hold a substantial forward reserve for VOD playback. The
+              // policy scales down on constrained networks and remains bounded
+              // to let the browser's MediaSource eviction protect device RAM.
               ...bufferPolicy,
               startFragPrefetch: true,
               lowLatencyMode: false,
@@ -2652,11 +2586,10 @@ export default function Watch() {
               fetchSetup: (context, init = {}) => {
                 const requestInit = {
                   ...init,
-                  // Continuous cache: immutable VOD segments are always reused
-                  // from the browser cache when available; manifests stay
-                  // fresh so signed URLs and ABR updates are never masked by a
-                  // stale playlist response.
-                  cache: getContinuousHlsRequestCacheMode(context),
+                  // Reuse a browser-cached VOD fragment when the source allows
+                  // it; manifests stay fresh so signed URLs and ABR updates are
+                  // never masked by a stale playlist response.
+                  cache: getHlsRequestCacheMode(context),
                 }
                 if (referer) {
                   try {
@@ -2666,31 +2599,31 @@ export default function Watch() {
                 return new Request(context.url, requestInit)
               },
             })
-                    let mediaRetries = 0
-                                let playbackStarted = false
-                                const markPlaybackStarted = () => {
-                                        playbackStarted = true
-                                }
-                                video.addEventListener('playing', markPlaybackStarted, { once: true })
-                    const fail = () => {
-                      if (buildIdRef.current !== myBuildId) return
-                      showToast('Stream issue — keeping the selected server.', { long: true })
-                      if (onBlocked) {
-                        onBlocked(
-                          playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
-                          { streamUrl: url }
-                        )
-                      }
+	            let mediaRetries = 0
+				let playbackStarted = false
+				const markPlaybackStarted = () => {
+					playbackStarted = true
+				}
+				video.addEventListener('playing', markPlaybackStarted, { once: true })
+	            const fail = () => {
+	              if (buildIdRef.current !== myBuildId) return
+	              showToast('Stream issue — keeping the selected server.', { long: true })
+	              if (onBlocked) {
+	                onBlocked(
+	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
+	                  { streamUrl: url }
+	                )
+	              }
               else setError('Stream playback error. Try a different server.')
             }
-                    hls.on(Hls.Events.ERROR, (_event, data) => {
+	            hls.on(Hls.Events.ERROR, (_event, data) => {
               if (buildIdRef.current !== myBuildId) return
               if (!data.fatal) return
               // Signed URL and throttle responses are terminal. Every other
               // transient request has already used hls.js' bounded retry policy;
               // do not call startLoad() here because that restarts loading and
               // can discard the buffer the viewer already earned.
-                      // MP4 mis-classified as HLS
+	              // MP4 mis-classified as HLS
               if (
                 data.type === Hls.ErrorTypes.MANIFEST_ERROR &&
                 data.details === Hls.ErrorDetails.MANIFEST_PARSE_ERROR
@@ -2710,118 +2643,118 @@ export default function Watch() {
                   } catch {}
                   return
                 }
-                        fail()
+	                fail()
                 return
-                      }
-                              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                                                // A proxy can serve the master manifest yet fail on the first
-                                                // playable media request. Manifest readiness is therefore not
-                                                // playback evidence. Before the video has actually started, make
-                                                // the bounded direct retry instead of staying in proxy recovery.
-                                                if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
-                                                        hlsTransportIndex += 1
-                                                        try {
-                                                                mediaRetries = 0
-                                                                showToast('Proxy stream failed before playback — trying direct.', { long: true })
-                                                                hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
-                                                                return
-                                                        } catch {}
-                                                }
-                                fail()
-                                return
+	              }
+		              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+						// A proxy can serve the master manifest yet fail on the first
+						// playable media request. Manifest readiness is therefore not
+						// playback evidence. Before the video has actually started, make
+						// the bounded direct retry instead of staying in proxy recovery.
+						if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
+							hlsTransportIndex += 1
+							try {
+								mediaRetries = 0
+								showToast('Proxy stream failed before playback — trying direct.', { long: true })
+								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
+								return
+							} catch {}
+						}
+		                fail()
+		                return
               }
-                      fail()
+	              fail()
             })
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                                      const levels = (hls.levels || [])
-                        .map((level, index) => ({
-                          index,
-                          height: Number(level?.height || 0),
-                          bitrate: Number(level?.bitrate || 0),
-                        }))
-                        .filter((level, index, list) =>
-                          level.height > 0 && list.findIndex((item) => item.height === level.height) === index
-                        )
-                        .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
-                      if (levels.length > 1 && art?.setting?.update) {
-                        const auto = getQualityPresentation('auto')
-                        const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
-                        const dataSaver = getHlsDataSaverCap(levels)
-                        let dataSaverCap = null
-                        const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
-                          const display = getHlsQualitySettingDisplay(levels, level, dataSaverCap)
-                          const qualitySetting = art.setting.find('quality')
-                          if (qualitySetting) {
-                            qualitySetting.html = display.title
-                            qualitySetting.tooltip = display.label
-                          }
-                          return display
-                        }
-                        const buildHlsQualitySetting = (activeLevel) => {
-                          const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel, dataSaverCap)
-                          return {
-                            name: 'quality',
-                            width: 220,
-                            html: activeDisplay.title,
-                            tooltip: activeDisplay.label,
-                            selector: [
-                              {
-                                default: activeLevel === -1 && dataSaverCap === null,
-                                html: qualityOptionHtml(auto),
-                                value: 'auto',
-                              },
-                              ...(dataSaver ? [{
-                                default: dataSaverCap === dataSaver.index,
-                                html: qualityOptionHtml(getQualityPresentation(`Data Saver · ≤${dataSaver.height}p`)),
-                                value: 'saver',
-                              }] : []),
-                              ...levels.map((level) => ({
-                                default: dataSaverCap === null && activeLevel === level.index,
-                                html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
-                                value: `level:${level.index}`,
-                              })),
-                            ],
-                            onSelect: (item) => {
-                              if (item.value === 'saver' && dataSaver) {
-                                dataSaverCap = dataSaver.index
-                                hlsQualitySelection.selectLevel(-1)
-                                hls.autoLevelCapping = dataSaver.index
-                                hls.currentLevel = -1
-                                hls.nextLevel = -1
-                              } else {
-                                const nextLevel = item.value === 'auto'
-                                  ? -1
-                                  : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
-                                dataSaverCap = null
-                                hls.autoLevelCapping = -1
-                                hls.currentLevel = nextLevel
-                                hls.nextLevel = nextLevel
-                                hlsQualitySelection.selectLevel(nextLevel)
-                              }
-                              const nextDisplay = syncHlsQualitySetting()
-                              return nextDisplay.label
-                            },
-                          }
-                        }
-                        art.setting.update(buildHlsQualitySetting(hls.currentLevel))
-                        hls.on(Hls.Events.LEVEL_SWITCHED, () => {
-                          if (buildIdRef.current !== myBuildId) return
-                          // hls.js can publish a transient adaptive currentLevel
-                          // while a manually selected rendition is settling. Keep
-                          // the displayed setting tied to the explicit user choice.
-                          syncHlsQualitySetting()
-                        })
-                      }
-                      if (pendingHandoffRef.current?.shouldPlay !== false) {
-                        const p = video.play()
-                        if (p && typeof p.catch === 'function') p.catch(() => {})
-                      }
-                    })
-                    hls.on(Hls.Events.BUFFER_APPENDING, () => {
+	            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+			              const levels = (hls.levels || [])
+	                .map((level, index) => ({
+	                  index,
+	                  height: Number(level?.height || 0),
+	                  bitrate: Number(level?.bitrate || 0),
+	                }))
+	                .filter((level, index, list) =>
+	                  level.height > 0 && list.findIndex((item) => item.height === level.height) === index
+	                )
+	                .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
+	              if (levels.length > 1 && art?.setting?.update) {
+	                const auto = getQualityPresentation('auto')
+	                const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
+	                const dataSaver = getHlsDataSaverCap(levels)
+	                let dataSaverCap = null
+	                const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
+	                  const display = getHlsQualitySettingDisplay(levels, level, dataSaverCap)
+	                  const qualitySetting = art.setting.find('quality')
+	                  if (qualitySetting) {
+	                    qualitySetting.html = display.title
+	                    qualitySetting.tooltip = display.label
+	                  }
+	                  return display
+	                }
+	                const buildHlsQualitySetting = (activeLevel) => {
+	                  const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel, dataSaverCap)
+	                  return {
+	                    name: 'quality',
+	                    width: 220,
+	                    html: activeDisplay.title,
+	                    tooltip: activeDisplay.label,
+	                    selector: [
+	                      {
+	                        default: activeLevel === -1 && dataSaverCap === null,
+	                        html: qualityOptionHtml(auto),
+	                        value: 'auto',
+	                      },
+	                      ...(dataSaver ? [{
+	                        default: dataSaverCap === dataSaver.index,
+	                        html: qualityOptionHtml(getQualityPresentation(`Data Saver · ≤${dataSaver.height}p`)),
+	                        value: 'saver',
+	                      }] : []),
+	                      ...levels.map((level) => ({
+	                        default: dataSaverCap === null && activeLevel === level.index,
+	                        html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
+	                        value: `level:${level.index}`,
+	                      })),
+	                    ],
+	                    onSelect: (item) => {
+	                      if (item.value === 'saver' && dataSaver) {
+	                        dataSaverCap = dataSaver.index
+	                        hlsQualitySelection.selectLevel(-1)
+	                        hls.autoLevelCapping = dataSaver.index
+	                        hls.currentLevel = -1
+	                        hls.nextLevel = -1
+	                      } else {
+	                        const nextLevel = item.value === 'auto'
+	                          ? -1
+	                          : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
+	                        dataSaverCap = null
+	                        hls.autoLevelCapping = -1
+	                        hls.currentLevel = nextLevel
+	                        hls.nextLevel = nextLevel
+	                        hlsQualitySelection.selectLevel(nextLevel)
+	                      }
+	                      const nextDisplay = syncHlsQualitySetting()
+	                      return nextDisplay.label
+	                    },
+	                  }
+	                }
+	                art.setting.update(buildHlsQualitySetting(hls.currentLevel))
+	                hls.on(Hls.Events.LEVEL_SWITCHED, () => {
+	                  if (buildIdRef.current !== myBuildId) return
+	                  // hls.js can publish a transient adaptive currentLevel
+	                  // while a manually selected rendition is settling. Keep
+	                  // the displayed setting tied to the explicit user choice.
+	                  syncHlsQualitySetting()
+	                })
+	              }
+	              if (pendingHandoffRef.current?.shouldPlay !== false) {
+	                const p = video.play()
+	                if (p && typeof p.catch === 'function') p.catch(() => {})
+	              }
+	            })
+	            hls.on(Hls.Events.BUFFER_APPENDING, () => {
               // could be used to show buffering indicator if needed
             })
-                    try {
-                      hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
+	            try {
+	              hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
               hls.attachMedia(video)
               art.hls = hls
               hlsInstance.current = hls
@@ -3286,14 +3219,14 @@ export default function Watch() {
           const cachedEmbed = !isBonkProvider(source)
             ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
             : null
-                  if (cachedEmbed) {
-                    destroyPlayer()
-                    setActiveEmbedUrl(cachedEmbed.url)
-                    applySkipSegments(normalizeProviderSkipSegments(cached))
-                    setStreamLoading(false)
-                    loadingRef.current = false
-                    return
-                  }
+	          if (cachedEmbed) {
+	            destroyPlayer()
+	            setActiveEmbedUrl(cachedEmbed.url)
+	            applySkipSegments(normalizeProviderSkipSegments(cached))
+	            setStreamLoading(false)
+	            loadingRef.current = false
+	            return
+	          }
         }
       }
 
@@ -3422,7 +3355,7 @@ export default function Watch() {
           setError('No video source found for this server.')
           setStreamLoading(false)
           loadingRef.current = false
-                  return
+	          return
         }
         const subs = firstSource.subtitles || []
         const onBlocked = createSameProviderFailureHandler(data)
@@ -3431,9 +3364,9 @@ export default function Watch() {
           qualityList[0].type,
           qualityList,
           subs,
-                  data.headers,
-                  onBlocked
-                )
+	          data.headers,
+	          onBlocked
+	        )
         applySkipSegments(normalizeProviderSkipSegments(data))
         setCachedStream(source, data)
         restoreWorkingStream(data.sources.map((entry) => entry?.url))
@@ -3596,19 +3529,19 @@ export default function Watch() {
   const loadStreamRef = useRef(loadStream)
   loadStreamRef.current = loadStream
 
-          // A playback issue never changes the selected provider. The visible server
-          // controls remain the only way to select another provider.
-          const handleProviderBlocked = useCallback((reason) => {
-            const now = Date.now()
-            if (now - lastBlockCycleRef.current < 3_000) return
-            lastBlockCycleRef.current = now
-            showToast(
-            reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
+	  // A playback issue never changes the selected provider. The visible server
+	  // controls remain the only way to select another provider.
+	  const handleProviderBlocked = useCallback((reason) => {
+	    const now = Date.now()
+	    if (now - lastBlockCycleRef.current < 3_000) return
+	    lastBlockCycleRef.current = now
+	    showToast(
+	    reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
         ? 'This source could not start. Choose another server manually or refresh for a new link.'
         : 'Stream issue — choose another server manually if needed.',
       { long: true }
     )
-          }, [showToast])
+	  }, [showToast])
 
   handleProviderBlockedRef.current = handleProviderBlocked
 
@@ -4576,13 +4509,13 @@ export default function Watch() {
           }}
         >
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: error ? '#f87171' : streamLoading ? '#fbbf24' : '#34d399' }} />
-                        {effectiveEpisodeAvailability === 'upcoming'
-                                ? UPCOMING_EPISODE_MESSAGE
-                                : error
-                                ? 'Playback needs attention. Choose a recovery option or another server.'
-                                : streamLoading
-                                ? 'Preparing a stream…'
-                                : `Playing on ${currentSource?.label || 'the selected server'}.`}
+			{effectiveEpisodeAvailability === 'upcoming'
+				? UPCOMING_EPISODE_MESSAGE
+				: error
+				? 'Playback needs attention. Choose a recovery option or another server.'
+				: streamLoading
+				? 'Preparing a stream…'
+				: `Playing on ${currentSource?.label || 'the selected server'}.`}
         </div>
 
         {/* Source selector */}
@@ -4627,13 +4560,13 @@ export default function Watch() {
                       key={source.id}
                       type="button"
                       onClick={() => handleSourceSwitch(source.id)}
-                              onPointerEnter={() => warmProviderStream(source.id)}
-                              onFocus={() => warmProviderStream(source.id)}
-                              onTouchStart={() => warmProviderStream(source.id)}
+	                      onPointerEnter={() => warmProviderStream(source.id)}
+	                      onFocus={() => warmProviderStream(source.id)}
+	                      onTouchStart={() => warmProviderStream(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-                              aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
-                              title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -4657,8 +4590,8 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-                              {source.label}
-                              {isActive && (
+	                      {source.label}
+	                      {isActive && (
                         <span
                           aria-hidden="true"
                           style={{
@@ -4742,8 +4675,8 @@ export default function Watch() {
               {isMovie
                 ? 'Movie'
                 : `Episode ${epNumber} of ${episodes.length || '?'}`}{' '}
-                                · {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
-                                {currentSource?.label || 'Server 1'}
+				· {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
+				{currentSource?.label || 'Server 1'}
             </div>
 
             <div
@@ -5238,31 +5171,31 @@ export default function Watch() {
             box-sizing: border-box;
           }
           .watch-nav { gap: 8px !important; }
-                  /* Keep page-flow actions independently reachable on Android browsers.
-                     Provider controls are already compatible, so this only protects
-                     rating, episode navigation, and related outside-player controls. */
-                  .watch-info,
-                  .watch-details {
-                    min-width: 0 !important;
-                    overflow: visible !important;
-                  }
-                  .watch-rating,
-                  .watch-nav {
-                    position: relative;
-                    z-index: 1;
-                  }
-                  .watch-nav {
-                    display: grid !important;
-                    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-                    width: 100%;
-                  }
-                  .watch-nav button,
-                  .watch-nav a {
-                    width: 100%;
-                    min-width: 0 !important;
-                    justify-content: center;
-                    white-space: nowrap;
-                  }
+	          /* Keep page-flow actions independently reachable on Android browsers.
+	             Provider controls are already compatible, so this only protects
+	             rating, episode navigation, and related outside-player controls. */
+	          .watch-info,
+	          .watch-details {
+	            min-width: 0 !important;
+	            overflow: visible !important;
+	          }
+	          .watch-rating,
+	          .watch-nav {
+	            position: relative;
+	            z-index: 1;
+	          }
+	          .watch-nav {
+	            display: grid !important;
+	            grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+	            width: 100%;
+	          }
+	          .watch-nav button,
+	          .watch-nav a {
+	            width: 100%;
+	            min-width: 0 !important;
+	            justify-content: center;
+	            white-space: nowrap;
+	          }
           .watch-art-mount .art-video-player {
             --art-control-height: 42px;
             --art-control-icon-size: 28px;
@@ -5308,12 +5241,12 @@ export default function Watch() {
             max-width: 100%;
             flex-wrap: nowrap;
             gap: 2px !important;
-                    overflow-x: auto;
-                    overflow-y: visible;
-                    -webkit-overflow-scrolling: touch;
-                    scrollbar-width: none;
+	            overflow-x: auto;
+	            overflow-y: visible;
+	            -webkit-overflow-scrolling: touch;
+	            scrollbar-width: none;
           }
-                  .watch-rating-stars::-webkit-scrollbar { display: none; }
+	          .watch-rating-stars::-webkit-scrollbar { display: none; }
           .watch-rating-stars button {
             width: 22px !important;
             min-width: 22px !important;
