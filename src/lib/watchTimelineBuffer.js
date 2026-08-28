@@ -62,3 +62,112 @@ export function getPlayableBufferedTimelineSegments(
   if (!hasForwardPlayableRange) return []
   return getBufferedTimelineSegments(ranges, { currentTime, duration, cacheSeconds })
 }
+
+// ────────────────────────────────────────────────────────────────
+// Buffered timeline indicator
+// ────────────────────────────────────────────────────────────────
+// Watch.jsx mounts this on the ArtPlayer progress bar to visualize the
+// continuous playback cache. It renders one cue segment per browser-reported
+// buffered range through getPlayableBufferedTimelineSegments above, so the
+// timeline always mirrors the real MediaSource buffer (back ranges included,
+// never clipped to a short artificial cache window). The DOM contract matches
+// the page CSS: a .watch-buffer-indicator layer containing
+// .watch-buffer-indicator-segment children positioned by percentage.
+
+function timeRangesToArray(ranges) {
+  const list = []
+  if (!ranges) return list
+  const count = Number(ranges.length)
+  if (!Number.isFinite(count) || count <= 0) return list
+  for (let index = 0; index < count; index += 1) {
+    const start = finite(typeof ranges.start === 'function' ? ranges.start(index) : NaN)
+    const end = finite(typeof ranges.end === 'function' ? ranges.end(index) : NaN)
+    if (end > start) list.push({ start, end })
+  }
+  return list
+}
+
+/**
+ * Attach a buffered-range indicator to an ArtPlayer progress bar.
+ *
+ * @param {HTMLVideoElement|null} video media element whose buffer is shown
+ * @param {HTMLElement|null} progressInner ArtPlayer .art-control-progress-inner
+ * @returns {() => void} idempotent cleanup that removes listeners and DOM
+ */
+export function createBufferedTimelineIndicator(video, progressInner) {
+  if (
+    !video ||
+    !progressInner ||
+    typeof video.addEventListener !== 'function' ||
+    typeof progressInner.appendChild !== 'function' ||
+    typeof document === 'undefined'
+  ) {
+    return () => {}
+  }
+
+  let layer = null
+  try {
+    layer = progressInner.querySelector('.watch-buffer-indicator')
+  } catch {}
+  if (!layer) {
+    layer = document.createElement('div')
+    layer.className = 'watch-buffer-indicator'
+    progressInner.appendChild(layer)
+  }
+
+  let frame = 0
+  let disposed = false
+
+  const render = () => {
+    frame = 0
+    if (disposed) return
+    const segments = getPlayableBufferedTimelineSegments(
+      timeRangesToArray(video.buffered),
+      {
+        currentTime: video.currentTime,
+        duration: video.duration,
+        readyState: video.readyState,
+      }
+    )
+    while (layer.firstChild) layer.removeChild(layer.firstChild)
+    for (const segment of segments) {
+      const node = document.createElement('div')
+      node.className = 'watch-buffer-indicator-segment'
+      node.style.left = `${segment.leftPercent}%`
+      node.style.width = `${segment.widthPercent}%`
+      layer.appendChild(node)
+    }
+  }
+
+  const scheduleRender = () => {
+    if (disposed || frame) return
+    frame = requestAnimationFrame(render)
+  }
+
+  const events = [
+    'progress',
+    'timeupdate',
+    'loadedmetadata',
+    'durationchange',
+    'seeking',
+    'seeked',
+    'canplay',
+    'playing',
+  ]
+  events.forEach((event) =>
+    video.addEventListener(event, scheduleRender, { passive: true })
+  )
+
+  scheduleRender()
+
+  return () => {
+    if (disposed) return
+    disposed = true
+    if (frame) {
+      cancelAnimationFrame(frame)
+      frame = 0
+    }
+    events.forEach((event) => video.removeEventListener(event, scheduleRender))
+    if (layer.parentNode) layer.parentNode.removeChild(layer)
+  }
+}
