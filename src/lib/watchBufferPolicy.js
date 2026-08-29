@@ -20,15 +20,15 @@ export function getHlsBufferPolicy(_connection = {}, { kiwi = false } = {}) {
   if (kiwi) {
     return {
       // Kiwi's proxy can expose the whole VOD through video.buffered while
-      // only a few HLS fragments have arrived. Give hls.js enough forward
-      // reserve to survive transient CDN/proxy delays without stalling, but
-      // keep it bounded so the MediaSource eviction can still protect device
-      // RAM on slow connections.
-      maxBufferLength: 60,
-      maxMaxBufferLength: 120,
-      backBufferLength: 60,
-      frontBufferFlushThreshold: 20,
-      maxBufferSize: 256 * MEBIBYTE,
+      // only a few HLS fragments have arrived. Give hls.js a large forward
+      // reserve to survive transient CDN/proxy delays without stalling.
+      // The player manages its own MediaSource budget, so these ceilings
+      // protect device RAM without choking the adaptive reserve.
+      maxBufferLength: 120,
+      maxMaxBufferLength: 300,
+      backBufferLength: 90,
+      frontBufferFlushThreshold: 30,
+      maxBufferSize: 512 * MEBIBYTE,
     }
   }
 
