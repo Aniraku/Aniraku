@@ -979,6 +979,10 @@ export default function Watch() {
   const artRef = useRef(null)
   const artInstance = useRef(null)
   const hlsInstance = useRef(null)
+  // Kiwi's proxy can expose the whole VOD through video.buffered even while
+  // only a few HLS fragments have arrived. Track completed Kiwi fragments
+  // separately for the cache indicator.
+  const kiwiFragmentRangesRef = useRef(null)
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
   const timelineHoverCleanupRef = useRef(null)
@@ -2125,6 +2129,7 @@ export default function Watch() {
   const buildPlayer = useCallback(
     async (streamUrl, sourceType, qualityList, subtitles, headers, onBlocked) => {
       destroyPlayer()
+      kiwiFragmentRangesRef.current = null
       setActiveEmbedUrl('')
       const container = artRef.current
       if (!container) return
@@ -2510,8 +2515,10 @@ export default function Watch() {
               if (buildIdRef.current === myBuildId) onBlocked?.('dash-error')
             }
           },
-	          m3u8: async (video, url, art) => {
-	            const proxiedH = proxied
+          m3u8: async (video, url, art) => {
+            const isKiwiHls = shouldPreferNativeHls(url)
+            if (isKiwiHls) kiwiFragmentRangesRef.current = []
+            const proxiedH = proxied
 	            const referer = (headers && headers.Referer) || ''
 				const hlsTransportPlan = createMediaTransportPlan({
 					verification: sourceVerification,
@@ -2824,7 +2831,28 @@ export default function Watch() {
               } catch {}
               if (forwardBuffer < 1.5) setBuffering(true)
             })
-            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            hls.on(Hls.Events.FRAG_BUFFERED, (_event, data) => {
+              if (isKiwiHls) {
+                const fragment = data?.frag
+                const start = Number(fragment?.startPTS ?? fragment?.start)
+                const duration = Number(fragment?.duration)
+                if (Number.isFinite(start) && Number.isFinite(duration) && duration > 0) {
+                  const end = start + duration
+                  const ranges = kiwiFragmentRangesRef.current || []
+                  const next = [...ranges, { start, end }]
+                    .sort((a, b) => a.start - b.start)
+                    .reduce((merged, range) => {
+                      const previous = merged[merged.length - 1]
+                      if (previous && range.start <= previous.end + 0.05) {
+                        previous.end = Math.max(previous.end, range.end)
+                      } else {
+                        merged.push({ ...range })
+                      }
+                      return merged
+                    }, [])
+                  kiwiFragmentRangesRef.current = next
+                }
+              }
               if (playbackStarted) setBuffering(false)
               video.dispatchEvent(new Event('progress'))
             })
@@ -2885,7 +2913,10 @@ export default function Watch() {
         ?.querySelector('.art-control-progress-inner')
       bufferIndicatorCleanupRef.current = createBufferedTimelineIndicator(
         art.video,
-        progressInner
+        progressInner,
+        {
+          getRanges: () => kiwiFragmentRangesRef.current,
+        }
       )
       timelineHoverCleanupRef.current = createTimelineHoverPreview(
         art.video,

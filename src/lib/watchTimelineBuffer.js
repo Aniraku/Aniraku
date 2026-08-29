@@ -65,7 +65,7 @@ function getVideoRanges(video) {
  * Install a passive visual cache layer behind ArtPlayer's played position and
  * seek marker. It never changes the video buffer or intercepts pointer input.
  */
-export function createBufferedTimelineIndicator(video, progressInner) {
+export function createBufferedTimelineIndicator(video, progressInner, { getRanges = null } = {}) {
   if (!video || !progressInner || typeof document === 'undefined') return () => {}
 
   const layer = document.createElement('div')
@@ -74,7 +74,10 @@ export function createBufferedTimelineIndicator(video, progressInner) {
   progressInner.append(layer)
 
   const render = () => {
-    const ranges = getVideoRanges(video)
+    const mediaRanges = getVideoRanges(video)
+    const ranges = typeof getRanges === 'function'
+      ? (getRanges() || mediaRanges)
+      : mediaRanges
     const lastBufferedEnd = ranges.reduce((end, range) => Math.max(end, range.end), 0)
     const seekable = video.seekable
     const lastSeekableEnd = seekable && seekable.length
