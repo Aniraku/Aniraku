@@ -5155,7 +5155,7 @@ export default function Watch() {
           position: absolute;
           inset: 0;
           pointer-events: none;
-          z-index: 1;
+          z-index: 2;
         }
         .watch-art-mount .watch-buffer-indicator-segment {
           position: absolute;
@@ -5163,8 +5163,8 @@ export default function Watch() {
           height: 3px;
           transform: translateY(-50%);
           border-radius: 999px;
-          background: rgba(226, 232, 240, 0.44);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+          background: rgba(226, 232, 240, 0.78);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 0 4px rgba(226, 232, 240, 0.2);
         }
         .watch-art-mount .art-progress-loaded {
           background: transparent !important;

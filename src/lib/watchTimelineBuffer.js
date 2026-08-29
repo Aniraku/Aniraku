@@ -1,6 +1,8 @@
-// Keep the full browser-reported buffered range visible; there is no artificial
-// forward cache-window cap.
-export const PLAYBACK_CACHE_SECONDS = Number.POSITIVE_INFINITY
+// Show a useful YouTube-style cache window instead of painting the entire
+// browser-reported VOD range. Some Kiwi proxy sessions report the complete VOD
+// as buffered after hls.js has opened the manifest, which otherwise makes the
+// cache layer indistinguishable from the progress track.
+export const PLAYBACK_CACHE_SECONDS = 180
 export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
 function finite(value, fallback = 0) {
@@ -9,8 +11,8 @@ function finite(value, fallback = 0) {
 }
 
 /**
- * Clamp the visible cache indication to the requested playback window instead
- * of drawing an unrestricted browser HTTP cache as if it were seekable media.
+ * Clamp the visible cache indication to a useful playback window instead of
+ * drawing an unrestricted browser HTTP/MSE range across the entire episode.
  */
 export function getBufferedTimelineSegments(
   ranges = [],
