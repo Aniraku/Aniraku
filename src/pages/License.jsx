@@ -17,7 +17,7 @@ const License = () => {
     <LegalPage
       title="Open Source License"
       eyebrow="Code & attribution"
-      revision="August 13, 2026"
+      revision="August 29, 2026"
       intro="The Aniraku source code is offered under the GNU Affero General Public License v3.0. This page summarizes the practical meaning of that license; the repository’s license file and the official GNU text control if this summary differs from the license."
       sections={sections}
     >
@@ -32,7 +32,7 @@ const License = () => {
         <li>Redistribute original or modified copies under the AGPL’s conditions.</li>
         <li>Offer the software as part of a larger project while respecting the license obligations that apply to the covered code.</li>
       </ul>
-      <p>Those freedoms do not grant ownership of AniList metadata, anime artwork, third-party provider code, stream files, trademarks, or user contributions. Those materials remain governed by their own rights and terms.</p>
+      <p>Those freedoms do not grant ownership of AniList metadata, anime artwork, third-party provider code, stream files, trademarks, or user contributions. Those materials remain governed by their own rights and terms. The Android APK and hosted website may include components distributed under licenses other than AGPL-3.0; review the applicable notices before redistributing them.</p>
 
       <h2 id="network">3. Network use and corresponding source</h2>
       <p>The AGPL includes a network interaction provision. If you run a modified version so users interact with it over a network, you generally need to provide those users an appropriate way to obtain the corresponding source code for your modified version, as described by the license.</p>
