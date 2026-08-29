@@ -1,8 +1,9 @@
-const DEFAULT_API_BASE = 'https://api.aniraku.tech'
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
-const ANILIST_BACKEND_FALLBACK = 'https://api.aniraku.tech/api/v1/anilist'
+const ANILIST_MIN_INTERVAL_MS = 2_200
+const ANILIST_MAX_RETRIES = 3
 const anilistInFlight = new Map()
+let nextAniListRequestAt = 0
 let directAniListBlockedUntil = 0
 
 export class AniListUnavailableError extends Error {
@@ -24,8 +25,14 @@ function retryAfterMs(response) {
   return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1000, 60_000) : 60_000
 }
 
-async function requestAniListEndpoint(endpoint, body) {
-  const response = await fetch(endpoint, {
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function requestAniListEndpoint(body) {
+  const now = Date.now()
+  const waitForSlot = Math.max(0, nextAniListRequestAt - now)
+  if (waitForSlot) await wait(waitForSlot)
+  nextAniListRequestAt = Date.now() + ANILIST_MIN_INTERVAL_MS
+  const response = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body,
@@ -47,23 +54,22 @@ async function directAniListRequest(query, variables = {}) {
   if (existing) return existing
 
   const request = (async () => {
-    if (Date.now() < directAniListBlockedUntil) {
-      return requestAniListEndpoint(ANILIST_BACKEND_FALLBACK, body)
-    }
-    try {
-      return await requestAniListEndpoint(ANILIST_GRAPHQL_ENDPOINT, body)
-    } catch (error) {
-      // The public endpoint may reject the deployed origin with CORS or apply
-      // a shared-IP 429. Try the existing backend contract once so the page
-      // remains usable, while the cooldown prevents a browser retry storm.
-      const corsLike = error?.name === 'TypeError' || /failed to fetch|cors/i.test(error?.message || '')
-      const rateLimited = Number(error?.status) === 429
-      if (rateLimited || corsLike) {
-        if (rateLimited) directAniListBlockedUntil = Date.now() + (error.retryAfterMs || 60_000)
-        return requestAniListEndpoint(ANILIST_BACKEND_FALLBACK, body)
+    for (let attempt = 0; attempt <= ANILIST_MAX_RETRIES; attempt += 1) {
+      const cooldown = Math.max(0, directAniListBlockedUntil - Date.now())
+      if (cooldown) await wait(cooldown)
+      try {
+        return await requestAniListEndpoint(body)
+      } catch (error) {
+        const corsLike = error?.name === 'TypeError' || /failed to fetch|cors/i.test(error?.message || '')
+        const rateLimited = Number(error?.status) === 429
+        const retryable = rateLimited || corsLike || Number(error?.status) >= 500
+        if (!retryable || attempt === ANILIST_MAX_RETRIES) throw error
+        const delay = rateLimited ? (error.retryAfterMs || 60_000) : Math.min(2_000 * (attempt + 1), 8_000)
+        if (rateLimited) directAniListBlockedUntil = Date.now() + delay
+        await wait(delay)
       }
-      throw error
     }
+    throw new Error('AniList request exhausted its retry budget.')
   })()
   anilistInFlight.set(requestKey, request)
   try {
