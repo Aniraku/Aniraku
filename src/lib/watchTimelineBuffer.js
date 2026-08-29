@@ -3,34 +3,41 @@
 export const PLAYBACK_CACHE_SECONDS = Number.POSITIVE_INFINITY
 export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
+// The maximum number of seconds of forward buffer to display on the timeline.
+// Even if the entire VOD is cached (e.g. Kiwi's fast CDN), the indicator only
+// shows this many seconds ahead of the playhead. This prevents a misleading
+// full-timeline fill and gives an accurate sense of the playback reserve.
+const DEFAULT_MAX_FORWARD_SECONDS = 120
+
 function finite(value, fallback = 0) {
   const number = Number(value)
   return Number.isFinite(number) ? number : fallback
 }
 
 /**
- * Render only the buffer AHEAD of the playhead. For VOD streams served from a
- * fast CDN (e.g. Kiwi's Cloudflare-backed uwucdn), the browser can buffer the
- * entire episode almost instantly, making `video.buffered` cover the full
- * timeline. Showing the full range as "cached" is misleading — the user only
- * cares about how much decodable data lies ahead of the current position.
- * Ranges behind the playhead are clipped so the indicator genuinely reflects
- * the forward buffer reserve.
+ * Render a capped window of buffer ahead of the playhead. Each range is
+ * clipped to [currentTime, currentTime + maxForwardSeconds] so the indicator
+ * never exceeds a reasonable visual width, even when the browser has buffered
+ * the entire VOD (as happens with Kiwi's Cloudflare-backed CDN).
  */
 export function getBufferedTimelineSegments(
   ranges = [],
-  { currentTime = 0, duration = 0, cacheSeconds = PLAYBACK_CACHE_SECONDS } = {}
+  { currentTime = 0, duration = 0, maxForwardSeconds = DEFAULT_MAX_FORWARD_SECONDS } = {}
 ) {
   const total = finite(duration)
   if (total <= 0) return []
 
-  void cacheSeconds
   const current = finite(currentTime)
+  const cap = Number.isFinite(maxForwardSeconds) && maxForwardSeconds > 0
+    ? maxForwardSeconds
+    : Number.POSITIVE_INFINITY
 
   return ranges
     .map((range) => {
-      const start = Math.max(finite(range?.start), current)
-      const end = finite(range?.end)
+      const rawStart = finite(range?.start)
+      const rawEnd = finite(range?.end)
+      const start = Math.max(rawStart, current)
+      const end = Math.min(rawEnd, current + cap)
       return { start, end }
     })
     .filter((range) => range.end > range.start)
@@ -47,7 +54,7 @@ export function getBufferedTimelineSegments(
  */
 export function getPlayableBufferedTimelineSegments(
   ranges = [],
-  { currentTime = 0, duration = 0, readyState = 0, cacheSeconds = PLAYBACK_CACHE_SECONDS } = {}
+  { currentTime = 0, duration = 0, readyState = 0, maxForwardSeconds = DEFAULT_MAX_FORWARD_SECONDS } = {}
 ) {
   void readyState
   const current = finite(currentTime)
@@ -57,7 +64,7 @@ export function getPlayableBufferedTimelineSegments(
     return end > start && end >= current
   })
   if (!hasBufferedRange) return []
-  return getBufferedTimelineSegments(ranges, { currentTime, duration, cacheSeconds })
+  return getBufferedTimelineSegments(ranges, { currentTime, duration, maxForwardSeconds })
 }
 
 function getVideoRanges(video) {
@@ -74,7 +81,11 @@ function getVideoRanges(video) {
  * Install a passive visual cache layer behind ArtPlayer's played position and
  * seek marker. It never changes the video buffer or intercepts pointer input.
  */
-export function createBufferedTimelineIndicator(video, progressInner, { getRanges = null } = {}) {
+export function createBufferedTimelineIndicator(
+  video,
+  progressInner,
+  { getRanges = null, maxForwardSeconds = DEFAULT_MAX_FORWARD_SECONDS } = {}
+) {
   if (!video || !progressInner || typeof document === 'undefined') return () => {}
 
   const layer = document.createElement('div')
@@ -107,6 +118,7 @@ export function createBufferedTimelineIndicator(video, progressInner, { getRange
       currentTime: video.currentTime,
       duration,
       readyState: video.readyState,
+      maxForwardSeconds,
     })
     layer.replaceChildren(
       ...segments.map((segment) => {
