@@ -4719,6 +4719,24 @@ export default function Watch() {
             ))}
         </div>
 
+        {/* FlixCloud dual-audio hint */}
+        {currentSource?.providerFamily === 'flixcloud' && currentSource?.lang === 'dub' && (
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--text-muted)',
+              marginTop: 6,
+              padding: '6px 10px',
+              background: 'var(--bg-elevated)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              lineHeight: 1.5,
+            }}
+          >
+            This server has both audio tracks. Use the player's audio settings to switch between Sub and Dub.
+          </div>
+        )}
+
         {/* Mobile episode toggle */}
         {!isMovie && (
           <button
