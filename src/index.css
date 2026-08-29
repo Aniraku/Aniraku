@@ -1874,3 +1874,9 @@ button, input, select, textarea {
 .watch-loading-youtube .watch-loading-action { position: absolute; right: 16px; bottom: 42px; margin: 0; border-color: rgba(255,255,255,0.38); background: rgba(0,0,0,0.48); color: #fff; text-shadow: none; }
 @keyframes watch-loading-progress { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }
 @media (prefers-reduced-motion: reduce) { .watch-loading-line i { animation: none; width: 48%; } }
+
+/* Shows buffered media depth for direct and proxied playback without obscuring controls. */
+.watch-cache-indicator { position: absolute; top: 14px; left: 50%; z-index: 4; display: inline-flex; align-items: center; gap: 7px; transform: translateX(-50%); padding: 6px 9px; border: 1px solid rgba(250, 204, 21, 0.34); border-radius: 999px; background: rgba(9, 9, 9, 0.76); color: #fef08a; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; line-height: 1; pointer-events: none; text-transform: uppercase; backdrop-filter: blur(8px); }
+.watch-cache-indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: #facc15; box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.15); }
+@media (max-width: 600px) { .watch-cache-indicator { top: 9px; font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) { .watch-cache-indicator-dot { box-shadow: none; } }
