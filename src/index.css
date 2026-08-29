@@ -1876,4 +1876,4 @@ button, input, select, textarea {
 @media (prefers-reduced-motion: reduce) { .watch-loading-line i { animation: none; width: 48%; } }
 
 /* Reference-style thin buffered mark; the played line remains above it. */
-.watch-art-mount .watch-buffer-indicator-segment { background: rgba(246, 246, 242, 0.78); box-shadow: none; }
+.watch-art-mount .watch-buffer-indicator-segment { background: rgba(255, 255, 255, 0.28); box-shadow: none; }

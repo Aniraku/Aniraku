@@ -20,7 +20,7 @@ assert.match(watchSource, /buffer: getDashBufferPolicy\(netHintRef\.current\)/)
 const hlsPrefetches = watchSource.match(/startFragPrefetch: true/g) || []
 assert.equal(hlsPrefetches.length, 2)
 assert.match(watchSource, /art-control-progress-inner \.art-progress-loaded/)
-assert.match(watchSource, /background: rgba\(148, 163, 184, 0\.72\) !important/)
+assert.match(watchSource, /display: none !important/)
 assert.doesNotMatch(watchSource, /watch-buffer-indicator-label|watch-buffer-indicator-endpoint/)
 assert.match(watchSource, /shouldPreferNativeHls\(url\) && video\.canPlayType\('application\/vnd\.apple\.mpegurl'\)/)
 assert.match(watchSource, /video\.removeAttribute\('crossorigin'\)/)
