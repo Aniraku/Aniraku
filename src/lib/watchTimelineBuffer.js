@@ -1,8 +1,6 @@
-// Show a useful YouTube-style cache window instead of painting the entire
-// browser-reported VOD range. Some Kiwi proxy sessions report the complete VOD
-// as buffered after hls.js has opened the manifest, which otherwise makes the
-// cache layer indistinguishable from the progress track.
-export const PLAYBACK_CACHE_SECONDS = 180
+// The indicator is derived only from the media element's actual buffered
+// ranges. There is intentionally no fixed cache duration or synthetic window.
+export const PLAYBACK_CACHE_SECONDS = Number.POSITIVE_INFINITY
 export const MIN_PLAYABLE_BUFFER_SECONDS = 0.5
 
 function finite(value, fallback = 0) {
@@ -11,8 +9,8 @@ function finite(value, fallback = 0) {
 }
 
 /**
- * Clamp the visible cache indication to a useful playback window instead of
- * drawing an unrestricted browser HTTP/MSE range across the entire episode.
+ * Render the exact downloaded-and-appended MediaSource ranges. The browser's
+ * `video.buffered` TimeRanges object is the source of truth for this layer.
  */
 export function getBufferedTimelineSegments(
   ranges = [],
@@ -21,20 +19,11 @@ export function getBufferedTimelineSegments(
   const total = finite(duration)
   if (total <= 0) return []
 
-  const current = Math.min(total, Math.max(0, finite(currentTime)))
-  const limit = cacheSeconds === Number.POSITIVE_INFINITY
-    ? Number.POSITIVE_INFINITY
-    : Math.max(1, finite(cacheSeconds, PLAYBACK_CACHE_SECONDS))
-  const windowStart = Math.max(0, current - limit)
-  const windowEnd = Math.min(total, current + limit)
+  void currentTime
+  void cacheSeconds
 
   return ranges
     .map((range) => ({ start: finite(range?.start), end: finite(range?.end) }))
-    .filter((range) => range.end > range.start)
-    .map((range) => ({
-      start: Math.max(windowStart, range.start),
-      end: Math.min(windowEnd, range.end),
-    }))
     .filter((range) => range.end > range.start)
     .map((range) => ({
       leftPercent: (range.start / total) * 100,
@@ -51,14 +40,14 @@ export function getPlayableBufferedTimelineSegments(
   ranges = [],
   { currentTime = 0, duration = 0, readyState = 0, cacheSeconds = PLAYBACK_CACHE_SECONDS } = {}
 ) {
-  if (finite(readyState) < 2) return []
+  void readyState
   const current = finite(currentTime)
-  const hasForwardPlayableRange = (Array.isArray(ranges) ? ranges : []).some((range) => {
+  const hasBufferedRange = (Array.isArray(ranges) ? ranges : []).some((range) => {
     const start = finite(range?.start)
     const end = finite(range?.end)
-    return start <= current + 0.1 && end - current >= MIN_PLAYABLE_BUFFER_SECONDS
+    return end > start && end >= current
   })
-  if (!hasForwardPlayableRange) return []
+  if (!hasBufferedRange) return []
   return getBufferedTimelineSegments(ranges, { currentTime, duration, cacheSeconds })
 }
 
