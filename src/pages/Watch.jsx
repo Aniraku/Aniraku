@@ -3849,6 +3849,9 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   // Render
   // ────────────────────────────────────────────────────────────
+  const currentEpisode = episodes.find((episode) => Number(episode?.number) === Number(epNumber))
+  const loadingThumbnail = currentEpisode?.thumbnail || currentEpisode?.image || anime?.coverImage?.extraLarge || anime?.coverImage?.large || anime?.bannerImage || ''
+  const loadingTitle = currentEpisode?.title || anime?.title?.english || anime?.title?.romaji || 'Preparing episode'
   const t = currentTime
   const intro = skipSegments?.intro
   const outro = skipSegments?.outro
@@ -4066,43 +4069,40 @@ export default function Watch() {
             </div>
           )}
 
-          {/* Cute startup overlay: source discovery stays visible, but never blocks the first playable proxy. */}
+          {/* Familiar YouTube-style thumbnail loading state for every source. */}
           {effectiveEpisodeAvailability !== 'upcoming' && streamLoading && (
-            <div className="watch-loading" role="status" aria-live="polite">
-              <div className="watch-loading-card">
-                <div className="watch-loading-orbit" aria-hidden="true">
-                  <span className="watch-loading-orbit-dot" />
-                  <span className="watch-loading-orbit-dot watch-loading-orbit-dot--two" />
-                  <span className="watch-loading-face">{slowStream ? '｡•́︿•̀｡' : '•ᴗ•'}</span>
-                </div>
-                <div className="watch-loading-kicker">STREAM LAB · {currentSource?.label || 'PLAYER'}</div>
-                <div className="watch-loading-title">
-                  {slowStream ? 'The stream is putting on its shoes…' : 'Finding the speediest stream…'}
-                </div>
-                <div className="watch-loading-copy">
-                  {slowStream
-                    ? 'The fastest verified source is being nudged awake. Direct or proxy, no embeds, no drama.'
-                    : 'Checking the fastest direct/proxy path and starting the player as soon as it is ready.'}
-                </div>
-                <div className="watch-loading-meter" aria-hidden="true"><span /></div>
-                <div className="watch-loading-status">
-                  {slowStream ? 'Still negotiating with the CDN' : 'Direct + proxy handshake in progress'}
-                </div>
-                {slowStream && (
-                  <button
-                    type="button"
-                    className="watch-loading-action"
-                    onClick={() => {
-                      const sources = [...SOURCES.sub, ...SOURCES.dub]
-                      const others = sources.filter((s) => s.id !== activeSource)
-                      if (others.length > 0) handleSourceSwitch(others[0].id)
-                      else loadStream(activeSource, true)
-                    }}
-                  >
-                    Try another server
-                  </button>
-                )}
+            <div className="watch-loading watch-loading-youtube" role="status" aria-live="polite">
+              {loadingThumbnail ? (
+                <img className="watch-loading-thumbnail" src={loadingThumbnail} alt="" aria-hidden="true" />
+              ) : (
+                <div className="watch-loading-thumbnail watch-loading-thumbnail--empty" aria-hidden="true" />
+              )}
+              <div className="watch-loading-scrim" aria-hidden="true" />
+              <div className="watch-loading-center">
+                <div className="watch-loading-play" aria-hidden="true"><span /></div>
+                <div className="watch-loading-label">Loading episode {epNumber}</div>
+                <div className="watch-loading-episode">{loadingTitle}</div>
+                <div className="watch-loading-subtitle">{slowStream ? 'Still connecting…' : 'Preparing playback…'}</div>
               </div>
+              <div className="watch-loading-bottom" aria-hidden="true">
+                <span className="watch-loading-line"><i /></span>
+                <span className="watch-loading-dot" />
+                <span className="watch-loading-time">0:00</span>
+              </div>
+              {slowStream && (
+                <button
+                  type="button"
+                  className="watch-loading-action"
+                  onClick={() => {
+                    const sources = [...SOURCES.sub, ...SOURCES.dub]
+                    const others = sources.filter((s) => s.id !== activeSource)
+                    if (others.length > 0) handleSourceSwitch(others[0].id)
+                    else loadStream(activeSource, true)
+                  }}
+                >
+                  Try another server
+                </button>
+              )}
             </div>
           )}
 
