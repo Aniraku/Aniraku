@@ -1,6 +1,12 @@
+// Intro and outro markers share a single yellow hue so the timeline stays
+// easy to scan: a single consistent color signals "this is a skip segment"
+// regardless of which side of the episode it sits on. Yellow was chosen for
+// high contrast against ArtPlayer's dark progress track and the Nothing-style
+// red played line. The alpha (~0.55) keeps the marker visible without
+// overpowering the buffered-range indicator layered behind it.
 export const TIMELINE_MARKER_DEFINITIONS = Object.freeze({
-  intro: Object.freeze({ label: 'Intro', color: 'rgba(99, 102, 241, 0.42)' }),
-  outro: Object.freeze({ label: 'Outro', color: 'rgba(244, 63, 94, 0.42)' }),
+  intro: Object.freeze({ label: 'Intro', color: 'rgba(234, 179, 8, 0.55)' }),
+  outro: Object.freeze({ label: 'Outro', color: 'rgba(234, 179, 8, 0.55)' }),
 })
 
 function finite(value, fallback = 0) {

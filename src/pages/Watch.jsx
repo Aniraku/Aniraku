@@ -75,6 +75,7 @@ import {
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
+import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
 import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
 // ────────────────────────────────────────────────────────────────
@@ -986,6 +987,7 @@ export default function Watch() {
   const playerContainerRef = useRef(null)
   const epSidebarRef = useRef(null)
   const buildIdRef = useRef(0)              // bumped on every buildPlayer
+  const hlsPreloadPromiseRef = useRef(null) // hls.js warm import shared across rebuilds
   const mountedRef = useRef(true)
   const toastTimerRef = useRef(null)
   const streamAbortRef = useRef(null)
@@ -2138,6 +2140,32 @@ export default function Watch() {
         Math.random().toString(36).slice(2) + Date.now().toString(36)
 	      const proxied = (u) =>
 	        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+	      // First-proxy pre-warm: start the network handshake against the
+	      // proxy as soon as we know the selected source. DNS, TCP, TLS and
+	      // the proxy's cold edge cache can each add 100-400ms on the first
+	      // request — exactly the window the user is staring at a spinner.
+	      // Firing a low-cost HEAD now means `video.src = proxied(url)`
+	      // reuses a warm socket and the browser's HTTP cache is already
+	      // primed when the media element opens the same connection.
+	      if (typeof fetch === 'function') {
+	        try {
+	          // fire-and-forget: failures here must never block playback.
+	          fetch(proxied(streamUrl), { method: 'HEAD', mode: 'cors', cache: 'no-store' })
+	            .catch(() => {})
+	        } catch {}
+	      }
+	      // hls.js pre-warm: the dynamic import is the single biggest
+	      // startup cost on the HLS path (parser compile + ~120KB of JS).
+	      // Triggering it here, in parallel with the ArtPlayer mount, lets
+	      // the m3u8 handler pick up a ready module instead of awaiting
+	      // the import on the play path. Failures are absorbed; hls.js
+	      // will still be re-imported on demand if the warm import lost
+	      // a race.
+	      if (!hlsPreloadPromiseRef.current) {
+	        hlsPreloadPromiseRef.current = import('hls.js')
+	          .then((mod) => mod?.default || null)
+	          .catch(() => null)
+	      }
 	      // Browser policy violations name the blocked URL. Suppress a control
 	      // only when that URL is the selected media URL, never for an unrelated
 	      // playlist ad, analytics resource, or other subrequest.
@@ -2161,9 +2189,13 @@ export default function Watch() {
       const selectedSource = [...SOURCES.sub, ...SOURCES.dub].find(
         (candidate) => candidate.id === activeSource
       )
-      const bonkProxyOnly = isBonkProvider(selectedSource)
+      const transportOverride = getProviderTransportOverride(selectedSource)
+      const bonkProxyOnly = Boolean(transportOverride?.proxyOnly)
       // Browser-native media playback — proxy first, direct as fallback for
-      // normal providers. Bonk is intentionally restricted to proxy transport.
+      // normal providers. Per-provider transport overrides (e.g. the Bonk
+      // proxy-only rule) are resolved through `getProviderTransportOverride`
+      // so adding a new provider-level behavior never requires touching
+      // this function.
 
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
@@ -2202,8 +2234,10 @@ export default function Watch() {
           hlsTried = true
           let Hls
           try {
-            const mod = await import('hls.js')
-            Hls = mod.default
+            // Reuse the warm import kicked off in buildPlayer; fall back to
+            // a fresh import if the pre-warm never started or already failed.
+            const mod = (await (hlsPreloadPromiseRef.current || import('hls.js')))
+            Hls = mod?.default || mod
           } catch {
             return false
           }
@@ -2559,8 +2593,10 @@ export default function Watch() {
             }
             let Hls
             try {
-              const mod = await import('hls.js')
-              Hls = mod.default
+              // Reuse the warm import kicked off in buildPlayer; fall back
+              // to a fresh import if the pre-warm never started or failed.
+              const mod = (await (hlsPreloadPromiseRef.current || import('hls.js')))
+              Hls = mod?.default || mod
             } catch (e) {
               if (buildIdRef.current === myBuildId) {
                 showToast('HLS engine failed to load — try another server.', { long: true })
