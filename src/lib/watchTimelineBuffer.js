@@ -131,8 +131,8 @@ export function createBufferedTimelineIndicator(
         bar.style.height = '3px'
         bar.style.transform = 'translateY(-50%)'
         bar.style.borderRadius = '999px'
-        bar.style.background = 'rgba(226, 232, 240, 0.9)'
-        bar.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.3), 0 0 5px rgba(226,232,240,0.35)'
+        bar.style.background = 'rgba(255, 255, 255, 0.28)'
+        bar.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.1)'
         return bar
       })
     )

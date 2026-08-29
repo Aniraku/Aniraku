@@ -5218,11 +5218,11 @@ export default function Watch() {
           height: 3px;
           transform: translateY(-50%);
           border-radius: 999px;
-          background: rgba(226, 232, 240, 0.78);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 0 4px rgba(226, 232, 240, 0.2);
+          background: rgba(255, 255, 255, 0.28);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
         }
         .watch-art-mount .art-progress-loaded {
-          background: transparent !important;
+          display: none !important;
         }
         .watch-art-mount .art-progress-played,
         .watch-art-mount .art-progress-indicator {
