@@ -18,5 +18,5 @@ export function shouldTryHlsFallback(url) {
 }
 
 export function shouldPreferNativeHls(url) {
-  return /(?:^|\/\/)(?:[^/]+\.)?(?:uwucdn|owocdn)\.top\//i.test(String(url || ''))
+  return /(?:^|\/\/)(?:[^/]+\.)?(?:uwucdn|owocdn)\.(?:top|net|com)\//i.test(String(url || ''))
 }
