@@ -1,7 +1,7 @@
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 const ANILIST_MIN_INTERVAL_MS = 2_200
-const ANILIST_MAX_RETRIES = 3
+const ANILIST_MAX_RETRIES = 2
 const anilistInFlight = new Map()
 let nextAniListRequestAt = 0
 let directAniListBlockedUntil = 0
@@ -64,8 +64,13 @@ async function directAniListRequest(query, variables = {}) {
         const rateLimited = Number(error?.status) === 429
         const retryable = rateLimited || corsLike || Number(error?.status) >= 500
         if (!retryable || attempt === ANILIST_MAX_RETRIES) throw error
-        const delay = rateLimited ? (error.retryAfterMs || 60_000) : Math.min(2_000 * (attempt + 1), 8_000)
-        if (rateLimited) directAniListBlockedUntil = Date.now() + delay
+        // A browser often surfaces AniList's rate-limited response as a
+        // CORS-like TypeError because the 429 response may omit CORS headers.
+        // Wait patiently instead of turning a temporary limit into "not found".
+        const delay = rateLimited || corsLike
+          ? Math.max(error.retryAfterMs || 60_000, 60_000)
+          : Math.min(2_000 * (attempt + 1), 8_000)
+        if (rateLimited || corsLike) directAniListBlockedUntil = Date.now() + delay
         await wait(delay)
       }
     }
