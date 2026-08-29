@@ -1103,7 +1103,6 @@ export default function Watch() {
   }, [activeEmbedUrl])
   const [retryAttempt, setRetryAttempt] = useState(0)
   const [buffering, setBuffering] = useState(false)
-  const [bufferedAhead, setBufferedAhead] = useState(0)
 
   // Verified skip intervals from the provider and AniSkip. Provider data
   // wins when present; AniSkip supplies anime-wide coverage by MAL ID.
@@ -2812,12 +2811,14 @@ export default function Watch() {
             })
             hls.on(Hls.Events.FRAG_BUFFERED, () => {
               if (playbackStarted) setBuffering(false)
+              video.dispatchEvent(new Event('progress'))
             })
             hls.on(Hls.Events.BUFFER_APPENDING, () => {
               if (playbackStarted) setBuffering(true)
             })
             hls.on(Hls.Events.BUFFER_APPENDED, () => {
               if (playbackStarted) setBuffering(false)
+              video.dispatchEvent(new Event('progress'))
             })
 	            try {
 	              hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
@@ -3021,19 +3022,6 @@ export default function Watch() {
         if (now - lastRender > 500) {
           lastRender = now
           setCurrentTime(position)
-          let bufferedEnd = position
-          try {
-            const ranges = art.video.buffered
-            for (let index = 0; index < ranges.length; index += 1) {
-              const start = ranges.start(index)
-              const end = ranges.end(index)
-              if (position >= start - 0.5 && position <= end + 0.5) {
-                bufferedEnd = Math.max(bufferedEnd, end)
-                break
-              }
-            }
-          } catch {}
-          setBufferedAhead(Math.max(0, Math.min(300, bufferedEnd - position)))
         }
         if (now - lastSave < 10_000) return
         lastSave = now
@@ -4094,12 +4082,6 @@ export default function Watch() {
             </div>
           )}
 
-          {effectiveEpisodeAvailability !== 'upcoming' && !activeEmbedUrl && bufferedAhead > 0 && (
-            <div className="watch-cache-indicator" role="status" aria-live="polite">
-              <span className="watch-cache-indicator-dot" aria-hidden="true" />
-              CACHE READY · {Math.max(1, Math.round(bufferedAhead))}S
-            </div>
-          )}
           {/* Familiar YouTube-style thumbnail loading state for every source. */}
           {effectiveEpisodeAvailability !== 'upcoming' && streamLoading && (
             <div className="watch-loading watch-loading-youtube" role="status" aria-live="polite">

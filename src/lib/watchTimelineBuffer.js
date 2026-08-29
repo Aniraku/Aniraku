@@ -49,7 +49,7 @@ export function getPlayableBufferedTimelineSegments(
   ranges = [],
   { currentTime = 0, duration = 0, readyState = 0, cacheSeconds = PLAYBACK_CACHE_SECONDS } = {}
 ) {
-  if (finite(readyState) < 3) return []
+  if (finite(readyState) < 2) return []
   const current = finite(currentTime)
   const hasForwardPlayableRange = (Array.isArray(ranges) ? ranges : []).some((range) => {
     const start = finite(range?.start)
