@@ -1,5 +1,6 @@
 const DEFAULT_API_BASE = 'https://api.aniraku.tech'
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
+const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 
 export class AniListUnavailableError extends Error {
   constructor(message) {
@@ -15,8 +16,18 @@ function reportAniListStatus(unavailable) {
   window.dispatchEvent(new CustomEvent(ANILIST_STATUS_EVENT, { detail: { unavailable } }))
 }
 
-function anirakuApiBase() {
-  return (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/$/, '')
+async function directAniListRequest(query, variables = {}) {
+  const response = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || payload?.errors?.length) {
+    const message = payload?.errors?.[0]?.message || `AniList is unavailable (${response.status}).`
+    throw new Error(message)
+  }
+  return payload
 }
 
 function titleFromSchedule(value) {
@@ -58,35 +69,8 @@ const ANIRAKU_CALENDAR_WEEK_QUERY = `
   }
 `
 
-async function mapScheduleMalIdsToAniList(apiBase, malIds) {
-  const ids = [...new Set(malIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 50)
-  if (!ids.length) return new Map()
-
-  const response = await fetch(`${apiBase}/api/v1/anilist`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      query: 'query ($ids: [Int]) { Page(perPage: 50) { media(idMal_in: $ids, type: ANIME) { id idMal } } }',
-      variables: { ids },
-    }),
-  })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(`Schedule ID mapping is unavailable (${response.status}).`)
-  return new Map((payload?.data?.Page?.media || []).flatMap((media) => {
-    const malId = Number(media?.idMal)
-    const anilistId = Number(media?.id)
-    return Number.isInteger(malId) && malId > 0 && Number.isInteger(anilistId) && anilistId > 0 ? [[malId, anilistId]] : []
-  }))
-}
-
-async function getAnirakuAiringScheduleFallback(apiBase, page, perPage, { startAt, endAt } = {}) {
-  const response = await fetch(`${apiBase}/api/v1/anilist`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query: ANIRAKU_AIRING_SCHEDULE_QUERY, variables: { page, perPage, startAt, endAt } }),
-  })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(`Schedule fallback is unavailable (${response.status}).`)
+async function getAnirakuAiringScheduleFallback(page, perPage, { startAt, endAt } = {}) {
+  const payload = await directAniListRequest(ANIRAKU_AIRING_SCHEDULE_QUERY, { page, perPage, startAt, endAt })
   const pageData = payload?.data?.Page
   const schedule = (pageData?.airingSchedules || []).flatMap((item) => {
     const media = item?.media
@@ -111,14 +95,8 @@ async function getAnirakuAiringScheduleFallback(apiBase, page, perPage, { startA
   }
 }
 
-async function getAnirakuCalendarWeek(apiBase, page, perPage, { startAt, endAt }) {
-  const response = await fetch(`${apiBase}/api/v1/anilist`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query: ANIRAKU_CALENDAR_WEEK_QUERY, variables: { page, perPage } }),
-  })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(`Weekly Schedule is unavailable (${response.status}).`)
+async function getAnirakuCalendarWeek(page, perPage, { startAt, endAt }) {
+  const payload = await directAniListRequest(ANIRAKU_CALENDAR_WEEK_QUERY, { page, perPage })
   const pageData = payload?.data?.Page
   const schedule = (pageData?.media || []).flatMap((media) => {
     const id = Number(media?.id)
@@ -145,86 +123,29 @@ async function getAnirakuCalendarWeek(apiBase, page, perPage, { startAt, endAt }
 export async function getAnirakuSchedule({ page = 1, perPage = 50, startAt, endAt } = {}) {
   const safePage = Math.max(1, Math.floor(Number(page) || 1))
   const safePerPage = Math.min(100, Math.max(1, Math.floor(Number(perPage) || 50)))
-  const apiBase = anirakuApiBase()
   const safeStartAt = Math.floor(Number(startAt))
   const safeEndAt = Math.floor(Number(endAt))
   const boundedWindow = Number.isInteger(safeStartAt) && Number.isInteger(safeEndAt) && safeStartAt > 0 && safeEndAt > safeStartAt
-
-  if (boundedWindow) return getAnirakuCalendarWeek(apiBase, safePage, safePerPage, { startAt: safeStartAt, endAt: safeEndAt })
-
-  const response = await fetch(`${apiBase}/api/v1/schedule?page=${safePage}&perPage=${safePerPage}`, {
-    headers: { Accept: 'application/json' },
+  if (boundedWindow) return getAnirakuCalendarWeek(safePage, safePerPage, { startAt: safeStartAt, endAt: safeEndAt })
+  return getAnirakuAiringScheduleFallback(safePage, safePerPage, {
+    startAt: Math.floor(Date.now() / 1000),
+    endAt: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),
   })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(`Schedule is unavailable (${response.status}).`)
-
-  const source = Array.isArray(payload?.schedule) ? payload.schedule : []
-  let idMap = new Map()
-  try {
-    idMap = await mapScheduleMalIdsToAniList(apiBase, source.map((item) => item?.id))
-  } catch (error) {
-    console.warn('Schedule MAL-ID mapping is unavailable; trying Aniraku schedule fallback:', error)
-  }
-  const schedule = source.flatMap((item) => {
-    const malId = Number(item?.id)
-    const id = idMap.get(malId)
-    const episode = Number(item?.episode)
-    const airingAt = Number(item?.airingAt)
-    if (!id || !Number.isInteger(episode) || episode < 1 || !Number.isInteger(airingAt) || airingAt < 1) return []
-    return [{
-      id,
-      idMal: malId,
-      title: titleFromSchedule(item?.title),
-      coverImage: item?.coverImage && typeof item.coverImage === 'object' ? item.coverImage : {},
-      format: String(item?.format || '').trim() || null,
-      nextAiringEpisode: { episode, airingAt },
-    }]
-  })
-
-  if (schedule.length) {
-    return {
-      schedule,
-      pageInfo: payload?.pageInfo && typeof payload.pageInfo === 'object'
-        ? payload.pageInfo
-        : { currentPage: safePage, perPage: safePerPage, hasNextPage: false, total: schedule.length },
-    }
-  }
-
-  return getAnirakuAiringScheduleFallback(apiBase, safePage, safePerPage)
 }
 
 export async function anilistQuery(query, variables = {}) {
-  const body = JSON.stringify({ query, variables })
-
-  // Always use Aniraku's API proxy by default. It avoids browser CORS issues
-  // and protects users from exhausting AniList's client-side rate limit. A
-  // deployment may still override this endpoint through VITE_API_URL.
-  const apiBase = (
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.DEV ? '' : DEFAULT_API_BASE)
-  ).replace(/\/$/, '')
-  const endpoint = `${apiBase}/api/v1/anilist`
   try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body,
-    })
-    const json = await res.json().catch(() => ({}))
-    if (res.ok && json.data) {
-      reportAniListStatus(false)
-      return json
-    }
-    const message = json?.errors?.[0]?.message || json?.error || `AniList is unavailable (${res.status}).`
-    if ((res.status === 403 && /temporarily disabled|severe stability issues/i.test(message)) || /anilist circuit open|rate limited/i.test(message)) {
-      reportAniListStatus(true)
-      throw new AniListUnavailableError('AniList is temporarily unavailable due to an upstream stability issue. Try again shortly.')
-    }
-    throw new Error(message)
+    const json = await directAniListRequest(query, variables)
+    reportAniListStatus(false)
+    return json
   } catch (error) {
-    if (isAniListUnavailableError(error)) throw error
-    console.warn('AniList proxy fetch failed:', error)
-    throw error instanceof Error ? error : new Error('AniList backend is unavailable')
+    const message = error instanceof Error ? error.message : 'AniList is unavailable.'
+    if (/rate limit|temporarily unavailable|stability/i.test(message)) {
+      reportAniListStatus(true)
+      throw new AniListUnavailableError('AniList is temporarily unavailable. Try again shortly.')
+    }
+    console.warn('Direct AniList fetch failed:', error)
+    throw error instanceof Error ? error : new Error(message)
   }
 }
 
