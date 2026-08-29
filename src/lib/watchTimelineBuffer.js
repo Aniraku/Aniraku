@@ -71,6 +71,10 @@ export function createBufferedTimelineIndicator(video, progressInner, { getRange
   const layer = document.createElement('div')
   layer.className = 'watch-buffer-indicator'
   layer.setAttribute('aria-hidden', 'true')
+  layer.style.position = 'absolute'
+  layer.style.inset = '0'
+  layer.style.zIndex = '2'
+  layer.style.pointerEvents = 'none'
   progressInner.append(layer)
 
   const render = () => {
@@ -96,8 +100,15 @@ export function createBufferedTimelineIndicator(video, progressInner, { getRange
       ...segments.map((segment) => {
         const bar = document.createElement('span')
         bar.className = 'watch-buffer-indicator-segment'
+        bar.style.position = 'absolute'
         bar.style.left = `${segment.leftPercent}%`
         bar.style.width = `${segment.widthPercent}%`
+        bar.style.top = '50%'
+        bar.style.height = '3px'
+        bar.style.transform = 'translateY(-50%)'
+        bar.style.borderRadius = '999px'
+        bar.style.background = 'rgba(226, 232, 240, 0.9)'
+        bar.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.3), 0 0 5px rgba(226,232,240,0.35)'
         return bar
       })
     )
