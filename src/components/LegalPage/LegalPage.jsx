@@ -166,7 +166,7 @@ const Support = styled.div`
   }
 `
 
-const LegalPage = ({ title, eyebrow = 'Trust & transparency', revision = 'August 13, 2026', intro, sections = [], children }) => (
+const LegalPage = ({ title, eyebrow = 'Trust & transparency', revision = 'August 29, 2026', intro, sections = [], children }) => (
   <>
     <Page>
       <Shell>
