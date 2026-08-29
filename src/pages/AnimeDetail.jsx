@@ -17,7 +17,6 @@ import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
 import { API_BASE } from '../config'
 import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
-const MIRURO_RELATIONS_BASE = 'https://miruro.aniraku.tech/anime'
 const EPISODE_RETRY_BASE_MS = 1_500
 const EPISODE_RETRY_MAX_MS = 15_000
 
@@ -763,41 +762,15 @@ const AnimeDetail = () => {
     return () => { cancelled = true }
   }, [id, user])
 
-  React.useEffect(() => {
-    // Relations accept the route ID directly. Start alongside metadata so a
-    // fast response is not delayed behind unrelated detail rendering or SEO.
-    if (!id) return undefined
-    const controller = new AbortController()
-    let cancelled = false
-
-    const loadRelations = async () => {
-      setRelations([])
-      setRelationsLoading(true)
-      try {
-        const response = await fetch(`${MIRURO_RELATIONS_BASE}/${encodeURIComponent(id)}/relations`, {
-          signal: controller.signal,
-          headers: { Accept: 'application/json' },
-        })
-        if (!response.ok) throw new Error(`Miruro relations API returned ${response.status}`)
-        const payload = await response.json()
-        const directRelations = (Array.isArray(payload?.relations) ? payload.relations : [])
-          .filter((entry) => entry?.node?.id && entry.node.type === 'ANIME' && ['SEQUEL', 'PREQUEL', 'SPIN_OFF', 'SIDE_STORY', 'ADAPTATION'].includes(entry.relationType))
-          .map((entry) => ({ ...entry.node, relationType: entry.relationType }))
-        if (!cancelled) setRelations(directRelations)
-      } catch (error) {
-        if (error?.name === 'AbortError' || cancelled) return
-        setRelations([])
-      } finally {
-        if (!cancelled) setRelationsLoading(false)
-      }
-    }
-
-    loadRelations()
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [id])
+    React.useEffect(() => {
+    // AniList already returns the relation graph in ANIME_DETAIL_QUERY. Keep
+    // Relations entirely client-side and avoid a duplicate Miruro request.
+    const directRelations = (Array.isArray(anime?.relations?.edges) ? anime.relations.edges : [])
+      .filter((entry) => entry?.node?.id && entry.node.type === 'ANIME' && ['SEQUEL', 'PREQUEL', 'SPIN_OFF', 'SIDE_STORY', 'ADAPTATION'].includes(entry.relationType))
+      .map((entry) => ({ ...entry.node, relationType: entry.relationType }))
+    setRelations(directRelations)
+    setRelationsLoading(false)
+  }, [anime])
 
   React.useEffect(() => {
     // Episode availability accepts the route ID directly. Resolve it in
