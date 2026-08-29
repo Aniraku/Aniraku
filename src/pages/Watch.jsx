@@ -2709,7 +2709,7 @@ export default function Watch() {
 							hlsTransportIndex += 1
 							try {
 								mediaRetries = 0
-								showToast('Proxy stream failed before playback — trying direct.', { long: true })
+								showToast(`${hlsTransportPlan[hlsTransportIndex - 1]?.mode === 'direct' ? 'Direct' : 'Proxy'} stream failed before playback — trying ${hlsTransportPlan[hlsTransportIndex].mode}.`, { long: true })
 								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
 								return
 							} catch {}
