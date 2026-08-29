@@ -127,6 +127,21 @@ export const AuthProvider = ({ children }) => {
       const { data: serverUserData, error: serverUserError } = await supabase.auth.getUser(session?.access_token)
       if (!mounted || revision !== sessionRevision) return
       const nextUser = serverUserData?.user || null
+
+      // Transient network failures should not sign the user out — keep the
+      // cached session so deploys and flaky connections don't force re-login.
+      const isTransient = serverUserError && (
+        serverUserError.message?.includes('Failed to fetch') ||
+        serverUserError.message?.includes('NetworkError') ||
+        serverUserError.message?.includes('timeout') ||
+        serverUserError.code === 'network_request_failed'
+      )
+      if (isTransient && claimedUser) {
+        setUser(claimedUser)
+        fetchProfile(claimedUser)
+        return
+      }
+
       if (
         serverUserError ||
         !nextUser ||
