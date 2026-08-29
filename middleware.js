@@ -18,8 +18,8 @@ function htmlShell({ title, description, image, url, type, animeType, score, epi
   // Build rich JSON-LD structured data
   let jsonld = `{"@context":"https://schema.org","@type":"${animeType || 'WebPage'}","name":"${title}","description":"${description}","url":"${url}","image":"${image}"`
   if (genres && genres.length > 0) jsonld += `,"genre":[${genres.map(g => `"${escape(g)}"`).join(',')}]`
-  if (score) jsonld += `,"aggregateRating":{"@type":"AggregateRating","ratingValue":"${(score/10).toFixed(1)}","bestRating":"10","worstRating":"1"}`
-  if (episodes) jsonld += `,"numberOfEpisodes":${episodes}`
+  if (score) jsonld += `,"aggregateRating":{"@type":"AggregateRating","ratingValue":"${String((score/10).toFixed(1))}","bestRating":"10","worstRating":"1"}`
+  if (episodes) jsonld += `,"numberOfEpisodes":${Number(episodes)}`
   if (startDate) jsonld += `,"datePublished":"${startDate}"`
   jsonld += `,"inLanguage":"ja","contentRating":"PG-13"`
   jsonld += `,"provider":{"@type":"Organization","name":"Aniraku","url":"${SITE}"}`

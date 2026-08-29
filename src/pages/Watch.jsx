@@ -2867,10 +2867,13 @@ export default function Watch() {
                   kiwiFragmentRangesRef.current = ranges
                 }
               }
-              if (playbackStarted) setBuffering(false)
+              // Always clear the spinner on fragment completion so early
+              // fragments (before playback starts) are not stuck in a
+              // buffering state that blocks the video from beginning.
+              setBuffering(false)
               video.dispatchEvent(new Event('progress'))
             }
-            // FRAG_LOADED is the precise “downloaded” moment requested by the
+            // FRAG_LOADED is the precise "downloaded" moment requested by the
             // indicator; FRAG_BUFFERED confirms the same fragment reached MSE.
             hls.on(Hls.Events.FRAG_LOADED, recordKiwiFragment)
             hls.on(Hls.Events.FRAG_BUFFERED, recordKiwiFragment)
@@ -2881,7 +2884,10 @@ export default function Watch() {
               video.dispatchEvent(new Event('progress'))
             })
             hls.on(Hls.Events.BUFFER_APPENDED, () => {
-              if (playbackStarted) setBuffering(false)
+              // Always clear the spinner when MSE confirms data arrived.
+              // Waiting for playbackStarted blocks the very first fragments
+              // that need to land before the video can begin playing.
+              setBuffering(false)
               video.dispatchEvent(new Event('progress'))
             })
 	            try {
