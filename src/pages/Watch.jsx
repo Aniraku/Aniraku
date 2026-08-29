@@ -2834,17 +2834,18 @@ export default function Watch() {
               } catch {}
               if (forwardBuffer < 1.5) setBuffering(true)
             })
-            hls.on(Hls.Events.FRAG_BUFFERED, (_event, data) => {
+            const recordKiwiFragment = (_event, data) => {
               if (isKiwiHls) {
                 const fragment = data?.frag
-                const start = Number(fragment?.startPTS ?? fragment?.start)
+                const rawStart = Number(fragment?.start)
+                const rawStartPTS = Number(fragment?.startPTS)
+                const start = Number.isFinite(rawStart) ? rawStart : rawStartPTS
                 const duration = Number(fragment?.duration)
                 if (Number.isFinite(start) && Number.isFinite(duration) && duration > 0) {
                   const end = start + duration
                   const ranges = kiwiFragmentRangesRef.current || []
-                  // FRAG_BUFFERED can repeat after retries or quality changes.
-                  // Insert in order and merge in place instead of allocating
-                  // and sorting the whole ledger for every fragment.
+                  // FRAG_LOADED and FRAG_BUFFERED may both report one fragment;
+                  // merge in place so retries never grow duplicate entries.
                   let insertAt = ranges.findIndex((range) => range.start > start)
                   if (insertAt < 0) insertAt = ranges.length
                   const previous = ranges[insertAt - 1]
@@ -2868,7 +2869,11 @@ export default function Watch() {
               }
               if (playbackStarted) setBuffering(false)
               video.dispatchEvent(new Event('progress'))
-            })
+            }
+            // FRAG_LOADED is the precise “downloaded” moment requested by the
+            // indicator; FRAG_BUFFERED confirms the same fragment reached MSE.
+            hls.on(Hls.Events.FRAG_LOADED, recordKiwiFragment)
+            hls.on(Hls.Events.FRAG_BUFFERED, recordKiwiFragment)
             hls.on(Hls.Events.BUFFER_APPENDING, () => {
               // Appending is the successful cache-building path. The low-water
               // check in FRAG_LOADING is the only place that raises the
