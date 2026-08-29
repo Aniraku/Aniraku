@@ -2804,8 +2804,20 @@ export default function Watch() {
 	                if (p && typeof p.catch === 'function') p.catch(() => {})
 	              }
 	            })
-	            hls.on(Hls.Events.BUFFER_APPENDING, () => {
-              // could be used to show buffering indicator if needed
+	            // Proxy HLS does not always surface a native `waiting` event
+            // while hls.js is fetching the next fragment. Mirror its media
+            // buffer lifecycle into the same player-owned indicator.
+            hls.on(Hls.Events.FRAG_LOADING, () => {
+              if (playbackStarted) setBuffering(true)
+            })
+            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+              if (playbackStarted) setBuffering(false)
+            })
+            hls.on(Hls.Events.BUFFER_APPENDING, () => {
+              if (playbackStarted) setBuffering(true)
+            })
+            hls.on(Hls.Events.BUFFER_APPENDED, () => {
+              if (playbackStarted) setBuffering(false)
             })
 	            try {
 	              hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
