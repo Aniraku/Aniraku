@@ -2247,7 +2247,7 @@ export default function Watch() {
           if (!Hls?.isSupported?.() || buildIdRef.current !== myBuildId) return false
           const hls = new Hls({
             enableWorker: false,
-            ...getHlsBufferPolicy(netHintRef.current),
+            ...getHlsBufferPolicy(netHintRef.current, { kiwi: shouldPreferNativeHls(url) }),
             ...getHlsLoadPolicies(),
             startFragPrefetch: true,
             lowLatencyMode: false,
@@ -2619,7 +2619,7 @@ export default function Watch() {
                 art.hls.destroy()
               } catch {}
             }
-            const bufferPolicy = getHlsBufferPolicy(netHintRef.current)
+            const bufferPolicy = getHlsBufferPolicy(netHintRef.current, { kiwi: shouldPreferNativeHls(url) })
             const hls = new Hls({
               enableWorker: false,
               // Hold a substantial forward reserve for VOD playback. The
@@ -2807,14 +2807,32 @@ export default function Watch() {
             // while hls.js is fetching the next fragment. Mirror its media
             // buffer lifecycle into the same player-owned indicator.
             hls.on(Hls.Events.FRAG_LOADING, () => {
-              if (playbackStarted) setBuffering(true)
+              if (!playbackStarted) return
+              // Fragment loading is normal while hls.js is extending the
+              // forward cache. Only show the player-level spinner when the
+              // current playhead is genuinely near the end of decodable data.
+              let forwardBuffer = 0
+              try {
+                const current = Number(video.currentTime) || 0
+                for (let index = 0; index < video.buffered.length; index += 1) {
+                  const start = video.buffered.start(index)
+                  const end = video.buffered.end(index)
+                  if (start <= current + 0.25 && end >= current) {
+                    forwardBuffer = Math.max(forwardBuffer, end - current)
+                  }
+                }
+              } catch {}
+              if (forwardBuffer < 1.5) setBuffering(true)
             })
             hls.on(Hls.Events.FRAG_BUFFERED, () => {
               if (playbackStarted) setBuffering(false)
               video.dispatchEvent(new Event('progress'))
             })
             hls.on(Hls.Events.BUFFER_APPENDING, () => {
-              if (playbackStarted) setBuffering(true)
+              // Appending is the successful cache-building path. The low-water
+              // check in FRAG_LOADING is the only place that raises the
+              // player-level buffering state for Kiwi.
+              video.dispatchEvent(new Event('progress'))
             })
             hls.on(Hls.Events.BUFFER_APPENDED, () => {
               if (playbackStarted) setBuffering(false)
