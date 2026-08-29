@@ -1,9 +1,17 @@
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
-const ANILIST_MIN_INTERVAL_MS = 2_200
 const ANILIST_MAX_RETRIES = 2
+
+// Sliding-window rate limiter.  AniList allows 30 requests per minute per IP.
+// We cap at 20 with a 3-second minimum gap so bursts of page navigations
+// never crowd the ceiling.  The window tracks timestamps of recent requests
+// and enforces the budget before each fetch.
+const ANILIST_RATE_LIMIT = 20
+const ANILIST_WINDOW_MS = 60_000
+const ANILIST_MIN_GAP_MS = 3_000
+const requestTimestamps = []
+
 const anilistInFlight = new Map()
-let nextAniListRequestAt = 0
 let directAniListBlockedUntil = 0
 
 export class AniListUnavailableError extends Error {
@@ -27,11 +35,30 @@ function retryAfterMs(response) {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function requestAniListEndpoint(body) {
+// Prune timestamps older than the window, then wait until a slot opens.
+async function acquireRequestSlot() {
   const now = Date.now()
-  const waitForSlot = Math.max(0, nextAniListRequestAt - now)
-  if (waitForSlot) await wait(waitForSlot)
-  nextAniListRequestAt = Date.now() + ANILIST_MIN_INTERVAL_MS
+  // Drop entries outside the sliding window
+  while (requestTimestamps.length && requestTimestamps[0] <= now - ANILIST_WINDOW_MS) {
+    requestTimestamps.shift()
+  }
+  // If at budget, wait for the oldest entry to expire
+  if (requestTimestamps.length >= ANILIST_RATE_LIMIT) {
+    const oldest = requestTimestamps[0]
+    const waitMs = oldest + ANILIST_WINDOW_MS - now + 50
+    if (waitMs > 0) await wait(waitMs)
+  }
+  // Enforce minimum gap between consecutive requests
+  if (requestTimestamps.length) {
+    const last = requestTimestamps[requestTimestamps.length - 1]
+    const gapMs = last + ANILIST_MIN_GAP_MS - Date.now()
+    if (gapMs > 0) await wait(gapMs)
+  }
+  requestTimestamps.push(Date.now())
+}
+
+async function requestAniListEndpoint(body) {
+  await acquireRequestSlot()
   const response = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -47,9 +74,19 @@ async function requestAniListEndpoint(body) {
   return payload
 }
 
+// In-memory response cache with 2-minute TTL.  Prevents identical queries
+// from hitting AniList when React re-renders or the user navigates back.
+const ANILIST_CACHE_TTL_MS = 120_000
+const responseCache = new Map()
+
 async function directAniListRequest(query, variables = {}) {
   const body = JSON.stringify({ query, variables })
   const requestKey = body
+
+  // Return cached response if still fresh
+  const cached = responseCache.get(requestKey)
+  if (cached && Date.now() - cached.ts < ANILIST_CACHE_TTL_MS) return cached.data
+
   const existing = anilistInFlight.get(requestKey)
   if (existing) return existing
 
@@ -78,7 +115,16 @@ async function directAniListRequest(query, variables = {}) {
   })()
   anilistInFlight.set(requestKey, request)
   try {
-    return await request
+    const result = await request
+    responseCache.set(requestKey, { data: result, ts: Date.now() })
+    // Evict stale entries when cache grows large
+    if (responseCache.size > 200) {
+      const now = Date.now()
+      for (const [key, entry] of responseCache) {
+        if (now - entry.ts > ANILIST_CACHE_TTL_MS) responseCache.delete(key)
+      }
+    }
+    return result
   } finally {
     anilistInFlight.delete(requestKey)
   }
