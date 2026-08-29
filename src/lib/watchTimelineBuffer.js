@@ -83,9 +83,19 @@ export function createBufferedTimelineIndicator(video, progressInner) {
   progressInner.append(layer)
 
   const render = () => {
-    const segments = getPlayableBufferedTimelineSegments(getVideoRanges(video), {
+    const ranges = getVideoRanges(video)
+    const lastBufferedEnd = ranges.reduce((end, range) => Math.max(end, range.end), 0)
+    const seekable = video.seekable
+    const lastSeekableEnd = seekable && seekable.length
+      ? seekable.end(seekable.length - 1)
+      : 0
+    const reportedDuration = Number(video.duration)
+    const duration = Number.isFinite(reportedDuration) && reportedDuration > 0
+      ? reportedDuration
+      : Math.max(lastBufferedEnd, Number.isFinite(lastSeekableEnd) ? lastSeekableEnd : 0)
+    const segments = getPlayableBufferedTimelineSegments(ranges, {
       currentTime: video.currentTime,
-      duration: video.duration,
+      duration,
       readyState: video.readyState,
     })
     layer.replaceChildren(
@@ -111,10 +121,12 @@ export function createBufferedTimelineIndicator(video, progressInner) {
     'playing',
   ]
   events.forEach((event) => video.addEventListener(event, render))
+  const refreshTimer = window.setInterval(render, 500)
   render()
 
   return () => {
     events.forEach((event) => video.removeEventListener(event, render))
+    window.clearInterval(refreshTimer)
     layer.remove()
   }
 }
