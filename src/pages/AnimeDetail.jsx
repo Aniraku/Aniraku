@@ -643,7 +643,7 @@ const AnimeDetail = () => {
   const [episodeRatings, setEpisodeRatings] = useState({})
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
-  const { data: anime, isLoading } = useAnimeDetails(id)
+  const { data: anime, isLoading, isError, refetch } = useAnimeDetails(id)
   const isMovieFormat = anime?.format === 'MOVIE'
   const episodeFallbackThumbnail = isMovieFormat
     ? anime?.bannerImage || anime?.coverImage?.large || anime?.coverImage?.medium || ''
@@ -901,7 +901,19 @@ const AnimeDetail = () => {
     <>
       <Center>
         <div style={{ textAlign: 'center', padding: '0 20px' }}>
-          <p style={{ fontSize: 18, marginBottom: 12, color: 'var(--text-muted)' }}>Anime not found</p>
+          <p style={{ fontSize: 18, marginBottom: 12, color: 'var(--text)' }}>
+            {isError ? 'Anime metadata is temporarily unavailable' : 'Anime not found'}
+          </p>
+          <p style={{ maxWidth: 460, margin: '0 auto 18px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {isError
+              ? 'AniList is busy or temporarily rejecting requests. Please retry shortly; this does not mean the anime is missing.'
+              : 'This title could not be found in AniList.'}
+          </p>
+          {isError && (
+            <button type="button" onClick={() => refetch()} style={{ marginRight: 10, padding: '10px 16px', border: 0, borderRadius: 999, background: 'var(--accent)', color: 'var(--bg)', fontWeight: 750, cursor: 'pointer' }}>
+              Retry AniList
+            </button>
+          )}
           <Link to="/" style={{ color: 'var(--accent)', fontSize: 14 }}>Back to Home</Link>
         </div>
       </Center>

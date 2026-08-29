@@ -130,5 +130,11 @@ export function useAnimeDetails(id) {
     const anime = response?.data?.Media
     if (!anime?.id) throw new Error('Metadata resolver returned no anime')
     return anime
-  }, { enabled: !!id, staleTime: 300000 })
+  }, {
+    enabled: !!id,
+    staleTime: 300000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
 }
