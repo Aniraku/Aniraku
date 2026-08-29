@@ -9,8 +9,13 @@ function finite(value, fallback = 0) {
 }
 
 /**
- * Render the exact downloaded-and-appended MediaSource ranges. The browser's
- * `video.buffered` TimeRanges object is the source of truth for this layer.
+ * Render only the buffer AHEAD of the playhead. For VOD streams served from a
+ * fast CDN (e.g. Kiwi's Cloudflare-backed uwucdn), the browser can buffer the
+ * entire episode almost instantly, making `video.buffered` cover the full
+ * timeline. Showing the full range as "cached" is misleading — the user only
+ * cares about how much decodable data lies ahead of the current position.
+ * Ranges behind the playhead are clipped so the indicator genuinely reflects
+ * the forward buffer reserve.
  */
 export function getBufferedTimelineSegments(
   ranges = [],
@@ -19,11 +24,15 @@ export function getBufferedTimelineSegments(
   const total = finite(duration)
   if (total <= 0) return []
 
-  void currentTime
   void cacheSeconds
+  const current = finite(currentTime)
 
   return ranges
-    .map((range) => ({ start: finite(range?.start), end: finite(range?.end) }))
+    .map((range) => {
+      const start = Math.max(finite(range?.start), current)
+      const end = finite(range?.end)
+      return { start, end }
+    })
     .filter((range) => range.end > range.start)
     .map((range) => ({
       leftPercent: (range.start / total) * 100,
