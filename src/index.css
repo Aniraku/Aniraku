@@ -1854,3 +1854,23 @@ button, input, select, textarea {
 
 .watch-timeline-marker-intro,
 .watch-timeline-marker-outro { background: #facc15 !important; box-shadow: 0 0 8px rgba(250, 204, 21, 0.38); }
+
+/* Familiar thumbnail-first player loading state */
+.watch-loading-youtube { display: block; padding: 0; background: #0f0f0f; }
+.watch-loading-thumbnail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.82; filter: saturate(0.88); }
+.watch-loading-thumbnail--empty { background: linear-gradient(135deg, #202124, #0f0f0f); }
+.watch-loading-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.82)); }
+.watch-loading-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.55); }
+.watch-loading-play { display: grid; width: 58px; height: 42px; margin-bottom: 14px; place-items: center; border-radius: 10px; background: rgba(255,255,255,0.94); box-shadow: 0 3px 14px rgba(0,0,0,0.28); }
+.watch-loading-play span { width: 0; height: 0; margin-left: 3px; border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-left: 14px solid #242424; }
+.watch-loading-label { font-size: 13px; font-weight: 650; }
+.watch-loading-episode { max-width: min(80%, 460px); margin-top: 5px; overflow: hidden; color: rgba(255,255,255,0.88); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.watch-loading-subtitle { margin-top: 10px; color: rgba(255,255,255,0.72); font-size: 11px; }
+.watch-loading-bottom { position: absolute; right: 16px; bottom: 14px; left: 16px; display: flex; align-items: center; gap: 9px; color: rgba(255,255,255,0.82); font-size: 10px; }
+.watch-loading-line { position: relative; display: block; flex: 1; height: 3px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,0.34); }
+.watch-loading-line i { display: block; width: 30%; height: 100%; border-radius: inherit; background: #fff; animation: watch-loading-progress 1.4s ease-in-out infinite; }
+.watch-loading-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
+.watch-loading-time { min-width: 25px; }
+.watch-loading-youtube .watch-loading-action { position: absolute; right: 16px; bottom: 42px; margin: 0; border-color: rgba(255,255,255,0.38); background: rgba(0,0,0,0.48); color: #fff; text-shadow: none; }
+@keyframes watch-loading-progress { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }
+@media (prefers-reduced-motion: reduce) { .watch-loading-line i { animation: none; width: 48%; } }
