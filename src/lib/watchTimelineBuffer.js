@@ -62,29 +62,6 @@ function getVideoRanges(video) {
 }
 
 /**
- * Merge two sets of { start, end } ranges, deduplicating overlapping entries.
- * Custom (Kiwi fragment) ranges are preferred when they overlap with native
- * video.buffered ranges so the indicator reflects the player's own tracking.
- */
-function mergeRanges(custom = [], native = []) {
-  const all = [...custom, ...native]
-    .filter((r) => r && Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start)
-    .sort((a, b) => a.start - b.start)
-  if (!all.length) return []
-  const merged = [{ ...all[0] }]
-  for (let i = 1; i < all.length; i += 1) {
-    const last = merged[merged.length - 1]
-    const cur = all[i]
-    if (cur.start <= last.end + 0.05) {
-      last.end = Math.max(last.end, cur.end)
-    } else {
-      merged.push({ ...cur })
-    }
-  }
-  return merged
-}
-
-/**
  * Install a passive visual cache layer behind ArtPlayer's played position and
  * seek marker. It never changes the video buffer or intercepts pointer input.
  */
@@ -102,12 +79,12 @@ export function createBufferedTimelineIndicator(video, progressInner, { getRange
 
   const render = () => {
     const mediaRanges = getVideoRanges(video)
-    // Always merge custom Kiwi fragment ranges with the native video.buffered
-    // ranges. Kiwi's proxy can expose the whole VOD through video.buffered
-    // even while only a few HLS fragments have arrived, so the native ranges
-    // are the most reliable source of truth for the indicator.
+    // Use custom Kiwi fragment ranges when populated — they reflect the
+    // actual downloaded fragments, not the proxy's misleading video.buffered
+    // which can report the entire VOD as cached. Fall back to native
+    // video.buffered only when no custom tracking is available.
     const customRanges = typeof getRanges === 'function' ? (getRanges() || []) : []
-    const ranges = mergeRanges(customRanges, mediaRanges)
+    const ranges = customRanges.length > 0 ? customRanges : mediaRanges
     const lastBufferedEnd = ranges.reduce((end, range) => Math.max(end, range.end), 0)
     const seekable = video.seekable
     const lastSeekableEnd = seekable && seekable.length
