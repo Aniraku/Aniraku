@@ -538,7 +538,7 @@ function CompactList({ items, label, emptyLabel = 'More titles will appear here 
 
 function Home() {
   const { data: homeData = {}, isFetched: homeDone } = useHomePageData()
-  const { trending = [], airing = [], upcoming = [], movies = [], topTV = [], schedule = [] } = homeData
+  const { trending = [], airing = [], upcoming = [], movies = [], finished = [], topTV = [], schedule = [] } = homeData
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
   const trendingList = useStreamable(filterAdult(trending, nsfwEnabled))
@@ -546,9 +546,7 @@ function Home() {
   const unreleasedList = useStreamable(filterAdult(upcoming, nsfwEnabled))
   const moviesList = useStreamable(filterAdult(movies, nsfwEnabled))
   const tvList = useStreamable(filterAdult(topTV, nsfwEnabled))
-  const finishedList = useMemo(() => uniqueMedia([...tvList, ...trendingList]
-    .filter((item) => item?.status === 'FINISHED'))
-    .slice(0, 6), [tvList, trendingList])
+  const finishedList = useStreamable(filterAdult(finished, nsfwEnabled)).slice(0, 6)
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [activeTab, setActiveTab] = useState('newest')
   const [activeScheduleDay, setActiveScheduleDay] = useState(0)
