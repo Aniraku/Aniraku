@@ -2194,12 +2194,12 @@ export default function Watch() {
         (candidate) => candidate.id === activeSource
       )
       const transportOverride = getProviderTransportOverride(selectedSource)
-      const bonkProxyOnly = Boolean(transportOverride?.proxyOnly)
-      // Browser-native media playback — proxy first, direct as fallback for
-      // normal providers. Per-provider transport overrides (e.g. the Bonk
-      // proxy-only rule) are resolved through `getProviderTransportOverride`
-      // so adding a new provider-level behavior never requires touching
-      // this function.
+      const bonkProxyFirst = Boolean(transportOverride?.proxyFirst)
+      // Browser-native media playback — direct first for normal providers,
+      // proxy first only for Bonk. Each failed media path remains bounded and
+      // the existing same-provider embed fallback handles eligible providers.
+      // Per-provider transport overrides are resolved through
+      // `getProviderTransportOverride`.
 
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
@@ -2208,7 +2208,7 @@ export default function Watch() {
 				verification: sourceVerification,
 				directUrl: url,
         proxyUrl: proxied(url),
-        proxyOnly: bonkProxyOnly,
+        proxyFirst: bonkProxyFirst,
       })
 	        let transportIndex = 0
 	        let hlsTried = false
