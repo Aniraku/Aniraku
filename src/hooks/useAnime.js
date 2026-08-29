@@ -9,9 +9,15 @@ async function browse(variables) {
 async function fetchHomePageData() {
   const now = Math.floor(Date.now() / 1000)
   const weekEnd = now + (7 * 24 * 60 * 60)
+  // Calculate date 3 months ago in AniList FuzzyDate format (YYYYMMDD)
+  const threeMonthsAgo = new Date()
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+  const finishedAfter = threeMonthsAgo.getFullYear() * 10000
+    + (threeMonthsAgo.getMonth() + 1) * 100
+    + threeMonthsAgo.getDate()
   const [metadata, scheduleData] = await Promise.all([
     anilistQuery(`
-    query {
+    query ($finishedAfter: FuzzyDateInt) {
       trending: Page(page: 1, perPage: 10) {
         media(type: ANIME, sort: TRENDING_DESC) {
           id title { romaji english native userPreferred }
@@ -44,6 +50,14 @@ async function fetchHomePageData() {
           format status episodes averageScore popularity genres isAdult
         }
       }
+      finished: Page(page: 1, perPage: 20) {
+        media(type: ANIME, status: FINISHED, sort: POPULARITY_DESC, endDate_greater: $finishedAfter) {
+          id title { romaji english native userPreferred }
+          coverImage { extraLarge large medium color }
+          bannerImage description(asHtml: false) nextAiringEpisode { episode airingAt }
+          format status episodes averageScore popularity genres isAdult endDate { year month day }
+        }
+      }
       topTV: Page(page: 1, perPage: 20) {
         media(type: ANIME, format: TV, sort: SCORE_DESC) {
           id title { romaji english native userPreferred }
@@ -53,7 +67,7 @@ async function fetchHomePageData() {
         }
       }
     }
-  `, {}),
+  `, { finishedAfter }),
     getAnirakuSchedule({ page: 1, perPage: 100, startAt: now, endAt: weekEnd }).catch((error) => {
       console.warn('Preview next-airing schedule is unavailable:', error)
       return { schedule: [] }
@@ -71,6 +85,7 @@ async function fetchHomePageData() {
     airing: withScheduledNextAiring(data.airing.media),
     upcoming: data.upcoming?.media || [],
     movies: withScheduledNextAiring(data.movies.media),
+    finished: data.finished?.media || [],
     topTV: withScheduledNextAiring(data.topTV.media),
     schedule,
   }
