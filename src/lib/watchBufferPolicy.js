@@ -1,21 +1,26 @@
 const MEBIBYTE = 1024 * 1024
 const TERMINAL_HLS_HTTP_STATUSES = new Set([401, 403, 404, 410, 429])
 
+// hls.js and dash.js default forward/backward buffer targets. We deliberately
+// do NOT pin maxBufferLength / maxMaxBufferLength / backBufferLength here —
+// the player manages its own MediaSource reserve based on the live segment
+// cadence, the connection profile, and the device's MSE budget. Pinning a
+// fixed ceiling either throttles smooth playback on fast links or lets a
+// slow stream blow past the intended reserve.
+const HLS_DEFAULT_FORWARD_BUFFER_SECONDS = 30
+const HLS_DEFAULT_BACK_BUFFER_SECONDS = 90
+
 /**
- * Returns bounded hls.js buffering settings. Media Source data is held in the
- * browser, so these values deliberately reserve meaningful forward playback
- * without allowing a low-bitrate stream to grow memory usage indefinitely.
+ * Returns the hls.js buffering settings we still want to control explicitly.
+ * Forward / max / back buffer length are intentionally left to hls.js
+ * defaults so the player can grow its MediaSource reserve freely; this
+ * function only pins the byte-level cap that protects device RAM.
  */
 export function getHlsBufferPolicy(_connection = {}) {
   return {
-    // A predictable VOD reserve: 120 seconds forward and 120 seconds behind
-    // the playhead. hls.js treats these as targets and still obeys browser MSE
-    // limits when a device cannot retain the complete target.
-    maxBufferLength: 120,
-    maxMaxBufferLength: 120,
+    // Byte cap only. No `maxBufferLength` / `maxMaxBufferLength` /
+    // `backBufferLength` here on purpose: hls.js owns the time-based reserve.
     maxBufferSize: 128 * MEBIBYTE,
-    backBufferLength: 120,
-    maxBufferHole: 0.75,
   }
 }
 
@@ -26,10 +31,10 @@ export function getHlsBufferPolicy(_connection = {}) {
  * not served from a stale playlist.
  */
 export function getHlsRequestCacheMode(context = {}) {
-  // MSE provides the explicit 120-second playback reserve. Forcing all VOD
-  // fragments into the browser HTTP cache made the full episode look buffered
-  // and could retain far more media than the player target. Normal caching
-  // honors the origin's headers and allows browser eviction.
+  // MSE provides its own playback reserve. Forcing all VOD fragments into the
+  // browser HTTP cache made the full episode look buffered and could retain
+  // far more media than the player target. Normal caching honors the origin's
+  // headers and allows browser eviction.
   return 'default'
 }
 
@@ -97,19 +102,19 @@ export function getNativeMediaBufferPolicy() {
 }
 
 /**
- * Express the same bounded connection-aware reserve through dash.js's forward
- * and backward buffer settings. Startup stays prompt while VOD keeps building
- * a meaningful reserve for smooth playback.
+ * Express the same no-fixed-cap policy through dash.js's forward and backward
+ * buffer settings. dash.js does not have a "default reserve" the way hls.js
+ * does, so we hand it the same forward/back values the hls.js default would
+ * have used and otherwise let it manage the MediaSource freely.
  */
-export function getDashBufferPolicy(connection = {}) {
-  const hls = getHlsBufferPolicy(connection)
+export function getDashBufferPolicy(_connection = {}) {
   return {
-    initialBufferLevel: Math.min(6, hls.maxBufferLength),
-    bufferTimeDefault: hls.maxBufferLength,
-    bufferTimeAtTopQuality: hls.maxBufferLength,
-    bufferTimeAtTopQualityLongForm: hls.maxBufferLength,
+    initialBufferLevel: Math.min(6, HLS_DEFAULT_FORWARD_BUFFER_SECONDS),
+    bufferTimeDefault: HLS_DEFAULT_FORWARD_BUFFER_SECONDS,
+    bufferTimeAtTopQuality: HLS_DEFAULT_FORWARD_BUFFER_SECONDS,
+    bufferTimeAtTopQualityLongForm: HLS_DEFAULT_FORWARD_BUFFER_SECONDS,
     longFormContentDurationThreshold: 600,
-    bufferToKeep: hls.backBufferLength,
+    bufferToKeep: HLS_DEFAULT_BACK_BUFFER_SECONDS,
     bufferPruningInterval: 15,
     fastSwitchEnabled: true,
   }
