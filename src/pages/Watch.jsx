@@ -2081,6 +2081,9 @@ export default function Watch() {
     bufferIndicatorCleanupRef.current = null
     timelineHoverCleanupRef.current?.cleanup?.()
     timelineHoverCleanupRef.current = null
+    // Release the per-source Kiwi fragment ledger with the player so episode
+    // changes and long binge sessions cannot retain old range arrays.
+    kiwiFragmentRangesRef.current = null
     cspViolationCleanupRef.current?.()
     cspViolationCleanupRef.current = null
     if (dashInstance.current) {
@@ -2839,18 +2842,28 @@ export default function Watch() {
                 if (Number.isFinite(start) && Number.isFinite(duration) && duration > 0) {
                   const end = start + duration
                   const ranges = kiwiFragmentRangesRef.current || []
-                  const next = [...ranges, { start, end }]
-                    .sort((a, b) => a.start - b.start)
-                    .reduce((merged, range) => {
-                      const previous = merged[merged.length - 1]
-                      if (previous && range.start <= previous.end + 0.05) {
-                        previous.end = Math.max(previous.end, range.end)
-                      } else {
-                        merged.push({ ...range })
-                      }
-                      return merged
-                    }, [])
-                  kiwiFragmentRangesRef.current = next
+                  // FRAG_BUFFERED can repeat after retries or quality changes.
+                  // Insert in order and merge in place instead of allocating
+                  // and sorting the whole ledger for every fragment.
+                  let insertAt = ranges.findIndex((range) => range.start > start)
+                  if (insertAt < 0) insertAt = ranges.length
+                  const previous = ranges[insertAt - 1]
+                  const next = ranges[insertAt]
+                  if (previous && start <= previous.end + 0.05) {
+                    previous.end = Math.max(previous.end, end)
+                    if (next && next.start <= previous.end + 0.05) {
+                      previous.end = Math.max(previous.end, next.end)
+                      ranges.splice(insertAt, 1)
+                    }
+                  } else if (next && end >= next.start - 0.05) {
+                    next.start = Math.min(next.start, start)
+                    next.end = Math.max(next.end, end)
+                  } else {
+                    ranges.splice(insertAt, 0, { start, end })
+                  }
+                  // Guard against malformed manifests emitting unbounded gaps.
+                  if (ranges.length > 4096) ranges.splice(0, ranges.length - 4096)
+                  kiwiFragmentRangesRef.current = ranges
                 }
               }
               if (playbackStarted) setBuffering(false)
