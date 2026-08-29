@@ -8,7 +8,7 @@ const ANILIST_MAX_RETRIES = 2
 // and enforces the budget before each fetch.
 const ANILIST_RATE_LIMIT = 20
 const ANILIST_WINDOW_MS = 60_000
-const ANILIST_MIN_GAP_MS = 3_000
+const ANILIST_MIN_GAP_MS = 1_500
 const requestTimestamps = []
 
 const anilistInFlight = new Map()
