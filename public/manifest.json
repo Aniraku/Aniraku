@@ -10,6 +10,26 @@
   "background_color": "#000000",
   "theme_color": "#000000",
   "categories": ["entertainment", "video", "anime", "streaming"],
+  "shortcuts": [
+    {
+      "name": "Search anime",
+      "short_name": "Search",
+      "url": "/search",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Browse catalog",
+      "short_name": "Catalog",
+      "url": "/catalog",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Airing schedule",
+      "short_name": "Schedule",
+      "url": "/schedule",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

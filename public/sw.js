@@ -1,5 +1,5 @@
 /* global self, caches */
-const VERSION = 'aniraku-shell-v5'
+const VERSION = 'aniraku-shell-v6'
 const CORE_ASSETS = [
   '/',
   '/manifest.json',
@@ -21,7 +21,8 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
+    Promise.resolve(self.registration.navigationPreload?.enable?.()).catch(() => {})
+      .then(() => caches.keys())
       .then((keys) => Promise.all(keys.filter((key) => key !== VERSION).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   )
@@ -34,7 +35,9 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
+      event.preloadResponse
+        .catch(() => undefined)
+        .then((preloaded) => preloaded || fetch(event.request))
         .then((response) => {
           if (response.ok) {
             const copy = response.clone()
