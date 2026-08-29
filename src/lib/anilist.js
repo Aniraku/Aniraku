@@ -1,6 +1,9 @@
 const DEFAULT_API_BASE = 'https://api.aniraku.tech'
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
+const ANILIST_BACKEND_FALLBACK = 'https://api.aniraku.tech/api/v1/anilist'
+const anilistInFlight = new Map()
+let directAniListBlockedUntil = 0
 
 export class AniListUnavailableError extends Error {
   constructor(message) {
@@ -16,18 +19,58 @@ function reportAniListStatus(unavailable) {
   window.dispatchEvent(new CustomEvent(ANILIST_STATUS_EVENT, { detail: { unavailable } }))
 }
 
-async function directAniListRequest(query, variables = {}) {
-  const response = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
+function retryAfterMs(response) {
+  const seconds = Number(response?.headers?.get?.('Retry-After'))
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds * 1000, 60_000) : 60_000
+}
+
+async function requestAniListEndpoint(endpoint, body) {
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ query, variables }),
+    body,
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok || payload?.errors?.length) {
-    const message = payload?.errors?.[0]?.message || `AniList is unavailable (${response.status}).`
-    throw new Error(message)
+    const error = new Error(payload?.errors?.[0]?.message || `AniList is unavailable (${response.status}).`)
+    error.status = response.status || Number(payload?.errors?.[0]?.status) || 0
+    error.retryAfterMs = retryAfterMs(response)
+    throw error
   }
   return payload
+}
+
+async function directAniListRequest(query, variables = {}) {
+  const body = JSON.stringify({ query, variables })
+  const requestKey = body
+  const existing = anilistInFlight.get(requestKey)
+  if (existing) return existing
+
+  const request = (async () => {
+    if (Date.now() < directAniListBlockedUntil) {
+      return requestAniListEndpoint(ANILIST_BACKEND_FALLBACK, body)
+    }
+    try {
+      return await requestAniListEndpoint(ANILIST_GRAPHQL_ENDPOINT, body)
+    } catch (error) {
+      // The public endpoint may reject the deployed origin with CORS or apply
+      // a shared-IP 429. Try the existing backend contract once so the page
+      // remains usable, while the cooldown prevents a browser retry storm.
+      const corsLike = error?.name === 'TypeError' || /failed to fetch|cors/i.test(error?.message || '')
+      const rateLimited = Number(error?.status) === 429
+      if (rateLimited || corsLike) {
+        if (rateLimited) directAniListBlockedUntil = Date.now() + (error.retryAfterMs || 60_000)
+        return requestAniListEndpoint(ANILIST_BACKEND_FALLBACK, body)
+      }
+      throw error
+    }
+  })()
+  anilistInFlight.set(requestKey, request)
+  try {
+    return await request
+  } finally {
+    anilistInFlight.delete(requestKey)
+  }
 }
 
 function titleFromSchedule(value) {
@@ -140,11 +183,11 @@ export async function anilistQuery(query, variables = {}) {
     return json
   } catch (error) {
     const message = error instanceof Error ? error.message : 'AniList is unavailable.'
-    if (/rate limit|temporarily unavailable|stability/i.test(message)) {
+    if (/rate limit|too many requests|temporarily unavailable|stability/i.test(message)) {
       reportAniListStatus(true)
-      throw new AniListUnavailableError('AniList is temporarily unavailable. Try again shortly.')
+      throw new AniListUnavailableError('AniList is rate-limited or temporarily unavailable. Please try again shortly.')
     }
-    console.warn('Direct AniList fetch failed:', error)
+    console.warn('AniList fetch failed after direct-first fallback:', error)
     throw error instanceof Error ? error : new Error(message)
   }
 }
