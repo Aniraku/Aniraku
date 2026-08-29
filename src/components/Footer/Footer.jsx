@@ -98,7 +98,7 @@ const Footer = ({ compact = true }) => {
           <CompactContent>
             <CompactBrand><Logo to="/" height={25} showText /><span>© 2026 Aniraku</span></CompactBrand>
             <CompactAttribution>
-              <img src={TMDB_LOGO_URL} alt="TMDB" />
+              <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer" aria-label="Visit the official TMDB website"><img src={TMDB_LOGO_URL} alt="TMDB" /></a>
               <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
             </CompactAttribution>
             <nav aria-label="Legal and support links">
@@ -124,7 +124,7 @@ const Footer = ({ compact = true }) => {
               Stream links are resolved from publicly available third-party sources at playback time.
             </F.Disclaimer>
             <F.TmdbAttribution>
-              <img src={TMDB_LOGO_URL} alt="TMDB" />
+              <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer" aria-label="Visit the official TMDB website"><img src={TMDB_LOGO_URL} alt="TMDB" /></a>
               <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
             </F.TmdbAttribution>
           <F.Socials>
@@ -186,7 +186,7 @@ const Footer = ({ compact = true }) => {
           <F.MobileLink as="a" href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">Report an issue</F.MobileLink>
         </F.MobileLinks>
         <F.TmdbAttribution>
-          <img src={TMDB_LOGO_URL} alt="TMDB" />
+          <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer" aria-label="Visit the official TMDB website"><img src={TMDB_LOGO_URL} alt="TMDB" /></a>
           <span>This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</span>
         </F.TmdbAttribution>
         <F.Copyright>&copy; 2026 Aniraku · AGPL-3.0 · No media hosting</F.Copyright>
