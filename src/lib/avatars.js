@@ -1,5 +1,5 @@
 /** Preset avatars hosted on the public Supabase Storage bucket "Anixen Avatars". */
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://sbjdrjaovcgvttfnpfsz.supabase.co'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const BUCKET = 'Anixen Avatars'
 
 const FILES = [
