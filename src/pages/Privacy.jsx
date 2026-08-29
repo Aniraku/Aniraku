@@ -55,7 +55,7 @@ const Privacy = () => {
       <p>Aniraku is not directed to children under 13, or the higher minimum age required in your jurisdiction. Do not create an account or submit personal information if you do not meet the applicable age requirement. A parent or guardian can contact the project about a child’s information.</p>
 
       <h2 id="contact">7. Contact and changes</h2>
-      <p>For privacy questions or deletion-related clarification, email <a href="mailto:privacy@aniraku.app">privacy@aniraku.app</a>. For a technical privacy bug, use the <a href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">private or appropriately redacted project issue path</a>; do not publish account tokens or private records.</p>
+      <p>For privacy questions or deletion-related clarification, email <a href="mailto:sho.islam0311@proton.me">sho.islam0311@proton.me</a>. For a technical privacy bug, use the <a href="https://github.com/Aniraku/Aniraku/issues" target="_blank" rel="noreferrer">private or appropriately redacted project issue path</a>; do not publish account tokens or private records.</p>
       <p>We may revise this policy when the product, providers, or legal requirements change. The revision date at the top of this page indicates which version you are reading.</p>
     </LegalPage>
   )
