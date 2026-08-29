@@ -69,24 +69,24 @@ export function getHlsLoadPolicies() {
       default: {
         maxTimeToFirstByteMs: 15_000,
         maxLoadTimeMs: 30_000,
-        timeoutRetry: retry(1, 750, 2_000),
-        errorRetry: retry(1, 1_000, 3_000),
+        timeoutRetry: retry(0, 750, 2_000),
+        errorRetry: retry(0, 1_000, 3_000),
       },
     },
     playlistLoadPolicy: {
       default: {
         maxTimeToFirstByteMs: 15_000,
         maxLoadTimeMs: 30_000,
-        timeoutRetry: retry(2, 750, 3_000),
-        errorRetry: retry(2, 1_000, 4_000),
+        timeoutRetry: retry(0, 750, 3_000),
+        errorRetry: retry(0, 1_000, 4_000),
       },
     },
     fragLoadPolicy: {
       default: {
         maxTimeToFirstByteMs: 15_000,
         maxLoadTimeMs: 90_000,
-        timeoutRetry: retry(2, 750, 3_000),
-        errorRetry: retry(3, 1_000, 6_000),
+        timeoutRetry: retry(0, 750, 3_000),
+        errorRetry: retry(0, 1_000, 6_000),
       },
     },
   }
