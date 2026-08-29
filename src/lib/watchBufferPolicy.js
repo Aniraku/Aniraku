@@ -19,15 +19,14 @@ const HLS_DEFAULT_BACK_BUFFER_SECONDS = 90
 export function getHlsBufferPolicy(_connection = {}, { kiwi = false } = {}) {
   if (kiwi) {
     return {
-      // Kiwi's uwucdn manifests use short fragments and can otherwise leave
-      // Chromium with only one or two fragments ahead of the playhead. Keep a
-      // real forward MSE reserve so playback can continue through a transient
-      // CDN/proxy delay instead of stalling after the first few seconds.
-      maxBufferLength: 180,
-      maxMaxBufferLength: 600,
-      backBufferLength: 120,
-      frontBufferFlushThreshold: 30,
-      maxBufferSize: 256 * MEBIBYTE,
+      // Kiwi's proxy previously used an oversized reserve that buffered much
+      // more than the other providers. Keep it close to the normal hls.js
+      // playback reserve while retaining a modest byte ceiling.
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      backBufferLength: 30,
+      frontBufferFlushThreshold: 15,
+      maxBufferSize: 128 * MEBIBYTE,
     }
   }
 
