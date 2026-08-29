@@ -1617,7 +1617,7 @@ export default function Watch() {
         return {
           id: key,
           label: name,
-          provider: name,
+          provider: family === 'flixcloud' ? 'flixcloud' : name,
           providerFamily: family,
           lang,
           initialSources: playableSources,
