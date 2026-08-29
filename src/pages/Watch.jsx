@@ -2147,13 +2147,17 @@ export default function Watch() {
 	      // Firing a low-cost HEAD now means `video.src = proxied(url)`
 	      // reuses a warm socket and the browser's HTTP cache is already
 	      // primed when the media element opens the same connection.
-	      if (typeof fetch === 'function') {
-	        try {
-	          // fire-and-forget: failures here must never block playback.
-	          fetch(proxied(streamUrl), { method: 'HEAD', mode: 'cors', cache: 'no-store' })
-	            .catch(() => {})
-	        } catch {}
-	      }
+      if (typeof fetch === 'function') {
+        const prewarm = (target, mode) => {
+          try {
+            // Fire-and-forget: failures must never block playback. Warm both
+            // transports so a direct fallback is not cold when the proxy fails.
+            fetch(target, { method: 'HEAD', mode, cache: 'no-store' }).catch(() => {})
+          } catch {}
+        }
+        prewarm(proxied(streamUrl), 'cors')
+        prewarm(streamUrl, 'no-cors')
+      }
 	      // hls.js pre-warm: the dynamic import is the single biggest
 	      // startup cost on the HLS path (parser compile + ~120KB of JS).
 	      // Triggering it here, in parallel with the ArtPlayer mount, lets
@@ -4062,81 +4066,43 @@ export default function Watch() {
             </div>
           )}
 
-          {/* Loading */}
+          {/* Cute startup overlay: source discovery stays visible, but never blocks the first playable proxy. */}
           {effectiveEpisodeAvailability !== 'upcoming' && streamLoading && (
-            <div
-              className="watch-loading"
-              role="status"
-              aria-live="polite"
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(0,0,0,0.55)',
-                color: '#e2e8f0',
-                zIndex: 4,
-                textAlign: 'center',
-                padding: 20,
-              }}
-            >
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 44,
-                  height: 44,
-                  border: '3px solid rgba(226,232,240,0.25)',
-                  borderTopColor: '#e2e8f0',
-                  borderRadius: '50%',
-                  animation: PREFERS_REDUCED_MOTION
-                    ? 'none'
-                    : 'watch-spin 800ms linear infinite',
-                  marginBottom: 12,
-                }}
-              />
-              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>
-                {slowStream ? 'Stream taking longer than expected…' : 'Preparing playback and finding available servers…'}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>
-                {slowStream ? 'Server is waking up or network is congested.' : 'Establishing secure stream connection.'}
-              </div>
-              {slowStream && (
-                <div style={{ marginTop: 4, fontSize: 12, color: '#fbbf24', background: 'rgba(251,191,36,0.1)', padding: '6px 12px', borderRadius: 8 }}>
-                  Tip: Switch servers or use the recovery options below if playback does not start.
+            <div className="watch-loading" role="status" aria-live="polite">
+              <div className="watch-loading-card">
+                <div className="watch-loading-orbit" aria-hidden="true">
+                  <span className="watch-loading-orbit-dot" />
+                  <span className="watch-loading-orbit-dot watch-loading-orbit-dot--two" />
+                  <span className="watch-loading-face">{slowStream ? '｡•́︿•̀｡' : '•ᴗ•'}</span>
                 </div>
-              )}
-              {slowStream && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const sources = [...SOURCES.sub, ...SOURCES.dub]
-                    const others = sources.filter(
-                      (s) => s.id !== activeSource
-                    )
-                    if (others.length > 0) {
-                      handleSourceSwitch(others[0].id)
-                    } else {
-                      loadStream(activeSource, true)
-                    }
-                  }}
-                  style={{
-                    marginTop: 12,
-                    padding: '8px 16px',
-                    background: 'rgba(226,232,240,0.12)',
-                    color: '#e2e8f0',
-                    border: '1px solid rgba(226,232,240,0.2)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    minHeight: 40,
-                  }}
-                >
-                  Try another server
-                </button>
-              )}
+                <div className="watch-loading-kicker">STREAM LAB · {currentSource?.label || 'PLAYER'}</div>
+                <div className="watch-loading-title">
+                  {slowStream ? 'The stream is putting on its shoes…' : 'Finding the speediest stream…'}
+                </div>
+                <div className="watch-loading-copy">
+                  {slowStream
+                    ? 'The fastest verified source is being nudged awake. Direct or proxy, no embeds, no drama.'
+                    : 'Checking the fastest direct/proxy path and starting the player as soon as it is ready.'}
+                </div>
+                <div className="watch-loading-meter" aria-hidden="true"><span /></div>
+                <div className="watch-loading-status">
+                  {slowStream ? 'Still negotiating with the CDN' : 'Direct + proxy handshake in progress'}
+                </div>
+                {slowStream && (
+                  <button
+                    type="button"
+                    className="watch-loading-action"
+                    onClick={() => {
+                      const sources = [...SOURCES.sub, ...SOURCES.dub]
+                      const others = sources.filter((s) => s.id !== activeSource)
+                      if (others.length > 0) handleSourceSwitch(others[0].id)
+                      else loadStream(activeSource, true)
+                    }}
+                  >
+                    Try another server
+                  </button>
+                )}
+              </div>
             </div>
           )}
 

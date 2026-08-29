@@ -1,13 +1,20 @@
-export function createMediaTransportPlan({ verification, directUrl, proxyUrl, proxyOnly = false }) {
-  const direct = { mode: 'direct', url: directUrl }
-  const proxy = { mode: 'proxy', url: proxyUrl }
-  if (proxyOnly) return [proxy]
+function usableUrl(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : ''
+}
 
-  // Keep the established proxy-first startup path for every source, including
-  // advisory-unverified Kiwi HLS URLs. Some Kiwi CDNs require the resolver's
-  // Referer/header context during the initial manifest request; direct browser
-  // playback remains the one bounded fallback if that proxy attempt fails.
-  return [proxy, direct]
+export function createMediaTransportPlan({ verification, directUrl, proxyUrl, proxyOnly = false }) {
+  const direct = usableUrl(directUrl) ? { mode: 'direct', url: usableUrl(directUrl) } : null
+  const proxy = usableUrl(proxyUrl) ? { mode: 'proxy', url: usableUrl(proxyUrl) } : null
+  if (proxyOnly) return proxy ? [proxy] : direct ? [direct] : []
+
+  // Fastest verified startup rule: the resolver's first proxy URL is the
+  // primary transport because it preserves provider headers and avoids an
+  // extra browser CORS negotiation. The direct URL is a single bounded
+  // fallback, never a second parallel player or an embed detour.
+  // `verification` is intentionally accepted for the resolver contract; the
+  // first proxy remains authoritative when it is present, including Bonk.
+  void verification
+  return [proxy, direct].filter(Boolean)
 }
 
 export function shouldTryHlsFallback(url) {
