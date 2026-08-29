@@ -11,18 +11,18 @@ const common = {
 }
 
 assert.deepEqual(createMediaTransportPlan({ ...common, verification: 'unverified' }), [
-  { mode: 'proxy', url: common.proxyUrl },
   { mode: 'direct', url: common.directUrl },
+  { mode: 'proxy', url: common.proxyUrl },
 ])
 assert.deepEqual(createMediaTransportPlan({ ...common, verification: 'proxy' }), [
+  { mode: 'direct', url: common.directUrl },
+  { mode: 'proxy', url: common.proxyUrl },
+])
+assert.deepEqual(createMediaTransportPlan({ ...common, proxyFirst: true }), [
   { mode: 'proxy', url: common.proxyUrl },
   { mode: 'direct', url: common.directUrl },
 ])
-assert.deepEqual(createMediaTransportPlan({ ...common, verification: '' }), [
-  { mode: 'proxy', url: common.proxyUrl },
-  { mode: 'direct', url: common.directUrl },
-])
-assert.deepEqual(createMediaTransportPlan({ ...common, proxyOnly: true }), [
+assert.deepEqual(createMediaTransportPlan({ directUrl: '', proxyUrl: common.proxyUrl }), [
   { mode: 'proxy', url: common.proxyUrl },
 ])
 

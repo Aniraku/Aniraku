@@ -16,13 +16,11 @@ import { isBonkProvider } from './watchProviderDiscovery.js'
 
 export const PROVIDER_PLAYBACK_RULES = Object.freeze([
   Object.freeze({
-    name: 'bonkProxyOnly',
-    // Bonk's embedded player is unreliable and its direct media URLs are
-    // frequently gated by anti-bot checks that browsers can't satisfy.
-    // Always route Bonk's HLS/MP4 sources through the proxy and never fall
-    // through to direct browser playback or its iframe embed fallback.
+    name: 'bonkProxyFirst',
+    // Bonk prefers the proxy because its provider headers and anti-bot checks
+    // are more reliable there, but direct playback remains the bounded fallback.
     predicate: isBonkProvider,
-    transport: Object.freeze({ proxyOnly: true }),
+    transport: Object.freeze({ proxyFirst: true }),
   }),
 ])
 
