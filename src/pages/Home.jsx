@@ -18,7 +18,7 @@ import { filterAdult, useNsfw, useStreamable } from '../hooks/useNsfw'
 import { setHomepageSEO } from '../lib/seo'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
+import { anilistBatchDetail } from '../lib/anilist'
 import { generateSlug } from '../lib/slug'
 import { createHomeScheduleDays, groupHomeScheduleRows, initialPopulatedScheduleDayIndex } from '../lib/homeSchedule'
 import { API_BASE } from '../config'
@@ -589,13 +589,16 @@ function Home() {
       let lastKnown = {}
       try { lastKnown = JSON.parse(localStorage.getItem('aniraku-episode-track') || '{}') || {} } catch { /* stale storage is non-fatal */ }
       const now = Date.now()
-      bookmarks.forEach((bookmark) => {
-        if (lastKnown[bookmark.id] && now - lastKnown[bookmark.id].t < 21600000) return
-        anilistQuery(ANIME_DETAIL_QUERY, { id: bookmark.id }).then(({ data }) => {
-          const media = data?.Media
-          if (!media || media.status !== 'RELEASING' || cancelled) return
+      const toCheck = bookmarks.filter((bookmark) => !lastKnown[bookmark.id] || now - lastKnown[bookmark.id].t >= 21600000)
+      if (toCheck.length) {
+        const idsToFetch = toCheck.map((b) => b.id)
+        const batchResult = await anilistBatchDetail(idsToFetch)
+        for (const bookmark of toCheck) {
+          if (cancelled) return
+          const media = batchResult[bookmark.id]
+          if (!media || media.status !== 'RELEASING') continue
           const episode = media.nextAiringEpisode?.episode ? media.nextAiringEpisode.episode - 1 : (media.episodes || 0)
-          if (episode <= (lastKnown[bookmark.id]?.e || 0)) return
+          if (episode <= (lastKnown[bookmark.id]?.e || 0)) continue
           fetch(`${API_BASE}/api/v1/anime/${bookmark.id}/episodes`)
             .then((response) => response.ok ? response.json() : Promise.reject())
             .then(async (payload) => {
@@ -611,8 +614,8 @@ function Home() {
               if (insertError && insertError.code !== '23505') return
             })
             .catch(() => {})
-        }).catch(() => {})
-      })
+        }
+      }
     }
     checkForNewEpisodes()
     return () => { cancelled = true }

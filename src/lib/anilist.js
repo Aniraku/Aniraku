@@ -322,3 +322,31 @@ export const SCHEDULE_QUERY = `
     }
   }
 `
+
+// Fetch multiple anime by ID in a single request.  AniList caps perPage at 50,
+// but bookmark lists rarely exceed that.  Each ID produces its own alias so the
+// response shape mirrors ANIME_DETAIL_QUERY per entry.
+export async function anilistBatchDetail(ids) {
+  const safeIds = (Array.isArray(ids) ? ids : []).filter((id) => Number.isInteger(id) && id > 0).slice(0, 50)
+  if (!safeIds.length) return {}
+  const variables = {}
+  const fields = safeIds.map((id, i) => {
+    variables[`id${i}`] = id
+    return `m${i}: Media(id: $id${i}, type: ANIME) {
+      id status episodes nextAiringEpisode { episode airingAt }
+    }`
+  })
+  const query = `query (${safeIds.map((_, i) => `$id${i}: Int!`).join(', ')}) { ${fields.join('\n')} }`
+  try {
+    const json = await directAniListRequest(query, variables)
+    reportAniListStatus(false)
+    const result = {}
+    safeIds.forEach((id, i) => {
+      result[id] = json?.data?.[`m${i}`] || null
+    })
+    return result
+  } catch (error) {
+    console.warn('AniList batch detail failed:', error)
+    return {}
+  }
+}

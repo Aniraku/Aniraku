@@ -1754,6 +1754,7 @@ export default function Watch() {
           }).catch(() => ({ data: null }))
           if (data?.Media) {
             animeData = { ...data.Media, id: animeId }
+            anilistSeoHydratedRef.current = String(animeId)
             if (
               !epData?.episodes?.length &&
               data.Media.episodes
