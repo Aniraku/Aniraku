@@ -26,7 +26,7 @@ const Dmca = () => {
       <p>When a valid concern identifies a specific Aniraku-controlled page, metadata record, resolver path, comment, profile, or other project-controlled surface, we can review what the client or service exposes and may restrict, correct, or remove that surface where appropriate.</p>
 
       <h2 id="notice">2. What to include in a copyright notice</h2>
-      <p>Send a notice to <a href="mailto:dmca@aniraku.app">dmca@aniraku.app</a>. This inbox is for Aniraku-controlled pages, metadata, resolver paths, and community content. It cannot remove files from an unrelated third-party host. If email delivery is unavailable, use a private contact route from the project maintainers; do not post personal legal documents or private contact information in a public GitHub issue.</p>
+      <p>Send a notice to <a href="mailto:sho.islam0311@proton.me">sho.islam0311@proton.me</a>. This inbox is for Aniraku-controlled pages, metadata, resolver paths, and community content. It cannot remove files from an unrelated third-party host. If email delivery is unavailable, use a private contact route from the project maintainers; do not post personal legal documents or private contact information in a public GitHub issue.</p>
       <p>A useful notice should include all of the following:</p>
       <ol>
         <li>Your name, organization, and contact information.</li>
