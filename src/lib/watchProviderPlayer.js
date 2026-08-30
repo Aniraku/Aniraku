@@ -12,7 +12,7 @@
 // sources that match this rule.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { isBonkProvider } from './watchProviderDiscovery.js'
+import { isBonkProvider, isPeweProvider } from './watchProviderDiscovery.js'
 
 export const PROVIDER_PLAYBACK_RULES = Object.freeze([
   Object.freeze({
@@ -21,6 +21,13 @@ export const PROVIDER_PLAYBACK_RULES = Object.freeze([
     // frequently gated by anti-bot checks that browsers cannot satisfy.
     predicate: isBonkProvider,
     transport: Object.freeze({ proxyOnly: true }),
+  }),
+  Object.freeze({
+    name: 'peweDirect',
+    // Pewe sources play directly in the browser — no iframe needed.
+    // Bypass embed fallback and use direct/native playback.
+    predicate: isPeweProvider,
+    transport: Object.freeze({ directPreferred: true }),
   }),
 ])
 

@@ -72,6 +72,7 @@ import {
 import {
   filterBrowserProviders,
   isBonkProvider,
+  isPeweProvider,
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
@@ -2204,8 +2205,10 @@ export default function Watch() {
       )
       const transportOverride = getProviderTransportOverride(selectedSource)
       const bonkProxyOnly = Boolean(transportOverride?.proxyOnly)
+      const peweDirectPreferred = Boolean(transportOverride?.directPreferred)
       // Legacy playback path: proxy first for every provider, with one bounded
       // direct fallback. Bonk remains proxy-only under its provider rule.
+      // Pewe prefers direct/native playback without embed fallback.
       // Per-provider transport overrides are resolved through
       // `getProviderTransportOverride`.
 
@@ -2217,6 +2220,7 @@ export default function Watch() {
 				directUrl: url,
         proxyUrl: proxied(url),
         proxyOnly: bonkProxyOnly,
+        directPreferred: peweDirectPreferred,
       })
 	        let transportIndex = 0
 	        let hlsTried = false
@@ -2528,6 +2532,7 @@ export default function Watch() {
 					verification: sourceVerification,
 					directUrl: url,
 					proxyUrl: proxiedH(url),
+					directPreferred: peweDirectPreferred,
 				})
 				let hlsTransportIndex = 0
 		          const updateNativeHlsQualities = async () => {
@@ -3311,7 +3316,7 @@ export default function Watch() {
       setShowEndedOverlay(false)
 
       const createSameProviderFailureHandler = (payload) => {
-        const embedFallback = !isBonkProvider(source) ? chooseBrowserPlayableEmbed(
+        const embedFallback = (!isBonkProvider(source) && !isPeweProvider(source)) ? chooseBrowserPlayableEmbed(
           payload?.sources,
           isBrowserPlayableEmbedSource
         ) : null
@@ -3363,7 +3368,7 @@ export default function Watch() {
             // here destroys active playback and caused Pewe/Bonk/Kiwi loops.
             return
           }
-          const cachedEmbed = !isBonkProvider(source)
+          const cachedEmbed = (!isBonkProvider(source) && !isPeweProvider(source))
             ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
             : null
 	          if (cachedEmbed) {
@@ -3478,7 +3483,7 @@ export default function Watch() {
         const firstSource = data.sources[0]
         const qualityList = buildQualityList(data.sources, suppressedQualityUrls)
         if (qualityList.length === 0) {
-          const verifiedEmbed = !isBonkProvider(source)
+          const verifiedEmbed = (!isBonkProvider(source) && !isPeweProvider(source))
             ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
             : null
           if (verifiedEmbed) {
@@ -5237,8 +5242,8 @@ export default function Watch() {
           height: 3px;
           transform: translateY(-50%);
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.28);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.55);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
         }
         .watch-art-mount .art-progress-loaded {
           display: none !important;
