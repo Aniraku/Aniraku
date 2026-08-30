@@ -1605,20 +1605,14 @@ export default function Watch() {
         seen.add(key)
         const initialSources = Array.isArray(server?.sources) ? server.sources : []
         const mediaSources = initialSources.filter((source) => {
-          // Verification is an advisory snapshot. Keep usable non-embed URLs
-          // even when the list response says "dead" so the provider remains
-          // available for the stream endpoint's fresh response and failover.
           return getSourcePlaybackType(source) !== 'embed' && source?.url && !hasExpiredEmbeddedToken(source.url)
         })
         const embedSources = initialSources.filter(isPlayableEmbedSource)
         const playableSources = [...mediaSources, ...embedSources]
-        // Keep provider rows even when this resolver response has no sources.
-        // A later retry can hydrate the same provider, and the UI should not
-        // make it disappear while other providers are still resolving.
         return {
           id: key,
           label: name,
-          provider: family === 'flixcloud' ? 'flixcloud' : name,
+          provider: (family === 'flixcloud' || family === 'anikoto') ? family : name,
           providerFamily: family,
           lang,
           initialSources: playableSources,
