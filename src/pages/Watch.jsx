@@ -425,6 +425,10 @@ function isKiwiEmbedUrl(url) {
 	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
 }
 
+function isSandboxBlockedEmbed(url) {
+	return /megaplay\.(buzz|site|top|xyz|pro|club|cc|live)/i.test(String(url || ''))
+}
+
 function getSourceVerification(source) {
 	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
@@ -4112,7 +4116,7 @@ export default function Watch() {
               ref={embedFrameRef}
               title="Anime embedded player"
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              sandbox={isKiwiEmbedUrl(activeEmbedUrl) ? undefined : 'allow-forms allow-modals allow-pointer-lock allow-presentation allow-popups allow-same-origin allow-scripts'}
+              sandbox={isKiwiEmbedUrl(activeEmbedUrl) || isSandboxBlockedEmbed(activeEmbedUrl) ? undefined : 'allow-forms allow-modals allow-pointer-lock allow-presentation allow-popups allow-same-origin allow-scripts'}
               referrerPolicy="no-referrer-when-downgrade"
               style={{
                 position: 'absolute',
