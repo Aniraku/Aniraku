@@ -18,6 +18,13 @@ export function isBonkProvider(server) {
   return values.some((value) => /(^|[:\s_-])bonk($|[:\s_-])/.test(value))
 }
 
+export function isPeweProvider(server) {
+  const values = [server?.name, server?.provider, server?.label, server?.id]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean)
+  return values.some((value) => /(^|[:\s_-])pewe($|[:\s_-])/.test(value))
+}
+
 function isNativeBonkSource(source) {
   const rawUrl = typeof source === 'string' ? source : source?.url
   const url = String(rawUrl || '').trim()
@@ -31,6 +38,21 @@ function isNativeBonkSource(source) {
 
 export function bonkHasDirectOrProxySource(server) {
   return Array.isArray(server?.sources) && server.sources.some(isNativeBonkSource)
+}
+
+function isNativePeweSource(source) {
+  const rawUrl = typeof source === 'string' ? source : source?.url
+  const url = String(rawUrl || '').trim()
+  if (!url) return false
+  const rawType = String(typeof source === 'string' ? '' : source?.type || source?.mime || '').toLowerCase()
+  const verification = String(typeof source === 'string' ? '' : source?.verification || source?.Verification || '').toLowerCase()
+  if (verification === 'dead') return false
+  return !/(^|\s)(embed|iframe|page)(\s|$)/.test(rawType)
+    && !/(?:\/embed(?:[/?]|$)|\/e\/|iframe)/i.test(url)
+}
+
+export function peweHasDirectOrProxySource(server) {
+  return Array.isArray(server?.sources) && server.sources.some(isNativePeweSource)
 }
 
 function serverHasSource(server) {
@@ -47,12 +69,15 @@ export function filterBrowserProviders(servers = []) {
     // when its resolver supplied direct or proxy-capable media; every other
     // provider retains the established Direct → Proxy → Embed behavior.
     .filter((server) => !isBonkProvider(server) || bonkHasDirectOrProxySource(server))
+    // Pewe plays directly in the browser. Only show when it has a native source.
+    .filter((server) => !isPeweProvider(server) || peweHasDirectOrProxySource(server))
   // Bonk may expose a direct/proxy source but still be unable to start for a
   // particular episode. Do not let Bonk alone hide Ally: the user can then
   // manually choose Ally's verified embedded fallback. Ally is still hidden
   // when another non-Bonk, non-deprioritized provider has a real source.
   const hasNonBonkPlayableAlternative = candidates.some((server) => (
     !isBonkProvider(server)
+      && !isPeweProvider(server)
       && !BROWSER_DEPRIORITIZED_PROVIDER_NAMES.has(serverName(server))
       && serverHasSource(server)
   ))
