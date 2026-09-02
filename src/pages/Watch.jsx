@@ -20,6 +20,7 @@ import {
   FaStar,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
+import { fetchAnimeEpisodes } from '../lib/episodeApi'
 import HomemadeAppleUrl from '../assets/fonts/Homemade-Apple.ttf'
 import ButterflyKidsUrl from '../assets/fonts/Butterfly-Kids.ttf'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
@@ -2201,33 +2202,18 @@ export default function Watch() {
           animeRes = null
         }
         if (cancelled) return
-        // Fetch episodes with plain fetch (same path as AnimeDetail – no fetchWithRetry wrapper)
+        // Use the configured API first, then call the public Aniraku API
+        // directly if VITE_API_URL is missing or unavailable. The complete
+        // response, including thumbnails, is retained for normalization.
         try {
-          const epResponse = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(animeId)}/episodes`, {
+          const episodes = await fetchAnimeEpisodes(animeId, {
             signal: epController.signal,
-            headers: { Accept: 'application/json' },
             cache: 'no-store',
           })
-          if (!epResponse.ok) throw new Error(`episodes ${epResponse.status}`)
-          const payload = await epResponse.json()
-          epRes = payload
+          epRes = { episodes }
         } catch (epErr) {
-          if (epErr?.name === 'AbortError' || cancelled) {
-            // outer catch will handle – keep epRes null to trigger fallbacks
-            epRes = { episodes: [] }
-          } else {
-            // One retry with fetchWithRetry as fallback
-            try {
-              const r2 = await fetchWithRetry(
-                `${API_BASE}/api/v1/anime/${animeId}/episodes`,
-                { method: 'GET' },
-                { maxRetries: 1, timeoutMs: 180_000 }
-              )
-              epRes = r2 ? await r2.json().catch(() => ({ episodes: [] })) : { episodes: [] }
-            } catch {
-              epRes = { episodes: [] }
-            }
-          }
+          if (epErr?.name === 'AbortError' || cancelled) epRes = { episodes: [] }
+          else epRes = { episodes: [] }
         }
         if (cancelled) return
         let animeData = animeRes

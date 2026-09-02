@@ -14,8 +14,7 @@ import styled from 'styled-components'
 import { AnimeDetailSkeleton } from '../components/Skeletons/Skeletons'
 import { setAnimeDetailSEO } from '../lib/seo'
 import { historyEntryKey, subscribeToWatchHistory } from '../lib/watchHistory'
-import { API_BASE } from '../config'
-import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
+import { fetchAnimeEpisodes } from '../lib/episodeApi'
 
 const EPISODE_RETRY_BASE_MS = 1_500
 const EPISODE_RETRY_MAX_MS = 15_000
@@ -795,13 +794,7 @@ const AnimeDetail = () => {
 
     const loadEpisodes = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(id)}/episodes`, {
-          signal: controller.signal,
-          headers: { Accept: 'application/json' },
-        })
-        if (!response.ok) throw new Error(`Aniraku episode API returned ${response.status}`)
-        const payload = await response.json()
-        const sourceEpisodes = Array.isArray(payload) ? payload : payload?.episodes
+        const sourceEpisodes = await fetchAnimeEpisodes(id, { signal: controller.signal })
         if (!Array.isArray(sourceEpisodes)) throw new Error('Aniraku episode API returned an invalid response')
         const directEpisodes = sourceEpisodes.filter(Boolean).map((episode, index) => ({
           ...episode,
@@ -812,20 +805,9 @@ const AnimeDetail = () => {
           recap: Boolean(episode.recap),
         }))
         if (!directEpisodes.length) throw new Error('Aniraku episode API returned no episodes')
-        // Preserve canonical availability data and request exact TMDB display
-        // metadata in bounded batches. This ref avoids serializing episode
-        // availability behind general metadata while retaining source artwork
-        // and the verified movie-title fallback.
-        const fallback = episodeFallbackRef.current
-        const verifiedEpisodes = await enrichEpisodesWithTmdb(id, directEpisodes, {
-          signal: controller.signal,
-          fallbackThumbnail: fallback.thumbnail,
-          fallbackTitle: fallback.title,
-          isMovie: fallback.isMovie,
-        })
         if (!cancelled) {
           retryAttempt = 0
-          setEpisodes(verifiedEpisodes)
+          setEpisodes(directEpisodes)
           setEpisodesLoading(false)
         }
       } catch (error) {

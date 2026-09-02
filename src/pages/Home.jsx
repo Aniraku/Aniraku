@@ -22,6 +22,7 @@ import { anilistBatchDetail } from '../lib/anilist'
 import { generateSlug } from '../lib/slug'
 import { createHomeScheduleDays, groupHomeScheduleRows, initialPopulatedScheduleDayIndex } from '../lib/homeSchedule'
 import { API_BASE } from '../config'
+import { fetchAnimeEpisodes } from '../lib/episodeApi'
 
 const Page = styled.main`
   min-height: 100vh;
@@ -597,10 +598,8 @@ function Home() {
           if (!media || media.status !== 'RELEASING') continue
           const episode = media.nextAiringEpisode?.episode ? media.nextAiringEpisode.episode - 1 : (media.episodes || 0)
           if (episode <= (lastKnown[bookmark.id]?.e || 0)) continue
-          fetch(`${API_BASE}/api/v1/anime/${bookmark.id}/episodes`)
-            .then((response) => response.ok ? response.json() : Promise.reject())
-            .then(async (payload) => {
-              const episodes = Array.isArray(payload) ? payload : payload?.episodes
+          fetchAnimeEpisodes(bookmark.id)
+            .then(async (episodes) => {
               const hasEpisode = Array.isArray(episodes) && episodes.some((item, index) => Number(item?.number ?? index + 1) === episode)
               if (!hasEpisode || cancelled) return
               const message = `Episode ${episode} of ${bookmark.title} is now available`

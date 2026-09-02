@@ -7,8 +7,8 @@ const source = readFileSync(
 )
 
 assert.match(source, /const \[episodesLoading, setEpisodesLoading\] = useState\(false\)/)
-assert.match(source, /\$\{API_BASE\}\/api\/v1\/anime\/\$\{encodeURIComponent\(id\)\}\/episodes/)
-assert.match(source, /Array\.isArray\(payload\) \? payload : payload\?\.episodes/)
+assert.match(source, /fetchAnimeEpisodes\(id, \{ signal: controller\.signal \}\)/)
+assert.match(source, /thumbnail: episode\.thumbnail \|\| episode\.image \|\| ''/)
 assert.match(source, /Aniraku episode API returned no episodes/)
 assert.match(source, /const EPISODE_RETRY_BASE_MS = 1_500/)
 assert.match(source, /const EPISODE_RETRY_MAX_MS = 15_000/)
