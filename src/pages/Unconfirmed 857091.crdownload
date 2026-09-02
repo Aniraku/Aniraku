@@ -619,8 +619,13 @@ function syncArtPlayerSetting(art, name, value, label) {
     setting.selector.forEach((option) => {
       const selected = String(option.value) === String(value)
       option.default = selected
-      if (option.$item) option.$item.classList.toggle('art-current', selected)
+      const controlItem = option.$control_item || option.$item
+      if (controlItem) controlItem.classList.toggle('art-current', selected)
     })
+    const selectedOption = setting.selector.find((option) => String(option.value) === String(value))
+    if (selectedOption && art?.setting?.check) {
+      try { art.setting.check(selectedOption) } catch {}
+    }
   }
 }
 
@@ -850,6 +855,14 @@ function seekControlHtml(direction) {
     ? 'M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8'
     : 'M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8z'
   return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="currentColor"/><text x="12" y="15.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="5.6" font-weight="800" fill="currentColor">10</text></svg></span>`
+}
+
+function ccControlHtml() {
+  return `<span class="watch-art-cc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="14.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-weight="800" fill="currentColor">CC</text></svg></span>`
+}
+
+function downloadControlHtml() {
+  return `<span class="watch-art-download-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 17v2c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
 }
 
 function formatAiringDate(unixTimestamp) {
@@ -1523,9 +1536,47 @@ export default function Watch() {
   const autoNextEmbedRef = useRef(autoNextEmbed)
   autoNextEmbedRef.current = autoNextEmbed
 
-  // Embed playback tracking — silent background progress + auto-next.
+  // Embed playback tracking — audio-aware timer + auto-next.
   const embedStartTimeRef = useRef(null)
   const embedAutoNextFiredRef = useRef(false)
+  const embedPausedRef = useRef(false)
+  const embedAccumulatedRef = useRef(0)
+  const embedLastTickRef = useRef(null)
+  const embedVideoTimeRef = useRef(0)
+  const embedHasRealTimeRef = useRef(false)
+  const [embedPaused, setEmbedPaused] = useState(false)
+  const toggleEmbedPaused = useCallback(() => {
+    setEmbedPaused((prev) => {
+      const next = !prev
+      embedPausedRef.current = next
+      if (!next) embedLastTickRef.current = Date.now()
+      return next
+    })
+  }, [])
+
+  // CC panel + download
+  const [showCCPanel, setShowCCPanel] = useState(false)
+  const showCCPanelRef = useRef(showCCPanel)
+  showCCPanelRef.current = showCCPanel
+  const currentDownloadUrlRef = useRef('')
+  const subtitleTracksRef = useRef([])
+  const switchSubtitleTrackRef = useRef(null)
+  const downloadUrlSourceRef = useRef('')
+  // Force re-render for CC style changes
+  const [, forceCCUpdate] = useState(0)
+  const handleCCStyleChange = useCallback((key, value) => {
+    setSubtitlePreference(key, value)
+    const art = artInstance.current
+    if (art) applySubtitleStyle(art, subtitlePreferencesRef.current)
+    forceCCUpdate((n) => n + 1)
+  }, [])
+  const handleCCTrackChange = useCallback((url) => {
+    const track = url === 'off' ? null : (subtitleTracksRef.current || []).find((t) => t.url === url) || null
+    const fn = switchSubtitleTrackRef.current
+    if (typeof fn === 'function') fn(track)
+    else setSubtitlePreference('track', url === 'off' ? 'off' : url)
+    forceCCUpdate((n) => n + 1)
+  }, [])
 
   const applySkipSegments = useCallback((incoming) => {
     const merged = mergeSkipSegments(skipSegmentsRef.current, incoming)
@@ -1994,6 +2045,7 @@ export default function Watch() {
           lang,
           initialSources: playableSources,
           headers: server?.headers || {},
+          downloads: server?.downloads || [],
         }
 
       }).filter(Boolean)
@@ -2112,20 +2164,54 @@ export default function Watch() {
     let cancelled = false
     let attempts = 0
 
+    // Episodes use plain fetch like AnimeDetail (proven reliable) – decoupled from anime fetch.
+    const epController = new AbortController()
     const run = async () => {
       try {
-        const [animeRes, epRes] = await Promise.all([
-          fetchWithRetry(
+        let animeRes = null
+        let epRes = null
+        // Fetch anime metadata (tolerate failure – episodes are independent)
+        try {
+          const animeResp = await fetchWithRetry(
             `${API_BASE}/api/v1/anime/${animeId}`,
             { method: 'GET' },
             { maxRetries: 2, timeoutMs: 12_000 }
-          ).then((r) => (r ? r.json() : null)),
-          fetchWithRetry(
-            `${API_BASE}/api/v1/anime/${animeId}/episodes`,
-            { method: 'GET' },
-            { maxRetries: 2, timeoutMs: 180_000 }
-          ).then((r) => (r ? r.json() : { episodes: [] })),
-        ])
+          )
+          if (!cancelled && animeResp) {
+            animeRes = await animeResp.json().catch(() => null)
+          }
+        } catch {
+          animeRes = null
+        }
+        if (cancelled) return
+        // Fetch episodes with plain fetch (same path as AnimeDetail – no fetchWithRetry wrapper)
+        try {
+          const epResponse = await fetch(`${API_BASE}/api/v1/anime/${encodeURIComponent(animeId)}/episodes`, {
+            signal: epController.signal,
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          })
+          if (!epResponse.ok) throw new Error(`episodes ${epResponse.status}`)
+          const payload = await epResponse.json()
+          epRes = payload
+        } catch (epErr) {
+          if (epErr?.name === 'AbortError' || cancelled) {
+            // outer catch will handle – keep epRes null to trigger fallbacks
+            epRes = { episodes: [] }
+          } else {
+            // One retry with fetchWithRetry as fallback
+            try {
+              const r2 = await fetchWithRetry(
+                `${API_BASE}/api/v1/anime/${animeId}/episodes`,
+                { method: 'GET' },
+                { maxRetries: 1, timeoutMs: 180_000 }
+              )
+              epRes = r2 ? await r2.json().catch(() => ({ episodes: [] })) : { episodes: [] }
+            } catch {
+              epRes = { episodes: [] }
+            }
+          }
+        }
         if (cancelled) return
         let animeData = animeRes
         let epData = epRes
@@ -2218,6 +2304,7 @@ export default function Watch() {
     run()
     return () => {
       cancelled = true
+      try { epController.abort() } catch {}
     }
   }, [animeId, epNumber])
 
@@ -2453,6 +2540,11 @@ export default function Watch() {
   // Player build / destroy
   // ────────────────────────────────────────────────────────────
   const destroyPlayer = useCallback(() => {
+    // Always release the page scroll lock during provider changes, unmounts,
+    // and player teardown. If a player is destroyed while fullscreen, ArtPlayer
+    // may not emit its normal fullscreen=false event.
+    document.documentElement.classList.remove('body-hidden')
+    document.body.classList.remove('body-hidden')
     // A native media event may have raised the indicator immediately before an
     // iframe handoff. Never allow that stale event to cover the next player.
     setBuffering(false)
@@ -2513,6 +2605,11 @@ export default function Watch() {
       destroyPlayer()
       kiwiFragmentRangesRef.current = null
       setActiveEmbedUrl('')
+      // Store for Download button — preserve any download URL already set from server list
+      if (!downloadUrlSourceRef.current) {
+        currentDownloadUrlRef.current = streamUrl || ''
+        downloadUrlSourceRef.current = streamUrl || ''
+      }
       const container = artRef.current
       if (!container) return
 
@@ -2748,7 +2845,7 @@ export default function Watch() {
           setSubtitlePreference(key, item.value)
           const selectedLabel = getLabel(options.find((option) => String(option.value) === String(item.value)) || item)
           syncArtPlayerSetting(artInstance.current, name, item.value, `${label} · ${selectedLabel}`)
-          return selectedLabel
+          return `${label} · ${selectedLabel}`
         },
       })
       const subtitleStyleSettings = [
@@ -2770,9 +2867,17 @@ export default function Watch() {
         if (!art?.subtitle) return null
         if (!nextTrack) {
           art._anirakuSubtitleEnabled = false
-          art.template?.$subtitle?.style && Object.assign(art.template.$subtitle.style, { display: 'none' })
-          if (art.template?.$subtitle) art.template.$subtitle.innerHTML = ''
-          if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'hidden'
+          // Keep the subtitle source mounted. Clearing art.subtitle.url can
+          // permanently remove the track in some ArtPlayer versions and make
+          // the next Off → On transition fail.
+
+          if (art.template?.$subtitle) {
+            art.template.$subtitle.style.display = 'none'
+            art.template.$subtitle.innerHTML = ''
+          }
+          if (art.subtitle.textTrack) {
+            try { art.subtitle.textTrack.mode = 'disabled' } catch {}
+          }
           showToast('Subtitles Off')
           return null
         }
@@ -2785,12 +2890,23 @@ export default function Watch() {
           style: getSubtitleStyle(subtitlePreferencesRef.current),
         }).catch(() => null)
         if (result) {
+          try {
+            if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'showing'
+          } catch {}
           applySubtitleStyle(art, subtitlePreferencesRef.current)
           art.subtitle.update?.()
           applySubtitleStyle(art, subtitlePreferencesRef.current)
           showToast(`Subtitles: ${nextTrack.label}`, { icon: 'ok' })
         }
         return result
+      }
+      // Expose for CC panel (moved out of ArtPlayer settings)
+      subtitleTracksRef.current = subtitleTracks
+      switchSubtitleTrackRef.current = switchSubtitleTrack
+      // Also keep refs for download persistence across controls — don't overwrite existing download URLs
+      if (!downloadUrlSourceRef.current) {
+        currentDownloadUrlRef.current = streamUrl || currentDownloadUrlRef.current
+        downloadUrlSourceRef.current = streamUrl || downloadUrlSourceRef.current
       }
 
       const playerConfig = {
@@ -2867,6 +2983,23 @@ export default function Watch() {
               }
             },
           },
+          {
+            name: 'download',
+            position: 'right',
+            index: 29,
+            html: downloadControlHtml(),
+            tooltip: 'Download',
+            style: { width: '42px', margin: '0 1px' },
+            click: function () {
+              const rawUrl = downloadUrlSourceRef.current || currentDownloadUrlRef.current
+              if (!rawUrl || rawUrl.includes('/api/v1/proxy') || rawUrl.includes('.m3u8')) {
+                showToast('No download available for this source', { icon: 'warn' })
+                return
+              }
+              window.open(rawUrl, '_blank', 'noopener')
+              showToast(rawUrl.includes('pahe.') || rawUrl.includes('nekostream') ? 'Opening download page…' : 'Opening download…')
+            },
+          },
         ],
         settings: [
           {
@@ -2881,22 +3014,28 @@ export default function Watch() {
             onSelect: (item) => {
               const selected = qualityList.find((quality) => quality.url === item.value)
               const art = artInstance.current
-              if (selected && art && selected.url !== art.option.url) {
-                const resumeAt = Number(art.video?.currentTime || 0)
-                if (resumeAt > 0) pendingResumeRef.current = resumeAt
-                buildPlayer(
-                  selected.url,
-                  selected.type || 'hls',
-                  selectQualityInList(qualityList, selected.url),
-                  subtitles,
-                  headers,
-                  onBlocked
-                )
+              if (selected && art) {
+                const currentUrl = art.video?.currentSrc || art.option?.url || ''
+                if (selected.url !== currentUrl) {
+                  const resumeAt = Number(art.video?.currentTime || 0)
+                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
+                  buildPlayer(
+                    selected.url,
+                    selected.type || 'hls',
+                    selectQualityInList(qualityList, selected.url),
+                    subtitles,
+                    headers,
+                    onBlocked
+                  )
+                }
               }
               return getQualitySettingTitle(selected)
             },
           },
-          ...(subtitleSetting ? [subtitleSetting, ...subtitleStyleSettings] : subtitleStyleSettings),
+          // Subtitle track selector
+          ...(subtitleSetting ? [subtitleSetting] : []),
+          // Subtitle style settings (compact, one per row, matching quality/auto-skip style)
+          ...subtitleStyleSettings,
           {
             name: 'autoSkip',
             width: 220,
@@ -2940,7 +3079,6 @@ export default function Watch() {
                 video.playbackRate = playbackRate
                 playerPreferencesRef.current = { ...playerPreferencesRef.current, playbackRate }
                 persistPlayerPreferences(playerPreferencesRef.current)
-                syncArtPlayerSetting(artInstance.current, 'playbackSpeed', playbackRate, `Playback speed · ${playbackRate}×`)
                 showToast(`Speed ${item.value}x`, { icon: 'ok' })
               }
               return `Playback speed · ${item.value}×`
@@ -3023,42 +3161,57 @@ export default function Watch() {
 	                if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
 	              }
 	              variants.sort((a, b) => b.height - a.height)
-              if (variants.length < 2 || !art?.setting?.update) return
+              // Allow single variant to still expose Auto + that variant (real cap, not fake).
+              if (variants.length < 1 || !art?.setting?.update) return
+              // If only 1 variant, synthesize bandwidth caps for lower heights via same URL but capped via hls cap emulation
+              // by still showing FIXED options that map to that single level (cap logic downstream picks best available).
+              if (variants.length === 1) {
+                const sole = variants[0]
+                // Add synthetic caps so user sees 1080/720/480 even if master only lists one height
+                const existingHeights = new Set(variants.map(v=>v.height))
+                for (const opt of FIXED_QUALITY_OPTIONS) {
+                  if (!existingHeights.has(opt.height)) {
+                    // Use same URL but will be capped via autoLevelCapping in hls.js path; for native, same URL with capped label
+                    // Native path can't truly downscale, but we expose the label as capped choice (no fake URL).
+                    // We keep variants as-is; fixed options will be added via hls.js path later.
+                  }
+                }
+              }
               const nativeQualityList = [
-	                {
-	                  default: true,
-	                  html: qualityOptionHtml(getQualityPresentation('auto')),
-	                  url,
-	                  type: 'hls',
-	                },
-	                ...variants.map((variant) => ({
-	                  default: false,
-	                  html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
-	                  url: variant.url,
-	                  type: 'hls',
-	                })),
-	              ]
+                { default: !playerPreferencesRef.current.qualityTarget, html: qualityOptionHtml(getQualityPresentation('auto')), url, type: 'hls' },
+                ...FIXED_QUALITY_OPTIONS.map((option) => {
+                  const selected = selectLevelForQualityTarget(variants, option.height)
+                  return {
+                    default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
+                    html: qualityOptionHtml(getQualityPresentation(option.label)),
+                    url: selected?.url || url,
+                    type: 'hls',
+                  }
+                }),
+              ]
               art.setting.update({
                 name: 'quality',
                 width: 220,
-                html: 'Quality',
-	                selector: [
-	                  { default: true, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
-	                  ...variants.map((variant) => ({
-	                    default: false,
-	                    html: qualityOptionHtml(getQualityPresentation(`${variant.height}p`)),
-	                    value: variant.url,
-	                  })),
-	                ],
-	                onSelect: (item) => {
-                          const selected = item.value === 'auto'
-	                    ? nativeQualityList[0]
-	                  : variants.find((variant) => variant.url === item.value)
-	                  const next = selected?.url || url
-	                  const resumeAt = Number(video.currentTime || 0)
-	                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
-	                  buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
-	                                    return item.html
+                html: `Quality · ${playerPreferencesRef.current.qualityTarget ? `${playerPreferencesRef.current.qualityTarget}P` : 'Auto'}`,
+                selector: [
+                  { default: !playerPreferencesRef.current.qualityTarget, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
+                  ...FIXED_QUALITY_OPTIONS.map((option) => ({
+                    default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
+                    html: qualityOptionHtml(getQualityPresentation(option.label)),
+                    value: `target:${option.height}`,
+                  })),
+                ],
+                onSelect: (item) => {
+                  const targetHeight = String(item.value).startsWith('target:') ? Number(String(item.value).replace('target:', '')) : null
+                  const targetOption = FIXED_QUALITY_OPTIONS.find((option) => option.height === targetHeight)
+                  const selected = targetOption ? selectLevelForQualityTarget(variants, targetOption.height) : null
+                  const next = selected?.url || url
+                  playerPreferencesRef.current = { ...playerPreferencesRef.current, qualityTarget: targetOption?.height || null }
+                  persistPlayerPreferences(playerPreferencesRef.current)
+                  const resumeAt = Number(video.currentTime || 0)
+                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
+                  buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
+                  return targetOption?.label || 'Auto'
                 },
               })
             } catch {}
@@ -3213,6 +3366,13 @@ export default function Watch() {
 								hlsTransportIndex += 1
 							try {
 								mediaRetries = 0
+								const previousMode = hlsTransportPlan[hlsTransportIndex - 1]?.mode
+								const nextMode = hlsTransportPlan[hlsTransportIndex]?.mode
+								if (previousMode === 'proxy' && nextMode === 'direct') {
+									showToast('Proxy stream failed before playback — trying direct.', { long: true })
+								} else {
+									showToast(`${previousMode || 'Previous'} stream failed before playback — trying ${nextMode || 'next'}.`, { long: true })
+								}
 								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
 								return
 							} catch {}
@@ -3308,11 +3468,24 @@ export default function Watch() {
                 const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
 	                  const display = getSpeedCappedDisplay(level)
 	                  const qualitySetting = art.setting.find('quality')
-	                  if (qualitySetting) {
-	                    qualitySetting.html = display.title
-	                    qualitySetting.tooltip = display.label
-	                  }
-	                  return display
+                  if (qualitySetting) {
+                    qualitySetting.html = display.title
+                    qualitySetting.tooltip = display.label
+                    const selectedValue = forcedQualityLabel ? `target:${String(forcedQualityLabel).replace('P', '')}` : 'auto'
+                    if (Array.isArray(qualitySetting.selector)) {
+                      qualitySetting.selector.forEach((option) => {
+                        const selected = option.value === selectedValue
+                        option.default = selected
+                        const controlItem = option.$control_item || option.$item
+                        if (controlItem) controlItem.classList.toggle('art-current', selected)
+                      })
+                      const selectedOption = qualitySetting.selector.find((option) => option.value === selectedValue)
+                      if (selectedOption && art.setting.check) {
+                        try { art.setting.check(selectedOption) } catch {}
+                      }
+                    }
+                  }
+                  return display
 	                }
                 const buildHlsQualitySetting = (activeLevel) => {
                   const activeDisplay = getSpeedCappedDisplay(activeLevel)
@@ -3337,83 +3510,44 @@ export default function Watch() {
                       if (item.value === 'saver' && dataSaver) {
 	                        dataSaverCap = dataSaver.index
 	                        hlsQualitySelection.selectLevel(-1)
-                        hls.startLevel = -1
-                        hls.nextAutoLevel = -1
-                        hls.autoLevelCapping = dataSaver.index
-                        hls.currentLevel = -1
-                        hls.nextLevel = -1
-                      } else if (item.value === 'adaptive') {
-                        speedLimit = 'adaptive'
-                        forcedQualityLabel = null
-                        playerPreferencesRef.current = { ...playerPreferencesRef.current, qualityMode: 'adaptive' }
-                        persistPlayerPreferences(playerPreferencesRef.current)
-                        forcedQualityLabel = null
-                        const adaptive = applyAdaptiveCap()
-                        forcedLevel = null
-                        hls._anirakuForcedLevel = null
-                        hls._anirakuAdaptiveCap = adaptiveCap
-                        dataSaverCap = null
-                        hls.autoLevelCapping = adaptiveCap ?? -1
-                        hls.config.minAutoBitrate = 0
-                        hls.startLevel = -1
-                        hls.nextAutoLevel = -1
-                        hls.currentLevel = -1
-                        hls.nextLevel = -1
-                        hlsQualitySelection.selectLevel(-1)
-                        forcedQualityLabel = null
-                        forcedLevel = null
-                        hls._anirakuForcedLevel = null
-                        hls._anirakuAdaptiveCap = null
+	                        hls.autoLevelCapping = dataSaver.index
+	                        hls.currentLevel = -1
+	                        hls.nextLevel = -1
                       } else {
-                        speedLimit = 'auto'
-                        const targetHeight = String(item.value).startsWith('target:') ? Number(String(item.value).replace('target:', '')) : null
+                        const targetHeight = String(item.value).startsWith('target:')
+                          ? Number(String(item.value).replace('target:', ''))
+                          : null
                         const targetOption = FIXED_QUALITY_OPTIONS.find((option) => option.height === targetHeight)
-                        playerPreferencesRef.current = {
-                          ...playerPreferencesRef.current,
-                          qualityMode: 'auto',
-                          qualityTarget: targetOption?.height || null,
-                        }
-                        persistPlayerPreferences(playerPreferencesRef.current)
-                        adaptiveCap = null
                         const selectedTarget = targetOption
                           ? selectLevelForQualityTarget(levels, targetOption.height)
                           : null
                         const nextLevel = targetOption
                           ? selectedTarget?.index ?? -1
                           : item.value === 'auto' ? -1 : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
+                        dataSaverCap = null
                         forcedQualityLabel = targetOption?.label || null
+                        playerPreferencesRef.current = {
+                          ...playerPreferencesRef.current,
+                          qualityMode: 'auto',
+                          qualityTarget: targetOption?.height || null,
+                        }
+                        persistPlayerPreferences(playerPreferencesRef.current)
                         forcedLevel = item.value === 'auto' ? null : nextLevel
                         hls._anirakuForcedLevel = forcedLevel
                         hls._anirakuAdaptiveCap = null
-                        dataSaverCap = null
                         hls.autoLevelCapping = -1
-                        hls.config.minAutoBitrate = 0
                         hls.startLevel = nextLevel
-                        hls.nextAutoLevel = -1
                         hls.loadLevel = nextLevel
                         hls.currentLevel = nextLevel
                         hls.nextLevel = nextLevel
                         hlsQualitySelection.selectLevel(nextLevel)
 	                      }
                       const nextDisplay = syncHlsQualitySetting()
-                      syncArtPlayerSetting(art, 'quality', item.value, nextDisplay.title)
                       return nextDisplay.label
 	                    },
 	                  }
 	                }
                 art.setting.update(buildHlsQualitySetting(hls.currentLevel))
-                syncArtPlayerSetting(art, 'quality', forcedQualityLabel ? `target:${forcedQualityLabel.replace('P', '')}` : 'auto', getSpeedCappedDisplay(hls.currentLevel).title)
-                hls.on(Hls.Events.LEVEL_SWITCHING, () => {
-                  if (forcedLevel !== null && hls.nextLevel !== forcedLevel) {
-                    hls.nextLevel = forcedLevel
-                  }
-                })
-                hls.on(Hls.Events.FRAG_LOADED, () => {
-                  if (speedLimit === 'adaptive') {
-                    applyAdaptiveCap()
-                    syncHlsQualitySetting()
-                  }
-                })
                 hls.on(Hls.Events.LEVEL_SWITCHED, () => {
 	                  if (buildIdRef.current !== myBuildId) return
 	                  // hls.js can publish a transient adaptive currentLevel
@@ -3516,11 +3650,16 @@ export default function Watch() {
         },
       }
 
-      if (initialSubtitleTrack) {
+      // Always mount the subtitle plugin so art.subtitle exists for toggling.
+      // When the user starts with captions off, mount with the first available
+      // track but hide it immediately — this lets switchSubtitleTrack turn it
+      // on later without needing to recreate the player.
+      const subtitleMountTrack = initialSubtitleTrack || subtitleTracks[0] || null
+      if (subtitleMountTrack) {
         playerConfig.subtitle = {
-          url: proxied(initialSubtitleTrack.url),
-          type: initialSubtitleTrack.type,
-          name: initialSubtitleTrack.label,
+          url: proxied(subtitleMountTrack.url),
+          type: subtitleMountTrack.type,
+          name: subtitleMountTrack.label,
           encoding: 'utf-8',
           style: getSubtitleStyle(subtitlePreferencesRef.current),
         }
@@ -3606,15 +3745,25 @@ export default function Watch() {
       art._anirakuSwitchSubtitle = switchSubtitleTrack
       art._anirakuActiveSubtitleUrl = preferredSubtitleTrack?.url || null
       art._anirakuSubtitleEnabled = Boolean(preferredSubtitleTrack)
-      if (!preferredSubtitleTrack && art.template?.$subtitle) {
-        art.template.$subtitle.style.display = 'none'
-        art.template.$subtitle.innerHTML = ''
-        if (art.subtitle?.textTrack) art.subtitle.textTrack.mode = 'disabled'
-      }
-      art.on('subtitleAfterUpdate', () => {
-        if (!art._anirakuSubtitleEnabled && art.template?.$subtitle) {
+      if (!preferredSubtitleTrack) {
+        // User prefers subtitles off — clear the source so ArtPlayer
+        // doesn't render any cues, even on timeupdate.
+        if (art.template?.$subtitle) {
           art.template.$subtitle.style.display = 'none'
           art.template.$subtitle.innerHTML = ''
+        }
+        if (art.subtitle?.textTrack) {
+          try { art.subtitle.textTrack.mode = 'disabled' } catch {}
+        }
+      }
+      art.on('subtitleAfterUpdate', () => {
+        // Safety net: if subtitle was turned off but ArtPlayer still fired this
+        // event (e.g., from a cached cue), re-hide immediately.
+        if (!art._anirakuSubtitleEnabled) {
+          if (art.template?.$subtitle) {
+            art.template.$subtitle.style.display = 'none'
+            art.template.$subtitle.innerHTML = ''
+          }
           return
         }
         applySubtitleStyle(art, subtitlePreferencesRef.current)
@@ -3808,91 +3957,221 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   // Embed playback progress tracker (silent background)
   // ────────────────────────────────────────────────────────────
+  // Embed playback: audio-aware timer (pauses when hidden or manually paused)
   useEffect(() => {
     if (!activeEmbedUrl) {
       embedStartTimeRef.current = null
       embedElapsedRef.current = 0
+      embedAccumulatedRef.current = 0
+      embedLastTickRef.current = null
       embedDurationRef.current = 0
       embedAutoNextFiredRef.current = false
+      embedPausedRef.current = false
+      setEmbedPaused(false)
       return
     }
 
     const startTime = Date.now()
     embedStartTimeRef.current = startTime
+    embedLastTickRef.current = startTime
+    embedAccumulatedRef.current = 0
     embedAutoNextFiredRef.current = false
+    embedPausedRef.current = false
+    setEmbedPaused(false)
 
-    // Estimate duration from metadata (fallback: 24 min).
+    // Duration: prefer episode meta, else anime duration, else 24 min. AnikotoTV provides per-episode length via API if available.
     const epMeta = Array.isArray(episodes) ? episodes.find(e => Number(e?.number) === Number(epNumber)) : null
-    const durationSec = (epMeta?.duration || anime?.duration || 24) * 60
+    const rawDuration = epMeta?.duration || epMeta?.runtime || anime?.duration || 24
+    const durationSec = Math.max(60, Number(rawDuration) * 60 || 24 * 60)
     embedDurationRef.current = durationSec
 
-    // Save to localStorage + Supabase every 10 seconds.
-    const progressInterval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTime) / 1000)
-      embedElapsedRef.current = elapsed
-      const title = anime?.title?.english || anime?.title?.romaji || animeId
-      upsertLocalWatchHistory({
-        animeId,
-        title,
-        episode: epNumber,
-        time: elapsed,
-        duration: durationSec,
-        completed: false,
-        timestamp: Date.now(),
-        image: anime?.coverImage?.large || '',
-      })
-      if (user) {
-        Promise.resolve(
-          supabase.from('watch_history').upsert(
-            {
-              user_id: user.id,
-              anime_id: parseInt(animeId, 10),
-              anime_title: title,
-              anime_image: anime?.coverImage?.large || '',
-              episode_number: epNumber,
-              progress: elapsed,
-              duration: durationSec,
-              timestamp: Date.now(),
-            },
-            { onConflict: 'user_id,anime_id,episode_number' }
-          )
-        ).catch(() => {})
+    let saveCounter = 0
+    let timeRequestCounter = 0
+    const tick = setInterval(() => {
+      if (embedPausedRef.current) {
+        embedLastTickRef.current = Date.now()
+        return
       }
-    }, 10_000)
-
-    // Check for auto-next every second (silent — no overlay).
-    const autoNextInterval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      // Request time from embed iframe every 3 seconds
+      timeRequestCounter += 1
+      if (timeRequestCounter >= 3) {
+        timeRequestCounter = 0
+        try {
+          const frame = embedFrameRef.current
+          if (frame?.contentWindow) {
+            // Try common embed player APIs
+            frame.contentWindow.postMessage({ action: 'getTime', time: true }, '*')
+            frame.contentWindow.postMessage({ event: 'get-time' }, '*')
+            frame.contentWindow.postMessage({ command: 'getCurrentTime' }, '*')
+          }
+        } catch {}
+      }
+      // If postMessage gives us real video time, use it directly (no accumulation)
+      if (embedHasRealTimeRef.current) {
+        embedLastTickRef.current = Date.now()
+        const elapsed = Math.floor(embedVideoTimeRef.current || 0)
+        embedElapsedRef.current = elapsed
+        saveCounter += 1
+        if (saveCounter >= 10) {
+          saveCounter = 0
+          const title = anime?.title?.english || anime?.title?.romaji || animeId
+          upsertLocalWatchHistory({
+            animeId, title, episode: epNumber, time: elapsed, duration: durationSec,
+            completed: false, timestamp: Date.now(), image: anime?.coverImage?.large || '',
+          })
+          if (user) {
+            Promise.resolve(supabase.from('watch_history').upsert({
+              user_id: user.id, anime_id: parseInt(animeId, 10), anime_title: title,
+              anime_image: anime?.coverImage?.large || '', episode_number: epNumber,
+              progress: elapsed, duration: durationSec, timestamp: Date.now(),
+            }, { onConflict: 'user_id,anime_id,episode_number' })).catch(() => {})
+          }
+          // MAL/AniList watching sync at 60%
+          if (elapsed >= durationSec * 0.6) {
+            syncProgressRef.current?.('watching', { elapsed, duration: durationSec })
+          }
+        }
+        // Auto-next check (real embed time)
+        if (
+          !embedAutoNextFiredRef.current &&
+          elapsed >= Math.max(10, durationSec) &&
+          autoNextEmbedRef.current && !isMovie &&
+          Number(epNumber) < Number(episodes?.length || 0)
+        ) {
+          embedAutoNextFiredRef.current = true
+          syncProgressRef.current?.('completed', { elapsed: durationSec, duration: durationSec })
+          const title = anime?.title?.english || anime?.title?.romaji || animeId
+          upsertLocalWatchHistory({
+            animeId, title, episode: epNumber, time: durationSec, duration: durationSec,
+            completed: true, timestamp: Date.now(), image: anime?.coverImage?.large || '',
+          })
+          const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
+          navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
+        }
+        return
+      }
+      // Fallback: accumulate wall-clock time when no real video time from postMessage
+      const now = Date.now()
+      const last = embedLastTickRef.current || now
+      const delta = (now - last) / 1000
+      embedLastTickRef.current = now
+      if (delta > 0 && delta < 120) {
+        embedAccumulatedRef.current += delta
+      }
+      const elapsed = Math.floor(embedAccumulatedRef.current)
       embedElapsedRef.current = elapsed
 
-      // Episode "ended" — auto-advance silently.
+      // Save progress every 10 seconds (fallback path — when no postMessage)
+      saveCounter += 1
+      if (saveCounter >= 10) {
+        saveCounter = 0
+        const title = anime?.title?.english || anime?.title?.romaji || animeId
+        upsertLocalWatchHistory({
+          animeId, title, episode: epNumber, time: elapsed, duration: durationSec,
+          completed: false, timestamp: Date.now(), image: anime?.coverImage?.large || '',
+        })
+        if (user) {
+          Promise.resolve(supabase.from('watch_history').upsert({
+            user_id: user.id, anime_id: parseInt(animeId, 10), anime_title: title,
+            anime_image: anime?.coverImage?.large || '', episode_number: epNumber,
+            progress: elapsed, duration: durationSec, timestamp: Date.now(),
+          }, { onConflict: 'user_id,anime_id,episode_number' })).catch(() => {})
+        }
+        if (elapsed >= durationSec * 0.6) {
+          syncProgressRef.current?.('watching', { elapsed, duration: durationSec })
+        }
+      }
+
+      // Auto-next check (fallback path — no postMessage)
       if (
         !embedAutoNextFiredRef.current &&
-        elapsed >= durationSec &&
-        autoNextEmbedRef.current &&
-        !isMovie &&
-        epNumber < episodes.length
+        elapsed >= Math.max(10, durationSec) &&
+        autoNextEmbedRef.current && !isMovie &&
+        Number(epNumber) < Number(episodes?.length || 0)
       ) {
         embedAutoNextFiredRef.current = true
-        // Sync completion to MAL/AniList + Supabase before navigating.
         syncProgressRef.current?.('completed', { elapsed: durationSec, duration: durationSec })
+        const title = anime?.title?.english || anime?.title?.romaji || animeId
+        upsertLocalWatchHistory({
+          animeId, title, episode: epNumber, time: durationSec, duration: durationSec,
+          completed: true, timestamp: Date.now(), image: anime?.coverImage?.large || '',
+        })
         const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
         navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
       }
     }, 1_000)
 
-    return () => {
-      clearInterval(progressInterval)
-      clearInterval(autoNextInterval)
+    const onVisibility = () => {
+      if (!document.hidden && !embedPausedRef.current) {
+        embedLastTickRef.current = Date.now()
+      }
     }
-  }, [activeEmbedUrl, animeId, epNumber, anime, user, isMovie, episodes.length, navigate])
+    document.addEventListener('visibilitychange', onVisibility)
+
+    // Also resume tick baseline on window focus
+    const onFocus = () => { if (!embedPausedRef.current) embedLastTickRef.current = Date.now() }
+    window.addEventListener('focus', onFocus)
+
+    // PostMessage listener — try to sync with actual embedded player time
+    // Many embed providers send { event: 'time', time: <seconds> } or { currentTime: <seconds> }
+    const onEmbedMessage = (e) => {
+      try {
+        const d = typeof e?.data === 'string' ? JSON.parse(e.data) : e?.data
+        if (!d || typeof d !== 'object') return
+        // Check iframe source matches
+        const frame = embedFrameRef.current
+        if (frame && e.source !== frame.contentWindow) return
+        // Extract time from common embed message formats
+        const t = Number(d.time ?? d.currentTime ?? d.position ?? d.seconds ?? d.current_time ?? d.played)
+        if (Number.isFinite(t) && t >= 0) {
+          embedVideoTimeRef.current = t
+          embedHasRealTimeRef.current = true
+          embedAccumulatedRef.current = t
+          embedElapsedRef.current = Math.floor(t)
+          embedLastTickRef.current = Date.now()
+        }
+        // Also accept duration updates from embed
+        const dur = Number(d.duration ?? d.totalDuration ?? d.total_duration)
+        if (Number.isFinite(dur) && dur > 0) {
+          embedDurationRef.current = dur
+        }
+        // Detect ended
+        if (d.event === 'ended' || d.event === 'finish' || d.event === 'complete' || d.ended === true || d.state === 'ended') {
+          embedVideoTimeRef.current = embedDurationRef.current || durationSec
+          embedAccumulatedRef.current = embedDurationRef.current || durationSec
+          embedElapsedRef.current = embedDurationRef.current || durationSec
+        }
+        // Detect paused state from embed
+        if (d.event === 'pause' || d.paused === true || d.state === 'paused') {
+          embedPausedRef.current = true
+          setEmbedPaused(true)
+        }
+        if (d.event === 'play' || (d.paused === false && d.event !== 'ended') || d.state === 'playing') {
+          if (embedPausedRef.current) {
+            embedPausedRef.current = false
+            setEmbedPaused(false)
+            embedLastTickRef.current = Date.now()
+          }
+        }
+      } catch {}
+    }
+    window.addEventListener('message', onEmbedMessage)
+
+    return () => {
+      clearInterval(tick)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('message', onEmbedMessage)
+    }
+  }, [activeEmbedUrl, animeId, epNumber, anime, user, isMovie, navigate])
 
   // Save final embed progress on tab close / navigation.
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (!activeEmbedUrl || !embedStartTimeRef.current) return
-      const elapsed = Math.floor((Date.now() - embedStartTimeRef.current) / 1000)
-      const duration = embedDurationRef.current
+      if (!activeEmbedUrl) return
+      const elapsed = Math.floor(embedAccumulatedRef.current || embedElapsedRef.current || 0)
+      const duration = embedDurationRef.current || 0
+      if (elapsed <= 0 || duration <= 0) return
       const title = anime?.title?.english || anime?.title?.romaji || animeId
       upsertLocalWatchHistory({
         animeId,
@@ -4101,6 +4380,10 @@ export default function Watch() {
 
       const startPayloadImmediately = (payload) => {
         if (!hasAnyStreamSource(payload)) return false
+        // Capture Anikoto downloads from server list payload (before /stream call)
+        if (Array.isArray(payload.downloads) && payload.downloads.length > 0 && payload.downloads[0]?.url) {
+          downloadUrlSourceRef.current = String(payload.downloads[0].url)
+        }
         const qualityList = buildQualityList(payload.sources, suppressedQualityUrls)
         if (qualityList.length > 0) {
           const firstSource = qualityList[0]?.src || payload.sources.find((entry) => entry?.url)
@@ -4140,6 +4423,7 @@ export default function Watch() {
       if (!forceRefresh && startPayloadImmediately({
         sources: source.initialSources,
         headers: source.headers,
+        downloads: source.downloads,
       })) return
 
       // Stale-while-revalidate: if we have a recent good stream for
@@ -4252,6 +4536,26 @@ export default function Watch() {
         }
 
         if (!data) data = await res?.json().catch(() => ({}))
+        // Capture Anikoto download links (downloads[0].url = pahe link) — direct, no proxy
+        if (Array.isArray(data?.downloads) && data.downloads.length > 0 && data.downloads[0]?.url) {
+          downloadUrlSourceRef.current = String(data.downloads[0].url)
+        } else if (Array.isArray(data?.sources) && data.sources[0]?.url) {
+          downloadUrlSourceRef.current = String(data.sources[0].url)
+        }
+        // Fallback: if backend old binary didn't return downloads, fetch Anivexa directly for anikoto
+        if (source.provider === 'anikoto' && (!downloadUrlSourceRef.current || !downloadUrlSourceRef.current.includes('pahe.'))) {
+          try {
+            const anivexaUrl = `https://anivexa-api-tu4a.onrender.com/watch/anikoto/${animeId}/${source.lang}/anikoto-${targetEpisode}`
+            const dlRes = await fetch(anivexaUrl, { cache: 'no-store' })
+            if (dlRes.ok) {
+              const dlJson = await dlRes.json()
+              if (Array.isArray(dlJson.downloads) && dlJson.downloads[0]?.url) {
+                downloadUrlSourceRef.current = String(dlJson.downloads[0].url)
+                data.downloads = dlJson.downloads
+              }
+            }
+          } catch {}
+        }
         if (!mountedRef.current) return
         // Navigation may have happened while the stream was fetching —
         // never build a player for an episode the user has left.
@@ -4520,14 +4824,13 @@ export default function Watch() {
       ) {
         syncProgressRef.current?.('watching')
       }
-      // Embed source — sync embed progress if >= 60% watched.
+      // Embed source — sync embed progress if >= 60% watched (audio-aware elapsed).
       if (
         !skipSync &&
         activeEmbedUrl &&
-        embedStartTimeRef.current &&
         embedDurationRef.current > 0
       ) {
-        const embedElapsed = Math.floor((Date.now() - embedStartTimeRef.current) / 1000)
+        const embedElapsed = Math.floor(embedAccumulatedRef.current || embedElapsedRef.current || 0)
         if (embedElapsed >= embedDurationRef.current * 0.6) {
           syncProgressRef.current?.('watching', {
             elapsed: embedElapsed,
@@ -4965,6 +5268,8 @@ export default function Watch() {
               }}
             />
           )}
+
+
 
 
           {/* Buffering indicator */}
@@ -6320,6 +6625,94 @@ export default function Watch() {
              compact label only when the essential controls cannot all fit. */
           .watch-art-mount .art-video-player .art-controls-quality {
             display: none !important;
+          }
+        }
+        /* Settings panel: never exceed the player or viewport. */
+        .watch-art-mount .art-settings,
+        .watch-art-mount .art-setting-panel,
+        .watch-art-mount .art-settings .art-settings-build,
+        .watch-art-mount .art-setting-selector {
+          box-sizing: border-box !important;
+          max-width: min(280px, calc(100vw - 16px), 100%) !important;
+        }
+        .watch-art-mount .art-settings {
+          max-height: min(78vh, 420px) !important;
+          max-height: min(78dvh, 420px) !important;
+          overflow: hidden !important;
+        }
+        .watch-art-mount .art-setting-panel {
+          width: min(280px, calc(100vw - 16px), 100%) !important;
+          max-height: min(78vh, 420px) !important;
+          max-height: min(78dvh, 420px) !important;
+          overflow: hidden auto !important;
+          overscroll-behavior: contain;
+        }
+        .watch-art-mount .art-setting-panel .art-setting-item {
+          min-height: 36px !important;
+          width: 100% !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+        }
+        .watch-art-mount .art-setting-panel .art-setting-item-left,
+        .watch-art-mount .art-setting-panel .art-setting-item-left-text,
+        .watch-art-mount .art-setting-panel .art-setting-item-right,
+        .watch-art-mount .art-setting-panel .art-setting-item-right-tooltip,
+        .watch-art-mount .art-setting-panel .art-selector-item,
+        .watch-art-mount .art-setting-panel .art-selector-value {
+          min-width: 0 !important;
+          max-width: 100% !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          white-space: nowrap !important;
+        }
+        .watch-art-mount .art-setting-panel .art-setting-selector {
+          width: 100% !important;
+          max-height: min(48vh, 240px) !important;
+          max-height: min(48dvh, 240px) !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+        }
+        @media (max-width: 480px) {
+          .watch-art-mount .art-settings,
+          .watch-art-mount .art-setting-panel,
+          .watch-art-mount .art-settings .art-settings-build {
+            width: min(240px, calc(100vw - 12px), 100%) !important;
+            max-width: min(240px, calc(100vw - 12px), 100%) !important;
+            font-size: 12px !important;
+          }
+          .watch-art-mount .art-setting-panel .art-setting-item {
+            padding-inline: 8px !important;
+          }
+        }
+        @media (max-height: 520px) {
+          .watch-art-mount .art-settings,
+          .watch-art-mount .art-setting-panel {
+            max-height: min(70vh, 300px) !important;
+            max-height: min(70dvh, 300px) !important;
+          }
+        }
+        /* Download control in bottom bar */
+        .watch-art-mount .art-video-player .art-control-download {
+          width: 42px !important;
+          min-width: 42px !important;
+        }
+        @media (max-width: 768px) {
+          .watch-art-mount .art-setting-panel {
+            max-width: min(240px, calc(100vw - 16px)) !important;
+          }
+          .watch-art-mount .art-settings .art-settings-build {
+            max-width: min(240px, calc(100vw - 16px)) !important;
+          }
+          .watch-art-mount .art-video-player .art-control-download {
+            width: 36px !important;
+            min-width: 36px !important;
+          }
+        }
+        @media (max-width: 360px) {
+          .watch-art-mount .art-video-player .art-control-download {
+            width: 32px !important;
+            min-width: 32px !important;
           }
         }
         /* High-contrast support */
