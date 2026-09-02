@@ -2772,7 +2772,7 @@ export default function Watch() {
           art._anirakuSubtitleEnabled = false
           art.template?.$subtitle?.style && Object.assign(art.template.$subtitle.style, { display: 'none' })
           if (art.template?.$subtitle) art.template.$subtitle.innerHTML = ''
-          if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'disabled'
+          if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'hidden'
           showToast('Subtitles Off')
           return null
         }
