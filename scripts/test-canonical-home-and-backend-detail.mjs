@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 const root = new URL('..', import.meta.url)
 const read = (relativePath) => readFile(new URL(relativePath, root), 'utf8')
 
-const [app, seoHelper, indexHtml, animeHook, animeDetail, home, middleware, sitemap] = await Promise.all([
+const [app, seoHelper, indexHtml, animeHook, animeDetail, home, middleware, sitemap, config] = await Promise.all([
   read('src/App.jsx'),
   read('public/seo.js'),
   read('index.html'),
@@ -13,6 +13,7 @@ const [app, seoHelper, indexHtml, animeHook, animeDetail, home, middleware, site
   read('src/pages/Home.jsx'),
   read('middleware.js'),
   read('scripts/generate-sitemap.js'),
+  read('src/config.js'),
 ])
 
 assert.match(app, /<Route path="\/" element={<Home\s*\/>}\s*\/>/)
@@ -33,6 +34,10 @@ assert.match(middleware, /ANIME_SEO_QUERY/)
 assert.doesNotMatch(middleware, /api\.aniraku\.tech\/api\/v1\/anime/)
 assert.match(sitemap, /const ANILIST_ENDPOINT = 'https:\/\/graphql\.anilist\.co'/)
 assert.doesNotMatch(sitemap, /ANILIST_PROXY|api\.aniraku\.tech\/api\/v1\/anilist/)
+assert.match(config, /configuredApiBase/)
+assert.match(config, /window\.location\.protocol === 'https:'/)
+assert.match(config, /secureApiBase/)
+assert.match(config, /configuredApiBase\.replace\(/)
 assert.doesNotMatch(animeDetail, /miruro-api-v3\.onrender\.com/)
 assert.match(animeDetail, /label: 'Relations'/)
 assert.match(animeDetail, /const EPISODE_RETRY_BASE_MS = 1_500/)
