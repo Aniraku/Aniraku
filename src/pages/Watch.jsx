@@ -608,6 +608,22 @@ function applySubtitleStyle(art, preferences) {
   })
 }
 
+function safelyUpdateSubtitle(art) {
+  const subtitle = art?.subtitle
+  const textTrack = subtitle?.textTrack
+  // ArtPlayer 5.4 can temporarily expose a textTrack whose `cues` is null
+  // while switching captions off or while a new source is loading. Its
+  // Subtitle.update() calls Array.from(activeCues), which throws in that
+  // state. Wait until the browser has populated the cue list.
+  if (!subtitle?.update || !textTrack || textTrack.cues == null) return false
+  try {
+    const pending = subtitle.update()
+    if (pending && typeof pending.catch === 'function') pending.catch(() => {})
+    return true
+  } catch {
+    return false
+  }
+}
 function syncArtPlayerSetting(art, name, value, label) {
   const setting = art?.setting?.find?.(name)
   if (!setting) return
@@ -1481,7 +1497,7 @@ export default function Watch() {
     const art = artInstance.current
     if (art?.subtitle?.style) {
       art.subtitle.style(getSubtitleStyle(next))
-      art.subtitle.update?.()
+      safelyUpdateSubtitle(art)
       applySubtitleStyle(art, next)
     }
     return next
@@ -1561,6 +1577,7 @@ export default function Watch() {
   const currentDownloadUrlRef = useRef('')
   const subtitleTracksRef = useRef([])
   const switchSubtitleTrackRef = useRef(null)
+  const subtitleSwitchGenerationRef = useRef(0)
   const downloadUrlSourceRef = useRef('')
   // Force re-render for CC style changes
   const [, forceCCUpdate] = useState(0)
@@ -2860,13 +2877,19 @@ export default function Watch() {
       ]
 
       const switchSubtitleTrack = async (track) => {
+        const switchGeneration = ++subtitleSwitchGenerationRef.current
         const art = artInstance.current
         const nextTrack = track && subtitleTracks.some((candidate) => candidate.url === track.url) ? track : null
+        // Update the authoritative flag before setSubtitlePreference(), because
+        // that setter refreshes ArtPlayer’s subtitle cues synchronously.
+        // Otherwise the old enabled state can render one more cue after Off.
+        if (art) {
+          art._anirakuActiveSubtitleUrl = nextTrack?.url || null
+          art._anirakuSubtitleEnabled = Boolean(nextTrack)
+        }
         setSubtitlePreference('track', nextTrack ? nextTrack.url : 'off')
-        if (art) art._anirakuActiveSubtitleUrl = nextTrack?.url || null
         if (!art?.subtitle) return null
         if (!nextTrack) {
-          art._anirakuSubtitleEnabled = false
           // Keep the subtitle source mounted. Clearing art.subtitle.url can
           // permanently remove the track in some ArtPlayer versions and make
           // the next Off → On transition fail.
@@ -2889,12 +2912,12 @@ export default function Watch() {
           encoding: 'utf-8',
           style: getSubtitleStyle(subtitlePreferencesRef.current),
         }).catch(() => null)
-        if (result) {
+        if (result && switchGeneration === subtitleSwitchGenerationRef.current && artInstance.current === art) {
           try {
             if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'showing'
           } catch {}
           applySubtitleStyle(art, subtitlePreferencesRef.current)
-          art.subtitle.update?.()
+          safelyUpdateSubtitle(art)
           applySubtitleStyle(art, subtitlePreferencesRef.current)
           showToast(`Subtitles: ${nextTrack.label}`, { icon: 'ok' })
         }
@@ -3756,6 +3779,14 @@ export default function Watch() {
           try { art.subtitle.textTrack.mode = 'disabled' } catch {}
         }
       }
+      art.on('subtitleLoad', () => {
+        try {
+          if (art.subtitle?.textTrack) {
+            art.subtitle.textTrack.mode = art._anirakuSubtitleEnabled ? 'showing' : 'disabled'
+          }
+        } catch {}
+        if (art._anirakuSubtitleEnabled) applySubtitleStyle(art, subtitlePreferencesRef.current)
+      })
       art.on('subtitleAfterUpdate', () => {
         // Safety net: if subtitle was turned off but ArtPlayer still fired this
         // event (e.g., from a cached cue), re-hide immediately.
@@ -6317,6 +6348,102 @@ export default function Watch() {
         .watch-art-mount .art-selector-item.art-current .watch-quality-badge {
           color: #cbd5e1;
         }
+        /* Responsive settings menu. ArtPlayer's default settings layer can
+           grow beyond the video on phones and can clip nested selectors on
+           desktop when a long label or many options are present. Keep the
+           outer layer inside the player, then make every option panel a real
+           touch/mouse-scroll container. */
+        .watch-art-mount .art-video-player {
+          --art-settings-max-height: min(68dvh, 360px);
+          --art-selector-max-height: min(62dvh, 320px);
+        }
+        .watch-art-mount .art-settings {
+          box-sizing: border-box;
+          width: min(250px, calc(100% - 16px)) !important;
+          max-width: calc(100% - 16px) !important;
+          height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
+          max-height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          overscroll-behavior: contain;
+        }
+        .watch-art-mount .art-settings,
+        .watch-art-mount .art-settings * {
+          box-sizing: border-box;
+        }
+        .watch-art-mount .art-setting-panel,
+        .watch-art-mount .art-setting-panel .art-selector-list {
+          flex: 1 1 auto;
+          min-height: 0 !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          max-height: none !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.34) transparent;
+        }
+        .watch-art-mount .art-setting-panel::-webkit-scrollbar,
+        .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar {
+          width: 6px;
+        }
+        .watch-art-mount .art-setting-panel::-webkit-scrollbar-thumb,
+        .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar-thumb {
+          border-radius: 999px;
+          background: rgba(255,255,255,0.34);
+        }
+        .watch-art-mount .art-setting-item,
+        .watch-art-mount .art-setting-item-left,
+        .watch-art-mount .art-setting-item-right,
+        .watch-art-mount .art-selector-item {
+          min-width: 0 !important;
+          max-width: 100%;
+          white-space: normal;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .watch-art-mount .art-setting-item {
+          min-height: 35px;
+          height: auto;
+        }
+        .watch-art-mount .art-setting-item-left,
+        .watch-art-mount .art-setting-item-right {
+          overflow: hidden;
+        }
+        .watch-art-mount .art-setting-item-left {
+          flex: 1 1 auto;
+        }
+        .watch-art-mount .art-setting-item-right {
+          flex: 0 1 auto;
+          text-align: right;
+        }
+        .watch-art-mount .art-selector-list {
+          width: 100%;
+          min-width: 0 !important;
+        }
+        .watch-art-mount .art-selector-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          min-height: 35px;
+          height: auto;
+          padding: 8px 10px;
+        }
+        .watch-art-mount .art-selector-item > * {
+          min-width: 0;
+          max-width: 100%;
+        }
+        .watch-art-mount .art-setting-item-right-tooltip,
+        .watch-art-mount .art-selector-value {
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: normal;
+          overflow-wrap: anywhere;
+        }
         .watch-art-mount .art-control-seekBackward10,
         .watch-art-mount .art-control-seekForward10 {
           color: #e2e8f0;
@@ -6491,9 +6618,27 @@ export default function Watch() {
             --art-control-height: 42px;
             --art-control-icon-size: 28px;
             --art-padding: 8px;
+            --art-settings-max-height: min(78dvh, 420px);
+            --art-selector-max-height: min(68dvh, 320px);
           }
           .watch-art-mount .art-video-player .art-controls {
             padding-inline: 2px;
+          }
+          .watch-art-mount .art-settings {
+            width: min(250px, calc(100vw - 16px)) !important;
+            max-width: calc(100vw - 16px) !important;
+            height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
+            max-height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
+            right: 8px !important;
+            bottom: 44px !important;
+          }
+          .watch-art-mount .art-setting-panel,
+          .watch-art-mount .art-setting-panel .art-selector-list {
+            flex: 1 1 auto;
+            max-height: none !important;
+          }
+          .watch-art-mount .art-setting-panel .art-selector-list {
+            max-height: min(var(--art-selector-max-height), 320px) !important;
           }
           .watch-art-mount .art-video-player .art-controls .art-control {
             width: 34px;
