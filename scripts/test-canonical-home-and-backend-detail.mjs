@@ -4,13 +4,15 @@ import { readFile } from 'node:fs/promises'
 const root = new URL('..', import.meta.url)
 const read = (relativePath) => readFile(new URL(relativePath, root), 'utf8')
 
-const [app, seoHelper, indexHtml, animeHook, animeDetail, home] = await Promise.all([
+const [app, seoHelper, indexHtml, animeHook, animeDetail, home, middleware, sitemap] = await Promise.all([
   read('src/App.jsx'),
   read('public/seo.js'),
   read('index.html'),
   read('src/hooks/useAnime.js'),
   read('src/pages/AnimeDetail.jsx'),
   read('src/pages/Home.jsx'),
+  read('middleware.js'),
+  read('scripts/generate-sitemap.js'),
 ])
 
 assert.match(app, /<Route path="\/" element={<Home\s*\/>}\s*\/>/)
@@ -26,8 +28,11 @@ assert.doesNotMatch(animeHook, /RECOMMEND_QUERY/)
 assert.match(animeDetail, /anime\?\.recommendations\?\.nodes/)
 assert.match(animeDetail, /\$\{API_BASE\}\/api\/v1\/anime\/\$\{encodeURIComponent\(id\)\}\/episodes/)
 assert.match(animeDetail, /Array\.isArray\(payload\) \? payload : payload\?\.episodes/)
-assert.match(animeDetail, /https:\/\/miruro\.aniraku\.tech\/anime/)
-assert.match(animeDetail, /\$\{MIRURO_RELATIONS_BASE\}\/\$\{encodeURIComponent\(id\)\}\/relations/)
+assert.match(middleware, /https:\/\/graphql\.anilist\.co/)
+assert.match(middleware, /ANIME_SEO_QUERY/)
+assert.doesNotMatch(middleware, /api\.aniraku\.tech\/api\/v1\/anime/)
+assert.match(sitemap, /const ANILIST_ENDPOINT = 'https:\/\/graphql\.anilist\.co'/)
+assert.doesNotMatch(sitemap, /ANILIST_PROXY|api\.aniraku\.tech\/api\/v1\/anilist/)
 assert.doesNotMatch(animeDetail, /miruro-api-v3\.onrender\.com/)
 assert.match(animeDetail, /label: 'Relations'/)
 assert.match(animeDetail, /const EPISODE_RETRY_BASE_MS = 1_500/)
@@ -43,4 +48,4 @@ assert.match(home, /retain stable item order and identity/)
 assert.match(home, /\$\{API_BASE\}\/api\/v1\/anime\/\$\{bookmark\.id\}\/episodes/)
 assert.doesNotMatch(home, /\/api\/v1\/miruro\/episodes/)
 
-console.log('Canonical Home route and backend-only Anime Detail checks passed.')
+console.log('Canonical Home, direct AniList SEO, and backend episode-contract checks passed.')
