@@ -2,18 +2,9 @@ import fs from 'fs'
 import path from 'path'
 import { generateSlug } from '../src/lib/slug.js'
 
-// Prefer the build-time env var (Vercel injects VITE_API_URL), fall back to
-// the local .env, then to the production Azure API.
-const readEnv = (key) => {
-  if (process.env[key]) return process.env[key]
-  try {
-    const env = fs.readFileSync(path.resolve('.env'), 'utf8')
-    const m = env.match(new RegExp(`^${key}=(.*)$`, 'm'))
-    return m ? m[1].trim() : ''
-  } catch { return '' }
-}
-const API_BASE = `${readEnv('VITE_API_URL') || 'https://api.aniraku.tech'}/api/v1`
-const ANILIST_PROXY = `${API_BASE}/anilist`
+// SEO metadata and slug mapping come directly from AniList. The public
+// backend URL is reserved for runtime episode queries in the frontend.
+const ANILIST_ENDPOINT = 'https://graphql.anilist.co'
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
 const PER_PAGE = 50
@@ -113,10 +104,10 @@ function sleep(ms) {
 }
 
 /**
- * Send a GraphQL query to the AniList proxy endpoint.
+ * Send a GraphQL query directly to AniList for sitemap SEO data.
  */
 async function graphqlFetch(query, variables = {}) {
-  const res = await fetch(ANILIST_PROXY, {
+  const res = await fetch(ANILIST_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -131,7 +122,7 @@ async function graphqlFetch(query, variables = {}) {
 }
 
 /**
- * Wake-up ping: fetch 1 item from the backend to trigger cold start.
+ * Warm-up check: fetch one item directly from AniList before generating URLs.
  */
 async function wakeUpPing() {
   try {
@@ -237,7 +228,7 @@ async function fetchAllPages() {
 const today = new Date().toISOString().slice(0, 10)
 
 console.log('Generating sitemaps...')
-console.log(`Backend proxy: ${ANILIST_PROXY}`)
+console.log(`AniList endpoint: ${ANILIST_ENDPOINT}`)
 
 // Step 1: Wake up the backend (wait up to 5 minutes)
 console.log('\n--- Step 1: Waking up backend (max 5 min wait) ---')

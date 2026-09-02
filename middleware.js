@@ -1,4 +1,4 @@
-const BACKEND = 'https://api.aniraku.tech'
+const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 const SITE = 'https://www.aniraku.tech'
 const FALLBACK_IMAGE = `${SITE}/og-image.png`
 
@@ -64,12 +64,36 @@ function htmlShell({ title, description, image, url, type, animeType, score, epi
 </head><body><h1>${title}</h1><p>${description}</p></body></html>`
 }
 
+const ANIME_SEO_QUERY = `
+  query ($id: Int) {
+    Media(id: $id, type: ANIME) {
+      id
+      title { english romaji userPreferred native }
+      description(asHtml: false)
+      coverImage { extraLarge large medium }
+      format
+      episodes
+      averageScore
+      genres
+      startDate { year month day }
+    }
+  }
+`
+
 async function fetchAnime(id) {
-  const res = await fetch(`${BACKEND}/api/v1/anime/${id}`, {
-    headers: { 'User-Agent': 'AnirakuBot/1.0' }
+  const res = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': 'AnirakuBot/1.0',
+    },
+    body: JSON.stringify({ query: ANIME_SEO_QUERY, variables: { id: Number(id) } }),
   })
   if (!res.ok) return null
-  return res.json()
+  const payload = await res.json().catch(() => null)
+  if (payload?.errors?.length) return null
+  return payload?.data?.Media || null
 }
 
 export default async function middleware(request) {
