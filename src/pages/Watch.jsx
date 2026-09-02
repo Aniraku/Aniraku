@@ -20,6 +20,8 @@ import {
   FaStar,
 } from 'react-icons/fa'
 import { API_BASE, PROXY_BASE } from '../config'
+import HomemadeAppleUrl from '../assets/fonts/Homemade-Apple.ttf'
+import ButterflyKidsUrl from '../assets/fonts/Butterfly-Kids.ttf'
 import { anilistQuery, ANIME_DETAIL_QUERY } from '../lib/anilist'
 import Comments from '../components/Comments/Comments'
 import EpisodeSidebar from '../components/Watch/EpisodeSidebar'
@@ -77,7 +79,6 @@ import {
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
 import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
-import { enrichEpisodesWithTmdb } from '../lib/tmdbEpisodes'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -362,6 +363,327 @@ function qualityOptionHtml(presentation) {
 	return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
 }
 
+const SUBTITLE_PREFERENCES_LS_KEY = 'aniraku-subtitle-preferences-v1'
+const PLAYER_PREFERENCES_LS_KEY = 'aniraku-player-preferences-v1'
+const DEFAULT_SUBTITLE_PREFERENCES = Object.freeze({
+  track: 'auto',
+  size: 'medium',
+  color: '#ffffff',
+  background: 'dark',
+  position: 'bottom',
+  font: 'system',
+  weight: '600',
+  outline: 'soft',
+  opacity: '100',
+})
+
+const SUBTITLE_SIZE_OPTIONS = [
+  { value: 'small', label: 'Small · 16px', fontSize: '16px' },
+  { value: 'medium', label: 'Medium · 20px', fontSize: '20px' },
+  { value: 'large', label: 'Large · 26px', fontSize: '26px' },
+  { value: 'xl', label: 'Extra large · 32px', fontSize: '32px' },
+]
+const SUBTITLE_COLOR_OPTIONS = [
+  { value: '#ffffff', label: 'White' },
+  { value: '#fde68a', label: 'Warm yellow' },
+  { value: '#bfdbfe', label: 'Soft blue' },
+  { value: '#bbf7d0', label: 'Soft green' },
+  { value: '#fecaca', label: 'Soft red' },
+]
+const SUBTITLE_BACKGROUND_OPTIONS = [
+  { value: 'dark', label: 'Dark box' },
+  { value: 'solid', label: 'Solid box' },
+  { value: 'light', label: 'Light box' },
+  { value: 'none', label: 'No box' },
+]
+const SUBTITLE_POSITION_OPTIONS = [
+  { value: 'bottom', label: 'Bottom' },
+  { value: 'middle', label: 'Lower middle' },
+  { value: 'top', label: 'Top' },
+]
+const SUBTITLE_FONT_OPTIONS = [
+  { value: 'system', label: 'System sans' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'mono', label: 'Monospace' },
+  { value: 'rounded', label: 'Rounded' },
+  { value: 'homemade-apple', label: 'Homemade Apple' },
+  { value: 'butterfly-kids', label: 'Butterfly Kids' },
+]
+const SUBTITLE_WEIGHT_OPTIONS = [
+  { value: '400', label: 'Regular' },
+  { value: '600', label: 'Semi-bold' },
+  { value: '800', label: 'Bold' },
+]
+const SUBTITLE_OUTLINE_OPTIONS = [
+  { value: 'soft', label: 'Soft outline' },
+  { value: 'strong', label: 'Strong outline' },
+  { value: 'none', label: 'No outline' },
+]
+const SUBTITLE_OPACITY_OPTIONS = [
+  { value: '70', label: '70%' },
+  { value: '85', label: '85%' },
+  { value: '100', label: '100%' },
+]
+
+const ADAPTIVE_BANDWIDTH_THRESHOLDS = [
+  { minMbps: 1.8, maxHeight: 1080, label: '1080p' },
+  { minMbps: 1.0, maxHeight: 720, label: '720p' },
+  { minMbps: 0, maxHeight: 480, label: '480p' },
+]
+
+const FIXED_QUALITY_OPTIONS = [
+  { value: '1080', label: '1080P', height: 1080, maxBitrate: 2_000_000 },
+  { value: '720', label: '720P', height: 720, maxBitrate: 1_000_000 },
+  { value: '480', label: '480P', height: 480, maxBitrate: 750_000 },
+  { value: '360', label: '360P', height: 360, maxBitrate: 500_000 },
+]
+
+const SPEED_LIMIT_OPTIONS = [
+  { value: 'adaptive', label: 'Adaptive bandwidth · 480p/720p/1080p', maxBitrate: Infinity, maxHeight: Infinity },
+  { value: 'auto', label: 'Auto · all qualities', maxBitrate: Infinity, maxHeight: Infinity },
+  { value: '0.5', label: '0.5 Mbps · ≤360p', maxBitrate: 500_000, maxHeight: 360 },
+  { value: '1', label: '1 Mbps · ≤480p', maxBitrate: 1_000_000, maxHeight: 480 },
+  { value: '2', label: '2 Mbps · ≤720p', maxBitrate: 2_000_000, maxHeight: 720 },
+  { value: '4', label: '4 Mbps · ≤1080p', maxBitrate: 4_000_000, maxHeight: 1080 },
+  { value: '8', label: '8 Mbps · ≤1440p', maxBitrate: 8_000_000, maxHeight: 1440 },
+]
+
+function readCookie(name) {
+  try {
+    const match = document.cookie.split('; ').find((entry) => entry.startsWith(`${name}=`))
+    return match ? decodeURIComponent(match.slice(name.length + 1)) : ''
+  } catch {
+    return ''
+  }
+}
+
+function writeCookie(name, value) {
+  try {
+    document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=31536000; Path=/; SameSite=Lax`
+  } catch {
+    // Cookies can be disabled; localStorage remains the fallback.
+  }
+}
+
+function readPlayerPreferences() {
+  try {
+    const raw = readCookie(PLAYER_PREFERENCES_LS_KEY) || localStorage.getItem(PLAYER_PREFERENCES_LS_KEY) || '{}'
+    const stored = JSON.parse(raw)
+    return {
+      volume: Number.isFinite(Number(stored?.volume)) ? Math.max(0, Math.min(1, Number(stored.volume))) : 0.7,
+      muted: Boolean(stored?.muted),
+      playbackRate: Number.isFinite(Number(stored?.playbackRate)) ? Math.max(0.5, Math.min(2, Number(stored.playbackRate))) : 1,
+      qualityMode: stored?.qualityMode === 'auto' ? 'auto' : stored?.qualityMode === 'adaptive' ? 'adaptive' : null,
+      qualityTarget: [1080, 720, 480, 360].includes(Number(stored?.qualityTarget)) ? Number(stored.qualityTarget) : null,
+    }
+  } catch {
+    return { volume: 0.7, muted: false, playbackRate: 1, qualityMode: null, qualityTarget: null }
+  }
+}
+
+function persistPlayerPreferences(preferences) {
+  const serialized = JSON.stringify(preferences)
+  writeCookie(PLAYER_PREFERENCES_LS_KEY, serialized)
+  try {
+    localStorage.setItem(PLAYER_PREFERENCES_LS_KEY, serialized)
+  } catch {
+    // Cookies are the primary persistence layer when storage is disabled.
+  }
+}
+
+function readSubtitlePreferences() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SUBTITLE_PREFERENCES_LS_KEY) || '{}')
+    return { ...DEFAULT_SUBTITLE_PREFERENCES, ...(stored && typeof stored === 'object' ? stored : {}) }
+  } catch {
+    return { ...DEFAULT_SUBTITLE_PREFERENCES }
+  }
+}
+
+function persistSubtitlePreferences(preferences) {
+  try {
+    localStorage.setItem(SUBTITLE_PREFERENCES_LS_KEY, JSON.stringify(preferences))
+  } catch {
+    // Storage can be disabled in private browsing; captions must still work.
+  }
+}
+
+function normalizeSubtitleType(url) {
+  const extension = String(url || '').split('?')[0].split('#')[0].split('.').pop()?.toLowerCase()
+  return extension === 'srt' || extension === 'ass' || extension === 'vtt' ? extension : 'vtt'
+}
+
+function normalizeSubtitleTracks(subtitles) {
+  const seen = new Set()
+  return (Array.isArray(subtitles) ? subtitles : [])
+    .map((track, index) => {
+      const url = String(track?.url || '').trim()
+      if (!url || seen.has(url)) return null
+      seen.add(url)
+      const lang = String(track?.lang || '').trim().toLowerCase()
+      const label = String(track?.label || '').trim() || (
+        lang === 'en' || lang === 'eng' || lang === 'english' ? 'English' :
+        lang === 'th' ? 'Thai' :
+        lang === 'vi' ? 'Vietnamese' :
+        lang === 'id' ? 'Indonesian' :
+        lang ? lang.toUpperCase() : `Subtitle ${index + 1}`
+      )
+      return {
+        id: `${index}:${url}`,
+        url,
+        lang,
+        label,
+        type: normalizeSubtitleType(url),
+      }
+    })
+    .filter(Boolean)
+}
+
+function getDefaultSubtitleTrack(tracks) {
+  return tracks.find((track) => /^(en|eng|english)(?:[-_].*)?$/i.test(track.lang) || /english/i.test(track.label)) || tracks[0] || null
+}
+
+function getSubtitleStyle(preferences) {
+  const size = SUBTITLE_SIZE_OPTIONS.find((item) => item.value === preferences?.size) || SUBTITLE_SIZE_OPTIONS[1]
+  const background = {
+    dark: 'rgba(0, 0, 0, 0.72)',
+    solid: 'rgba(15, 23, 42, 0.94)',
+    light: 'rgba(255, 255, 255, 0.92)',
+    none: 'transparent',
+  }[preferences?.background] || 'rgba(0, 0, 0, 0.72)'
+  const fontFamily = {
+    system: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    rounded: 'ui-rounded, "Trebuchet MS", Arial, sans-serif',
+    'homemade-apple': '"Homemade Apple", cursive',
+    'butterfly-kids': '"Butterfly Kids", cursive',
+  }[preferences?.font] || 'Inter, ui-sans-serif, system-ui, sans-serif'
+  const textShadow = {
+    soft: '0 1px 3px rgba(0, 0, 0, 0.92)',
+    strong: '0 2px 5px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 1)',
+    none: 'none',
+  }[preferences?.outline] || '0 1px 3px rgba(0, 0, 0, 0.92)'
+  const position = {
+    bottom: { bottom: '8%', top: 'auto' },
+    middle: { bottom: '28%', top: 'auto' },
+    top: { bottom: 'auto', top: '12%' },
+  }[preferences?.position] || { bottom: '8%', top: 'auto' }
+  return {
+    ...position,
+    left: '4%',
+    right: '4%',
+    width: '92%',
+    color: preferences?.color || '#ffffff',
+    fontSize: size.fontSize,
+    fontFamily,
+    fontWeight: preferences?.weight || '600',
+    lineHeight: '1.35',
+    backgroundColor: background,
+    borderRadius: preferences?.background === 'none' ? '0' : '5px',
+    padding: preferences?.background === 'none' ? '2px 0' : '4px 10px',
+    textShadow,
+    opacity: `${Number(preferences?.opacity || 100) / 100}`,
+    boxSizing: 'border-box',
+    textAlign: 'center',
+    letterSpacing: ['homemade-apple', 'butterfly-kids'].includes(preferences?.font) ? '0.015em' : 'normal',
+  }
+}
+
+function applySubtitleStyle(art, preferences) {
+  const subtitle = art?.template?.$subtitle
+  if (!subtitle) return
+  const style = getSubtitleStyle(preferences)
+  Object.assign(subtitle.style, style)
+  subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
+    Object.assign(line.style, {
+      color: style.color,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+      textShadow: style.textShadow,
+      letterSpacing: style.letterSpacing,
+    })
+  })
+}
+
+function syncArtPlayerSetting(art, name, value, label) {
+  const setting = art?.setting?.find?.(name)
+  if (!setting) return
+  if (label) {
+    setting.html = label
+    setting.tooltip = label
+  }
+  if (Array.isArray(setting.selector)) {
+    setting.selector.forEach((option) => {
+      const selected = String(option.value) === String(value)
+      option.default = selected
+      if (option.$item) option.$item.classList.toggle('art-current', selected)
+    })
+  }
+}
+
+function getSpeedLimitOption(value) {
+  return SPEED_LIMIT_OPTIONS.find((item) => item.value === String(value)) || SPEED_LIMIT_OPTIONS[0]
+}
+
+function getHlsLevelLabel(level) {
+  const height = Number(level?.height || 0)
+  const bitrate = Number(level?.bitrate || 0)
+  if (height > 0) return `${height}p`
+  if (bitrate > 0) return `${Math.round(bitrate / 1000)}kbps`
+  return 'Source'
+}
+
+function getAdaptiveBandwidthPolicy(downlinkMbps, levels = []) {
+  const speed = Number(downlinkMbps)
+  const threshold = Number.isFinite(speed) && speed > 0
+    ? ADAPTIVE_BANDWIDTH_THRESHOLDS.find((item) => speed >= item.minMbps) || ADAPTIVE_BANDWIDTH_THRESHOLDS.at(-1)
+    : null
+  if (!threshold) return { mode: 'auto', speedMbps: 0, maxHeight: Infinity, label: 'Auto' }
+  const usable = (Array.isArray(levels) ? levels : [])
+    .filter((level) => Number(level?.height) > 0)
+    .sort((a, b) => Number(b.height) - Number(a.height) || Number(b.bitrate) - Number(a.bitrate))
+  const selected = usable.find((level) => Number(level.height) <= threshold.maxHeight) || usable.at(-1) || null
+  return {
+    mode: 'bandwidth',
+    speedMbps: speed,
+    maxHeight: threshold.maxHeight,
+    label: threshold.label,
+    level: selected,
+  }
+}
+
+function selectLevelForQualityTarget(levels, targetHeight, maxBitrate = Infinity) {
+  const usable = (Array.isArray(levels) ? levels : []).filter((level) => Number(level?.height) > 0)
+  if (!usable.length) return null
+  const target = Number(targetHeight)
+  const underBudget = usable.filter((level) => {
+    const bitrate = Number(level?.bitrate || 0)
+    return bitrate <= 0 || bitrate <= Number(maxBitrate)
+  })
+  const candidates = underBudget.length ? underBudget : usable
+  return [...candidates].sort((a, b) => {
+    const aHeight = Number(a.height)
+    const bHeight = Number(b.height)
+    const aUnderTarget = aHeight <= target
+    const bUnderTarget = bHeight <= target
+    if (aUnderTarget !== bUnderTarget) return aUnderTarget ? -1 : 1
+    return Math.abs(bHeight - target) - Math.abs(aHeight - target) || bHeight - aHeight
+  })[0]
+}
+
+function selectLevelForSpeed(levels, speedValue) {
+  const option = getSpeedLimitOption(speedValue)
+  if (option.value === 'auto') return null
+  const usable = (Array.isArray(levels) ? levels : []).filter((level) => Number(level?.height) > 0)
+  const byBitrate = usable.filter((level) => Number(level?.bitrate) > 0 && Number(level.bitrate) <= option.maxBitrate)
+  const byHeight = usable.filter((level) => Number(level.height) <= option.maxHeight)
+  const candidates = byBitrate.length > 0 ? byBitrate : byHeight
+  return [...(candidates.length > 0 ? candidates : usable)].sort((a, b) => Number(b.height) - Number(a.height) || Number(b.bitrate) - Number(a.bitrate))[0] || null
+}
+
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
 // Some upstreams embed UTC expiry stamps such as 20260808014918 in the
 // stream URL. A token whose newest valid timestamp is already in the past is
@@ -511,8 +833,13 @@ function buildQualityList(sources, suppressedUrls = new Set()) {
 			label: entry.presentation.label,
 		qualityKey: entry.presentation.key,
 		qualityRank: entry.presentation.rank,
-		isAuto: entry.presentation.isAuto,
-	}))
+      isAuto: entry.presentation.isAuto,
+      subtitles: Array.isArray(entry.src?.subtitles) ? entry.src.subtitles : [],
+		}))
+}
+
+function hasAnyStreamSource(payload) {
+  return Array.isArray(payload?.sources) && payload.sources.some((source) => source?.url)
 }
 
 function seekControlHtml(direction) {
@@ -744,6 +1071,7 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
     setActiveSource,
     showToast,
     setTheaterMode,
+    switchSubtitle,
   } = options
   const toastTimeoutRef = useRef(null)
   useEffect(() => {
@@ -839,23 +1167,11 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
         e.preventDefault()
         if (art) {
           const subtitles = art._anirakuSubtitles || []
-          if (subtitles.length > 0) {
-            const currentSub = art.subtitle?.url
+          if (subtitles.length > 0 && typeof switchSubtitle === 'function') {
+            const currentSub = art._anirakuActiveSubtitleUrl || art.subtitle?.option?.url || art.subtitle?.url
             const currentIdx = subtitles.findIndex((s) => s.url === currentSub)
             const nextIdx = (currentIdx + 1) % (subtitles.length + 1)
-            if (nextIdx === 0 || nextIdx >= subtitles.length) {
-              art.subtitle = null
-              showToast('Subtitles Off')
-            } else {
-              const sub = subtitles[nextIdx]
-              if (!sub.url) {
-                art.subtitle = null
-                showToast('Subtitles Off')
-              } else {
-                art.subtitle = { url: sub.url, type: 'srt' }
-                showToast(`Subtitles: ${sub.label || 'Track ' + nextIdx}`)
-              }
-            }
+            switchSubtitle(nextIdx >= subtitles.length ? null : subtitles[nextIdx])
           } else {
             showToast('No subtitles available')
           }
@@ -950,6 +1266,7 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
     setActiveSource,
     showToast,
     setTheaterMode,
+    switchSubtitle,
   ])
 }
 
@@ -958,6 +1275,31 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
 // ────────────────────────────────────────────────────────────────
 export default function Watch() {
   const { slugId } = useParams()
+
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.dataset.anirakuCaptionFont = 'custom-google-fonts'
+    style.textContent = `
+      @font-face {
+        font-family: 'Homemade Apple';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('${HomemadeAppleUrl}') format('truetype');
+      }
+      @font-face {
+        font-family: 'Butterfly Kids';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('${ButterflyKidsUrl}') format('truetype');
+      }
+    `
+    document.head.appendChild(style)
+    document.fonts?.load('400 32px "Homemade Apple"')
+    document.fonts?.load('400 32px "Butterfly Kids"')
+    return () => style.remove()
+  }, [])
   const navigate = useNavigate()
   const { user } = useAuth()
   const { nsfwEnabled } = useNsfw()
@@ -1112,6 +1454,25 @@ export default function Watch() {
   }, [activeEmbedUrl])
   const [retryAttempt, setRetryAttempt] = useState(0)
   const [buffering, setBuffering] = useState(false)
+  const [subtitlePreferences, setSubtitlePreferences] = useState(readSubtitlePreferences)
+  const playerPreferencesRef = useRef(readPlayerPreferences())
+  const [subtitleTrackCount, setSubtitleTrackCount] = useState(0)
+  const subtitlePreferencesRef = useRef(subtitlePreferences)
+  subtitlePreferencesRef.current = subtitlePreferences
+
+  const setSubtitlePreference = useCallback((key, value) => {
+    const next = { ...subtitlePreferencesRef.current, [key]: value }
+    subtitlePreferencesRef.current = next
+    setSubtitlePreferences(next)
+    persistSubtitlePreferences(next)
+    const art = artInstance.current
+    if (art?.subtitle?.style) {
+      art.subtitle.style(getSubtitleStyle(next))
+      art.subtitle.update?.()
+      applySubtitleStyle(art, next)
+    }
+    return next
+  }, [])
 
   // Verified skip intervals from the provider and AniSkip. Provider data
   // wins when present; AniSkip supplies anime-wide coverage by MAL ID.
@@ -1153,6 +1514,18 @@ export default function Watch() {
     } catch {}
     return next
   }, [])
+
+  // Auto-next for embedded players (toggled from Settings page).
+  const [autoNextEmbed, setAutoNextEmbed] = useState(() => {
+    try { return localStorage.getItem('aniraku-auto-next-embed') === 'true' }
+    catch { return false }
+  })
+  const autoNextEmbedRef = useRef(autoNextEmbed)
+  autoNextEmbedRef.current = autoNextEmbed
+
+  // Embed playback tracking — silent background progress + auto-next.
+  const embedStartTimeRef = useRef(null)
+  const embedAutoNextFiredRef = useRef(false)
 
   const applySkipSegments = useCallback((incoming) => {
     const merged = mergeSkipSegments(skipSegmentsRef.current, incoming)
@@ -1260,16 +1633,16 @@ export default function Watch() {
   const syncConnectedRef = useRef(null) // null = not fetched yet
   const syncProgressRef = useRef(null)
   const skipSwitchSyncRef = useRef(false) // episode already synced on 'ended'
-  const syncWatchProgress = useCallback(async (mode = 'completed') => {
+  const embedElapsedRef = useRef(0)
+  const embedDurationRef = useRef(0)
+  const syncWatchProgress = useCallback(async (mode = 'completed', embedOverride = null) => {
     if (!user) return
-    // Only sync when something actually played: no player, no stream, or a
-    // 0-duration source (empty/upcoming episodes) must never mark progress.
     const art = artInstance.current
-    if (!art?.video) return
-    const el = art.video
-    const dur = Math.floor(el.duration || 0)
+    const el = art?.video
+    // Use embed data when ArtPlayer video is unavailable (embed playback mode).
+    const dur = el ? Math.floor(el.duration || 0) : (embedOverride?.duration || 0)
     if (noStreamError || dur <= 0) return
-    const played = Math.floor(el.currentTime || 0)
+    const played = el ? Math.floor(el.currentTime || 0) : (embedOverride?.elapsed || 0)
     if (played <= 0) return
     let synced = []
     let failed = []
@@ -1701,6 +2074,15 @@ export default function Watch() {
     setShowEndedOverlay(false)
   }, [])
 
+  const switchSubtitle = useCallback((track) => {
+    const art = artInstance.current
+    if (typeof art?._anirakuSwitchSubtitle === 'function') {
+      return art._anirakuSwitchSubtitle(track)
+    }
+    showToast('Captions are not ready yet')
+    return null
+  }, [showToast])
+
   // Global keyboard shortcuts
   useKeyboardShortcuts(artInstance, null, {
     onNext: goNext,
@@ -1712,6 +2094,7 @@ export default function Watch() {
     theaterMode,
     setTheaterMode,
     containerRef: playerContainerRef,
+    switchSubtitle,
   })
 
   // ────────────────────────────────────────────────────────────
@@ -1740,7 +2123,7 @@ export default function Watch() {
           fetchWithRetry(
             `${API_BASE}/api/v1/anime/${animeId}/episodes`,
             { method: 'GET' },
-            { maxRetries: 2, timeoutMs: 12_000 }
+            { maxRetries: 2, timeoutMs: 180_000 }
           ).then((r) => (r ? r.json() : { episodes: [] })),
         ])
         if (cancelled) return
@@ -1817,13 +2200,9 @@ export default function Watch() {
             : 'available'
         )
         setBackendHealthy(true)
-        const verifiedEpisodes = await enrichEpisodesWithTmdb(animeId, normalizedEpisodes, {
-          fallbackThumbnail,
-          fallbackTitle,
-          isMovie: isMovieFormat,
-        }).catch(() => normalizedEpisodes)
-        if (cancelled) return
-        setEpisodes(verifiedEpisodes)
+        // Backend now serves unlimited AniZip ↔ TMDB (verified + Fribb fallback) at
+        // GET /api/v1/anime/:id/episodes, so no frontend enrich needed.
+        // Episode titles/thumbnails are already merged server-side.
       } catch (e) {
         if (cancelled) return
         setBackendHealthy(false)
@@ -2294,11 +2673,6 @@ export default function Watch() {
 	          if (buildIdRef.current !== myBuildId) return
 	          if (transportIndex + 1 < transportPlan.length) {
 	            transportIndex += 1
-	            showToast(
-					transportPlan[transportIndex].mode === 'direct'
-						? 'Trying direct playback…'
-						: 'Trying the media proxy…'
-				)
 	            tryUrl(
 					transportPlan[transportIndex].url,
 					transportPlan[transportIndex].mode === 'proxy'
@@ -2306,9 +2680,9 @@ export default function Watch() {
 	            return
 	          }
           if (shouldTryHlsFallback(url) && await tryHls()) return
-	          showToast('Direct playback failed — choose another server if needed.', { long: true })
+	          showToast('Playback failed.', { long: true })
           if (onBlocked) onBlocked('native-media-error')
-          else setError('Stream playback error. Try a different server.')
+          else setError('Playback failed.')
         }
       }
 
@@ -2325,6 +2699,98 @@ export default function Watch() {
 	        })
 	        if (onBlocked) onBlocked('playback-error')
         else setError('Stream playback error. Try a different server.')
+      }
+
+      const subtitleTracks = normalizeSubtitleTracks(subtitles)
+      setSubtitleTrackCount(subtitleTracks.length)
+      const savedSubtitleTrack = subtitlePreferencesRef.current.track
+      const preferredSubtitleTrack = savedSubtitleTrack === 'off'
+        ? null
+        : subtitleTracks.find((track) => track.url === savedSubtitleTrack) || getDefaultSubtitleTrack(subtitleTracks)
+      // Keep one source track mounted so ArtPlayer can switch tracks later even
+      // when the viewer starts with captions turned off.
+      const initialSubtitleTrack = preferredSubtitleTrack || subtitleTracks[0] || null
+      const subtitleSettingOptions = subtitleTracks.length > 0
+        ? [
+            { default: savedSubtitleTrack === 'off', html: 'Off', value: 'off' },
+            ...subtitleTracks.map((track) => ({
+              default: track.url === preferredSubtitleTrack?.url,
+              html: escapeHtml(track.label),
+              value: track.url,
+            })),
+          ]
+        : []
+      const subtitleSetting = subtitleTracks.length > 0
+        ? {
+            name: 'subtitleTrack',
+            width: 260,
+            html: `Subtitles · ${preferredSubtitleTrack?.label || 'Off'}`,
+            selector: subtitleSettingOptions,
+            onSelect: (item) => {
+              const track = subtitleTracks.find((candidate) => candidate.url === item.value) || null
+              const subtitleLabel = item.value === 'off' ? 'Subtitles · Off' : `Subtitles · ${track?.label || 'Track'}`
+              switchSubtitleTrack(track)
+              syncArtPlayerSetting(artInstance.current, 'subtitleTrack', item.value, subtitleLabel)
+              return subtitleLabel
+            },
+          }
+        : null
+      const makeSubtitleStyleSetting = (name, label, key, options, getLabel = (item) => item.label) => ({
+        name,
+        width: 260,
+        html: `${label} · ${getLabel(options.find((option) => String(subtitlePreferencesRef.current[key]) === String(option.value)) || options[0] || {})}`,
+        selector: options.map((item) => ({
+          default: String(subtitlePreferencesRef.current[key]) === String(item.value),
+          html: escapeHtml(getLabel(item)),
+          value: item.value,
+        })),
+        onSelect: (item) => {
+          setSubtitlePreference(key, item.value)
+          const selectedLabel = getLabel(options.find((option) => String(option.value) === String(item.value)) || item)
+          syncArtPlayerSetting(artInstance.current, name, item.value, `${label} · ${selectedLabel}`)
+          return selectedLabel
+        },
+      })
+      const subtitleStyleSettings = [
+        makeSubtitleStyleSetting('subtitleSize', 'Caption size', 'size', SUBTITLE_SIZE_OPTIONS),
+        makeSubtitleStyleSetting('subtitleColor', 'Caption color', 'color', SUBTITLE_COLOR_OPTIONS),
+        makeSubtitleStyleSetting('subtitleBackground', 'Caption background', 'background', SUBTITLE_BACKGROUND_OPTIONS),
+        makeSubtitleStyleSetting('subtitlePosition', 'Caption position', 'position', SUBTITLE_POSITION_OPTIONS),
+        makeSubtitleStyleSetting('subtitleFont', 'Caption font', 'font', SUBTITLE_FONT_OPTIONS),
+        makeSubtitleStyleSetting('subtitleWeight', 'Caption weight', 'weight', SUBTITLE_WEIGHT_OPTIONS),
+        makeSubtitleStyleSetting('subtitleOutline', 'Caption outline', 'outline', SUBTITLE_OUTLINE_OPTIONS),
+        makeSubtitleStyleSetting('subtitleOpacity', 'Caption opacity', 'opacity', SUBTITLE_OPACITY_OPTIONS),
+      ]
+
+      const switchSubtitleTrack = async (track) => {
+        const art = artInstance.current
+        const nextTrack = track && subtitleTracks.some((candidate) => candidate.url === track.url) ? track : null
+        setSubtitlePreference('track', nextTrack ? nextTrack.url : 'off')
+        if (art) art._anirakuActiveSubtitleUrl = nextTrack?.url || null
+        if (!art?.subtitle) return null
+        if (!nextTrack) {
+          art._anirakuSubtitleEnabled = false
+          art.template?.$subtitle?.style && Object.assign(art.template.$subtitle.style, { display: 'none' })
+          if (art.template?.$subtitle) art.template.$subtitle.innerHTML = ''
+          if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'disabled'
+          showToast('Subtitles Off')
+          return null
+        }
+        art._anirakuSubtitleEnabled = true
+        if (art.template?.$subtitle) art.template.$subtitle.style.display = ''
+        const result = await art.subtitle.switch(proxied(nextTrack.url), {
+          type: nextTrack.type,
+          name: nextTrack.label,
+          encoding: 'utf-8',
+          style: getSubtitleStyle(subtitlePreferencesRef.current),
+        }).catch(() => null)
+        if (result) {
+          applySubtitleStyle(art, subtitlePreferencesRef.current)
+          art.subtitle.update?.()
+          applySubtitleStyle(art, subtitlePreferencesRef.current)
+          showToast(`Subtitles: ${nextTrack.label}`, { icon: 'ok' })
+        }
+        return result
       }
 
       const playerConfig = {
@@ -2358,7 +2824,7 @@ export default function Watch() {
         setting: true,
         hotkey: false,
         theme: '#e2e8f0',
-        volume: 0.7,
+        volume: playerPreferencesRef.current.volume,
         isLive: false,
         lang:
           (navigator.language || 'en').toLowerCase() === 'zh-cn' ? 'zh-cn' : 'en',
@@ -2430,6 +2896,7 @@ export default function Watch() {
               return getQualitySettingTitle(selected)
             },
           },
+          ...(subtitleSetting ? [subtitleSetting, ...subtitleStyleSettings] : subtitleStyleSettings),
           {
             name: 'autoSkip',
             width: 220,
@@ -2456,23 +2923,27 @@ export default function Watch() {
           {
             name: 'playbackSpeed',
             width: 180,
-            html: 'Playback speed',
+            html: `Playback speed · ${playerPreferencesRef.current.playbackRate}×`,
             selector: [
-              { html: '0.5×', value: 0.5 },
-              { html: '0.75×', value: 0.75 },
-              { default: true, html: 'Normal (1×)', value: 1 },
-              { html: '1.25×', value: 1.25 },
-              { html: '1.5×', value: 1.5 },
-              { html: '1.75×', value: 1.75 },
-              { html: '2×', value: 2 },
+              { default: playerPreferencesRef.current.playbackRate === 0.5, html: '0.5×', value: 0.5 },
+              { default: playerPreferencesRef.current.playbackRate === 0.75, html: '0.75×', value: 0.75 },
+              { default: playerPreferencesRef.current.playbackRate === 1, html: 'Normal (1×)', value: 1 },
+              { default: playerPreferencesRef.current.playbackRate === 1.25, html: '1.25×', value: 1.25 },
+              { default: playerPreferencesRef.current.playbackRate === 1.5, html: '1.5×', value: 1.5 },
+              { default: playerPreferencesRef.current.playbackRate === 1.75, html: '1.75×', value: 1.75 },
+              { default: playerPreferencesRef.current.playbackRate === 2, html: '2×', value: 2 },
             ],
             onSelect: (item) => {
               const video = artInstance.current?.video
               if (video && Number.isFinite(Number(item.value))) {
-                video.playbackRate = Number(item.value)
+                const playbackRate = Number(item.value)
+                video.playbackRate = playbackRate
+                playerPreferencesRef.current = { ...playerPreferencesRef.current, playbackRate }
+                persistPlayerPreferences(playerPreferencesRef.current)
+                syncArtPlayerSetting(artInstance.current, 'playbackSpeed', playbackRate, `Playback speed · ${playbackRate}×`)
                 showToast(`Speed ${item.value}x`, { icon: 'ok' })
               }
-              return item.html
+              return `Playback speed · ${item.value}×`
             },
           },
         ],
@@ -2552,8 +3023,8 @@ export default function Watch() {
 	                if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
 	              }
 	              variants.sort((a, b) => b.height - a.height)
-	              if (variants.length < 2 || !art?.setting?.update) return
-	              const nativeQualityList = [
+              if (variants.length < 2 || !art?.setting?.update) return
+              const nativeQualityList = [
 	                {
 	                  default: true,
 	                  html: qualityOptionHtml(getQualityPresentation('auto')),
@@ -2567,10 +3038,10 @@ export default function Watch() {
 	                  type: 'hls',
 	                })),
 	              ]
-	              art.setting.update({
-	                name: 'quality',
-	                width: 220,
-	                html: 'Quality',
+              art.setting.update({
+                name: 'quality',
+                width: 220,
+                html: 'Quality',
 	                selector: [
 	                  { default: true, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
 	                  ...variants.map((variant) => ({
@@ -2580,24 +3051,26 @@ export default function Watch() {
 	                  })),
 	                ],
 	                onSelect: (item) => {
-	                  const selected = item.value === 'auto'
+                          const selected = item.value === 'auto'
 	                    ? nativeQualityList[0]
-	                    : variants.find((variant) => item.html.includes(`${variant.height}p`))
+	                  : variants.find((variant) => variant.url === item.value)
 	                  const next = selected?.url || url
 	                  const resumeAt = Number(video.currentTime || 0)
 	                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
 	                  buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
-	                  return item.html
-	                },
-	              })
-	            } catch {}
-	          }
+	                                    return item.html
+                },
+              })
+            } catch {}
+          }
+
             // Kiwi is verified on the native proxy-first HLS branch. Ally and
             // other manifests remain on hls.js, whose bounded buffer and media
             // recovery avoid falling through to an expired embed page.
             if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
-	              try {
-	                video.src = hlsTransportPlan[hlsTransportIndex].url
+		              try {
+		                video.preload = getNativeMediaBufferPolicy().preload
+		                video.src = hlsTransportPlan[hlsTransportIndex].url
 	                if (pendingHandoffRef.current?.shouldPlay !== false) {
 	                  const p = video.play()
 	                  if (p && typeof p.catch === 'function') p.catch(() => {})
@@ -2622,8 +3095,9 @@ export default function Watch() {
             }
 	            if (!Hls.isSupported()) {
 	              // last-resort native
-	              try {
-	                video.src = proxiedH(url)
+		              try {
+		                video.preload = getNativeMediaBufferPolicy().preload
+		                video.src = proxiedH(url)
 	                if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
 	              } catch {}
               return
@@ -2636,6 +3110,10 @@ export default function Watch() {
             const bufferPolicy = getHlsBufferPolicy(netHintRef.current, { kiwi: shouldPreferNativeHls(url) })
             const hls = new Hls({
               enableWorker: false,
+              // User-selected bandwidth caps must not be replaced by the
+              // viewport-size cap. The quality menu owns this policy.
+              capLevelToPlayerSize: false,
+              minAutoBitrate: 0,
               // Hold a substantial forward reserve for VOD playback. The
               // policy scales down on constrained networks and remains bounded
               // to let the browser's MediaSource eviction protect device RAM.
@@ -2674,14 +3152,13 @@ export default function Watch() {
 				video.addEventListener('playing', markPlaybackStarted, { once: true })
 	            const fail = () => {
 	              if (buildIdRef.current !== myBuildId) return
-	              showToast('Stream issue — keeping the selected server.', { long: true })
 	              if (onBlocked) {
 	                onBlocked(
 	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
 	                  { streamUrl: url }
 	                )
 	              }
-              else setError('Stream playback error. Try a different server.')
+              else setError('Playback failed.')
             }
 	            hls.on(Hls.Events.ERROR, (_event, data) => {
               if (buildIdRef.current !== myBuildId) return
@@ -2707,6 +3184,20 @@ export default function Watch() {
                   mediaRetries += 1
                   try {
                     hls.recoverMediaError()
+                    const manualLevel = Number(hls._anirakuForcedLevel)
+                    const adaptiveCap = Number(hls._anirakuAdaptiveCap)
+                    if (Number.isInteger(manualLevel) && manualLevel >= 0) {
+                      hls.autoLevelCapping = -1
+                      hls.startLevel = manualLevel
+                      hls.loadLevel = manualLevel
+                      hls.currentLevel = manualLevel
+                      hls.nextLevel = manualLevel
+                    } else if (Number.isInteger(adaptiveCap) && adaptiveCap >= 0) {
+                      hls.autoLevelCapping = adaptiveCap
+                      hls.startLevel = -1
+                      hls.currentLevel = -1
+                      hls.nextLevel = -1
+                    }
                   } catch {}
                   return
                 }
@@ -2719,10 +3210,9 @@ export default function Watch() {
 						// playback evidence. Before the video has actually started, make
 						// the bounded direct retry instead of staying in proxy recovery.
 						if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
-							hlsTransportIndex += 1
+								hlsTransportIndex += 1
 							try {
 								mediaRetries = 0
-								showToast(`${hlsTransportPlan[hlsTransportIndex - 1]?.mode === 'direct' ? 'Direct' : 'Proxy'} stream failed before playback — trying ${hlsTransportPlan[hlsTransportIndex].mode}.`, { long: true })
 								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
 								return
 							} catch {}
@@ -2733,23 +3223,90 @@ export default function Watch() {
 	              fail()
             })
 	            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-			              const levels = (hls.levels || [])
+                const levels = (hls.levels || [])
 	                .map((level, index) => ({
 	                  index,
 	                  height: Number(level?.height || 0),
-	                  bitrate: Number(level?.bitrate || 0),
+	                  bitrate: Number(level?.bitrate || level?.averageBitrate || level?.bandwidth || 0),
 	                }))
-	                .filter((level, index, list) =>
-	                  level.height > 0 && list.findIndex((item) => item.height === level.height) === index
-	                )
+	                .filter((level, index, list) => {
+	                  if (level.height <= 0 && level.bitrate <= 0) return false
+	                  const key = level.height > 0 ? `height:${level.height}` : `bitrate:${level.bitrate}`
+	                  return list.findIndex((item) => {
+	                    const itemKey = item.height > 0 ? `height:${item.height}` : `bitrate:${item.bitrate}`
+	                    return itemKey === key
+	                  }) === index
+	                })
 	                .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
-	              if (levels.length > 1 && art?.setting?.update) {
-	                const auto = getQualityPresentation('auto')
+              if (levels.length > 0 && art?.setting?.update) {
+                const auto = getQualityPresentation('auto')
 	                const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
-	                const dataSaver = getHlsDataSaverCap(levels)
-	                let dataSaverCap = null
-	                const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
-	                  const display = getHlsQualitySettingDisplay(levels, level, dataSaverCap)
+                const dataSaver = getHlsDataSaverCap(levels)
+                let dataSaverCap = null
+                const adaptivePolicy = getAdaptiveBandwidthPolicy(netHintRef.current?.downlink, levels)
+                let adaptiveCap = adaptivePolicy.level?.index ?? null
+                let speedLimit = playerPreferencesRef.current.qualityMode || (adaptivePolicy.mode === 'bandwidth' ? 'adaptive' : 'auto')
+                let forcedLevel = null
+                const persistedQualityTarget = playerPreferencesRef.current.qualityTarget
+                let forcedQualityLabel = persistedQualityTarget ? `${persistedQualityTarget}P` : (adaptivePolicy.maxHeight === Infinity ? '1080P' : `${adaptivePolicy.maxHeight}P`)
+                const getLiveAdaptiveSpeedMbps = () => {
+                  const measured = Number(hls.bandwidthEstimate) / 1_000_000
+                  const browserHint = Number(netHintRef.current?.downlink)
+                  return Number.isFinite(measured) && measured > 0
+                    ? measured
+                    : Number.isFinite(browserHint) && browserHint > 0 ? browserHint : 0
+                }
+                const applyAdaptiveCap = () => {
+                  const adaptive = getAdaptiveBandwidthPolicy(getLiveAdaptiveSpeedMbps(), levels)
+                  adaptiveCap = adaptive.level?.index ?? null
+                  hls._anirakuAdaptiveCap = adaptiveCap
+                  hls.autoLevelCapping = adaptiveCap ?? -1
+                  hls.config.minAutoBitrate = 0
+                  hls.startLevel = -1
+                  hls.nextAutoLevel = -1
+                  hls.currentLevel = -1
+                  hls.nextLevel = -1
+                  return adaptive
+                }
+                hls._anirakuForcedLevel = null
+                hls._anirakuAdaptiveCap = adaptiveCap
+                if (persistedQualityTarget) {
+                  const persistedTargetLevel = selectLevelForQualityTarget(
+                    levels,
+                    persistedQualityTarget,
+                    FIXED_QUALITY_OPTIONS.find((option) => option.height === persistedQualityTarget)?.maxBitrate
+                  )
+                  adaptiveCap = persistedTargetLevel?.index ?? adaptiveCap
+                  hls._anirakuAdaptiveCap = adaptiveCap
+                  hls.autoLevelCapping = adaptiveCap ?? -1
+                  hls.currentLevel = -1
+                  hls.nextLevel = -1
+                } else if (speedLimit === 'adaptive' && adaptiveCap !== null) {
+                  hls.autoLevelCapping = adaptiveCap
+                }
+                const getSpeedCappedDisplay = (level) => {
+                  const selected = levels.find((candidate) => Number(candidate.index) === Number(level))
+                  if (forcedQualityLabel) {
+                    return { label: forcedQualityLabel, title: getQualitySettingTitle({ label: forcedQualityLabel }) }
+                  }
+                  if (speedLimit === 'adaptive' && adaptiveCap !== null) {
+                    const cap = levels.find((candidate) => Number(candidate.index) === Number(adaptiveCap))
+                    const label = cap ? `Adaptive · ≤${getHlsLevelLabel(cap)} (${adaptivePolicy.speedMbps.toFixed(1)} Mbps)` : 'Adaptive bandwidth'
+                    return { label, title: getQualitySettingTitle({ label }) }
+                  }
+                  if (speedLimit === 'auto' && dataSaverCap === null) {
+                    const label = Number(level) === -1 ? 'Auto' : getHlsLevelLabel(selected)
+                    return { label, title: getQualitySettingTitle({ label }) }
+                  }
+                  if (speedLimit !== 'auto') {
+                    const cap = selectLevelForSpeed(levels, speedLimit)
+                    const label = cap ? `Auto · ≤${getHlsLevelLabel(cap)}` : 'Auto'
+                    return { label, title: getQualitySettingTitle({ label }) }
+                  }
+                  return getHlsQualitySettingDisplay(levels, level, dataSaverCap)
+                }
+                const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
+	                  const display = getSpeedCappedDisplay(level)
 	                  const qualitySetting = art.setting.find('quality')
 	                  if (qualitySetting) {
 	                    qualitySetting.html = display.title
@@ -2757,8 +3314,8 @@ export default function Watch() {
 	                  }
 	                  return display
 	                }
-	                const buildHlsQualitySetting = (activeLevel) => {
-	                  const activeDisplay = getHlsQualitySettingDisplay(levels, activeLevel, dataSaverCap)
+                const buildHlsQualitySetting = (activeLevel) => {
+                  const activeDisplay = getSpeedCappedDisplay(activeLevel)
 	                  return {
 	                    name: 'quality',
 	                    width: 220,
@@ -2766,45 +3323,98 @@ export default function Watch() {
 	                    tooltip: activeDisplay.label,
 	                    selector: [
 	                      {
-	                        default: activeLevel === -1 && dataSaverCap === null,
-	                        html: qualityOptionHtml(auto),
+                        default: !forcedQualityLabel && activeLevel === -1 && dataSaverCap === null,
+                        html: qualityOptionHtml(auto),
 	                        value: 'auto',
 	                      },
-	                      ...(dataSaver ? [{
-	                        default: dataSaverCap === dataSaver.index,
-	                        html: qualityOptionHtml(getQualityPresentation(`Data Saver · ≤${dataSaver.height}p`)),
-	                        value: 'saver',
-	                      }] : []),
-	                      ...levels.map((level) => ({
-	                        default: dataSaverCap === null && activeLevel === level.index,
-	                        html: qualityOptionHtml(getQualityPresentation(`${level.height}p`)),
-	                        value: `level:${level.index}`,
-	                      })),
+                      ...FIXED_QUALITY_OPTIONS.map((option) => ({
+                        default: dataSaverCap === null && forcedQualityLabel === option.label,
+                        html: qualityOptionHtml(getQualityPresentation(option.label)),
+                        value: `target:${option.height}`,
+                      })),
 	                    ],
-	                    onSelect: (item) => {
-	                      if (item.value === 'saver' && dataSaver) {
+                    onSelect: (item) => {
+                      if (item.value === 'saver' && dataSaver) {
 	                        dataSaverCap = dataSaver.index
 	                        hlsQualitySelection.selectLevel(-1)
-	                        hls.autoLevelCapping = dataSaver.index
-	                        hls.currentLevel = -1
-	                        hls.nextLevel = -1
-	                      } else {
-	                        const nextLevel = item.value === 'auto'
-	                          ? -1
-	                          : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
-	                        dataSaverCap = null
-	                        hls.autoLevelCapping = -1
-	                        hls.currentLevel = nextLevel
-	                        hls.nextLevel = nextLevel
-	                        hlsQualitySelection.selectLevel(nextLevel)
+                        hls.startLevel = -1
+                        hls.nextAutoLevel = -1
+                        hls.autoLevelCapping = dataSaver.index
+                        hls.currentLevel = -1
+                        hls.nextLevel = -1
+                      } else if (item.value === 'adaptive') {
+                        speedLimit = 'adaptive'
+                        forcedQualityLabel = null
+                        playerPreferencesRef.current = { ...playerPreferencesRef.current, qualityMode: 'adaptive' }
+                        persistPlayerPreferences(playerPreferencesRef.current)
+                        forcedQualityLabel = null
+                        const adaptive = applyAdaptiveCap()
+                        forcedLevel = null
+                        hls._anirakuForcedLevel = null
+                        hls._anirakuAdaptiveCap = adaptiveCap
+                        dataSaverCap = null
+                        hls.autoLevelCapping = adaptiveCap ?? -1
+                        hls.config.minAutoBitrate = 0
+                        hls.startLevel = -1
+                        hls.nextAutoLevel = -1
+                        hls.currentLevel = -1
+                        hls.nextLevel = -1
+                        hlsQualitySelection.selectLevel(-1)
+                        forcedQualityLabel = null
+                        forcedLevel = null
+                        hls._anirakuForcedLevel = null
+                        hls._anirakuAdaptiveCap = null
+                      } else {
+                        speedLimit = 'auto'
+                        const targetHeight = String(item.value).startsWith('target:') ? Number(String(item.value).replace('target:', '')) : null
+                        const targetOption = FIXED_QUALITY_OPTIONS.find((option) => option.height === targetHeight)
+                        playerPreferencesRef.current = {
+                          ...playerPreferencesRef.current,
+                          qualityMode: 'auto',
+                          qualityTarget: targetOption?.height || null,
+                        }
+                        persistPlayerPreferences(playerPreferencesRef.current)
+                        adaptiveCap = null
+                        const selectedTarget = targetOption
+                          ? selectLevelForQualityTarget(levels, targetOption.height)
+                          : null
+                        const nextLevel = targetOption
+                          ? selectedTarget?.index ?? -1
+                          : item.value === 'auto' ? -1 : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
+                        forcedQualityLabel = targetOption?.label || null
+                        forcedLevel = item.value === 'auto' ? null : nextLevel
+                        hls._anirakuForcedLevel = forcedLevel
+                        hls._anirakuAdaptiveCap = null
+                        dataSaverCap = null
+                        hls.autoLevelCapping = -1
+                        hls.config.minAutoBitrate = 0
+                        hls.startLevel = nextLevel
+                        hls.nextAutoLevel = -1
+                        hls.loadLevel = nextLevel
+                        hls.currentLevel = nextLevel
+                        hls.nextLevel = nextLevel
+                        hlsQualitySelection.selectLevel(nextLevel)
 	                      }
-	                      const nextDisplay = syncHlsQualitySetting()
-	                      return nextDisplay.label
+                      const nextDisplay = syncHlsQualitySetting()
+                      syncArtPlayerSetting(art, 'quality', item.value, nextDisplay.title)
+                      return nextDisplay.label
 	                    },
 	                  }
 	                }
-	                art.setting.update(buildHlsQualitySetting(hls.currentLevel))
-	                hls.on(Hls.Events.LEVEL_SWITCHED, () => {
+                art.setting.update(buildHlsQualitySetting(hls.currentLevel))
+                syncArtPlayerSetting(art, 'quality', forcedQualityLabel ? `target:${forcedQualityLabel.replace('P', '')}` : 'auto', getSpeedCappedDisplay(hls.currentLevel).title)
+                hls.on(Hls.Events.LEVEL_SWITCHING, () => {
+                  if (forcedLevel !== null && hls.nextLevel !== forcedLevel) {
+                    hls.nextLevel = forcedLevel
+                  }
+                })
+                hls.on(Hls.Events.FRAG_LOADED, () => {
+                  if (speedLimit === 'adaptive') {
+                    applyAdaptiveCap()
+                    syncHlsQualitySetting()
+                  }
+                })
+                hls.on(Hls.Events.LEVEL_SWITCHED, () => {
 	                  if (buildIdRef.current !== myBuildId) return
 	                  // hls.js can publish a transient adaptive currentLevel
 	                  // while a manually selected rendition is settling. Keep
@@ -2906,20 +3516,13 @@ export default function Watch() {
         },
       }
 
-      if (subtitles && subtitles.length > 0 && subtitles[0].url) {
-        const subtitleUrl = subtitles[0].url
+      if (initialSubtitleTrack) {
         playerConfig.subtitle = {
-          url: proxied(subtitleUrl),
-          type: 'srt',
+          url: proxied(initialSubtitleTrack.url),
+          type: initialSubtitleTrack.type,
+          name: initialSubtitleTrack.label,
           encoding: 'utf-8',
-          style: {
-            color: '#fff',
-            fontSize: window.innerWidth <= 768 ? '18px' : '16px',
-            backgroundColor: 'rgba(0,0,0,0.65)',
-            borderRadius: '4px',
-            padding: '2px 8px',
-            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-          },
+          style: getSubtitleStyle(subtitlePreferencesRef.current),
         }
       }
 
@@ -2935,6 +3538,21 @@ export default function Watch() {
       if (buildIdRef.current !== myBuildId) return
       destroyPlayer()
       const art = new Artplayer(playerConfig)
+      const savedPlayerPreferences = playerPreferencesRef.current
+      art.volume = savedPlayerPreferences.volume
+      art.muted = savedPlayerPreferences.muted
+      if (art.video) art.video.playbackRate = savedPlayerPreferences.playbackRate
+      const persistCurrentPlayerPreferences = () => {
+        playerPreferencesRef.current = {
+          ...playerPreferencesRef.current,
+          volume: Number.isFinite(Number(art.volume)) ? Number(art.volume) : playerPreferencesRef.current.volume,
+          muted: Boolean(art.muted),
+          playbackRate: Number.isFinite(Number(art.video?.playbackRate)) ? Number(art.video.playbackRate) : playerPreferencesRef.current.playbackRate,
+        }
+        persistPlayerPreferences(playerPreferencesRef.current)
+      }
+      art.video?.addEventListener('volumechange', persistCurrentPlayerPreferences)
+      art.video?.addEventListener('ratechange', persistCurrentPlayerPreferences)
 
       const progressInner = art.video
         ?.closest('.art-video-player')
@@ -2958,6 +3576,12 @@ export default function Watch() {
       // source-reset listener and retain a direct-media fallback for streams
       // not managed by hls.js.
       art.off('video:error')
+      const playValidSource = () => {
+        if (pendingHandoffRef.current?.shouldPlay === false) return
+        const promise = art.video?.play?.()
+        if (promise && typeof promise.catch === 'function') promise.catch(() => {})
+      }
+      art.on('video:loadedmetadata', playValidSource)
       art.on('video:canplay', () => {
         setBuffering(false)
         if (pendingResumeRef.current) {
@@ -2967,7 +3591,7 @@ export default function Watch() {
         const handoff = pendingHandoffRef.current
         if (handoff) {
           if (handoff.shouldPlay === false) art.video.pause()
-          else art.video.play().catch(() => {})
+          else playValidSource()
           pendingHandoffRef.current = null
         }
       })
@@ -2978,9 +3602,23 @@ export default function Watch() {
         recoverPlayback()
       })
 
-      if (subtitles && subtitles.length > 1) {
-        art._anirakuSubtitles = subtitles
+      art._anirakuSubtitles = subtitleTracks
+      art._anirakuSwitchSubtitle = switchSubtitleTrack
+      art._anirakuActiveSubtitleUrl = preferredSubtitleTrack?.url || null
+      art._anirakuSubtitleEnabled = Boolean(preferredSubtitleTrack)
+      if (!preferredSubtitleTrack && art.template?.$subtitle) {
+        art.template.$subtitle.style.display = 'none'
+        art.template.$subtitle.innerHTML = ''
+        if (art.subtitle?.textTrack) art.subtitle.textTrack.mode = 'disabled'
       }
+      art.on('subtitleAfterUpdate', () => {
+        if (!art._anirakuSubtitleEnabled && art.template?.$subtitle) {
+          art.template.$subtitle.style.display = 'none'
+          art.template.$subtitle.innerHTML = ''
+          return
+        }
+        applySubtitleStyle(art, subtitlePreferencesRef.current)
+      })
 
       // Auto next episode (only when the user hasn't turned it off)
       art.on('video:ended', () => {
@@ -3152,6 +3790,7 @@ export default function Watch() {
       setAutoSkipPreference,
       skipSegmentNow,
       SOURCES,
+      setSubtitlePreference,
     ]
   )
 
@@ -3165,6 +3804,113 @@ export default function Watch() {
     const t = setTimeout(() => setSlowStream(true), SLOW_THRESHOLD_MS)
     return () => clearTimeout(t)
   }, [streamLoading])
+
+  // ────────────────────────────────────────────────────────────
+  // Embed playback progress tracker (silent background)
+  // ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!activeEmbedUrl) {
+      embedStartTimeRef.current = null
+      embedElapsedRef.current = 0
+      embedDurationRef.current = 0
+      embedAutoNextFiredRef.current = false
+      return
+    }
+
+    const startTime = Date.now()
+    embedStartTimeRef.current = startTime
+    embedAutoNextFiredRef.current = false
+
+    // Estimate duration from metadata (fallback: 24 min).
+    const epMeta = Array.isArray(episodes) ? episodes.find(e => Number(e?.number) === Number(epNumber)) : null
+    const durationSec = (epMeta?.duration || anime?.duration || 24) * 60
+    embedDurationRef.current = durationSec
+
+    // Save to localStorage + Supabase every 10 seconds.
+    const progressInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      embedElapsedRef.current = elapsed
+      const title = anime?.title?.english || anime?.title?.romaji || animeId
+      upsertLocalWatchHistory({
+        animeId,
+        title,
+        episode: epNumber,
+        time: elapsed,
+        duration: durationSec,
+        completed: false,
+        timestamp: Date.now(),
+        image: anime?.coverImage?.large || '',
+      })
+      if (user) {
+        Promise.resolve(
+          supabase.from('watch_history').upsert(
+            {
+              user_id: user.id,
+              anime_id: parseInt(animeId, 10),
+              anime_title: title,
+              anime_image: anime?.coverImage?.large || '',
+              episode_number: epNumber,
+              progress: elapsed,
+              duration: durationSec,
+              timestamp: Date.now(),
+            },
+            { onConflict: 'user_id,anime_id,episode_number' }
+          )
+        ).catch(() => {})
+      }
+    }, 10_000)
+
+    // Check for auto-next every second (silent — no overlay).
+    const autoNextInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      embedElapsedRef.current = elapsed
+
+      // Episode "ended" — auto-advance silently.
+      if (
+        !embedAutoNextFiredRef.current &&
+        elapsed >= durationSec &&
+        autoNextEmbedRef.current &&
+        !isMovie &&
+        epNumber < episodes.length
+      ) {
+        embedAutoNextFiredRef.current = true
+        // Sync completion to MAL/AniList + Supabase before navigating.
+        syncProgressRef.current?.('completed', { elapsed: durationSec, duration: durationSec })
+        const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
+        navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
+      }
+    }, 1_000)
+
+    return () => {
+      clearInterval(progressInterval)
+      clearInterval(autoNextInterval)
+    }
+  }, [activeEmbedUrl, animeId, epNumber, anime, user, isMovie, episodes.length, navigate])
+
+  // Save final embed progress on tab close / navigation.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!activeEmbedUrl || !embedStartTimeRef.current) return
+      const elapsed = Math.floor((Date.now() - embedStartTimeRef.current) / 1000)
+      const duration = embedDurationRef.current
+      const title = anime?.title?.english || anime?.title?.romaji || animeId
+      upsertLocalWatchHistory({
+        animeId,
+        title,
+        episode: epNumber,
+        time: elapsed,
+        duration,
+        completed: false,
+        timestamp: Date.now(),
+        image: anime?.coverImage?.large || '',
+      })
+      if (user && elapsed >= duration * 0.6) {
+        syncProgressRef.current?.('watching', { elapsed, duration })
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [activeEmbedUrl, animeId, epNumber, anime, user])
 
   // ────────────────────────────────────────────────────────────
   // Stream cache
@@ -3214,8 +3960,22 @@ export default function Watch() {
       .then(async (response) => {
         if (!response.ok || targetEpisode !== epNumberRef.current) return null
         const data = await response.json().catch(() => null)
-        if (data?.sources?.[0]?.url) setCachedStream(source, data)
-        return data?.sources?.[0]?.url ? data : null
+        if (hasAnyStreamSource(data)) {
+          setCachedStream(source, data)
+          const mediaEntry = buildQualityList(data.sources)[0]
+          if (mediaEntry?.url && typeof fetch === 'function') {
+            const headersParam = data.headers
+              ? `&headers=${encodeURIComponent(JSON.stringify(data.headers))}`
+              : ''
+            const warmNonce = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+            const proxyUrl = `${PROXY_BASE}/proxy?url=${encodeURIComponent(mediaEntry.url)}${headersParam}&rn=${warmNonce}`
+            // Warm both legs concurrently. Failures are intentionally ignored;
+            // the real player still owns all transport and fallback decisions.
+            fetch(proxyUrl, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
+            fetch(mediaEntry.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
+          }
+        }
+        return hasAnyStreamSource(data) ? data : null
       })
       .catch(() => null)
       .finally(() => {
@@ -3323,12 +4083,12 @@ export default function Watch() {
           if (embedFallback && !fallbackUsed) {
             fallbackUsed = true
             destroyPlayer()
+            showToast('Playback failed — trying Embed.', { long: true })
             setActiveEmbedUrl(embedFallback.url)
             applySkipSegments(normalizeProviderSkipSegments(payload))
             setStreamLoading(false)
             loadingRef.current = false
             setError('')
-            showToast(`${source.label} direct media is unavailable — using its compatible player.`, { long: true })
             return
           }
           suppressTerminalStream({
@@ -3339,14 +4099,57 @@ export default function Watch() {
         }
       }
 
+      const startPayloadImmediately = (payload) => {
+        if (!hasAnyStreamSource(payload)) return false
+        const qualityList = buildQualityList(payload.sources, suppressedQualityUrls)
+        if (qualityList.length > 0) {
+          const firstSource = qualityList[0]?.src || payload.sources.find((entry) => entry?.url)
+          const onBlocked = createSameProviderFailureHandler(payload)
+          buildPlayer(
+            qualityList[0].url,
+            qualityList[0].type,
+            qualityList,
+            qualityList[0].subtitles || firstSource?.subtitles || [],
+            payload.headers || source.headers,
+            onBlocked
+          )
+          applySkipSegments(normalizeProviderSkipSegments(payload))
+          setCachedStream(source, payload)
+          setStreamLoading(false)
+          loadingRef.current = false
+          setRetryAttempt(0)
+          return true
+        }
+        const embed = (!isBonkProvider(source) && !isPeweProvider(source))
+          ? chooseBrowserPlayableEmbed(payload.sources, isBrowserPlayableEmbedSource)
+          : null
+        if (!embed) return false
+        destroyPlayer()
+        setActiveEmbedUrl(embed.url)
+        applySkipSegments(normalizeProviderSkipSegments(payload))
+        setCachedStream(source, payload)
+        setStreamLoading(false)
+        loadingRef.current = false
+        setRetryAttempt(0)
+        return true
+      }
+
+      // The server list already contains playable URLs in the supplied
+      // provider payload. Start those immediately; do not make the viewer wait
+      // for a second /stream resolver call before any player can appear.
+      if (!forceRefresh && startPayloadImmediately({
+        sources: source.initialSources,
+        headers: source.headers,
+      })) return
+
       // Stale-while-revalidate: if we have a recent good stream for
       // this source, play it now, then refresh in the background.
       if (!forceRefresh) {
         const cached = getCachedStream(source)
-        if (cached && cached.sources?.[0]?.url) {
+        if (hasAnyStreamSource(cached)) {
           if (targetEpisode !== epNumberRef.current) return
-          const firstSource = cached.sources[0]
           const qualityList = buildQualityList(cached.sources, suppressedQualityUrls)
+          const firstSource = qualityList[0]?.src || cached.sources.find((entry) => entry?.url) || cached.sources[0]
           if (qualityList.length > 0) {
             const onBlocked = createSameProviderFailureHandler(cached)
             buildPlayer(
@@ -3454,7 +4257,7 @@ export default function Watch() {
         // never build a player for an episode the user has left.
         if (targetEpisode !== epNumberRef.current) return
 
-        if (data.error || !data.sources?.[0]?.url) {
+        if (!hasAnyStreamSource(data)) {
           if (quiet) {
             setStreamLoading(false)
             loadingRef.current = false
@@ -3478,8 +4281,8 @@ export default function Watch() {
           return
         }
 
-        const firstSource = data.sources[0]
         const qualityList = buildQualityList(data.sources, suppressedQualityUrls)
+        const firstSource = qualityList[0]?.src || data.sources.find((entry) => entry?.url) || data.sources[0]
         if (qualityList.length === 0) {
           const verifiedEmbed = (!isBonkProvider(source) && !isPeweProvider(source))
             ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
@@ -3507,7 +4310,7 @@ export default function Watch() {
           loadingRef.current = false
 	          return
         }
-        const subs = firstSource.subtitles || []
+        const subs = qualityList[0]?.subtitles || firstSource?.subtitles || []
         const onBlocked = createSameProviderFailureHandler(data)
         buildPlayer(
           qualityList[0].url,
@@ -3601,7 +4404,7 @@ export default function Watch() {
   // Server list (with backoff retry, language fallback)
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!animeId || !epNumber || effectiveEpisodeAvailability !== 'available') return
+    if (!animeId || !epNumber || effectiveEpisodeAvailability !== 'available' || !episodes.length) return
     let cancelled = false
     let attempt = 0
     let retryTimer = null
@@ -3612,7 +4415,11 @@ export default function Watch() {
     // SUB response is already available.
     setServers({ sub: [], dub: [] })
     setSuppressedQualityUrls(new Set())
-    const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}`
+    // Pass genres to backend so it can skip Anikoto for Hentai titles.
+    const genresParam = anime?.genres?.length
+      ? `&genres=${encodeURIComponent(anime.genres.join(','))}`
+      : ''
+    const base = `${API_BASE}/api/v1/servers?animeId=${animeId}&episode=${epNumber}${genresParam}`
 
     const fetchServers = async () => {
       const fetchLanguage = async (lang) => {
@@ -3673,7 +4480,7 @@ export default function Watch() {
       if (retryTimer) clearTimeout(retryTimer)
       requestControllers.forEach((controller) => controller.abort())
     }
-  }, [animeId, epNumber, effectiveEpisodeAvailability])
+  }, [animeId, epNumber, effectiveEpisodeAvailability, episodes.length])
 
   // Load stream on active source / episode change
   const loadStreamRef = useRef(loadStream)
@@ -3685,12 +4492,7 @@ export default function Watch() {
 	    const now = Date.now()
 	    if (now - lastBlockCycleRef.current < 3_000) return
 	    lastBlockCycleRef.current = now
-	    showToast(
-	    reason === 'hls-terminal-before-playback' || reason === 'native-media-error' || reason === 'csp-blocked'
-        ? 'This source could not start. Choose another server manually or refresh for a new link.'
-        : 'Stream issue — choose another server manually if needed.',
-      { long: true }
-    )
+	    showToast('Playback failed.', { long: true })
 	  }, [showToast])
 
   handleProviderBlockedRef.current = handleProviderBlocked
@@ -3709,6 +4511,7 @@ export default function Watch() {
       const skipSync = skipSwitchSyncRef.current
       skipSwitchSyncRef.current = false
       pendingResumeRef.current = null
+      // ArtPlayer source (HLS/DASH/MP4).
       if (
         !skipSync &&
         el &&
@@ -3716,6 +4519,21 @@ export default function Watch() {
         el.currentTime >= el.duration * 0.6
       ) {
         syncProgressRef.current?.('watching')
+      }
+      // Embed source — sync embed progress if >= 60% watched.
+      if (
+        !skipSync &&
+        activeEmbedUrl &&
+        embedStartTimeRef.current &&
+        embedDurationRef.current > 0
+      ) {
+        const embedElapsed = Math.floor((Date.now() - embedStartTimeRef.current) / 1000)
+        if (embedElapsed >= embedDurationRef.current * 0.6) {
+          syncProgressRef.current?.('watching', {
+            elapsed: embedElapsed,
+            duration: embedDurationRef.current,
+          })
+        }
       }
       // New episode: kill the current player FIRST so the old video can
       // never keep playing, then load the stream for the new episode.
@@ -3739,18 +4557,23 @@ export default function Watch() {
 
   const handleSourceSwitch = useCallback(
     (sourceId) => {
-      if (sourceId === activeSource) return
+      const previousSourceId = activeSourceRef.current || activeSource
+      if (sourceId === previousSourceId) return
       const source = [...SOURCES.sub, ...SOURCES.dub].find(
         (s) => s.id === sourceId
       )
-      if (source)
-        showToast(`Switching to ${source.lang.toUpperCase()}…`)
+      if (!source) return
+      // Start the resolver before React schedules the state update. This is
+      // the fastest path for keyboard, touch, and programmatic switches.
+      warmProviderStream(sourceId)
+      activeSourceRef.current = sourceId
+      showToast(`Switching to ${source.lang.toUpperCase()}…`)
       const video = artInstance.current?.video
       const resumeAt = Number(video?.currentTime || 0)
       if (resumeAt > 0) pendingResumeRef.current = resumeAt
       quietProviderSwitchRef.current = artInstance.current
-        ? beginQuietProviderSwitch({
-            from: activeSourceRef.current || activeSource,
+        ?           beginQuietProviderSwitch({
+            from: previousSourceId,
             to: sourceId,
             episode: epNumber,
             resumeAt,
@@ -3762,8 +4585,22 @@ export default function Watch() {
       setNoStreamError(false)
       setErrorType('')
     },
-    [activeSource, SOURCES, epNumber, showToast]
+    [activeSource, SOURCES, epNumber, showToast, warmProviderStream]
   )
+
+  // Warm every alternate provider shortly after discovery. Pointer/focus
+  // warming remains in place for the instant path, while this background pass
+  // means a mobile tap does not have to wait for its first resolver request.
+  useEffect(() => {
+    if (effectiveEpisodeAvailability !== 'available' || !activeSource) return undefined
+    const alternateSources = [...SOURCES.sub, ...SOURCES.dub]
+      .filter((source) => source.id !== activeSource)
+    const timers = alternateSources.map((source, index) => window.setTimeout(
+      () => warmProviderStream(source.id),
+      index * 180
+    ))
+    return () => timers.forEach((timer) => window.clearTimeout(timer))
+  }, [activeSource, SOURCES, effectiveEpisodeAvailability, warmProviderStream])
 
   // ────────────────────────────────────────────────────────────
   // Mobile gestures
@@ -4740,6 +5577,25 @@ export default function Watch() {
           </div>
         )}
 
+        {!activeEmbedUrl && subtitleTrackCount > 0 && (
+          <div
+            className="watch-caption-hint"
+            role="status"
+            style={{
+              fontSize: 12,
+              color: 'var(--text-muted)',
+              marginTop: 6,
+              padding: '8px 10px',
+              background: 'rgba(99, 102, 241, 0.08)',
+              borderRadius: 8,
+              border: '1px solid rgba(129, 140, 248, 0.22)',
+              lineHeight: 1.5,
+            }}
+          >
+            <strong style={{ color: 'var(--text-primary)' }}>CC ready:</strong>{' '}
+            {subtitleTrackCount} source {subtitleTrackCount === 1 ? 'track' : 'tracks'}. Open the player Settings menu to choose a track, size, color, background, font, position, outline, and opacity. Press <kbd>C</kbd> to cycle captions.
+          </div>
+        )}
         {/* Mobile episode toggle */}
         {!isMovie && (
           <button
