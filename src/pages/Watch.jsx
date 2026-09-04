@@ -1669,45 +1669,8 @@ export default function Watch() {
   const [ccPanelView, setCcPanelView] = useState(null) // null = main list, 'track'/'size'/etc = sub-list
   const ccPanelViewRef = useRef(null)
   ccPanelViewRef.current = ccPanelView
-  // CC panel handlers — called from the compact CC panel UI.
-  // Track changes go through switchSubtitleTrackRef; style changes
-  // go through setSubtitlePreference (which also applies the style
-  // to the live Artplayer instance).
-  const handleCCTrackChange = useCallback((url) => {
-    const track = url === 'off' ? null : (subtitleTracksRef.current || []).find((t) => t.url === url) || null
-    const fn = switchSubtitleTrackRef.current
-    if (typeof fn === 'function') fn(track)
-  }, [])
-  const handleCCStyleChange = useCallback((key, value) => {
-    setSubtitlePreference(key, value)
-    const art = artInstance.current
-    if (art) applySubtitleStyle(art, subtitlePreferencesRef.current)
-    // If delay changed, apply it to the live subtitle instance
-    if (key === 'delay' && art?.subtitle) {
-      try {
-        const delaySec = Number(value) || 0
-        if (typeof art.subtitle.offset === 'function') art.subtitle.offset(delaySec)
-        else art.subtitle.offset = delaySec
-      } catch {}
-    }
-  }, [setSubtitlePreference])
-  const handleCCReset = useCallback(() => {
-    const defaults = { ...DEFAULT_SUBTITLE_PREFERENCES }
-    Object.entries(defaults).forEach(([key, value]) => {
-      setSubtitlePreference(key, value)
-    })
-    const art = artInstance.current
-    if (art) {
-      applySubtitleStyle(art, defaults)
-      if (art.subtitle) {
-        try {
-          if (typeof art.subtitle.offset === 'function') art.subtitle.offset(0)
-          else art.subtitle.offset = 0
-        } catch {}
-      }
-    }
-    showToast('Subtitles reset to defaults', { icon: 'ok' })
-  }, [setSubtitlePreference, showToast])
+  // CC panel handlers are defined AFTER showToast (below) to avoid a
+  // temporal-dead-zone error in the minified production build.
   const applySkipSegments = useCallback((incoming) => {
     const merged = mergeSkipSegments(skipSegmentsRef.current, incoming)
     skipSegmentsRef.current = merged
@@ -1939,6 +1902,46 @@ export default function Watch() {
     clearTimeout(toastTimerRef.current)
     toastTimerRef.current = setTimeout(() => setToast(null), opts.long ? 4000 : 2500)
   }, [])
+
+  // ── CC panel handlers ──
+  // Defined AFTER showToast to avoid temporal-dead-zone errors in the
+  // minified production build (const variables cannot be referenced
+  // before their initialization in the same scope).
+  const handleCCTrackChange = useCallback((url) => {
+    const track = url === 'off' ? null : (subtitleTracksRef.current || []).find((t) => t.url === url) || null
+    const fn = switchSubtitleTrackRef.current
+    if (typeof fn === 'function') fn(track)
+  }, [])
+  const handleCCStyleChange = useCallback((key, value) => {
+    setSubtitlePreference(key, value)
+    const art = artInstance.current
+    if (art) applySubtitleStyle(art, subtitlePreferencesRef.current)
+    // If delay changed, apply it to the live subtitle instance
+    if (key === 'delay' && art?.subtitle) {
+      try {
+        const delaySec = Number(value) || 0
+        if (typeof art.subtitle.offset === 'function') art.subtitle.offset(delaySec)
+        else art.subtitle.offset = delaySec
+      } catch {}
+    }
+  }, [setSubtitlePreference])
+  const handleCCReset = useCallback(() => {
+    const defaults = { ...DEFAULT_SUBTITLE_PREFERENCES }
+    Object.entries(defaults).forEach(([key, value]) => {
+      setSubtitlePreference(key, value)
+    })
+    const art = artInstance.current
+    if (art) {
+      applySubtitleStyle(art, defaults)
+      if (art.subtitle) {
+        try {
+          if (typeof art.subtitle.offset === 'function') art.subtitle.offset(0)
+          else art.subtitle.offset = 0
+        } catch {}
+      }
+    }
+    showToast('Subtitles reset to defaults', { icon: 'ok' })
+  }, [setSubtitlePreference, showToast])
 
   // Suppress only an exact failed media URL for this episode after a confirmed
   // terminal pre-start failure. The provider remains selectable when it has
