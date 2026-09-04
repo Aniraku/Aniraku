@@ -402,7 +402,7 @@ const SUBTITLE_BACKGROUND_OPTIONS = [
   { value: 'none', label: 'No box' },
 ]
 const SUBTITLE_POSITION_OPTIONS = [
-  { value: 'bottom', label: 'Bottom (above controls)' },
+  { value: 'bottom', label: 'Bottom' },
   { value: 'middle', label: 'Middle' },
   { value: 'top', label: 'Top' },
 ]
@@ -505,10 +505,14 @@ function readPlayerPreferences() {
       muted: Boolean(stored?.muted),
       playbackRate: Number.isFinite(Number(stored?.playbackRate)) ? Math.max(0.5, Math.min(2, Number(stored.playbackRate))) : 1,
       qualityMode: stored?.qualityMode === 'auto' ? 'auto' : stored?.qualityMode === 'adaptive' ? 'adaptive' : null,
-      qualityTarget: [1080, 720, 480, 360].includes(Number(stored?.qualityTarget)) ? Number(stored.qualityTarget) : null,
+      // Default to HIGHEST quality (1080) instead of Auto, unless the user
+      // explicitly chose Auto (qualityMode === 'auto') or a specific quality.
+      qualityTarget: [1080, 720, 480, 360].includes(Number(stored?.qualityTarget))
+        ? Number(stored.qualityTarget)
+        : (stored?.qualityMode === 'auto' ? null : 1080),
     }
   } catch {
-    return { volume: 0.7, muted: false, playbackRate: 1, qualityMode: null, qualityTarget: null }
+    return { volume: 0.7, muted: false, playbackRate: 1, qualityMode: null, qualityTarget: 1080 }
   }
 }
 
@@ -653,7 +657,25 @@ function applySubtitleStyle(art, preferences) {
   const subtitle = art?.template?.$subtitle
   if (!subtitle) return
   const style = getSubtitleStyle(preferences)
-  Object.assign(subtitle.style, style)
+  // Use setProperty with !important for position + sizing so Artplayer's
+  // own CSS (.artplayer-subtitle { bottom: 0; ... }) cannot override
+  // the user's chosen position. Inline Object.assign can't beat
+  // !important in Artplayer's stylesheet.
+  const importantKeys = ['bottom', 'top', 'left', 'right', 'width', 'maxWidth', 'position']
+  importantKeys.forEach((key) => {
+    if (style[key] != null) {
+      subtitle.style.setProperty(key, String(style[key]), 'important')
+    }
+  })
+  // Clear the opposite position axis so bottom/top don't both be set
+  if (style.bottom && style.bottom !== 'auto') {
+    subtitle.style.setProperty('top', 'auto', 'important')
+  } else if (style.top && style.top !== 'auto') {
+    subtitle.style.setProperty('bottom', 'auto', 'important')
+  }
+  // Apply the rest (color, font, background, etc.) without !important
+  const { bottom, top, left, right, width, maxWidth, position, ...rest } = style
+  Object.assign(subtitle.style, rest)
   subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
     Object.assign(line.style, {
       color: style.color,
@@ -917,7 +939,7 @@ function buildQualityList(sources, suppressedUrls = new Set()) {
   // Backend verification is a soft snapshot; the stream endpoint can return a
   // usable URL after the list endpoint has marked it stale. Only an expired
   // signed token is definitive enough to omit before playback/failover.
-  return entries
+  const sorted = entries
     .filter((entry) => !entry.expiredToken && !suppressedUrls.has(entry.url))
     // Prefer the provider's own Auto/adaptive
     // URL and then the highest numeric quality without inventing a new URL.
@@ -930,8 +952,13 @@ function buildQualityList(sources, suppressedUrls = new Set()) {
       }
       return a.sourceIndex - b.sourceIndex
     })
+  // Default to the HIGHEST quality (first non-Auto entry), not Auto.
+  // Auto remains available in the list but is no longer the default.
+  const firstNonAutoIdx = sorted.findIndex((e) => !e.presentation.isAuto)
+  const defaultIdx = firstNonAutoIdx >= 0 ? firstNonAutoIdx : 0
+  return sorted
             .map((entry, index) => ({
-              default: index === 0,
+              default: index === defaultIdx,
               html: entry.html,
               url: entry.url,
               type: entry.type,
@@ -4601,13 +4628,15 @@ export default function Watch() {
         }
         const qualityList = buildQualityList(payload.sources, suppressedQualityUrls)
         if (qualityList.length > 0) {
-          const firstSource = qualityList[0]?.src || payload.sources.find((entry) => entry?.url)
+          // Use the default (highest) quality, not index 0 (which is Auto)
+          const defaultQuality = qualityList.find((q) => q.default) || qualityList[0]
+          const firstSource = defaultQuality?.src || payload.sources.find((entry) => entry?.url)
           const onBlocked = createSameProviderFailureHandler(payload)
           buildPlayer(
-            qualityList[0].url,
-            qualityList[0].type,
+            defaultQuality.url,
+            defaultQuality.type,
             qualityList,
-            qualityList[0].subtitles || firstSource?.subtitles || [],
+            defaultQuality.subtitles || firstSource?.subtitles || [],
             payload.headers || source.headers,
             onBlocked
           )
@@ -4648,12 +4677,14 @@ export default function Watch() {
         if (hasAnyStreamSource(cached)) {
           if (targetEpisode !== epNumberRef.current) return
           const qualityList = buildQualityList(cached.sources, suppressedQualityUrls)
-          const firstSource = qualityList[0]?.src || cached.sources.find((entry) => entry?.url) || cached.sources[0]
+          // Use the default (highest) quality, not index 0 (which is Auto)
+          const defaultQuality = qualityList.find((q) => q.default) || qualityList[0]
+          const firstSource = defaultQuality?.src || cached.sources.find((entry) => entry?.url) || cached.sources[0]
           if (qualityList.length > 0) {
             const onBlocked = createSameProviderFailureHandler(cached)
             buildPlayer(
-              qualityList[0].url,
-              qualityList[0].type,
+              defaultQuality.url,
+              defaultQuality.type,
               qualityList,
               firstSource.subtitles || [],
               cached.headers,
@@ -4801,7 +4832,9 @@ export default function Watch() {
         }
 
         const qualityList = buildQualityList(data.sources, suppressedQualityUrls)
-        const firstSource = qualityList[0]?.src || data.sources.find((entry) => entry?.url) || data.sources[0]
+        // Use the default (highest) quality, not index 0 (which is Auto)
+        const defaultQuality = qualityList.find((q) => q.default) || qualityList[0]
+        const firstSource = defaultQuality?.src || data.sources.find((entry) => entry?.url) || data.sources[0]
         if (qualityList.length === 0) {
           const verifiedEmbed = (!isBonkProvider(source) && !isPeweProvider(source))
             ? chooseBrowserPlayableEmbed(data.sources, isBrowserPlayableEmbedSource)
@@ -4829,11 +4862,11 @@ export default function Watch() {
           loadingRef.current = false
                   return
         }
-        const subs = qualityList[0]?.subtitles || firstSource?.subtitles || []
+        const subs = defaultQuality?.subtitles || firstSource?.subtitles || []
         const onBlocked = createSameProviderFailureHandler(data)
         buildPlayer(
-          qualityList[0].url,
-          qualityList[0].type,
+          defaultQuality.url,
+          defaultQuality.type,
           qualityList,
           subs,
                   data.headers,
@@ -6775,19 +6808,19 @@ export default function Watch() {
            outer layer inside the player, then make every option panel a real
            touch/mouse-scroll container. */
         .watch-art-mount .art-video-player {
-          --art-settings-max-height: min(60dvh, 320px);
-          --art-selector-max-height: min(56dvh, 280px);
+          --art-settings-max-height: min(56dvh, 300px);
+          --art-selector-max-height: min(52dvh, 260px);
         }
         .watch-art-mount .art-settings {
           box-sizing: border-box;
-          width: min(220px, calc(100% - 16px)) !important;
+          width: min(200px, calc(100% - 16px)) !important;
           max-width: calc(100% - 16px) !important;
           height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
           max-height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
           min-height: 0 !important;
           overflow: hidden !important;
           overscroll-behavior: contain;
-          font-size: 12px !important;
+          font-size: 11px !important;
         }
         .watch-art-mount .art-settings,
         .watch-art-mount .art-settings * {
@@ -6827,8 +6860,9 @@ export default function Watch() {
           word-break: break-word;
         }
         .watch-art-mount .art-setting-item {
-          min-height: 35px;
+          min-height: 32px;
           height: auto;
+          padding-inline: 8px !important;
         }
         .watch-art-mount .art-setting-item-left,
         .watch-art-mount .art-setting-item-right {
@@ -6850,7 +6884,7 @@ export default function Watch() {
           align-items: center;
           gap: 8px;
           width: 100%;
-          min-height: 35px;
+          min-height: 32px;
           height: auto;
           padding: 8px 10px;
         }
@@ -7040,20 +7074,20 @@ export default function Watch() {
             --art-control-height: 42px;
             --art-control-icon-size: 28px;
             --art-padding: 8px;
-            --art-settings-max-height: min(70dvh, 380px);
-            --art-selector-max-height: min(60dvh, 280px);
+            --art-settings-max-height: min(65dvh, 340px);
+            --art-selector-max-height: min(55dvh, 260px);
           }
           .watch-art-mount .art-video-player .art-controls {
             padding-inline: 2px;
           }
           .watch-art-mount .art-settings {
-            width: min(220px, calc(100vw - 16px)) !important;
+            width: min(200px, calc(100vw - 16px)) !important;
             max-width: calc(100vw - 16px) !important;
             height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
             max-height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
             right: 8px !important;
             bottom: 44px !important;
-            font-size: 12px !important;
+            font-size: 11px !important;
           }
           .watch-art-mount .art-setting-panel,
           .watch-art-mount .art-setting-panel .art-selector-list {
@@ -7201,22 +7235,22 @@ export default function Watch() {
         .watch-art-mount .art-settings .art-settings-build,
         .watch-art-mount .art-setting-selector {
           box-sizing: border-box !important;
-          max-width: min(240px, calc(100vw - 16px), 100%) !important;
+          max-width: min(220px, calc(100vw - 16px), 100%) !important;
         }
         .watch-art-mount .art-settings {
-          max-height: min(68vh, 360px) !important;
-          max-height: min(68dvh, 360px) !important;
+          max-height: min(60vh, 320px) !important;
+          max-height: min(60dvh, 320px) !important;
           overflow: hidden !important;
         }
         .watch-art-mount .art-setting-panel {
-          width: min(240px, calc(100vw - 16px), 100%) !important;
-          max-height: min(68vh, 360px) !important;
-          max-height: min(68dvh, 360px) !important;
+          width: min(220px, calc(100vw - 16px), 100%) !important;
+          max-height: min(60vh, 320px) !important;
+          max-height: min(60dvh, 320px) !important;
           overflow: hidden auto !important;
           overscroll-behavior: contain;
         }
         .watch-art-mount .art-setting-panel .art-setting-item {
-          min-height: 34px !important;
+          min-height: 30px !important;
           width: 100% !important;
           min-width: 0 !important;
           overflow: hidden !important;
