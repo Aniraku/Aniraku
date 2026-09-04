@@ -358,10 +358,10 @@ function getQualityPresentation(value) {
 }
 
 function qualityOptionHtml(presentation) {
-	const badge = presentation.badge
-		? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
-		: ''
-	return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
+        const badge = presentation.badge
+                ? `<span class="watch-quality-badge">${escapeHtml(presentation.badge)}</span>`
+                : ''
+        return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
 }
 
 const SUBTITLE_PREFERENCES_LS_KEY = 'aniraku-subtitle-preferences-v1'
@@ -575,6 +575,7 @@ function getSubtitleStyle(preferences) {
     left: '4%',
     right: '4%',
     width: '92%',
+    maxWidth: '92%',
     color: preferences?.color || '#ffffff',
     fontSize: size.fontSize,
     fontFamily,
@@ -588,6 +589,14 @@ function getSubtitleStyle(preferences) {
     boxSizing: 'border-box',
     textAlign: 'center',
     letterSpacing: ['homemade-apple', 'butterfly-kids'].includes(preferences?.font) ? '0.015em' : 'normal',
+    // Overflow protection: long tokens (URLs, CJK without spaces, etc.)
+    // must wrap inside the 92% box instead of spilling out horizontally.
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
+    whiteSpace: 'pre-wrap',
+    overflow: 'hidden',
+    display: 'block',
+    pointerEvents: 'none',
   }
 }
 
@@ -605,6 +614,14 @@ function applySubtitleStyle(art, preferences) {
       lineHeight: style.lineHeight,
       textShadow: style.textShadow,
       letterSpacing: style.letterSpacing,
+      // Propagate overflow protection to each subtitle line so long
+      // tokens wrap inside the line box instead of overflowing.
+      wordBreak: style.wordBreak,
+      overflowWrap: style.overflowWrap,
+      whiteSpace: style.whiteSpace,
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      display: 'block',
     })
   })
 }
@@ -678,21 +695,38 @@ function getAdaptiveBandwidthPolicy(downlinkMbps, levels = []) {
 }
 
 function selectLevelForQualityTarget(levels, targetHeight, maxBitrate = Infinity) {
-  const usable = (Array.isArray(levels) ? levels : []).filter((level) => Number(level?.height) > 0)
+  const usable = (Array.isArray(levels) ? levels : []).filter((level) =>
+    Number(level?.height) > 0 || Number(level?.bitrate) > 0
+  )
   if (!usable.length) return null
   const target = Number(targetHeight)
+  // Prefer levels under the bitrate budget; if none qualify, fall back to
+  // all usable levels so the user always gets the closest match instead of
+  // a silent fallback to Auto.
   const underBudget = usable.filter((level) => {
     const bitrate = Number(level?.bitrate || 0)
     return bitrate <= 0 || bitrate <= Number(maxBitrate)
   })
   const candidates = underBudget.length ? underBudget : usable
   return [...candidates].sort((a, b) => {
-    const aHeight = Number(a.height)
-    const bHeight = Number(b.height)
-    const aUnderTarget = aHeight <= target
-    const bUnderTarget = bHeight <= target
-    if (aUnderTarget !== bUnderTarget) return aUnderTarget ? -1 : 1
-    return Math.abs(bHeight - target) - Math.abs(aHeight - target) || bHeight - aHeight
+    const aHeight = Number(a.height) || 0
+    const bHeight = Number(b.height) || 0
+    // If we have height info, prefer levels at or below the target,
+    // then closest to target, then higher quality.
+    if (aHeight > 0 && bHeight > 0) {
+      const aUnderTarget = aHeight <= target
+      const bUnderTarget = bHeight <= target
+      if (aUnderTarget !== bUnderTarget) return aUnderTarget ? -1 : 1
+      const aDiff = Math.abs(aHeight - target)
+      const bDiff = Math.abs(bHeight - target)
+      if (aDiff !== bDiff) return aDiff - bDiff
+      return bHeight - aHeight
+    }
+    // No height info — fall back to bitrate proximity.
+    const aBitrate = Number(a.bitrate) || 0
+    const bBitrate = Number(b.bitrate) || 0
+    const targetBitrate = Number(maxBitrate) > 0 ? Number(maxBitrate) : (aBitrate + bBitrate) / 2
+    return Math.abs(aBitrate - targetBitrate) - Math.abs(bBitrate - targetBitrate)
   })[0]
 }
 
@@ -751,30 +785,30 @@ function hasExpiredEmbeddedToken(url) {
 }
 
 function getSourcePlaybackType(source) {
-	const rawType = String(source?.type || source?.mime || '').trim().toLowerCase()
-	const url = String(source?.url || '').toLowerCase()
-	if (rawType === 'embed' || rawType === 'iframe' || rawType === 'page' || rawType.includes('embed')) return 'embed'
-	if (rawType === 'hls' || rawType === 'm3u8' || rawType.includes('mpegurl') || /\.m3u8(?:$|[?#])/.test(url)) return 'hls'
-	if (rawType === 'dash' || rawType === 'mpd' || rawType.includes('dash+xml') || /\.mpd(?:$|[?#])/.test(url)) return 'dash'
-	if (rawType === 'mp4' || rawType === 'm4v' || rawType.includes('video/mp4') || /\.(?:mp4|m4v)(?:$|[?#])/.test(url)) return 'mp4'
-	if (rawType === 'webm' || rawType.includes('video/webm') || /\.webm(?:$|[?#])/.test(url)) return 'webm'
-	if (rawType === 'ogg' || rawType === 'ogv' || rawType.includes('video/ogg') || rawType.includes('audio/ogg') || /\.(?:ogg|ogv)(?:$|[?#])/.test(url)) return 'ogg'
-	if (rawType === 'mpeg' || rawType === 'mpg' || rawType.includes('video/mpeg') || /\.(?:mpeg|mpg)(?:$|[?#])/.test(url)) return 'mpeg'
-	// A live URL with no reliable extension is still attempted through the
-	// browser's native media element; the backend has already probed it.
-	return 'native'
+        const rawType = String(source?.type || source?.mime || '').trim().toLowerCase()
+        const url = String(source?.url || '').toLowerCase()
+        if (rawType === 'embed' || rawType === 'iframe' || rawType === 'page' || rawType.includes('embed')) return 'embed'
+        if (rawType === 'hls' || rawType === 'm3u8' || rawType.includes('mpegurl') || /\.m3u8(?:$|[?#])/.test(url)) return 'hls'
+        if (rawType === 'dash' || rawType === 'mpd' || rawType.includes('dash+xml') || /\.mpd(?:$|[?#])/.test(url)) return 'dash'
+        if (rawType === 'mp4' || rawType === 'm4v' || rawType.includes('video/mp4') || /\.(?:mp4|m4v)(?:$|[?#])/.test(url)) return 'mp4'
+        if (rawType === 'webm' || rawType.includes('video/webm') || /\.webm(?:$|[?#])/.test(url)) return 'webm'
+        if (rawType === 'ogg' || rawType === 'ogv' || rawType.includes('video/ogg') || rawType.includes('audio/ogg') || /\.(?:ogg|ogv)(?:$|[?#])/.test(url)) return 'ogg'
+        if (rawType === 'mpeg' || rawType === 'mpg' || rawType.includes('video/mpeg') || /\.(?:mpeg|mpg)(?:$|[?#])/.test(url)) return 'mpeg'
+        // A live URL with no reliable extension is still attempted through the
+        // browser's native media element; the backend has already probed it.
+        return 'native'
 }
 
 function isKiwiEmbedUrl(url) {
-	return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
+        return /^https?:\/\/(?:www\.)?kwik\.cx\//i.test(String(url || ''))
 }
 
 function isSandboxBlockedEmbed(url) {
-	return /megaplay\.(buzz|site|top|xyz|pro|club|cc|live)/i.test(String(url || ''))
+        return /megaplay\.(buzz|site|top|xyz|pro|club|cc|live)/i.test(String(url || ''))
 }
 
 function getSourceVerification(source) {
-	return String(source?.verification || source?.Verification || '').trim().toLowerCase()
+        return String(source?.verification || source?.Verification || '').trim().toLowerCase()
 }
 
 // Embed verification is normally supplied by the API. Some provider responses
@@ -782,48 +816,48 @@ function getSourceVerification(source) {
 // selectable instead of removing the whole provider row. A definitive dead
 // verdict or an expired signed token is still rejected.
 function isPlayableEmbedSource(source) {
-	if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
-	return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
+        if (getSourcePlaybackType(source) !== 'embed' || !source?.url) return false
+        return getSourceVerification(source) !== 'dead' && !hasExpiredEmbeddedToken(source.url)
 }
 
 function isKiwiEmbedSource(source) {
-	if (!isPlayableEmbedSource(source)) return false
-	try {
-		const target = new URL(source.url)
-		return target.protocol === 'https:' && target.hostname === 'kwik.cx' && /^\/e\/[A-Za-z0-9_-]{6,128}$/.test(target.pathname)
-	} catch {
-		return false
-	}
+        if (!isPlayableEmbedSource(source)) return false
+        try {
+                const target = new URL(source.url)
+                return target.protocol === 'https:' && target.hostname === 'kwik.cx' && /^\/e\/[A-Za-z0-9_-]{6,128}$/.test(target.pathname)
+        } catch {
+                return false
+        }
 }
 
 // Kwik denies being framed by third-party pages. Do not turn a recoverable
 // Kiwi direct-source failure into a browser iframe that must be rejected.
 function isBrowserPlayableEmbedSource(source) {
-	return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
+        return isPlayableEmbedSource(source) && !isKiwiEmbedSource(source)
 }
 
 function buildQualityList(sources, suppressedUrls = new Set()) {
-	const seenUrls = new Set()
-	const entries = (Array.isArray(sources) ? sources : [])
-		// Backend verification tags are advisory snapshots, not a playback
-		// permission model. Keep every non-embed media URL so providers such as
-		// Kiwi remain playable when their current CDN verdict is stale.
-		.filter((src) => getSourcePlaybackType(src) !== 'embed' && src?.url)
-		.map((src, sourceIndex) => {
-			const presentation = getQualityPresentation(src.quality)
-			return {
-				src,
-				sourceIndex,
-					presentation,
-					html: qualityOptionHtml(presentation),
-					url: src.url,
-				// Provider metadata and URL classification are both considered so
-				// mislabeled streams use the correct ArtPlayer loader.
-				type: getSourcePlaybackType(src),
-				verification: getSourceVerification(src),
-					expiredToken: hasExpiredEmbeddedToken(src.url),
-			}
-		})
+        const seenUrls = new Set()
+        const entries = (Array.isArray(sources) ? sources : [])
+                // Backend verification tags are advisory snapshots, not a playback
+                // permission model. Keep every non-embed media URL so providers such as
+                // Kiwi remain playable when their current CDN verdict is stale.
+                .filter((src) => getSourcePlaybackType(src) !== 'embed' && src?.url)
+                .map((src, sourceIndex) => {
+                        const presentation = getQualityPresentation(src.quality)
+                        return {
+                                src,
+                                sourceIndex,
+                                        presentation,
+                                        html: qualityOptionHtml(presentation),
+                                        url: src.url,
+                                // Provider metadata and URL classification are both considered so
+                                // mislabeled streams use the correct ArtPlayer loader.
+                                type: getSourcePlaybackType(src),
+                                verification: getSourceVerification(src),
+                                        expiredToken: hasExpiredEmbeddedToken(src.url),
+                        }
+                })
     .filter((entry) => {
       if (seenUrls.has(entry.url)) return false
       seenUrls.add(entry.url)
@@ -846,18 +880,18 @@ function buildQualityList(sources, suppressedUrls = new Set()) {
       }
       return a.sourceIndex - b.sourceIndex
     })
-	    .map((entry, index) => ({
-	      default: index === 0,
-	      html: entry.html,
-	      url: entry.url,
-	      type: entry.type,
-			verification: entry.verification,
-			label: entry.presentation.label,
-		qualityKey: entry.presentation.key,
-		qualityRank: entry.presentation.rank,
+            .map((entry, index) => ({
+              default: index === 0,
+              html: entry.html,
+              url: entry.url,
+              type: entry.type,
+                        verification: entry.verification,
+                        label: entry.presentation.label,
+                qualityKey: entry.presentation.key,
+                qualityRank: entry.presentation.rank,
       isAuto: entry.presentation.isAuto,
       subtitles: Array.isArray(entry.src?.subtitles) ? entry.src.subtitles : [],
-		}))
+                }))
 }
 
 function hasAnyStreamSource(payload) {
@@ -874,8 +908,11 @@ function seekControlHtml(direction) {
   return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="currentColor"/><text x="12" y="15.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="5.6" font-weight="800" fill="currentColor">10</text></svg></span>`
 }
 
-function ccControlHtml() {
-  return `<span class="watch-art-cc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="14.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-weight="800" fill="currentColor">CC</text></svg></span>`
+function ccControlHtml(active = false) {
+  // When captions are on, the CC icon glows; when off, it dims.
+  const color = active ? '#a5b4fc' : 'currentColor'
+  const opacity = active ? '1' : '0.7'
+  return `<span class="watch-art-cc-icon${active ? ' watch-art-cc-active' : ''}" aria-hidden="true" style="opacity:${opacity}"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2" fill="none" stroke="${color}" stroke-width="1.8"/><text x="12" y="14.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-weight="800" fill="${color}">CC</text></svg></span>`
 }
 
 function downloadControlHtml() {
@@ -917,6 +954,91 @@ function formatAiringDate(unixTimestamp) {
     return `${formattedDate} ${countdown}`
   }
   return formattedDate
+}
+
+// ────────────────────────────────────────────────────────────────
+// CC Panel helper component + style constants
+// ────────────────────────────────────────────────────────────────
+// A labeled <select> row used inside the CC customization panel.
+// Keeping it as a module-level component avoids re-creating the
+// function on every Watch render and keeps the panel JSX readable.
+const CC_LABEL_STYLE = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: 0.4,
+  textTransform: 'uppercase',
+  color: '#94a3b8',
+  marginBottom: 4,
+  marginTop: 2,
+}
+
+const CC_SELECT_WRAPPER_STYLE = {
+  display: 'flex',
+  flexDirection: 'column',
+  marginBottom: 10,
+  minWidth: 0,
+}
+
+const CC_SELECT_STYLE = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '7px 8px',
+  background: 'rgba(255,255,255,0.06)',
+  color: '#e2e8f0',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 7,
+  fontSize: 12,
+  fontWeight: 500,
+  cursor: 'pointer',
+  outline: 'none',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+  MozAppearance: 'none',
+  backgroundImage:
+    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>\")",
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 8px center',
+  backgroundSize: '12px',
+  paddingRight: 28,
+}
+
+function ccChipStyle(selected) {
+  return {
+    padding: '6px 10px',
+    background: selected ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.06)',
+    color: selected ? '#a5b4fc' : '#cbd5e1',
+    border: `1px solid ${selected ? 'rgba(129,140,248,0.45)' : 'rgba(255,255,255,0.1)'}`,
+    borderRadius: 7,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  }
+}
+
+function CCSelectRow({ label, value, options, getLabel, onChange }) {
+  return (
+    <div style={CC_SELECT_WRAPPER_STYLE}>
+      <label className="watch-cc-label" style={CC_LABEL_STYLE}>
+        {label}
+      </label>
+      <select
+        value={String(value ?? '')}
+        onChange={(e) => onChange(e.target.value)}
+        style={CC_SELECT_STYLE}
+      >
+        {options.map((option) => (
+          <option key={String(option.value)} value={String(option.value)} style={{ background: '#0f172a', color: '#e2e8f0' }}>
+            {getLabel(option)}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
 }
 
 // Live countdown to the next airing episode. Ticks every second in a
@@ -1806,7 +1928,7 @@ export default function Watch() {
     lastBlockCycleRef.current = 0
     recoveryBusyRef.current = false
     streamRetries.current = {}
-	}, [animeId, epNumber])
+        }, [animeId, epNumber])
 
   // Keep the active episode row visible in the sidebar.
   useEffect(() => {
@@ -1840,7 +1962,8 @@ export default function Watch() {
         return new Set([...previous, streamUrl])
       })
     }
-    showToast('This failed stream link was removed for this episode. Refresh to request a fresh link or choose another quality manually.', { long: true })
+    // No toast — the user only sees "Playback failed." from the final
+    // fallback handler. Suppression is a silent internal cleanup.
   }, [showToast])
 
   const restoreWorkingStream = useCallback((urls) => {
@@ -2072,7 +2195,7 @@ export default function Watch() {
   }, [servers])
 
 
-	const currentSource = useMemo(() => {
+        const currentSource = useMemo(() => {
     const all = [...SOURCES.sub, ...SOURCES.dub]
     return all.find((s) => s.id === activeSource) || all[0] || null
   }, [SOURCES, activeSource])
@@ -2625,15 +2748,15 @@ export default function Watch() {
       // The backend strips "rn" before dialing the CDN.
       const nonce =
         Math.random().toString(36).slice(2) + Date.now().toString(36)
-	      const proxied = (u) =>
-	        `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
-	      // First-proxy pre-warm: start the network handshake against the
-	      // proxy as soon as we know the selected source. DNS, TCP, TLS and
-	      // the proxy's cold edge cache can each add 100-400ms on the first
-	      // request — exactly the window the user is staring at a spinner.
-	      // Firing a low-cost HEAD now means `video.src = proxied(url)`
-	      // reuses a warm socket and the browser's HTTP cache is already
-	      // primed when the media element opens the same connection.
+              const proxied = (u) =>
+                `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+              // First-proxy pre-warm: start the network handshake against the
+              // proxy as soon as we know the selected source. DNS, TCP, TLS and
+              // the proxy's cold edge cache can each add 100-400ms on the first
+              // request — exactly the window the user is staring at a spinner.
+              // Firing a low-cost HEAD now means `video.src = proxied(url)`
+              // reuses a warm socket and the browser's HTTP cache is already
+              // primed when the media element opens the same connection.
       if (typeof fetch === 'function') {
         const prewarm = (target, mode) => {
           try {
@@ -2645,38 +2768,38 @@ export default function Watch() {
         prewarm(proxied(streamUrl), 'cors')
         prewarm(streamUrl, 'no-cors')
       }
-	      // hls.js pre-warm: the dynamic import is the single biggest
-	      // startup cost on the HLS path (parser compile + ~120KB of JS).
-	      // Triggering it here, in parallel with the ArtPlayer mount, lets
-	      // the m3u8 handler pick up a ready module instead of awaiting
-	      // the import on the play path. Failures are absorbed; hls.js
-	      // will still be re-imported on demand if the warm import lost
-	      // a race.
-	      if (!hlsPreloadPromiseRef.current) {
-	        hlsPreloadPromiseRef.current = import('hls.js')
-	          .then((mod) => mod?.default || null)
-	          .catch(() => null)
-	      }
-	      // Browser policy violations name the blocked URL. Suppress a control
-	      // only when that URL is the selected media URL, never for an unrelated
-	      // playlist ad, analytics resource, or other subrequest.
-	      if (typeof document !== 'undefined') {
-	        const selectedUrl = String(streamUrl)
-	        const onPolicyViolation = (event) => {
-	          if (buildIdRef.current !== myBuildId) return
-	          const directive = String(event?.violatedDirective || event?.effectiveDirective || '')
-	          const blockedUrl = String(event?.blockedURI || '')
-	          const blocksSelectedMedia = /^(?:media-src|connect-src|default-src)/.test(directive) &&
-	            (blockedUrl === selectedUrl || blockedUrl.startsWith(`${selectedUrl}?`) || blockedUrl.startsWith(`${selectedUrl}#`))
-	          if (blocksSelectedMedia) onBlocked?.('csp-blocked', { streamUrl: selectedUrl })
-	        }
-	        document.addEventListener('securitypolicyviolation', onPolicyViolation)
-	        cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
-	      }
-			const activeQuality = Array.isArray(qualityList)
-				? qualityList.find((quality) => quality?.url === streamUrl)
-				: null
-			      const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
+              // hls.js pre-warm: the dynamic import is the single biggest
+              // startup cost on the HLS path (parser compile + ~120KB of JS).
+              // Triggering it here, in parallel with the ArtPlayer mount, lets
+              // the m3u8 handler pick up a ready module instead of awaiting
+              // the import on the play path. Failures are absorbed; hls.js
+              // will still be re-imported on demand if the warm import lost
+              // a race.
+              if (!hlsPreloadPromiseRef.current) {
+                hlsPreloadPromiseRef.current = import('hls.js')
+                  .then((mod) => mod?.default || null)
+                  .catch(() => null)
+              }
+              // Browser policy violations name the blocked URL. Suppress a control
+              // only when that URL is the selected media URL, never for an unrelated
+              // playlist ad, analytics resource, or other subrequest.
+              if (typeof document !== 'undefined') {
+                const selectedUrl = String(streamUrl)
+                const onPolicyViolation = (event) => {
+                  if (buildIdRef.current !== myBuildId) return
+                  const directive = String(event?.violatedDirective || event?.effectiveDirective || '')
+                  const blockedUrl = String(event?.blockedURI || '')
+                  const blocksSelectedMedia = /^(?:media-src|connect-src|default-src)/.test(directive) &&
+                    (blockedUrl === selectedUrl || blockedUrl.startsWith(`${selectedUrl}?`) || blockedUrl.startsWith(`${selectedUrl}#`))
+                  if (blocksSelectedMedia) onBlocked?.('csp-blocked', { streamUrl: selectedUrl })
+                }
+                document.addEventListener('securitypolicyviolation', onPolicyViolation)
+                cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
+              }
+                        const activeQuality = Array.isArray(qualityList)
+                                ? qualityList.find((quality) => quality?.url === streamUrl)
+                                : null
+                              const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
       const selectedSource = [...SOURCES.sub, ...SOURCES.dub].find(
         (candidate) => candidate.id === activeSource
       )
@@ -2691,16 +2814,16 @@ export default function Watch() {
 
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
-	      const playAsNative = async (video, url, art) => {
-			const transportPlan = createMediaTransportPlan({
-				verification: sourceVerification,
-				directUrl: url,
+              const playAsNative = async (video, url, art) => {
+                        const transportPlan = createMediaTransportPlan({
+                                verification: sourceVerification,
+                                directUrl: url,
         proxyUrl: proxied(url),
         proxyOnly: bonkProxyOnly,
         directPreferred: peweDirectPreferred,
       })
-	        let transportIndex = 0
-	        let hlsTried = false
+                let transportIndex = 0
+                let hlsTried = false
         const tryUrl = (target, withCors) => {
           try {
             if (withCors) {
@@ -2763,41 +2886,42 @@ export default function Watch() {
                 return
               } catch {}
             }
-	            if (onBlocked) onBlocked('playback-error')
+                    if (onBlocked) onBlocked('playback-error')
           })
           return true
         }
 
-	        tryUrl(transportPlan[transportIndex].url, transportPlan[transportIndex].mode === 'proxy')
-	        video.onerror = async () => {
-	          if (buildIdRef.current !== myBuildId) return
-	          if (transportIndex + 1 < transportPlan.length) {
-	            transportIndex += 1
-	            tryUrl(
-					transportPlan[transportIndex].url,
-					transportPlan[transportIndex].mode === 'proxy'
-				)
-	            return
-	          }
+                tryUrl(transportPlan[transportIndex].url, transportPlan[transportIndex].mode === 'proxy')
+                video.onerror = async () => {
+                  if (buildIdRef.current !== myBuildId) return
+                  if (transportIndex + 1 < transportPlan.length) {
+                    transportIndex += 1
+                    tryUrl(
+                                        transportPlan[transportIndex].url,
+                                        transportPlan[transportIndex].mode === 'proxy'
+                                )
+                    return
+                  }
           if (shouldTryHlsFallback(url) && await tryHls()) return
-	          showToast('Playback failed.', { long: true })
+          // Do NOT show a toast here — onBlocked will silently try the
+          // embed fallback next, and only show "Playback failed." if the
+          // embed ALSO fails. Showing it here would be premature.
           if (onBlocked) onBlocked('native-media-error')
           else setError('Playback failed.')
         }
       }
 
-	      // Recovery after ArtPlayer's reconnect loop is intentionally manual.
-	      // Auto-changing a representation or provider made healthy servers look
-	      // blocked and replaced a viewer's selected playback path unexpectedly.
-	      const recoverPlayback = () => {
-	        if (buildIdRef.current !== myBuildId) return
-	        if (recoveryBusyRef.current) return
-	        recoveryBusyRef.current = true
-	        recoveryBusyRef.current = false
-	        showToast('Playback interrupted — choose another server manually.', {
-	          long: true,
-	        })
-	        if (onBlocked) onBlocked('playback-error')
+              // Recovery after ArtPlayer's reconnect loop is intentionally manual.
+              // Auto-changing a representation or provider made healthy servers look
+              // blocked and replaced a viewer's selected playback path unexpectedly.
+              const recoverPlayback = () => {
+                if (buildIdRef.current !== myBuildId) return
+                if (recoveryBusyRef.current) return
+                recoveryBusyRef.current = true
+                recoveryBusyRef.current = false
+                // Silently delegate to onBlocked — the user only sees
+                // "Playback failed." if all fallbacks are exhausted.
+                if (onBlocked) onBlocked('playback-error')
         else setError('Stream playback error. Try a different server.')
       }
 
@@ -2867,13 +2991,22 @@ export default function Watch() {
         const art = artInstance.current
         const nextTrack = track && subtitleTracks.some((candidate) => candidate.url === track.url) ? track : null
         // Update the authoritative flag before setSubtitlePreference(), because
-        // that setter refreshes ArtPlayer’s subtitle cues synchronously.
+        // that setter refreshes ArtPlayer's subtitle cues synchronously.
         // Otherwise the old enabled state can render one more cue after Off.
         if (art) {
           art._anirakuActiveSubtitleUrl = nextTrack?.url || null
           art._anirakuSubtitleEnabled = Boolean(nextTrack)
         }
+        // Update the CC control button visual state (glow when on, dim when off)
+        try {
+          const ccEl = art?.template?.$ccToggle || art?.template?.['$ccToggle']
+          if (ccEl) {
+            ccEl.innerHTML = ccControlHtml(Boolean(nextTrack))
+          }
+        } catch {}
         setSubtitlePreference('track', nextTrack ? nextTrack.url : 'off')
+        // Force CC panel re-render so the track chips reflect the new selection
+        try { forceCCUpdate((n) => n + 1) } catch {}
         if (!art?.subtitle) return null
         if (!nextTrack) {
           // Keep the subtitle source mounted. Clearing art.subtitle.url can
@@ -2993,6 +3126,23 @@ export default function Watch() {
             },
           },
           {
+            // CC button — opens the subtitle customization panel.
+            // Sits in the right control cluster before the download button.
+            // Clicking it toggles the React-rendered CC overlay which
+            // contains track selection + 8 style dimensions.
+            name: 'ccToggle',
+            position: 'right',
+            index: 28,
+            html: ccControlHtml(Boolean(preferredSubtitleTrack)),
+            tooltip: 'Subtitles',
+            style: { width: '42px', margin: '0 1px' },
+            click: function () {
+              // Toggle the CC panel via React state. The panel reads
+              // subtitleTracksRef / subtitlePreferencesRef for live values.
+              setShowCCPanel((prev) => !prev)
+            },
+          },
+          {
             name: 'download',
             position: 'right',
             index: 29,
@@ -3041,10 +3191,11 @@ export default function Watch() {
               return getQualitySettingTitle(selected)
             },
           },
-          // Subtitle track selector
-          ...(subtitleSetting ? [subtitleSetting] : []),
-          // Subtitle style settings (compact, one per row, matching quality/auto-skip style)
-          ...subtitleStyleSettings,
+          // NOTE: Subtitle track + 8 style settings have been MOVED to the
+          // CC button (ccToggle) in the controls bar. The CC button opens
+          // a React-rendered panel that owns all subtitle customization.
+          // The settings menu now only contains: quality, auto-skip,
+          // auto-next, and playback speed.
           {
             name: 'autoSkip',
             width: 220,
@@ -3103,8 +3254,9 @@ export default function Watch() {
               const mod = await import('dashjs')
               dash = mod.default || mod
             } catch {
+              // Silently fall through to the next transport — the user
+              // only needs to see "Playback failed." if ALL options fail.
               if (buildIdRef.current === myBuildId) {
-                showToast('DASH engine failed to load — trying another server.', { long: true })
                 onBlocked?.('unsupported-format')
               }
               return
@@ -3143,60 +3295,62 @@ export default function Watch() {
             const isKiwiHls = shouldPreferNativeHls(url)
             if (isKiwiHls) kiwiFragmentRangesRef.current = []
             const proxiedH = proxied
-	            const referer = (headers && headers.Referer) || ''
-				const hlsTransportPlan = createMediaTransportPlan({
-					verification: sourceVerification,
-					directUrl: url,
-					proxyUrl: proxiedH(url),
-					directPreferred: peweDirectPreferred,
-				})
-				let hlsTransportIndex = 0
-		          const updateNativeHlsQualities = async () => {
-		            try {
-		              const response = await fetch(hlsTransportPlan[hlsTransportIndex].url, { cache: 'no-store' })
-	              if (!response.ok) return
-	              const lines = (await response.text()).split(/\r?\n/)
-	              const variants = []
-	              for (let index = 0; index < lines.length; index += 1) {
-	                const streamInfo = lines[index]
-	                if (!streamInfo.startsWith('#EXT-X-STREAM-INF:')) continue
-	                const child = lines.slice(index + 1).find((line) => line && !line.startsWith('#'))
-	                const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
-	                if (!child || !height) continue
-	                const childCandidate = new URL(child, window.location.origin)
-	                const childUrl = childCandidate.origin === new URL(PROXY_BASE).origin && childCandidate.pathname.endsWith('/proxy')
-	                  ? childCandidate.searchParams.get('url') || new URL(child, url).toString()
-	                  : new URL(child, url).toString()
-	                if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
-	              }
-	              variants.sort((a, b) => b.height - a.height)
+                    const referer = (headers && headers.Referer) || ''
+                                const hlsTransportPlan = createMediaTransportPlan({
+                                        verification: sourceVerification,
+                                        directUrl: url,
+                                        proxyUrl: proxiedH(url),
+                                        directPreferred: peweDirectPreferred,
+                                })
+                                let hlsTransportIndex = 0
+                          const updateNativeHlsQualities = async () => {
+                            try {
+                              const response = await fetch(hlsTransportPlan[hlsTransportIndex].url, { cache: 'no-store' })
+                      if (!response.ok) return
+                      const lines = (await response.text()).split(/\r?\n/)
+                      const variants = []
+                      for (let index = 0; index < lines.length; index += 1) {
+                        const streamInfo = lines[index]
+                        if (!streamInfo.startsWith('#EXT-X-STREAM-INF:')) continue
+                        const child = lines.slice(index + 1).find((line) => line && !line.startsWith('#'))
+                        const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
+                        if (!child || !height) continue
+                        const childCandidate = new URL(child, window.location.origin)
+                        const childUrl = childCandidate.origin === new URL(PROXY_BASE).origin && childCandidate.pathname.endsWith('/proxy')
+                          ? childCandidate.searchParams.get('url') || new URL(child, url).toString()
+                          : new URL(child, url).toString()
+                        if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
+                      }
+                      variants.sort((a, b) => b.height - a.height)
               // Allow single variant to still expose Auto + that variant (real cap, not fake).
               if (variants.length < 1 || !art?.setting?.update) return
-              // If only 1 variant, synthesize bandwidth caps for lower heights via same URL but capped via hls cap emulation
-              // by still showing FIXED options that map to that single level (cap logic downstream picks best available).
-              if (variants.length === 1) {
-                const sole = variants[0]
-                // Add synthetic caps so user sees 1080/720/480 even if master only lists one height
-                const existingHeights = new Set(variants.map(v=>v.height))
-                for (const opt of FIXED_QUALITY_OPTIONS) {
-                  if (!existingHeights.has(opt.height)) {
-                    // Use same URL but will be capped via autoLevelCapping in hls.js path; for native, same URL with capped label
-                    // Native path can't truly downscale, but we expose the label as capped choice (no fake URL).
-                    // We keep variants as-is; fixed options will be added via hls.js path later.
-                  }
-                }
+              // Build a quality list that only includes qualities actually
+              // present in the manifest. Previously, all FIXED_QUALITY_OPTIONS
+              // were shown even when the manifest had only one variant, which
+              // caused the user to "select 720P" but actually play 1080P.
+              // Now we map each fixed option to the closest available variant
+              // and only show it if that variant's height is within ±1 step.
+              const availableHeights = variants.map((v) => Number(v.height)).sort((a, b) => a - b)
+              const isQualityAvailable = (targetHeight) => {
+                if (availableHeights.length === 0) return false
+                // Show the option if a variant exists at or near this height.
+                // "Near" means within one quality step (e.g., 720P option
+                // shows if 720 or 1080 exists, since 1080 can be capped).
+                return availableHeights.some((h) => h <= targetHeight || Math.abs(h - targetHeight) <= 360)
               }
               const nativeQualityList = [
                 { default: !playerPreferencesRef.current.qualityTarget, html: qualityOptionHtml(getQualityPresentation('auto')), url, type: 'hls' },
-                ...FIXED_QUALITY_OPTIONS.map((option) => {
-                  const selected = selectLevelForQualityTarget(variants, option.height)
-                  return {
-                    default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
-                    html: qualityOptionHtml(getQualityPresentation(option.label)),
-                    url: selected?.url || url,
-                    type: 'hls',
-                  }
-                }),
+                ...FIXED_QUALITY_OPTIONS
+                  .filter((option) => isQualityAvailable(option.height))
+                  .map((option) => {
+                    const selected = selectLevelForQualityTarget(variants, option.height)
+                    return {
+                      default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
+                      html: qualityOptionHtml(getQualityPresentation(option.label)),
+                      url: selected?.url || url,
+                      type: 'hls',
+                    }
+                  }),
               ]
               art.setting.update({
                 name: 'quality',
@@ -3204,17 +3358,21 @@ export default function Watch() {
                 html: `Quality · ${playerPreferencesRef.current.qualityTarget ? `${playerPreferencesRef.current.qualityTarget}P` : 'Auto'}`,
                 selector: [
                   { default: !playerPreferencesRef.current.qualityTarget, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
-                  ...FIXED_QUALITY_OPTIONS.map((option) => ({
-                    default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
-                    html: qualityOptionHtml(getQualityPresentation(option.label)),
-                    value: `target:${option.height}`,
-                  })),
+                  ...FIXED_QUALITY_OPTIONS
+                    .filter((option) => isQualityAvailable(option.height))
+                    .map((option) => ({
+                      default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
+                      html: qualityOptionHtml(getQualityPresentation(option.label)),
+                      value: `target:${option.height}`,
+                    })),
                 ],
                 onSelect: (item) => {
                   const targetHeight = String(item.value).startsWith('target:') ? Number(String(item.value).replace('target:', '')) : null
                   const targetOption = FIXED_QUALITY_OPTIONS.find((option) => option.height === targetHeight)
                   const selected = targetOption ? selectLevelForQualityTarget(variants, targetOption.height) : null
-                  const next = selected?.url || url
+                  // If the exact quality isn't available, pick the closest
+                  // variant instead of falling back to the master URL.
+                  const next = selected?.url || (variants[0]?.url || url)
                   playerPreferencesRef.current = { ...playerPreferencesRef.current, qualityTarget: targetOption?.height || null }
                   persistPlayerPreferences(playerPreferencesRef.current)
                   const resumeAt = Number(video.currentTime || 0)
@@ -3230,14 +3388,14 @@ export default function Watch() {
             // other manifests remain on hls.js, whose bounded buffer and media
             // recovery avoid falling through to an expired embed page.
             if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
-		              try {
-		                video.preload = getNativeMediaBufferPolicy().preload
-		                video.src = hlsTransportPlan[hlsTransportIndex].url
-	                if (pendingHandoffRef.current?.shouldPlay !== false) {
-	                  const p = video.play()
-	                  if (p && typeof p.catch === 'function') p.catch(() => {})
-	                }
-	              void updateNativeHlsQualities()
+                              try {
+                                video.preload = getNativeMediaBufferPolicy().preload
+                                video.src = hlsTransportPlan[hlsTransportIndex].url
+                        if (pendingHandoffRef.current?.shouldPlay !== false) {
+                          const p = video.play()
+                          if (p && typeof p.catch === 'function') p.catch(() => {})
+                        }
+                      void updateNativeHlsQualities()
               } catch {
                 // fall through to hls.js
               }
@@ -3250,18 +3408,17 @@ export default function Watch() {
               const mod = (await (hlsPreloadPromiseRef.current || import('hls.js')))
               Hls = mod?.default || mod
             } catch (e) {
-              if (buildIdRef.current === myBuildId) {
-                showToast('HLS engine failed to load — try another server.', { long: true })
-              }
+              // Silently fall through — onBlocked will be called by the
+              // caller's error handler if all transports fail.
               return
             }
-	            if (!Hls.isSupported()) {
-	              // last-resort native
-		              try {
-		                video.preload = getNativeMediaBufferPolicy().preload
-		                video.src = proxiedH(url)
-	                if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
-	              } catch {}
+                    if (!Hls.isSupported()) {
+                      // last-resort native
+                              try {
+                                video.preload = getNativeMediaBufferPolicy().preload
+                                video.src = proxiedH(url)
+                        if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
+                      } catch {}
               return
             }
             if (art.hls) {
@@ -3306,30 +3463,30 @@ export default function Watch() {
                 return new Request(context.url, requestInit)
               },
             })
-	            let mediaRetries = 0
-				let playbackStarted = false
-				const markPlaybackStarted = () => {
-					playbackStarted = true
-				}
-				video.addEventListener('playing', markPlaybackStarted, { once: true })
-	            const fail = () => {
-	              if (buildIdRef.current !== myBuildId) return
-	              if (onBlocked) {
-	                onBlocked(
-	                  playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
-	                  { streamUrl: url }
-	                )
-	              }
+                    let mediaRetries = 0
+                                let playbackStarted = false
+                                const markPlaybackStarted = () => {
+                                        playbackStarted = true
+                                }
+                                video.addEventListener('playing', markPlaybackStarted, { once: true })
+                    const fail = () => {
+                      if (buildIdRef.current !== myBuildId) return
+                      if (onBlocked) {
+                        onBlocked(
+                          playbackStarted ? 'playback-error' : 'hls-terminal-before-playback',
+                          { streamUrl: url }
+                        )
+                      }
               else setError('Playback failed.')
             }
-	            hls.on(Hls.Events.ERROR, (_event, data) => {
+                    hls.on(Hls.Events.ERROR, (_event, data) => {
               if (buildIdRef.current !== myBuildId) return
               if (!data.fatal) return
               // Signed URL and throttle responses are terminal. Every other
               // transient request has already used hls.js' bounded retry policy;
               // do not call startLoad() here because that restarts loading and
               // can discard the buffer the viewer already earned.
-	              // MP4 mis-classified as HLS
+                      // MP4 mis-classified as HLS
               if (
                 data.type === Hls.ErrorTypes.MANIFEST_ERROR &&
                 data.details === Hls.ErrorDetails.MANIFEST_PARSE_ERROR
@@ -3363,53 +3520,48 @@ export default function Watch() {
                   } catch {}
                   return
                 }
-	                fail()
+                        fail()
                 return
-	              }
-		              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-						// A proxy can serve the master manifest yet fail on the first
-						// playable media request. Manifest readiness is therefore not
-						// playback evidence. Before the video has actually started, make
-						// the bounded direct retry instead of staying in proxy recovery.
-						if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
-								hlsTransportIndex += 1
-							try {
-								mediaRetries = 0
-								const previousMode = hlsTransportPlan[hlsTransportIndex - 1]?.mode
-								const nextMode = hlsTransportPlan[hlsTransportIndex]?.mode
-								if (previousMode === 'proxy' && nextMode === 'direct') {
-									showToast('Proxy stream failed before playback — trying direct.', { long: true })
-								} else {
-									showToast(`${previousMode || 'Previous'} stream failed before playback — trying ${nextMode || 'next'}.`, { long: true })
-								}
-								hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
-								return
-							} catch {}
-						}
-		                fail()
-		                return
+                      }
+                              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                                // A proxy can serve the master manifest yet fail on the first
+                                                // playable media request. Manifest readiness is therefore not
+                                                // playback evidence. Before the video has actually started, make
+                                                // the bounded direct retry instead of staying in proxy recovery.
+                                                if (!playbackStarted && hlsTransportIndex + 1 < hlsTransportPlan.length) {
+                                                                hlsTransportIndex += 1
+                                                        try {
+                                                                mediaRetries = 0
+                                                                // Silently try the next transport — the user only sees
+                                                                // a toast if ALL transports (direct + proxy + embed) fail.
+                                                                hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
+                                                                return
+                                                        } catch {}
+                                                }
+                                fail()
+                                return
               }
-	              fail()
+                      fail()
             })
-	            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 const levels = (hls.levels || [])
-	                .map((level, index) => ({
-	                  index,
-	                  height: Number(level?.height || 0),
-	                  bitrate: Number(level?.bitrate || level?.averageBitrate || level?.bandwidth || 0),
-	                }))
-	                .filter((level, index, list) => {
-	                  if (level.height <= 0 && level.bitrate <= 0) return false
-	                  const key = level.height > 0 ? `height:${level.height}` : `bitrate:${level.bitrate}`
-	                  return list.findIndex((item) => {
-	                    const itemKey = item.height > 0 ? `height:${item.height}` : `bitrate:${item.bitrate}`
-	                    return itemKey === key
-	                  }) === index
-	                })
-	                .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
+                        .map((level, index) => ({
+                          index,
+                          height: Number(level?.height || 0),
+                          bitrate: Number(level?.bitrate || level?.averageBitrate || level?.bandwidth || 0),
+                        }))
+                        .filter((level, index, list) => {
+                          if (level.height <= 0 && level.bitrate <= 0) return false
+                          const key = level.height > 0 ? `height:${level.height}` : `bitrate:${level.bitrate}`
+                          return list.findIndex((item) => {
+                            const itemKey = item.height > 0 ? `height:${item.height}` : `bitrate:${item.bitrate}`
+                            return itemKey === key
+                          }) === index
+                        })
+                        .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
               if (levels.length > 0 && art?.setting?.update) {
                 const auto = getQualityPresentation('auto')
-	                const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
+                        const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
                 const dataSaver = getHlsDataSaverCap(levels)
                 let dataSaverCap = null
                 const adaptivePolicy = getAdaptiveBandwidthPolicy(netHintRef.current?.downlink, levels)
@@ -3475,8 +3627,8 @@ export default function Watch() {
                   return getHlsQualitySettingDisplay(levels, level, dataSaverCap)
                 }
                 const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
-	                  const display = getSpeedCappedDisplay(level)
-	                  const qualitySetting = art.setting.find('quality')
+                          const display = getSpeedCappedDisplay(level)
+                          const qualitySetting = art.setting.find('quality')
                   if (qualitySetting) {
                     qualitySetting.html = display.title
                     qualitySetting.tooltip = display.label
@@ -3495,33 +3647,33 @@ export default function Watch() {
                     }
                   }
                   return display
-	                }
+                        }
                 const buildHlsQualitySetting = (activeLevel) => {
                   const activeDisplay = getSpeedCappedDisplay(activeLevel)
-	                  return {
-	                    name: 'quality',
-	                    width: 220,
-	                    html: activeDisplay.title,
-	                    tooltip: activeDisplay.label,
-	                    selector: [
-	                      {
+                          return {
+                            name: 'quality',
+                            width: 220,
+                            html: activeDisplay.title,
+                            tooltip: activeDisplay.label,
+                            selector: [
+                              {
                         default: !forcedQualityLabel && activeLevel === -1 && dataSaverCap === null,
                         html: qualityOptionHtml(auto),
-	                        value: 'auto',
-	                      },
+                                value: 'auto',
+                              },
                       ...FIXED_QUALITY_OPTIONS.map((option) => ({
                         default: dataSaverCap === null && forcedQualityLabel === option.label,
                         html: qualityOptionHtml(getQualityPresentation(option.label)),
                         value: `target:${option.height}`,
                       })),
-	                    ],
+                            ],
                     onSelect: (item) => {
                       if (item.value === 'saver' && dataSaver) {
-	                        dataSaverCap = dataSaver.index
-	                        hlsQualitySelection.selectLevel(-1)
-	                        hls.autoLevelCapping = dataSaver.index
-	                        hls.currentLevel = -1
-	                        hls.nextLevel = -1
+                                dataSaverCap = dataSaver.index
+                                hlsQualitySelection.selectLevel(-1)
+                                hls.autoLevelCapping = dataSaver.index
+                                hls.currentLevel = -1
+                                hls.nextLevel = -1
                       } else {
                         const targetHeight = String(item.value).startsWith('target:')
                           ? Number(String(item.value).replace('target:', ''))
@@ -3550,27 +3702,27 @@ export default function Watch() {
                         hls.currentLevel = nextLevel
                         hls.nextLevel = nextLevel
                         hlsQualitySelection.selectLevel(nextLevel)
-	                      }
+                              }
                       const nextDisplay = syncHlsQualitySetting()
                       return nextDisplay.label
-	                    },
-	                  }
-	                }
+                            },
+                          }
+                        }
                 art.setting.update(buildHlsQualitySetting(hls.currentLevel))
                 hls.on(Hls.Events.LEVEL_SWITCHED, () => {
-	                  if (buildIdRef.current !== myBuildId) return
-	                  // hls.js can publish a transient adaptive currentLevel
-	                  // while a manually selected rendition is settling. Keep
-	                  // the displayed setting tied to the explicit user choice.
-	                  syncHlsQualitySetting()
-	                })
-	              }
-	              if (pendingHandoffRef.current?.shouldPlay !== false) {
-	                const p = video.play()
-	                if (p && typeof p.catch === 'function') p.catch(() => {})
-	              }
-	            })
-	            // Proxy HLS does not always surface a native `waiting` event
+                          if (buildIdRef.current !== myBuildId) return
+                          // hls.js can publish a transient adaptive currentLevel
+                          // while a manually selected rendition is settling. Keep
+                          // the displayed setting tied to the explicit user choice.
+                          syncHlsQualitySetting()
+                        })
+                      }
+                      if (pendingHandoffRef.current?.shouldPlay !== false) {
+                        const p = video.play()
+                        if (p && typeof p.catch === 'function') p.catch(() => {})
+                      }
+                    })
+                    // Proxy HLS does not always surface a native `waiting` event
             // while hls.js is fetching the next fragment. Mirror its media
             // buffer lifecycle into the same player-owned indicator.
             hls.on(Hls.Events.FRAG_LOADING, () => {
@@ -3647,8 +3799,8 @@ export default function Watch() {
               setBuffering(false)
               video.dispatchEvent(new Event('progress'))
             })
-	            try {
-	              hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
+                    try {
+                      hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
               hls.attachMedia(video)
               art.hls = hls
               hlsInstance.current = hls
@@ -3679,7 +3831,8 @@ export default function Watch() {
         const mod = await import('artplayer')
         Artplayer = mod.default
       } catch (e) {
-        showToast('Player failed to load — check your connection.', { long: true })
+        // Silently fail — the caller will surface "Playback failed." via
+        // the onBlocked callback if no other transport succeeds.
         return
       }
 
@@ -3974,7 +4127,20 @@ export default function Watch() {
   // ────────────────────────────────────────────────────────────
   // Embed playback progress tracker (silent background)
   // ────────────────────────────────────────────────────────────
-  // Embed playback: audio-aware timer (pauses when hidden or manually paused)
+  // Embed playback: high-precision timer that syncs with the embedded
+  // player's real video time via postMessage when available, and falls
+  // back to a visibility-aware wall-clock accumulator otherwise.
+  //
+  // Key improvements over the previous implementation:
+  // 1. Uses performance.now() for sub-millisecond delta precision.
+  // 2. Pauses accumulation when the tab is hidden (document.hidden) —
+  //    browsers throttle setInterval in background tabs, so the old
+  //    code could add a huge delta when the user returned.
+  // 3. Caps per-tick delta at 5s (was 120s) to prevent runaway jumps.
+  // 4. Polls the embed for real time every second (was every 3s).
+  // 5. Supports more postMessage formats (YouTube, Vimeo, Video.js,
+  //    Plyr, and generic HTML5 video events).
+  // 6. No overlay is shown — the iframe is never covered.
   useEffect(() => {
     if (!activeEmbedUrl) {
       embedStartTimeRef.current = null
@@ -3984,19 +4150,23 @@ export default function Watch() {
       embedDurationRef.current = 0
       embedAutoNextFiredRef.current = false
       embedPausedRef.current = false
+      embedHasRealTimeRef.current = false
+      embedVideoTimeRef.current = 0
       setEmbedPaused(false)
       return
     }
 
-    const startTime = Date.now()
-    embedStartTimeRef.current = startTime
+    const startTime = performance.now()
+    embedStartTimeRef.current = Date.now()
     embedLastTickRef.current = startTime
     embedAccumulatedRef.current = 0
     embedAutoNextFiredRef.current = false
     embedPausedRef.current = false
+    embedHasRealTimeRef.current = false
+    embedVideoTimeRef.current = 0
     setEmbedPaused(false)
 
-    // Duration: prefer episode meta, else anime duration, else 24 min. AnikotoTV provides per-episode length via API if available.
+    // Duration: prefer episode meta, else anime duration, else 24 min.
     const epMeta = Array.isArray(episodes) ? episodes.find(e => Number(e?.number) === Number(epNumber)) : null
     const rawDuration = epMeta?.duration || epMeta?.runtime || anime?.duration || 24
     const durationSec = Math.max(60, Number(rawDuration) * 60 || 24 * 60)
@@ -4004,170 +4174,204 @@ export default function Watch() {
 
     let saveCounter = 0
     let timeRequestCounter = 0
+    // Track whether the tab was hidden so we can discard the hidden gap
+    // instead of accumulating it as playback time.
+    let wasHidden = false
+
+    const saveProgress = (elapsed) => {
+      const title = anime?.title?.english || anime?.title?.romaji || animeId
+      upsertLocalWatchHistory({
+        animeId, title, episode: epNumber, time: elapsed, duration: durationSec,
+        completed: false, timestamp: Date.now(), image: anime?.coverImage?.large || '',
+      })
+      if (user) {
+        Promise.resolve(supabase.from('watch_history').upsert({
+          user_id: user.id, anime_id: parseInt(animeId, 10), anime_title: title,
+          anime_image: anime?.coverImage?.large || '', episode_number: epNumber,
+          progress: elapsed, duration: durationSec, timestamp: Date.now(),
+        }, { onConflict: 'user_id,anime_id,episode_number' })).catch(() => {})
+      }
+      if (elapsed >= durationSec * 0.6) {
+        syncProgressRef.current?.('watching', { elapsed, duration: durationSec })
+      }
+    }
+
+    const fireAutoNext = (elapsed) => {
+      if (embedAutoNextFiredRef.current) return
+      if (!(autoNextEmbedRef.current && !isMovie && Number(epNumber) < Number(episodes?.length || 0))) return
+      if (elapsed < Math.max(10, durationSec)) return
+      embedAutoNextFiredRef.current = true
+      syncProgressRef.current?.('completed', { elapsed: durationSec, duration: durationSec })
+      const title = anime?.title?.english || anime?.title?.romaji || animeId
+      upsertLocalWatchHistory({
+        animeId, title, episode: epNumber, time: durationSec, duration: durationSec,
+        completed: true, timestamp: Date.now(), image: anime?.coverImage?.large || '',
+      })
+      const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
+      navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
+    }
+
     const tick = setInterval(() => {
+      // If the embed is paused (detected via postMessage), skip accumulation.
       if (embedPausedRef.current) {
-        embedLastTickRef.current = Date.now()
+        embedLastTickRef.current = performance.now()
         return
       }
-      // Request time from embed iframe every 3 seconds
+      // If the tab is hidden, skip accumulation entirely. Browsers throttle
+      // background timers, so any delta here would be unreliable. The
+      // visibilitychange listener below resets the baseline on return.
+      if (typeof document !== 'undefined' && document.hidden) {
+        wasHidden = true
+        return
+      }
+      if (wasHidden) {
+        // Tab just became visible — reset the baseline so the hidden gap
+        // is NOT counted as playback time.
+        wasHidden = false
+        embedLastTickRef.current = performance.now()
+        // If we have real time from postMessage, trust it; otherwise skip
+        // this tick's accumulation to avoid a false jump.
+        if (!embedHasRealTimeRef.current) return
+      }
+
+      // Request real video time from the embed every second.
       timeRequestCounter += 1
-      if (timeRequestCounter >= 3) {
+      if (timeRequestCounter >= 1) {
         timeRequestCounter = 0
         try {
           const frame = embedFrameRef.current
           if (frame?.contentWindow) {
-            // Try common embed player APIs
+            // Generic HTML5 video / Video.js / Plyr
             frame.contentWindow.postMessage({ action: 'getTime', time: true }, '*')
             frame.contentWindow.postMessage({ event: 'get-time' }, '*')
             frame.contentWindow.postMessage({ command: 'getCurrentTime' }, '*')
+            // YouTube iframe API
+            frame.contentWindow.postMessage(JSON.stringify({ event: 'listening', info: {} }), '*')
+            frame.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'getCurrentTime', args: [] }), '*')
+            // Vimeo (requires player_id but we try anyway)
+            frame.contentWindow.postMessage(JSON.stringify({ method: 'getCurrentTime' }), '*')
           }
         } catch {}
       }
-      // If postMessage gives us real video time, use it directly (no accumulation)
+
+      // If postMessage gives us real video time, use it directly.
       if (embedHasRealTimeRef.current) {
-        embedLastTickRef.current = Date.now()
+        embedLastTickRef.current = performance.now()
         const elapsed = Math.floor(embedVideoTimeRef.current || 0)
         embedElapsedRef.current = elapsed
         saveCounter += 1
         if (saveCounter >= 10) {
           saveCounter = 0
-          const title = anime?.title?.english || anime?.title?.romaji || animeId
-          upsertLocalWatchHistory({
-            animeId, title, episode: epNumber, time: elapsed, duration: durationSec,
-            completed: false, timestamp: Date.now(), image: anime?.coverImage?.large || '',
-          })
-          if (user) {
-            Promise.resolve(supabase.from('watch_history').upsert({
-              user_id: user.id, anime_id: parseInt(animeId, 10), anime_title: title,
-              anime_image: anime?.coverImage?.large || '', episode_number: epNumber,
-              progress: elapsed, duration: durationSec, timestamp: Date.now(),
-            }, { onConflict: 'user_id,anime_id,episode_number' })).catch(() => {})
-          }
-          // MAL/AniList watching sync at 60%
-          if (elapsed >= durationSec * 0.6) {
-            syncProgressRef.current?.('watching', { elapsed, duration: durationSec })
-          }
+          saveProgress(elapsed)
         }
-        // Auto-next check (real embed time)
-        if (
-          !embedAutoNextFiredRef.current &&
-          elapsed >= Math.max(10, durationSec) &&
-          autoNextEmbedRef.current && !isMovie &&
-          Number(epNumber) < Number(episodes?.length || 0)
-        ) {
-          embedAutoNextFiredRef.current = true
-          syncProgressRef.current?.('completed', { elapsed: durationSec, duration: durationSec })
-          const title = anime?.title?.english || anime?.title?.romaji || animeId
-          upsertLocalWatchHistory({
-            animeId, title, episode: epNumber, time: durationSec, duration: durationSec,
-            completed: true, timestamp: Date.now(), image: anime?.coverImage?.large || '',
-          })
-          const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
-          navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
-        }
+        fireAutoNext(elapsed)
         return
       }
-      // Fallback: accumulate wall-clock time when no real video time from postMessage
-      const now = Date.now()
+
+      // Fallback: accumulate wall-clock time with a tight delta cap.
+      const now = performance.now()
       const last = embedLastTickRef.current || now
-      const delta = (now - last) / 1000
+      const deltaMs = now - last
       embedLastTickRef.current = now
-      if (delta > 0 && delta < 120) {
-        embedAccumulatedRef.current += delta
+      // Cap delta at 5 seconds to prevent runaway jumps from throttled
+      // background timers or GC pauses. The old 120s cap could add 2
+      // minutes of fake watch time after a tab switch.
+      const deltaSec = Math.min(5, Math.max(0, deltaMs / 1000))
+      if (deltaSec > 0) {
+        embedAccumulatedRef.current += deltaSec
       }
       const elapsed = Math.floor(embedAccumulatedRef.current)
       embedElapsedRef.current = elapsed
 
-      // Save progress every 10 seconds (fallback path — when no postMessage)
       saveCounter += 1
       if (saveCounter >= 10) {
         saveCounter = 0
-        const title = anime?.title?.english || anime?.title?.romaji || animeId
-        upsertLocalWatchHistory({
-          animeId, title, episode: epNumber, time: elapsed, duration: durationSec,
-          completed: false, timestamp: Date.now(), image: anime?.coverImage?.large || '',
-        })
-        if (user) {
-          Promise.resolve(supabase.from('watch_history').upsert({
-            user_id: user.id, anime_id: parseInt(animeId, 10), anime_title: title,
-            anime_image: anime?.coverImage?.large || '', episode_number: epNumber,
-            progress: elapsed, duration: durationSec, timestamp: Date.now(),
-          }, { onConflict: 'user_id,anime_id,episode_number' })).catch(() => {})
-        }
-        if (elapsed >= durationSec * 0.6) {
-          syncProgressRef.current?.('watching', { elapsed, duration: durationSec })
-        }
+        saveProgress(elapsed)
       }
-
-      // Auto-next check (fallback path — no postMessage)
-      if (
-        !embedAutoNextFiredRef.current &&
-        elapsed >= Math.max(10, durationSec) &&
-        autoNextEmbedRef.current && !isMovie &&
-        Number(epNumber) < Number(episodes?.length || 0)
-      ) {
-        embedAutoNextFiredRef.current = true
-        syncProgressRef.current?.('completed', { elapsed: durationSec, duration: durationSec })
-        const title = anime?.title?.english || anime?.title?.romaji || animeId
-        upsertLocalWatchHistory({
-          animeId, title, episode: epNumber, time: durationSec, duration: durationSec,
-          completed: true, timestamp: Date.now(), image: anime?.coverImage?.large || '',
-        })
-        const slug = generateSlug(anime?.title?.english || anime?.title?.romaji || '')
-        navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
-      }
+      fireAutoNext(elapsed)
     }, 1_000)
 
     const onVisibility = () => {
-      if (!document.hidden && !embedPausedRef.current) {
-        embedLastTickRef.current = Date.now()
+      if (document.hidden) {
+        // Mark so the next tick knows to discard the gap.
+        wasHidden = true
+      } else {
+        // Reset baseline immediately on return to visible.
+        embedLastTickRef.current = performance.now()
+        wasHidden = false
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
 
-    // Also resume tick baseline on window focus
-    const onFocus = () => { if (!embedPausedRef.current) embedLastTickRef.current = Date.now() }
+    // Resume tick baseline on window focus (covers cases where
+    // visibilitychange doesn't fire, e.g., alt-tab on some OSes).
+    const onFocus = () => {
+      if (!embedPausedRef.current) {
+        embedLastTickRef.current = performance.now()
+        wasHidden = false
+      }
+    }
     window.addEventListener('focus', onFocus)
+    const onBlur = () => { wasHidden = true }
+    window.addEventListener('blur', onBlur)
 
-    // PostMessage listener — try to sync with actual embedded player time
-    // Many embed providers send { event: 'time', time: <seconds> } or { currentTime: <seconds> }
+    // PostMessage listener — sync with actual embedded player time.
+    // Accepts a wide variety of formats from common embed providers.
     const onEmbedMessage = (e) => {
       try {
-        const d = typeof e?.data === 'string' ? JSON.parse(e.data) : e?.data
+        let d = e?.data
+        if (typeof d === 'string') {
+          try { d = JSON.parse(d) } catch { return }
+        }
         if (!d || typeof d !== 'object') return
-        // Check iframe source matches
+        // Verify the message came from our iframe.
         const frame = embedFrameRef.current
         if (frame && e.source !== frame.contentWindow) return
-        // Extract time from common embed message formats
-        const t = Number(d.time ?? d.currentTime ?? d.position ?? d.seconds ?? d.current_time ?? d.played)
+
+        // YouTube iframe API: { event: 'infoDelivery', info: { currentTime: N } }
+        const ytInfo = d.info || d.data || {}
+        const t = Number(
+          d.time ?? d.currentTime ?? d.position ?? d.seconds ??
+          d.current_time ?? d.played ?? ytInfo.currentTime ??
+          ytInfo.position ?? ytInfo.seconds
+        )
         if (Number.isFinite(t) && t >= 0) {
           embedVideoTimeRef.current = t
           embedHasRealTimeRef.current = true
           embedAccumulatedRef.current = t
           embedElapsedRef.current = Math.floor(t)
-          embedLastTickRef.current = Date.now()
+          embedLastTickRef.current = performance.now()
         }
-        // Also accept duration updates from embed
-        const dur = Number(d.duration ?? d.totalDuration ?? d.total_duration)
+        // Duration updates
+        const dur = Number(
+          d.duration ?? d.totalDuration ?? d.total_duration ??
+          ytInfo.duration ?? ytInfo.totalDuration
+        )
         if (Number.isFinite(dur) && dur > 0) {
           embedDurationRef.current = dur
         }
-        // Detect ended
-        if (d.event === 'ended' || d.event === 'finish' || d.event === 'complete' || d.ended === true || d.state === 'ended') {
-          embedVideoTimeRef.current = embedDurationRef.current || durationSec
-          embedAccumulatedRef.current = embedDurationRef.current || durationSec
-          embedElapsedRef.current = embedDurationRef.current || durationSec
+        // Ended event
+        if (d.event === 'ended' || d.event === 'finish' || d.event === 'complete' ||
+            d.ended === true || d.state === 'ended' || ytInfo.playerState === 0) {
+          const finalDur = embedDurationRef.current || durationSec
+          embedVideoTimeRef.current = finalDur
+          embedAccumulatedRef.current = finalDur
+          embedElapsedRef.current = finalDur
+          fireAutoNext(finalDur)
         }
-        // Detect paused state from embed
-        if (d.event === 'pause' || d.paused === true || d.state === 'paused') {
+        // Paused state
+        if (d.event === 'pause' || d.paused === true || d.state === 'paused' || ytInfo.playerState === 2) {
           embedPausedRef.current = true
           setEmbedPaused(true)
         }
-        if (d.event === 'play' || (d.paused === false && d.event !== 'ended') || d.state === 'playing') {
+        // Playing state
+        if (d.event === 'play' || d.event === 'playing' ||
+            (d.paused === false && d.event !== 'ended') ||
+            d.state === 'playing' || ytInfo.playerState === 1) {
           if (embedPausedRef.current) {
             embedPausedRef.current = false
             setEmbedPaused(false)
-            embedLastTickRef.current = Date.now()
+            embedLastTickRef.current = performance.now()
           }
         }
       } catch {}
@@ -4178,6 +4382,7 @@ export default function Watch() {
       clearInterval(tick)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
       window.removeEventListener('message', onEmbedMessage)
     }
   }, [activeEmbedUrl, animeId, epNumber, anime, user, isMovie, navigate])
@@ -4379,7 +4584,8 @@ export default function Watch() {
           if (embedFallback && !fallbackUsed) {
             fallbackUsed = true
             destroyPlayer()
-            showToast('Playback failed — trying Embed.', { long: true })
+            // Silently switch to the embed fallback — the user only sees
+            // "Playback failed." if the embed ALSO fails (second call below).
             setActiveEmbedUrl(embedFallback.url)
             applySkipSegments(normalizeProviderSkipSegments(payload))
             setStreamLoading(false)
@@ -4473,14 +4679,14 @@ export default function Watch() {
           const cachedEmbed = (!isBonkProvider(source) && !isPeweProvider(source))
             ? chooseBrowserPlayableEmbed(cached.sources, isBrowserPlayableEmbedSource)
             : null
-	          if (cachedEmbed) {
-	            destroyPlayer()
-	            setActiveEmbedUrl(cachedEmbed.url)
-	            applySkipSegments(normalizeProviderSkipSegments(cached))
-	            setStreamLoading(false)
-	            loadingRef.current = false
-	            return
-	          }
+                  if (cachedEmbed) {
+                    destroyPlayer()
+                    setActiveEmbedUrl(cachedEmbed.url)
+                    applySkipSegments(normalizeProviderSkipSegments(cached))
+                    setStreamLoading(false)
+                    loadingRef.current = false
+                    return
+                  }
         }
       }
 
@@ -4629,7 +4835,7 @@ export default function Watch() {
           setError('No video source found for this server.')
           setStreamLoading(false)
           loadingRef.current = false
-	          return
+                  return
         }
         const subs = qualityList[0]?.subtitles || firstSource?.subtitles || []
         const onBlocked = createSameProviderFailureHandler(data)
@@ -4638,9 +4844,9 @@ export default function Watch() {
           qualityList[0].type,
           qualityList,
           subs,
-	          data.headers,
-	          onBlocked
-	        )
+                  data.headers,
+                  onBlocked
+                )
         applySkipSegments(normalizeProviderSkipSegments(data))
         setCachedStream(source, data)
         restoreWorkingStream(data.sources.map((entry) => entry?.url))
@@ -4807,14 +5013,14 @@ export default function Watch() {
   const loadStreamRef = useRef(loadStream)
   loadStreamRef.current = loadStream
 
-	  // A playback issue never changes the selected provider. The visible server
-	  // controls remain the only way to select another provider.
-	  const handleProviderBlocked = useCallback((reason) => {
-	    const now = Date.now()
-	    if (now - lastBlockCycleRef.current < 3_000) return
-	    lastBlockCycleRef.current = now
-	    showToast('Playback failed.', { long: true })
-	  }, [showToast])
+          // A playback issue never changes the selected provider. The visible server
+          // controls remain the only way to select another provider.
+          const handleProviderBlocked = useCallback((reason) => {
+            const now = Date.now()
+            if (now - lastBlockCycleRef.current < 3_000) return
+            lastBlockCycleRef.current = now
+            showToast('Playback failed.', { long: true })
+          }, [showToast])
 
   handleProviderBlockedRef.current = handleProviderBlocked
 
@@ -5764,6 +5970,226 @@ export default function Watch() {
               )}
             </div>
           )}
+
+          {/* ── CC Customization Panel ──
+              Triggered by the CC button in the Artplayer control bar.
+              Contains: subtitle track selector (Off + tracks) and all
+              8 style dimensions (size, color, background, position,
+              font, weight, outline, opacity). Click outside to close. */}
+          {showCCPanel && !activeEmbedUrl && (
+            <>
+              {/* Click-away backdrop — transparent, covers full player */}
+              <div
+                role="button"
+                tabIndex={-1}
+                aria-label="Close subtitles panel"
+                onClick={() => setShowCCPanel(false)}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 9,
+                  background: 'transparent',
+                  cursor: 'default',
+                }}
+              />
+              <div
+                role="dialog"
+                aria-label="Subtitle settings"
+                className="watch-cc-panel"
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  bottom: 'calc(48px + env(safe-area-inset-bottom, 0px))',
+                  zIndex: 10,
+                  width: 'min(340px, calc(100vw - 24px))',
+                  maxHeight: 'min(72dvh, 460px)',
+                  background: 'rgba(10, 14, 24, 0.97)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 12,
+                  boxShadow: '0 12px 36px rgba(0,0,0,0.6)',
+                  backdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  color: '#e2e8f0',
+                  fontSize: 13,
+                }}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px 10px',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.3 }}>
+                    Subtitles
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCCPanel(false)}
+                    aria-label="Close"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: 18,
+                      lineHeight: 1,
+                      padding: '2px 6px',
+                      borderRadius: 6,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Scrollable body */}
+                <div
+                  className="watch-cc-panel-body"
+                  style={{
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    overscrollBehavior: 'contain',
+                    WebkitOverflowScrolling: 'touch',
+                    padding: '8px 12px 14px',
+                    flex: '1 1 auto',
+                    minHeight: 0,
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'rgba(255,255,255,0.3) transparent',
+                  }}
+                >
+                  {/* Track selector */}
+                  {(subtitleTracksRef.current || []).length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="watch-cc-label" style={CC_LABEL_STYLE}>
+                        Track
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleCCTrackChange('off')}
+                          style={ccChipStyle(subtitlePreferences.track === 'off')}
+                        >
+                          Off
+                        </button>
+                        {(subtitleTracksRef.current || []).map((track) => (
+                          <button
+                            key={track.url}
+                            type="button"
+                            onClick={() => handleCCTrackChange(track.url)}
+                            style={ccChipStyle(subtitlePreferences.track === track.url)}
+                            title={track.label}
+                          >
+                            {track.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Style options — each is a labeled <select> */}
+                  <CCSelectRow
+                    label="Size"
+                    value={subtitlePreferences.size}
+                    options={SUBTITLE_SIZE_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('size', v)}
+                  />
+                  <CCSelectRow
+                    label="Color"
+                    value={subtitlePreferences.color}
+                    options={SUBTITLE_COLOR_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('color', v)}
+                  />
+                  <CCSelectRow
+                    label="Background"
+                    value={subtitlePreferences.background}
+                    options={SUBTITLE_BACKGROUND_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('background', v)}
+                  />
+                  <CCSelectRow
+                    label="Position"
+                    value={subtitlePreferences.position}
+                    options={SUBTITLE_POSITION_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('position', v)}
+                  />
+                  <CCSelectRow
+                    label="Font"
+                    value={subtitlePreferences.font}
+                    options={SUBTITLE_FONT_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('font', v)}
+                  />
+                  <CCSelectRow
+                    label="Weight"
+                    value={subtitlePreferences.weight}
+                    options={SUBTITLE_WEIGHT_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('weight', v)}
+                  />
+                  <CCSelectRow
+                    label="Outline"
+                    value={subtitlePreferences.outline}
+                    options={SUBTITLE_OUTLINE_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('outline', v)}
+                  />
+                  <CCSelectRow
+                    label="Opacity"
+                    value={subtitlePreferences.opacity}
+                    options={SUBTITLE_OPACITY_OPTIONS}
+                    getLabel={(o) => o.label}
+                    onChange={(v) => handleCCStyleChange('opacity', v)}
+                  />
+
+                  {/* Live preview */}
+                  <div style={{ marginTop: 12 }}>
+                    <div className="watch-cc-label" style={CC_LABEL_STYLE}>
+                      Preview
+                    </div>
+                    <div
+                      style={{
+                        position: 'relative',
+                        height: 80,
+                        background:
+                          'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(15,23,42,0.6))',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          ...getSubtitleStyle(subtitlePreferences),
+                          // Override position for preview — always bottom
+                          bottom: '8px',
+                          top: 'auto',
+                          left: '8px',
+                          right: '8px',
+                          width: 'auto',
+                          maxWidth: 'calc(100% - 16px)',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <span className="art-subtitle-line" style={{ display: 'block' }}>
+                          The quick brown fox jumps over the lazy dog.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div
@@ -5780,13 +6206,13 @@ export default function Watch() {
           }}
         >
           <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 99, background: error ? '#f87171' : streamLoading ? '#fbbf24' : '#34d399' }} />
-			{effectiveEpisodeAvailability === 'upcoming'
-				? UPCOMING_EPISODE_MESSAGE
-				: error
-				? 'Playback needs attention. Choose a recovery option or another server.'
-				: streamLoading
-				? 'Preparing a stream…'
-				: `Playing on ${currentSource?.label || 'the selected server'}.`}
+                        {effectiveEpisodeAvailability === 'upcoming'
+                                ? UPCOMING_EPISODE_MESSAGE
+                                : error
+                                ? 'Playback needs attention. Choose a recovery option or another server.'
+                                : streamLoading
+                                ? 'Preparing a stream…'
+                                : `Playing on ${currentSource?.label || 'the selected server'}.`}
         </div>
 
         {/* Source selector */}
@@ -5831,13 +6257,13 @@ export default function Watch() {
                       key={source.id}
                       type="button"
                       onClick={() => handleSourceSwitch(source.id)}
-	                      onPointerEnter={() => warmProviderStream(source.id)}
-	                      onFocus={() => warmProviderStream(source.id)}
-	                      onTouchStart={() => warmProviderStream(source.id)}
+                              onPointerEnter={() => warmProviderStream(source.id)}
+                              onFocus={() => warmProviderStream(source.id)}
+                              onTouchStart={() => warmProviderStream(source.id)}
                       className="watch-source-btn"
                       aria-pressed={isActive}
-	                      aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
-	                      title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+                              aria-label={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
+                              title={`${isActive ? 'Current server: ' : 'Switch to '}${source.label}`}
                       style={{
                         padding: '10px 16px',
                         background: isActive
@@ -5861,8 +6287,8 @@ export default function Watch() {
                         minHeight: 40,
                       }}
                     >
-	                      {source.label}
-	                      {isActive && (
+                              {source.label}
+                              {isActive && (
                         <span
                           aria-hidden="true"
                           style={{
@@ -5915,7 +6341,7 @@ export default function Watch() {
             }}
           >
             <strong style={{ color: 'var(--text-primary)' }}>CC ready:</strong>{' '}
-            {subtitleTrackCount} source {subtitleTrackCount === 1 ? 'track' : 'tracks'}. Open the player Settings menu to choose a track, size, color, background, font, position, outline, and opacity. Press <kbd>C</kbd> to cycle captions.
+            {subtitleTrackCount} source {subtitleTrackCount === 1 ? 'track' : 'tracks'}. Tap the <strong style={{ color: '#a5b4fc' }}>CC</strong> button in the player controls to choose a track and customize size, color, background, font, position, outline, and opacity. Press <kbd>C</kbd> to cycle captions.
           </div>
         )}
         {/* Mobile episode toggle */}
@@ -5983,8 +6409,8 @@ export default function Watch() {
               {isMovie
                 ? 'Movie'
                 : `Episode ${epNumber} of ${episodes.length || '?'}`}{' '}
-				· {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
-				{currentSource?.label || 'Server 1'}
+                                · {currentSource?.lang?.toUpperCase() || 'SUB'} via{' '}
+                                {currentSource?.label || 'Server 1'}
             </div>
 
             <div
@@ -6285,6 +6711,37 @@ export default function Watch() {
         .watch-art-mount video {
           background: #000;
         }
+        /* ── Subtitle text overflow protection ──
+           Artplayer's subtitle container is absolutely positioned inside
+           the video frame. Long tokens (URLs, CJK without spaces, etc.)
+           must wrap inside the box instead of spilling out horizontally.
+           These rules are the CSS-level safety net; the inline styles set
+           in getSubtitleStyle() handle the same thing at the JS level. */
+        .watch-art-mount .art-subtitle,
+        .watch-art-mount .artplayer-subtitle,
+        .watch-art-mount .art-video-player .art-subtitle {
+          box-sizing: border-box !important;
+          max-width: 92% !important;
+          width: 92% !important;
+          left: 4% !important;
+          right: 4% !important;
+          word-break: break-word !important;
+          overflow-wrap: anywhere !important;
+          white-space: pre-wrap !important;
+          overflow: hidden !important;
+          pointer-events: none !important;
+        }
+        .watch-art-mount .art-subtitle .art-subtitle-line,
+        .watch-art-mount .artplayer-subtitle .art-subtitle-line,
+        .watch-art-mount .art-video-player .art-subtitle .art-subtitle-line {
+          box-sizing: border-box !important;
+          max-width: 100% !important;
+          width: 100% !important;
+          word-break: break-word !important;
+          overflow-wrap: anywhere !important;
+          white-space: pre-wrap !important;
+          display: block !important;
+        }
         /* Quality selector: make the current mode obvious and give every
            option a compact resolution badge instead of a raw source label. */
         .watch-art-mount .art-controls-quality {
@@ -6575,31 +7032,31 @@ export default function Watch() {
             box-sizing: border-box;
           }
           .watch-nav { gap: 8px !important; }
-	          /* Keep page-flow actions independently reachable on Android browsers.
-	             Provider controls are already compatible, so this only protects
-	             rating, episode navigation, and related outside-player controls. */
-	          .watch-info,
-	          .watch-details {
-	            min-width: 0 !important;
-	            overflow: visible !important;
-	          }
-	          .watch-rating,
-	          .watch-nav {
-	            position: relative;
-	            z-index: 1;
-	          }
-	          .watch-nav {
-	            display: grid !important;
-	            grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-	            width: 100%;
-	          }
-	          .watch-nav button,
-	          .watch-nav a {
-	            width: 100%;
-	            min-width: 0 !important;
-	            justify-content: center;
-	            white-space: nowrap;
-	          }
+                  /* Keep page-flow actions independently reachable on Android browsers.
+                     Provider controls are already compatible, so this only protects
+                     rating, episode navigation, and related outside-player controls. */
+                  .watch-info,
+                  .watch-details {
+                    min-width: 0 !important;
+                    overflow: visible !important;
+                  }
+                  .watch-rating,
+                  .watch-nav {
+                    position: relative;
+                    z-index: 1;
+                  }
+                  .watch-nav {
+                    display: grid !important;
+                    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+                    width: 100%;
+                  }
+                  .watch-nav button,
+                  .watch-nav a {
+                    width: 100%;
+                    min-width: 0 !important;
+                    justify-content: center;
+                    white-space: nowrap;
+                  }
           .watch-art-mount .art-video-player {
             --art-control-height: 42px;
             --art-control-icon-size: 28px;
@@ -6663,12 +7120,12 @@ export default function Watch() {
             max-width: 100%;
             flex-wrap: nowrap;
             gap: 2px !important;
-	            overflow-x: auto;
-	            overflow-y: visible;
-	            -webkit-overflow-scrolling: touch;
-	            scrollbar-width: none;
+                    overflow-x: auto;
+                    overflow-y: visible;
+                    -webkit-overflow-scrolling: touch;
+                    scrollbar-width: none;
           }
-	          .watch-rating-stars::-webkit-scrollbar { display: none; }
+                  .watch-rating-stars::-webkit-scrollbar { display: none; }
           .watch-rating-stars button {
             width: 22px !important;
             min-width: 22px !important;
@@ -6823,8 +7280,9 @@ export default function Watch() {
             max-height: min(70dvh, 300px) !important;
           }
         }
-        /* Download control in bottom bar */
-        .watch-art-mount .art-video-player .art-control-download {
+        /* Download + CC control in bottom bar */
+        .watch-art-mount .art-video-player .art-control-download,
+        .watch-art-mount .art-video-player .art-control-ccToggle {
           width: 42px !important;
           min-width: 42px !important;
         }
@@ -6835,7 +7293,8 @@ export default function Watch() {
           .watch-art-mount .art-settings .art-settings-build {
             max-width: min(240px, calc(100vw - 16px)) !important;
           }
-          .watch-art-mount .art-video-player .art-control-download {
+          .watch-art-mount .art-video-player .art-control-download,
+          .watch-art-mount .art-video-player .art-control-ccToggle {
             width: 36px !important;
             min-width: 36px !important;
           }
@@ -6845,11 +7304,81 @@ export default function Watch() {
             width: 32px !important;
             min-width: 32px !important;
           }
+          /* CC button hidden on very narrow screens — captions still
+             accessible via keyboard shortcut C or settings. */
+          .watch-art-mount .art-video-player .art-control-ccToggle {
+            display: none !important;
+          }
         }
         /* High-contrast support */
         @media (prefers-contrast: more) {
           .watch-source-btn { border-width: 2px !important; }
           .watch-countdown { border-width: 2px !important; }
+        }
+        /* ── CC button + CC Panel styles ── */
+        .watch-art-mount .art-control-ccToggle {
+          color: #e2e8f0;
+          opacity: 0.82;
+          transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .watch-art-mount .art-control-ccToggle:hover {
+          opacity: 1;
+          background: rgba(255,255,255,0.1);
+        }
+        .watch-art-mount .art-control-ccToggle:active {
+          transform: scale(0.94);
+        }
+        .watch-art-mount .art-control-ccToggle .watch-art-cc-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          pointer-events: none;
+        }
+        .watch-art-mount .art-control-ccToggle .watch-art-cc-icon.watch-art-cc-active {
+          filter: drop-shadow(0 0 4px rgba(165,180,252,0.6));
+        }
+        .watch-art-mount .art-control-ccToggle .watch-art-cc-icon svg {
+          width: 22px;
+          height: 22px;
+        }
+        /* CC Panel — responsive + scrollable */
+        .watch-cc-panel {
+          animation: watch-cc-in 180ms ease-out;
+        }
+        @keyframes watch-cc-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .watch-cc-panel { animation: none !important; }
+        }
+        .watch-cc-panel-body::-webkit-scrollbar { width: 6px; }
+        .watch-cc-panel-body::-webkit-scrollbar-thumb {
+          border-radius: 999px;
+          background: rgba(255,255,255,0.3);
+        }
+        .watch-cc-panel select option {
+          background: #0f172a;
+          color: #e2e8f0;
+        }
+        @media (max-width: 480px) {
+          .watch-cc-panel {
+            right: 8px !important;
+            left: 8px !important;
+            width: auto !important;
+            max-width: calc(100vw - 16px) !important;
+          }
+        }
+        /* Hide CC button only when the player is too narrow for essentials */
+        @media (max-width: 360px) {
+          .watch-art-mount .art-video-player .art-control-ccToggle {
+            display: none !important;
+          }
         }
       `}</style>
     </>
