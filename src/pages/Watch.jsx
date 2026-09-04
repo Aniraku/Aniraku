@@ -653,48 +653,53 @@ function getSubtitleStyle(preferences) {
 }
 
 function applySubtitleStyle(art, preferences) {
-  const subtitle = art?.template?.$subtitle
-  if (!subtitle) return
+  if (!art?.subtitle) return
   const style = getSubtitleStyle(preferences)
-  // Use setProperty with !important for position + sizing so Artplayer's
-  // own CSS (.artplayer-subtitle { bottom: 0; ... }) cannot override
-  // the user's chosen position. Inline Object.assign can't beat
-  // !important in Artplayer's stylesheet.
-  const importantKeys = ['bottom', 'top', 'left', 'right', 'width', 'maxWidth', 'position']
-  importantKeys.forEach((key) => {
-    if (style[key] != null) {
-      subtitle.style.setProperty(key, String(style[key]), 'important')
-    }
-  })
-  // Clear the opposite position axis so bottom/top don't both be set
-  if (style.bottom && style.bottom !== 'auto') {
-    subtitle.style.setProperty('top', 'auto', 'important')
-  } else if (style.top && style.top !== 'auto') {
-    subtitle.style.setProperty('bottom', 'auto', 'important')
-  }
-  // Apply the rest (color, font, background, etc.) without !important
-  const { bottom, top, left, right, width, maxWidth, position, ...rest } = style
-  Object.assign(subtitle.style, rest)
-  subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
-    Object.assign(line.style, {
-      color: style.color,
-      fontFamily: style.fontFamily,
-      fontSize: style.fontSize,
-      fontWeight: style.fontWeight,
-      lineHeight: style.lineHeight,
-      textShadow: style.textShadow,
-      letterSpacing: style.letterSpacing,
-      wordSpacing: style.wordSpacing,
-      // Propagate overflow protection to each subtitle line so long
-      // tokens wrap inside the line box instead of overflowing.
-      wordBreak: style.wordBreak,
-      overflowWrap: style.overflowWrap,
-      whiteSpace: style.whiteSpace,
-      maxWidth: '100%',
-      boxSizing: 'border-box',
-      display: 'block',
+
+  // PRIMARY: Use Artplayer's native art.subtitle.style() method.
+  // This is the official API and works correctly with Artplayer's
+  // internal subtitle rendering, fullscreen, and cue update cycle.
+  try {
+    art.subtitle.style(style)
+  } catch {}
+
+  // SECONDARY: Also apply via direct DOM manipulation for position
+  // properties that need !important to override Artplayer's CSS
+  // (e.g., .art-subtitle { bottom: 15px }).
+  const subtitle = art?.template?.$subtitle
+  if (subtitle) {
+    const importantKeys = ['bottom', 'top', 'left', 'right', 'width', 'maxWidth']
+    importantKeys.forEach((key) => {
+      if (style[key] != null) {
+        subtitle.style.setProperty(key, String(style[key]), 'important')
+      }
     })
-  })
+    // Clear the opposite position axis so bottom/top don't conflict
+    if (style.bottom && style.bottom !== 'auto') {
+      subtitle.style.setProperty('top', 'auto', 'important')
+    } else if (style.top && style.top !== 'auto') {
+      subtitle.style.setProperty('bottom', 'auto', 'important')
+    }
+    // Propagate styles to subtitle lines
+    subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
+      Object.assign(line.style, {
+        color: style.color,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        lineHeight: style.lineHeight,
+        textShadow: style.textShadow,
+        letterSpacing: style.letterSpacing,
+        wordSpacing: style.wordSpacing,
+        wordBreak: style.wordBreak,
+        overflowWrap: style.overflowWrap,
+        whiteSpace: style.whiteSpace,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        display: 'block',
+      })
+    })
+  }
 }
 
 function safelyUpdateSubtitle(art) {
@@ -2960,11 +2965,10 @@ export default function Watch() {
           // If delay changed, apply it to the live subtitle instance
           if (key === 'delay') {
             const art = artInstance.current
-            if (art?.subtitle) {
+            if (art) {
               try {
-                const delaySec = Number(item.value) || 0
-                if (typeof art.subtitle.offset === 'function') art.subtitle.offset(delaySec)
-                else art.subtitle.offset = delaySec
+                // Artplayer native API: art.subtitleOffset (top-level)
+                art.subtitleOffset = Number(item.value) || 0
               } catch {}
             }
           }
@@ -3001,12 +3005,10 @@ export default function Watch() {
             const art = artInstance.current
             if (art) {
               applySubtitleStyle(art, defaults)
-              if (art.subtitle) {
-                try {
-                  if (typeof art.subtitle.offset === 'function') art.subtitle.offset(0)
-                  else art.subtitle.offset = 0
-                } catch {}
-              }
+              try {
+                // Artplayer native API: art.subtitleOffset (top-level)
+                art.subtitleOffset = 0
+              } catch {}
             }
             showToast('Subtitles reset to defaults', { icon: 'ok' })
           }
@@ -3028,22 +3030,19 @@ export default function Watch() {
         setSubtitlePreference('track', nextTrack ? nextTrack.url : 'off')
         if (!art?.subtitle) return null
         if (!nextTrack) {
-          // Keep the subtitle source mounted. Clearing art.subtitle.url can
-          // permanently remove the track in some ArtPlayer versions and make
-          // the next Off → On transition fail.
-
-          if (art.template?.$subtitle) {
-            art.template.$subtitle.style.display = 'none'
-            art.template.$subtitle.innerHTML = ''
-          }
-          if (art.subtitle.textTrack) {
+          // Use Artplayer's native show property to hide subtitles.
+          // This is the correct API — it toggles the 'art-subtitle-show'
+          // class on the player root and emits the 'subtitle' event.
+          // We keep the source mounted so Off → On works without reloading.
+          try { art.subtitle.show = false } catch {}
+          if (art.subtitle?.textTrack) {
             try { art.subtitle.textTrack.mode = 'disabled' } catch {}
           }
           showToast('Subtitles Off')
           return null
         }
-        art._anirakuSubtitleEnabled = true
-        if (art.template?.$subtitle) art.template.$subtitle.style.display = ''
+        // Show subtitles using Artplayer's native API
+        try { art.subtitle.show = true } catch {}
         const result = await art.subtitle.switch(proxied(nextTrack.url), {
           type: nextTrack.type,
           name: nextTrack.label,
@@ -3054,18 +3053,15 @@ export default function Watch() {
           try {
             if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'showing'
           } catch {}
+          // Use Artplayer's native style() method to apply custom styles
+          try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
           applySubtitleStyle(art, subtitlePreferencesRef.current)
           safelyUpdateSubtitle(art)
           applySubtitleStyle(art, subtitlePreferencesRef.current)
-          // ── New: apply subtitle delay offset ──
-          // Artplayer's subtitle.offset shifts cue timing by N seconds.
+          // Apply subtitle delay offset using native art.subtitleOffset
           try {
             const delaySec = Number(subtitlePreferencesRef.current.delay) || 0
-            if (art.subtitle && typeof art.subtitle.offset === 'function') {
-              art.subtitle.offset(delaySec)
-            } else if (art.subtitle) {
-              art.subtitle.offset = delaySec
-            }
+            art.subtitleOffset = delaySec
           } catch {}
           showToast(`Subtitles: ${nextTrack.label}`, { icon: 'ok' })
         }
@@ -3109,6 +3105,10 @@ export default function Watch() {
         autoOrientation: !IS_TV,
         airplay: true,
         setting: true,
+        // Enable Artplayer's built-in subtitle offset slider in the settings
+        // panel. This adds a native range slider for subtitle timing adjustment
+        // that works perfectly in fullscreen.
+        subtitleOffset: true,
         hotkey: false,
         theme: '#e2e8f0',
         volume: playerPreferencesRef.current.volume,
@@ -3933,12 +3933,8 @@ export default function Watch() {
       art._anirakuActiveSubtitleUrl = preferredSubtitleTrack?.url || null
       art._anirakuSubtitleEnabled = Boolean(preferredSubtitleTrack)
       if (!preferredSubtitleTrack) {
-        // User prefers subtitles off — clear the source so ArtPlayer
-        // doesn't render any cues, even on timeupdate.
-        if (art.template?.$subtitle) {
-          art.template.$subtitle.style.display = 'none'
-          art.template.$subtitle.innerHTML = ''
-        }
+        // User prefers subtitles off — use Artplayer's native show property
+        try { art.subtitle.show = false } catch {}
         if (art.subtitle?.textTrack) {
           try { art.subtitle.textTrack.mode = 'disabled' } catch {}
         }
@@ -3948,19 +3944,23 @@ export default function Watch() {
           if (art.subtitle?.textTrack) {
             art.subtitle.textTrack.mode = art._anirakuSubtitleEnabled ? 'showing' : 'disabled'
           }
+          // Sync Artplayer's native show state with our preference
+          art.subtitle.show = art._anirakuSubtitleEnabled
         } catch {}
-        if (art._anirakuSubtitleEnabled) applySubtitleStyle(art, subtitlePreferencesRef.current)
+        if (art._anirakuSubtitleEnabled) {
+          try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
+          applySubtitleStyle(art, subtitlePreferencesRef.current)
+        }
       })
       art.on('subtitleAfterUpdate', () => {
         // Safety net: if subtitle was turned off but ArtPlayer still fired this
-        // event (e.g., from a cached cue), re-hide immediately.
+        // event (e.g., from a cached cue), re-hide using native API.
         if (!art._anirakuSubtitleEnabled) {
-          if (art.template?.$subtitle) {
-            art.template.$subtitle.style.display = 'none'
-            art.template.$subtitle.innerHTML = ''
-          }
+          try { art.subtitle.show = false } catch {}
           return
         }
+        // Re-apply custom styles after each cue update
+        try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
         applySubtitleStyle(art, subtitlePreferencesRef.current)
       })
 
