@@ -955,6 +955,13 @@ function seekControlHtml(direction) {
   return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="currentColor"/><text x="12" y="15.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="5.6" font-weight="800" fill="currentColor">10</text></svg></span>`
 }
 
+// CC button icon — uses Artplayer's native control button style.
+// Same SVG approach as Artplayer's built-in icons (24x24 viewBox,
+// currentColor fill). The icon dims when CC is off, glows when on.
+function ccButtonHtml(active = false) {
+  return `<span class="watch-cc-btn-icon" style="opacity:${active ? 1 : 0.55};${active ? 'color:#a5b4fc;' : ''}"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg></span>`
+}
+
 function downloadControlHtml() {
   return `<span class="watch-art-download-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 17v2c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
 }
@@ -1649,13 +1656,58 @@ export default function Watch() {
   }, [])
 
   // Download URL tracking + subtitle track refs.
-  // Subtitle customization now lives entirely in Artplayer's built-in
-  // settings menu — no custom CC panel state needed.
+  // CC panel state: the CC button in the control bar opens a compact
+  // panel that mirrors Artplayer's native settings panel look. It is
+  // SEPARATE from the gear menu — the gear only has quality, auto-skip,
+  // auto-next, and speed.
   const currentDownloadUrlRef = useRef('')
   const subtitleTracksRef = useRef([])
   const switchSubtitleTrackRef = useRef(null)
   const subtitleSwitchGenerationRef = useRef(0)
   const downloadUrlSourceRef = useRef('')
+  const [showCCPanel, setShowCCPanel] = useState(false)
+  const [ccPanelView, setCcPanelView] = useState(null) // null = main list, 'track'/'size'/etc = sub-list
+  const ccPanelViewRef = useRef(null)
+  ccPanelViewRef.current = ccPanelView
+  // CC panel handlers — called from the compact CC panel UI.
+  // Track changes go through switchSubtitleTrackRef; style changes
+  // go through setSubtitlePreference (which also applies the style
+  // to the live Artplayer instance).
+  const handleCCTrackChange = useCallback((url) => {
+    const track = url === 'off' ? null : (subtitleTracksRef.current || []).find((t) => t.url === url) || null
+    const fn = switchSubtitleTrackRef.current
+    if (typeof fn === 'function') fn(track)
+  }, [])
+  const handleCCStyleChange = useCallback((key, value) => {
+    setSubtitlePreference(key, value)
+    const art = artInstance.current
+    if (art) applySubtitleStyle(art, subtitlePreferencesRef.current)
+    // If delay changed, apply it to the live subtitle instance
+    if (key === 'delay' && art?.subtitle) {
+      try {
+        const delaySec = Number(value) || 0
+        if (typeof art.subtitle.offset === 'function') art.subtitle.offset(delaySec)
+        else art.subtitle.offset = delaySec
+      } catch {}
+    }
+  }, [setSubtitlePreference])
+  const handleCCReset = useCallback(() => {
+    const defaults = { ...DEFAULT_SUBTITLE_PREFERENCES }
+    Object.entries(defaults).forEach(([key, value]) => {
+      setSubtitlePreference(key, value)
+    })
+    const art = artInstance.current
+    if (art) {
+      applySubtitleStyle(art, defaults)
+      if (art.subtitle) {
+        try {
+          if (typeof art.subtitle.offset === 'function') art.subtitle.offset(0)
+          else art.subtitle.offset = 0
+        } catch {}
+      }
+    }
+    showToast('Subtitles reset to defaults', { icon: 'ok' })
+  }, [setSubtitlePreference, showToast])
   const applySkipSegments = useCallback((incoming) => {
     const merged = mergeSkipSegments(skipSegmentsRef.current, incoming)
     skipSegmentsRef.current = merged
@@ -2681,11 +2733,18 @@ export default function Watch() {
       const headersParam = headers
         ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
         : ''
-      // Per-build nonce: every playback session gets fresh proxy URLs, so
-      // stale edge-cache variants can never be served to the browser.
-      // The backend strips "rn" before dialing the CDN.
-      const nonce =
-        Math.random().toString(36).slice(2) + Date.now().toString(36)
+      // Deterministic nonce: hash the stream URL so the SAME source always
+      // gets the SAME proxy URL. This lets the browser cache HLS fragments
+      // across player rebuilds (quality switch, subtitle toggle, etc.).
+      // When the source actually changes (new episode / server), the hash
+      // changes and stale edge-cache is busted automatically.
+      let _streamHash = 0
+      const _streamStr = String(streamUrl || '')
+      for (let _i = 0; _i < _streamStr.length; _i++) {
+        _streamHash = ((_streamHash << 5) - _streamHash) + _streamStr.charCodeAt(_i)
+        _streamHash |= 0
+      }
+      const nonce = Math.abs(_streamHash).toString(36)
               const proxied = (u) =>
                 `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
               // First-proxy pre-warm: start the network handshake against the
@@ -2872,155 +2931,9 @@ export default function Watch() {
       // Keep one source track mounted so ArtPlayer can switch tracks later even
       // when the viewer starts with captions turned off.
       const initialSubtitleTrack = preferredSubtitleTrack || subtitleTracks[0] || null
-      const subtitleSettingOptions = subtitleTracks.length > 0
-        ? [
-            { default: savedSubtitleTrack === 'off', html: 'Off', value: 'off' },
-            ...subtitleTracks.map((track) => ({
-              default: track.url === preferredSubtitleTrack?.url,
-              html: escapeHtml(track.label),
-              value: track.url,
-            })),
-          ]
-        : []
-      const subtitleSetting = subtitleTracks.length > 0
-        ? {
-            name: 'subtitleTrack',
-            width: 260,
-            html: `Subtitles · ${preferredSubtitleTrack?.label || 'Off'}`,
-            selector: subtitleSettingOptions,
-            onSelect: (item) => {
-              const track = subtitleTracks.find((candidate) => candidate.url === item.value) || null
-              const subtitleLabel = item.value === 'off' ? 'Subtitles · Off' : `Subtitles · ${track?.label || 'Track'}`
-              switchSubtitleTrack(track)
-              syncArtPlayerSetting(artInstance.current, 'subtitleTrack', item.value, subtitleLabel)
-              return subtitleLabel
-            },
-          }
-        : null
-      const makeSubtitleStyleSetting = (name, label, key, options, getLabel = (item) => item.label) => ({
-        name,
-        width: 260,
-        html: `${label} · ${getLabel(options.find((option) => String(subtitlePreferencesRef.current[key]) === String(option.value)) || options[0] || {})}`,
-        selector: options.map((item) => ({
-          default: String(subtitlePreferencesRef.current[key]) === String(item.value),
-          html: escapeHtml(getLabel(item)),
-          value: item.value,
-        })),
-        onSelect: (item) => {
-          setSubtitlePreference(key, item.value)
-          const selectedLabel = getLabel(options.find((option) => String(option.value) === String(item.value)) || item)
-          syncArtPlayerSetting(artInstance.current, name, item.value, `${label} · ${selectedLabel}`)
-          return `${label} · ${selectedLabel}`
-        },
-      })
-      const subtitleStyleSettings = [
-        makeSubtitleStyleSetting('subtitleSize', 'Caption size', 'size', SUBTITLE_SIZE_OPTIONS),
-        makeSubtitleStyleSetting('subtitleColor', 'Caption color', 'color', SUBTITLE_COLOR_OPTIONS),
-        makeSubtitleStyleSetting('subtitleBackground', 'Caption background', 'background', SUBTITLE_BACKGROUND_OPTIONS),
-        makeSubtitleStyleSetting('subtitlePosition', 'Caption position', 'position', SUBTITLE_POSITION_OPTIONS),
-        makeSubtitleStyleSetting('subtitleFont', 'Caption font', 'font', SUBTITLE_FONT_OPTIONS),
-        makeSubtitleStyleSetting('subtitleWeight', 'Caption weight', 'weight', SUBTITLE_WEIGHT_OPTIONS),
-        makeSubtitleStyleSetting('subtitleOutline', 'Caption outline', 'outline', SUBTITLE_OUTLINE_OPTIONS),
-        makeSubtitleStyleSetting('subtitleOpacity', 'Caption opacity', 'opacity', SUBTITLE_OPACITY_OPTIONS),
-        // ── 3 new customization features (Artplayer-native selector style) ──
-        makeSubtitleStyleSetting('subtitleDelay', 'Caption delay', 'delay', SUBTITLE_DELAY_OPTIONS),
-        makeSubtitleStyleSetting('subtitleSpacing', 'Caption spacing', 'spacing', SUBTITLE_SPACING_OPTIONS),
-        makeSubtitleStyleSetting('subtitleRadius', 'Caption corners', 'radius', SUBTITLE_RADIUS_OPTIONS),
-      ]
-
-      // ── Special handler for the delay setting: also apply the offset
-      //    to the live Artplayer subtitle instance immediately. ──
-      const originalMakeSubtitleStyleSetting = makeSubtitleStyleSetting
-      // Override the delay setting's onSelect to also call art.subtitle.offset
-      // We re-build just the delay entry with a custom onSelect.
-      const delaySettingIndex = subtitleStyleSettings.findIndex(
-        (s) => s.name === 'subtitleDelay'
-      )
-      if (delaySettingIndex >= 0) {
-        const delayLabel = 'Caption delay'
-        subtitleStyleSettings[delaySettingIndex] = {
-          ...subtitleStyleSettings[delaySettingIndex],
-          onSelect: (item) => {
-            setSubtitlePreference('delay', item.value)
-            const art = artInstance.current
-            if (art?.subtitle) {
-              try {
-                const delaySec = Number(item.value) || 0
-                if (typeof art.subtitle.offset === 'function') art.subtitle.offset(delaySec)
-                else art.subtitle.offset = delaySec
-              } catch {}
-            }
-            const selectedLabel = SUBTITLE_DELAY_OPTIONS.find(
-              (o) => String(o.value) === String(item.value)
-            )?.label || item.value
-            syncArtPlayerSetting(artInstance.current, 'subtitleDelay', item.value, `${delayLabel} · ${selectedLabel}`)
-            return `${delayLabel} · ${selectedLabel}`
-          },
-        }
-      }
-
-      // ── "Reset subtitles" entry — restores all style prefs to defaults ──
-      // Uses Artplayer's selector UI but every option does the same thing
-      // (reset). The first option is the actual action; the second is a
-      // no-op "Cancel" so the user can back out.
-      const subtitleResetSetting = {
-        name: 'subtitleReset',
-        width: 260,
-        html: 'Reset subtitles',
-        selector: [
-          { default: false, html: 'Reset to defaults', value: 'reset' },
-          { default: true, html: 'Cancel', value: 'cancel' },
-        ],
-        onSelect: (item) => {
-          if (item.value === 'reset') {
-            const defaults = { ...DEFAULT_SUBTITLE_PREFERENCES }
-            subtitlePreferencesRef.current = defaults
-            setSubtitlePreference('size', defaults.size)
-            setSubtitlePreference('color', defaults.color)
-            setSubtitlePreference('background', defaults.background)
-            setSubtitlePreference('position', defaults.position)
-            setSubtitlePreference('font', defaults.font)
-            setSubtitlePreference('weight', defaults.weight)
-            setSubtitlePreference('outline', defaults.outline)
-            setSubtitlePreference('opacity', defaults.opacity)
-            setSubtitlePreference('delay', defaults.delay)
-            setSubtitlePreference('spacing', defaults.spacing)
-            setSubtitlePreference('radius', defaults.radius)
-            const art = artInstance.current
-            if (art) {
-              applySubtitleStyle(art, defaults)
-              if (art.subtitle) {
-                try {
-                  if (typeof art.subtitle.offset === 'function') art.subtitle.offset(0)
-                  else art.subtitle.offset = 0
-                } catch {}
-              }
-            }
-            showToast('Subtitles reset to defaults', { icon: 'ok' })
-            // Resync all subtitle setting labels in the Artplayer menu
-            const labels = [
-              ['subtitleSize', 'Caption size', 'size', SUBTITLE_SIZE_OPTIONS],
-              ['subtitleColor', 'Caption color', 'color', SUBTITLE_COLOR_OPTIONS],
-              ['subtitleBackground', 'Caption background', 'background', SUBTITLE_BACKGROUND_OPTIONS],
-              ['subtitlePosition', 'Caption position', 'position', SUBTITLE_POSITION_OPTIONS],
-              ['subtitleFont', 'Caption font', 'font', SUBTITLE_FONT_OPTIONS],
-              ['subtitleWeight', 'Caption weight', 'weight', SUBTITLE_WEIGHT_OPTIONS],
-              ['subtitleOutline', 'Caption outline', 'outline', SUBTITLE_OUTLINE_OPTIONS],
-              ['subtitleOpacity', 'Caption opacity', 'opacity', SUBTITLE_OPACITY_OPTIONS],
-              ['subtitleDelay', 'Caption delay', 'delay', SUBTITLE_DELAY_OPTIONS],
-              ['subtitleSpacing', 'Caption spacing', 'spacing', SUBTITLE_SPACING_OPTIONS],
-              ['subtitleRadius', 'Caption corners', 'radius', SUBTITLE_RADIUS_OPTIONS],
-            ]
-            labels.forEach(([name, label, key, opts]) => {
-              const val = defaults[key]
-              const opt = opts.find((o) => String(o.value) === String(val))
-              syncArtPlayerSetting(art, name, val, `${label} · ${opt?.label || val}`)
-            })
-            return 'Reset subtitles'
-          }
-          return 'Reset subtitles'
-        },
-      }
+      // subtitleSetting / makeSubtitleStyleSetting / subtitleStyleSettings were
+      // here but are now removed — subtitle customization lives in the CC
+      // button's compact panel, not the gear menu.
 
       const switchSubtitleTrack = async (track) => {
         const switchGeneration = ++subtitleSwitchGenerationRef.current
@@ -3033,6 +2946,11 @@ export default function Watch() {
           art._anirakuActiveSubtitleUrl = nextTrack?.url || null
           art._anirakuSubtitleEnabled = Boolean(nextTrack)
         }
+        // Update the CC button visual state (dim when off, glow when on)
+        try {
+          const ccBtn = art?.template?.$cc
+          if (ccBtn) ccBtn.innerHTML = ccButtonHtml(Boolean(nextTrack))
+        } catch {}
         setSubtitlePreference('track', nextTrack ? nextTrack.url : 'off')
         if (!art?.subtitle) return null
         if (!nextTrack) {
@@ -3163,6 +3081,24 @@ export default function Watch() {
             },
           },
           {
+            // CC button — uses Artplayer's native control button style.
+            // Opens a compact subtitle settings panel (separate from the
+            // gear menu). The gear menu only has quality / auto-skip /
+            // auto-next / speed; ALL subtitle customization lives here.
+            name: 'cc',
+            position: 'right',
+            index: 28,
+            html: ccButtonHtml(Boolean(preferredSubtitleTrack)),
+            tooltip: 'Subtitles',
+            style: { width: '40px', margin: '0 1px' },
+            click: function () {
+              setShowCCPanel((prev) => {
+                if (!prev) setCcPanelView(null)
+                return !prev
+              })
+            },
+          },
+          {
             name: 'download',
             position: 'right',
             index: 29,
@@ -3211,12 +3147,9 @@ export default function Watch() {
               return getQualitySettingTitle(selected)
             },
           },
-          // ── Subtitle settings (Artplayer-native selector UI) ──
-          // Track selector + 11 style options + reset, all using
-          // Artplayer's built-in settings panel (no custom overlay).
-          ...(subtitleSetting ? [subtitleSetting] : []),
-          ...subtitleStyleSettings,
-          subtitleResetSetting,
+          // NOTE: Subtitle settings (track + 11 style options + reset) are
+          // NOT in the gear menu. They live in the CC button's own panel.
+          // The gear menu only has: quality, auto-skip, auto-next, speed.
           {
             name: 'autoSkip',
             width: 220,
@@ -4489,7 +4422,16 @@ export default function Watch() {
             const headersParam = data.headers
               ? `&headers=${encodeURIComponent(JSON.stringify(data.headers))}`
               : ''
-            const warmNonce = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+            // Deterministic nonce: same URL → same nonce, so the pre-warm
+            // HEAD request can hit the browser cache if the same URL was
+            // already fetched by the real player.
+            let _wh = 0
+            const _ws = String(mediaEntry.url || '')
+            for (let _wi = 0; _wi < _ws.length; _wi++) {
+              _wh = ((_wh << 5) - _wh) + _ws.charCodeAt(_wi)
+              _wh |= 0
+            }
+            const warmNonce = Math.abs(_wh).toString(36)
             const proxyUrl = `${PROXY_BASE}/proxy?url=${encodeURIComponent(mediaEntry.url)}${headersParam}&rn=${warmNonce}`
             // Warm both legs concurrently. Failures are intentionally ignored;
             // the real player still owns all transport and fallback decisions.
@@ -5992,6 +5934,211 @@ export default function Watch() {
             </div>
           )}
 
+          {/* ── Compact CC Panel ──
+              Triggered by the CC button in the control bar.
+              Styled to match Artplayer's native .art-settings panel:
+              same dark bg, same row layout, same hover, same checkmark.
+              Two-level: main list (label + value + chevron) → option
+              sub-list (checkmark on selected). Compact: 220px wide,
+              36px rows, 12px font. Fully responsive + scrollable. */}
+          {showCCPanel && !activeEmbedUrl && (() => {
+            const tracks = subtitleTracksRef.current || []
+            const prefs = subtitlePreferences
+            const cats = [
+              ...(tracks.length > 0 ? [{
+                key: 'track',
+                label: 'Track',
+                options: [{ value: 'off', label: 'Off' }, ...tracks.map((t) => ({ value: t.url, label: t.label }))],
+                current: prefs.track || 'off',
+              }] : []),
+              { key: 'size', label: 'Size', options: SUBTITLE_SIZE_OPTIONS, current: prefs.size },
+              { key: 'color', label: 'Color', options: SUBTITLE_COLOR_OPTIONS, current: prefs.color },
+              { key: 'background', label: 'Background', options: SUBTITLE_BACKGROUND_OPTIONS, current: prefs.background },
+              { key: 'position', label: 'Position', options: SUBTITLE_POSITION_OPTIONS, current: prefs.position },
+              { key: 'font', label: 'Font', options: SUBTITLE_FONT_OPTIONS, current: prefs.font },
+              { key: 'weight', label: 'Weight', options: SUBTITLE_WEIGHT_OPTIONS, current: prefs.weight },
+              { key: 'outline', label: 'Outline', options: SUBTITLE_OUTLINE_OPTIONS, current: prefs.outline },
+              { key: 'opacity', label: 'Opacity', options: SUBTITLE_OPACITY_OPTIONS, current: prefs.opacity },
+              { key: 'delay', label: 'Delay', options: SUBTITLE_DELAY_OPTIONS, current: prefs.delay },
+              { key: 'spacing', label: 'Spacing', options: SUBTITLE_SPACING_OPTIONS, current: prefs.spacing },
+              { key: 'radius', label: 'Corners', options: SUBTITLE_RADIUS_OPTIONS, current: prefs.radius },
+            ]
+            const activeCat = cats.find((c) => c.key === ccPanelView) || null
+            const getCurrentLabel = (cat) => {
+              const opt = (cat.options || []).find((o) => String(o.value) === String(cat.current))
+              return opt ? opt.label : '—'
+            }
+            const applySel = (cat, value) => {
+              if (cat.key === 'track') handleCCTrackChange(value)
+              else handleCCStyleChange(cat.key, value)
+            }
+            return (
+              <>
+                <div
+                  role="button"
+                  tabIndex={-1}
+                  aria-label="Close subtitles panel"
+                  onClick={() => { setShowCCPanel(false); setCcPanelView(null) }}
+                  style={{ position: 'absolute', inset: 0, zIndex: 9, background: 'transparent', cursor: 'default' }}
+                />
+                <div
+                  role="dialog"
+                  aria-label="Subtitle settings"
+                  className="watch-cc-panel"
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    bottom: 'calc(44px + env(safe-area-inset-bottom, 0px))',
+                    zIndex: 10,
+                    width: 'min(220px, calc(100vw - 16px))',
+                    maxHeight: 'min(80dvh, 420px)',
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    borderRadius: 3,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    color: '#fff',
+                    fontSize: 12,
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  {/* Header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      height: 36,
+                      padding: '0 10px',
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      flexShrink: 0,
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {activeCat ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setCcPanelView(null)}
+                          aria-label="Back"
+                          style={{
+                            background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+                            padding: 0, display: 'flex', alignItems: 'center', lineHeight: 0,
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 6 9 12 15 18"/></svg>
+                        </button>
+                        <span>{activeCat.label}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Subtitles</span>
+                        <button
+                          type="button"
+                          onClick={() => { setShowCCPanel(false); setCcPanelView(null) }}
+                          aria-label="Close"
+                          style={{
+                            marginLeft: 'auto', background: 'none', border: 'none',
+                            color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
+                            fontSize: 16, lineHeight: 1, padding: 0,
+                          }}
+                        >×</button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Body — main list OR sub-list */}
+                  <div
+                    className="watch-cc-panel-body"
+                    style={{
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
+                      overscrollBehavior: 'contain',
+                      WebkitOverflowScrolling: 'touch',
+                      flex: '1 1 auto',
+                      minHeight: 0,
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: 'rgba(255,255,255,0.25) transparent',
+                    }}
+                  >
+                    {!activeCat ? (
+                      cats.map((cat) => (
+                        <button
+                          key={cat.key}
+                          type="button"
+                          onClick={() => setCcPanelView(cat.key)}
+                          className="watch-cc-row"
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            gap: 6, width: '100%', height: 36, padding: '0 10px',
+                            boxSizing: 'border-box', color: '#fff', fontSize: 12,
+                            fontWeight: 400, cursor: 'pointer', background: 'transparent',
+                            border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            textAlign: 'left', outline: 'none',
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1 1 auto', minWidth: 0 }}>{cat.label}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto', color: 'rgba(255,255,255,0.5)', fontSize: 11, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getCurrentLabel(cat)}</span>
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="9 6 15 12 9 18"/></svg>
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      activeCat.options.map((opt) => {
+                        const selected = String(opt.value) === String(activeCat.current)
+                        return (
+                          <button
+                            key={String(opt.value)}
+                            type="button"
+                            onClick={() => {
+                              applySel(activeCat, opt.value)
+                              setTimeout(() => setCcPanelView(null), 150)
+                            }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              width: '100%', height: 36, padding: '0 10px',
+                              boxSizing: 'border-box',
+                              color: selected ? '#a5b4fc' : '#fff',
+                              fontSize: 12, fontWeight: selected ? 600 : 400,
+                              cursor: 'pointer',
+                              background: selected ? 'rgba(165,180,252,0.08)' : 'transparent',
+                              border: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                              textAlign: 'left', outline: 'none',
+                            }}
+                          >
+                            <span style={{ display: 'flex', width: 14, height: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#a5b4fc', opacity: selected ? 1 : 0 }}>
+                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 12 10 17 19 8"/></svg>
+                            </span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: '1 1 auto', minWidth: 0 }}>{opt.label}</span>
+                          </button>
+                        )
+                      })
+                    )}
+                    {/* Reset button — only on main list */}
+                    {!activeCat && (
+                      <button
+                        type="button"
+                        onClick={() => { handleCCReset(); setShowCCPanel(false); setCcPanelView(null) }}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          width: '100%', height: 36, padding: '0 10px',
+                          boxSizing: 'border-box', color: '#f87171', fontSize: 12,
+                          fontWeight: 500, cursor: 'pointer', background: 'transparent',
+                          border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)',
+                          textAlign: 'center', outline: 'none',
+                        }}
+                      >
+                        Reset to defaults
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </div>
 
         <div
@@ -6143,7 +6290,7 @@ export default function Watch() {
             }}
           >
             <strong style={{ color: 'var(--text-primary)' }}>CC ready:</strong>{' '}
-            {subtitleTrackCount} source {subtitleTrackCount === 1 ? 'track' : 'tracks'}. Open the player <strong style={{ color: '#a5b4fc' }}>Settings</strong> menu (gear icon) to choose a track and customize size, color, background, font, position, outline, opacity, delay, spacing, and corner style. Press <kbd>C</kbd> to cycle captions.
+            {subtitleTrackCount} source {subtitleTrackCount === 1 ? 'track' : 'tracks'}. Tap the <strong style={{ color: '#a5b4fc' }}>CC</strong> button in the player controls to choose a track and customize size, color, background, font, position, outline, opacity, delay, spacing, and corners. Press <kbd>C</kbd> to cycle captions.
           </div>
         )}
         {/* Mobile episode toggle */}
@@ -7109,6 +7256,51 @@ export default function Watch() {
         @media (prefers-contrast: more) {
           .watch-source-btn { border-width: 2px !important; }
           .watch-countdown { border-width: 2px !important; }
+        }
+        /* ── CC button (Artplayer-native control style) ── */
+        .watch-art-mount .art-control-cc {
+          color: #fff;
+          opacity: 0.85;
+          transition: opacity 150ms ease, background 150ms ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .watch-art-mount .art-control-cc:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+        .watch-art-mount .art-control-cc:active { transform: scale(0.94); }
+        .watch-art-mount .art-control-cc .watch-cc-btn-icon {
+          display: inline-flex; align-items: center; justify-content: center;
+          pointer-events: none; transition: color 150ms ease, opacity 150ms ease;
+        }
+        .watch-art-mount .art-control-cc .watch-cc-btn-icon svg { width: 22px; height: 22px; }
+        /* ── CC Panel (compact, Artplayer-native look) ── */
+        .watch-cc-panel { animation: watch-cc-in 160ms ease-out; }
+        @keyframes watch-cc-in {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) { .watch-cc-panel { animation: none !important; } }
+        .watch-cc-panel-body::-webkit-scrollbar { width: 4px; }
+        .watch-cc-panel-body::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255,255,255,0.25); }
+        .watch-cc-panel button { font-family: inherit; -webkit-appearance: none; appearance: none; }
+        .watch-cc-panel button:focus-visible { outline: 2px solid rgba(165,180,252,0.5); outline-offset: -2px; }
+        .watch-cc-panel .watch-cc-row:hover { background: rgba(255,255,255,0.06); }
+        /* CC button + download sizing */
+        .watch-art-mount .art-video-player .art-control-cc,
+        .watch-art-mount .art-video-player .art-control-download {
+          width: 40px !important; min-width: 40px !important;
+        }
+        @media (max-width: 768px) {
+          .watch-art-mount .art-video-player .art-control-cc,
+          .watch-art-mount .art-video-player .art-control-download {
+            width: 36px !important; min-width: 36px !important;
+          }
+        }
+        @media (max-width: 360px) {
+          .watch-art-mount .art-video-player .art-control-cc,
+          .watch-art-mount .art-video-player .art-control-download {
+            width: 32px !important; min-width: 32px !important;
+          }
         }
       `}</style>
     </>
