@@ -600,12 +600,13 @@ function getSubtitleStyle(preferences) {
     none: 'none',
   }[preferences?.outline] || '0 1px 3px rgba(0, 0, 0, 0.92)'
   const position = {
-    // Standard subtitle positions — bottom sits just above the control
-    // bar (like Netflix/YouTube), middle is centered, top is near top.
-    bottom: { bottom: '40px', top: 'auto' },
-    middle: { bottom: '50%', top: 'auto' },
-    top: { bottom: 'auto', top: '40px' },
-  }[preferences?.position] || { bottom: '40px', top: 'auto' }
+    // Use Artplayer's native --art-subtitle-bottom CSS variable for position.
+    // The actual bottom offset is applied via art.cssVar() in applySubtitleStyle.
+    // Here we just return the label for the cssVar value.
+    bottom: '40px',
+    middle: '50%',
+    top: '8px',
+  }[preferences?.position] || '40px'
   // ── New: spacing (letter-spacing + word-spacing) ──
   const spacingOption = SUBTITLE_SPACING_OPTIONS.find(
     (item) => item.value === preferences?.spacing
@@ -621,10 +622,7 @@ function getSubtitleStyle(preferences) {
     (item) => item.value === preferences?.radius
   ) || SUBTITLE_RADIUS_OPTIONS[1]
   const borderRadius = preferences?.background === 'none' ? '0' : radiusOption.borderRadius
-  // Split the style into two parts:
-  // - visualStyle: color, font, background, etc. — safe to pass to art.subtitle.style()
-  // - positionStyle: bottom, top, left, right, width — must use setProperty !important
-  //   because Artplayer's CSS (.art-control-show .art-subtitle) overrides inline styles
+  // Visual styles — passed to art.subtitle.style() (the official API)
   const visualStyle = {
     color: preferences?.color || '#ffffff',
     fontSize: size.fontSize,
@@ -643,64 +641,58 @@ function getSubtitleStyle(preferences) {
     overflowWrap: 'anywhere',
     whiteSpace: 'pre-wrap',
   }
-  const positionStyle = {
-    ...position,
-    left: '4%',
-    right: '4%',
-    width: '92%',
-    maxWidth: '92%',
-    boxSizing: 'border-box',
-  }
-  return { ...visualStyle, ...positionStyle, _visualStyle: visualStyle, _positionStyle: positionStyle }
+  // Position is applied via art.cssVar('--art-subtitle-bottom', value)
+  // — this is Artplayer's native way to set subtitle position.
+  return { ...visualStyle, _visualStyle: visualStyle, _position: position }
 }
 
 function applySubtitleStyle(art, preferences) {
   if (!art?.subtitle) return
   const fullStyle = getSubtitleStyle(preferences)
   const visualStyle = fullStyle._visualStyle
-  const positionStyle = fullStyle._positionStyle
+  const position = fullStyle._position
 
-  // 1. Apply VISUAL styles (color, font, background, etc.) using Artplayer's
-  //    native art.subtitle.style() method. This is the official API.
+  // 1. Apply VISUAL styles using Artplayer's native art.subtitle.style()
   try {
     art.subtitle.style(visualStyle)
   } catch {}
 
-  const subtitle = art?.template?.$subtitle
-  if (!subtitle) return
-
-  // 2. Apply POSITION styles with !important — Artplayer's CSS
-  //    (.art-control-show .art-subtitle { bottom: calc(...) }) overrides
-  //    inline styles due to higher specificity, so we MUST use !important.
-  Object.entries(positionStyle).forEach(([key, value]) => {
-    if (value != null) {
-      subtitle.style.setProperty(key.replace(/[A-Z]/g, m => '-' + m.toLowerCase()), String(value), 'important')
+  // 2. Apply POSITION using art.cssVar() — Artplayer's native CSS variable
+  //    system. --art-subtitle-bottom controls the bottom offset.
+  //    This is the official, fullscreen-compatible way to position subtitles.
+  try {
+    if (typeof art.cssVar === 'function') {
+      art.cssVar('--art-subtitle-bottom', position)
     }
-  })
-  // Clear the opposite position axis so bottom/top don't conflict
-  if (positionStyle.bottom && positionStyle.bottom !== 'auto') {
-    subtitle.style.setProperty('top', 'auto', 'important')
-  } else if (positionStyle.top && positionStyle.top !== 'auto') {
-    subtitle.style.setProperty('bottom', 'auto', 'important')
-  }
+  } catch {}
 
-  // 3. Propagate visual styles to subtitle lines (Artplayer creates
-  //    .art-subtitle-line divs for each cue line)
-  subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
-    Object.assign(line.style, {
-      color: visualStyle.color,
-      fontFamily: visualStyle.fontFamily,
-      fontSize: visualStyle.fontSize,
-      fontWeight: visualStyle.fontWeight,
-      lineHeight: visualStyle.lineHeight,
-      textShadow: visualStyle.textShadow,
-      letterSpacing: visualStyle.letterSpacing,
-      wordSpacing: visualStyle.wordSpacing,
-      wordBreak: visualStyle.wordBreak,
-      overflowWrap: visualStyle.overflowWrap,
-      whiteSpace: visualStyle.whiteSpace,
+  // 3. Also apply font-size via cssVar for consistency with Artplayer's
+  //    internal subtitle rendering
+  try {
+    if (typeof art.cssVar === 'function') {
+      art.cssVar('--art-subtitle-font-size', visualStyle.fontSize)
+    }
+  } catch {}
+
+  // 4. Propagate visual styles to subtitle lines
+  const subtitle = art?.template?.$subtitle
+  if (subtitle) {
+    subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
+      Object.assign(line.style, {
+        color: visualStyle.color,
+        fontFamily: visualStyle.fontFamily,
+        fontSize: visualStyle.fontSize,
+        fontWeight: visualStyle.fontWeight,
+        lineHeight: visualStyle.lineHeight,
+        textShadow: visualStyle.textShadow,
+        letterSpacing: visualStyle.letterSpacing,
+        wordSpacing: visualStyle.wordSpacing,
+        wordBreak: visualStyle.wordBreak,
+        overflowWrap: visualStyle.overflowWrap,
+        whiteSpace: visualStyle.whiteSpace,
+      })
     })
-  })
+  }
 }
 
 function safelyUpdateSubtitle(art) {
@@ -3104,12 +3096,30 @@ export default function Watch() {
         // TV remotes have no rotation sensor; keep the player orientation
         // locked so Android TV never flips it.
         autoOrientation: !IS_TV,
+        // Mobile features: lock button (hides controls), long-press fast-forward,
+        // gesture support. These are no-ops on desktop.
+        lock: IS_MOBILE,
+        fastForward: IS_MOBILE,
+        gesture: IS_MOBILE,
         airplay: true,
         setting: true,
         // Enable Artplayer's built-in subtitle offset slider in the settings
         // panel. This adds a native range slider for subtitle timing adjustment
         // that works perfectly in fullscreen.
         subtitleOffset: true,
+        // Use Artplayer's native CSS variables for subtitle positioning.
+        // This is the official way — no !important hacks needed.
+        cssVar: {
+          '--art-subtitle-font-size': '20px',
+          '--art-subtitle-bottom': '40px',
+          '--art-subtitle-gap': '5px',
+          '--art-subtitle-border': '#000',
+          '--art-control-height': '40px',
+          '--art-control-icon-size': '22px',
+          '--art-padding': '8px',
+          '--art-settings-max-height': 'min(60dvh, 320px)',
+          '--art-selector-max-height': 'min(52dvh, 280px)',
+        },
         hotkey: false,
         theme: '#e2e8f0',
         volume: playerPreferencesRef.current.volume,
@@ -3189,16 +3199,29 @@ export default function Watch() {
               if (selected && art) {
                 const currentUrl = art.video?.currentSrc || art.option?.url || ''
                 if (selected.url !== currentUrl) {
-                  const resumeAt = Number(art.video?.currentTime || 0)
-                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
-                  buildPlayer(
-                    selected.url,
-                    selected.type || 'hls',
-                    selectQualityInList(qualityList, selected.url),
-                    subtitles,
-                    headers,
-                    onBlocked
-                  )
+                  // Try Artplayer's native switchQuality (preserves position)
+                  // Falls back to buildPlayer if switchQuality isn't available
+                  try {
+                    if (typeof art.switchQuality === 'function') {
+                      const resumeAt = Number(art.video?.currentTime || 0)
+                      if (resumeAt > 0) pendingResumeRef.current = resumeAt
+                      art.switchQuality(selected.url)
+                    } else {
+                      throw new Error('switchQuality not available')
+                    }
+                  } catch {
+                    // Fallback: rebuild the player with the new URL
+                    const resumeAt = Number(art.video?.currentTime || 0)
+                    if (resumeAt > 0) pendingResumeRef.current = resumeAt
+                    buildPlayer(
+                      selected.url,
+                      selected.type || 'hls',
+                      selectQualityInList(qualityList, selected.url),
+                      subtitles,
+                      headers,
+                      onBlocked
+                    )
+                  }
                 }
               }
               return getQualitySettingTitle(selected)
