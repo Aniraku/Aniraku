@@ -621,12 +621,11 @@ function getSubtitleStyle(preferences) {
     (item) => item.value === preferences?.radius
   ) || SUBTITLE_RADIUS_OPTIONS[1]
   const borderRadius = preferences?.background === 'none' ? '0' : radiusOption.borderRadius
-  return {
-    ...position,
-    left: '4%',
-    right: '4%',
-    width: '92%',
-    maxWidth: '92%',
+  // Split the style into two parts:
+  // - visualStyle: color, font, background, etc. — safe to pass to art.subtitle.style()
+  // - positionStyle: bottom, top, left, right, width — must use setProperty !important
+  //   because Artplayer's CSS (.art-control-show .art-subtitle) overrides inline styles
+  const visualStyle = {
     color: preferences?.color || '#ffffff',
     fontSize: size.fontSize,
     fontFamily,
@@ -637,69 +636,71 @@ function getSubtitleStyle(preferences) {
     padding: preferences?.background === 'none' ? '2px 0' : '4px 10px',
     textShadow,
     opacity: `${Number(preferences?.opacity || 100) / 100}`,
-    boxSizing: 'border-box',
     textAlign: 'center',
     letterSpacing,
     wordSpacing,
-    // Overflow protection: long tokens (URLs, CJK without spaces, etc.)
-    // must wrap inside the 92% box instead of spilling out horizontally.
     wordBreak: 'break-word',
     overflowWrap: 'anywhere',
     whiteSpace: 'pre-wrap',
-    overflow: 'hidden',
-    display: 'block',
-    pointerEvents: 'none',
   }
+  const positionStyle = {
+    ...position,
+    left: '4%',
+    right: '4%',
+    width: '92%',
+    maxWidth: '92%',
+    boxSizing: 'border-box',
+  }
+  return { ...visualStyle, ...positionStyle, _visualStyle: visualStyle, _positionStyle: positionStyle }
 }
 
 function applySubtitleStyle(art, preferences) {
   if (!art?.subtitle) return
-  const style = getSubtitleStyle(preferences)
+  const fullStyle = getSubtitleStyle(preferences)
+  const visualStyle = fullStyle._visualStyle
+  const positionStyle = fullStyle._positionStyle
 
-  // PRIMARY: Use Artplayer's native art.subtitle.style() method.
-  // This is the official API and works correctly with Artplayer's
-  // internal subtitle rendering, fullscreen, and cue update cycle.
+  // 1. Apply VISUAL styles (color, font, background, etc.) using Artplayer's
+  //    native art.subtitle.style() method. This is the official API.
   try {
-    art.subtitle.style(style)
+    art.subtitle.style(visualStyle)
   } catch {}
 
-  // SECONDARY: Also apply via direct DOM manipulation for position
-  // properties that need !important to override Artplayer's CSS
-  // (e.g., .art-subtitle { bottom: 15px }).
   const subtitle = art?.template?.$subtitle
-  if (subtitle) {
-    const importantKeys = ['bottom', 'top', 'left', 'right', 'width', 'maxWidth']
-    importantKeys.forEach((key) => {
-      if (style[key] != null) {
-        subtitle.style.setProperty(key, String(style[key]), 'important')
-      }
-    })
-    // Clear the opposite position axis so bottom/top don't conflict
-    if (style.bottom && style.bottom !== 'auto') {
-      subtitle.style.setProperty('top', 'auto', 'important')
-    } else if (style.top && style.top !== 'auto') {
-      subtitle.style.setProperty('bottom', 'auto', 'important')
+  if (!subtitle) return
+
+  // 2. Apply POSITION styles with !important — Artplayer's CSS
+  //    (.art-control-show .art-subtitle { bottom: calc(...) }) overrides
+  //    inline styles due to higher specificity, so we MUST use !important.
+  Object.entries(positionStyle).forEach(([key, value]) => {
+    if (value != null) {
+      subtitle.style.setProperty(key.replace(/[A-Z]/g, m => '-' + m.toLowerCase()), String(value), 'important')
     }
-    // Propagate styles to subtitle lines
-    subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
-      Object.assign(line.style, {
-        color: style.color,
-        fontFamily: style.fontFamily,
-        fontSize: style.fontSize,
-        fontWeight: style.fontWeight,
-        lineHeight: style.lineHeight,
-        textShadow: style.textShadow,
-        letterSpacing: style.letterSpacing,
-        wordSpacing: style.wordSpacing,
-        wordBreak: style.wordBreak,
-        overflowWrap: style.overflowWrap,
-        whiteSpace: style.whiteSpace,
-        maxWidth: '100%',
-        boxSizing: 'border-box',
-        display: 'block',
-      })
-    })
+  })
+  // Clear the opposite position axis so bottom/top don't conflict
+  if (positionStyle.bottom && positionStyle.bottom !== 'auto') {
+    subtitle.style.setProperty('top', 'auto', 'important')
+  } else if (positionStyle.top && positionStyle.top !== 'auto') {
+    subtitle.style.setProperty('bottom', 'auto', 'important')
   }
+
+  // 3. Propagate visual styles to subtitle lines (Artplayer creates
+  //    .art-subtitle-line divs for each cue line)
+  subtitle.querySelectorAll('.art-subtitle-line').forEach((line) => {
+    Object.assign(line.style, {
+      color: visualStyle.color,
+      fontFamily: visualStyle.fontFamily,
+      fontSize: visualStyle.fontSize,
+      fontWeight: visualStyle.fontWeight,
+      lineHeight: visualStyle.lineHeight,
+      textShadow: visualStyle.textShadow,
+      letterSpacing: visualStyle.letterSpacing,
+      wordSpacing: visualStyle.wordSpacing,
+      wordBreak: visualStyle.wordBreak,
+      overflowWrap: visualStyle.overflowWrap,
+      whiteSpace: visualStyle.whiteSpace,
+    })
+  })
 }
 
 function safelyUpdateSubtitle(art) {
@@ -1607,10 +1608,10 @@ export default function Watch() {
     setSubtitlePreferences(next)
     persistSubtitlePreferences(next)
     const art = artInstance.current
-    if (art?.subtitle?.style) {
-      art.subtitle.style(getSubtitleStyle(next))
-      safelyUpdateSubtitle(art)
+    if (art?.subtitle) {
+      // Use applySubtitleStyle which handles both visual + position styles
       applySubtitleStyle(art, next)
+      safelyUpdateSubtitle(art)
     }
     return next
   }, [])
@@ -3047,14 +3048,14 @@ export default function Watch() {
           type: nextTrack.type,
           name: nextTrack.label,
           encoding: 'utf-8',
-          style: getSubtitleStyle(subtitlePreferencesRef.current),
+          style: getSubtitleStyle(subtitlePreferencesRef.current)._visualStyle || getSubtitleStyle(subtitlePreferencesRef.current),
         }).catch(() => null)
         if (result && switchGeneration === subtitleSwitchGenerationRef.current && artInstance.current === art) {
           try {
             if (art.subtitle.textTrack) art.subtitle.textTrack.mode = 'showing'
           } catch {}
           // Use Artplayer's native style() method to apply custom styles
-          try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
+          try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)._visualStyle || getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
           applySubtitleStyle(art, subtitlePreferencesRef.current)
           safelyUpdateSubtitle(art)
           applySubtitleStyle(art, subtitlePreferencesRef.current)
@@ -3734,6 +3735,10 @@ export default function Watch() {
                           }
                         }
                 art.setting.update(buildHlsQualitySetting(hls.currentLevel))
+                // Sync the visual indicator (checkmark/art-current) immediately
+                // after rebuilding the quality menu so the default/highest
+                // quality shows as selected.
+                syncHlsQualitySetting()
                 hls.on(Hls.Events.LEVEL_SWITCHED, () => {
                           if (buildIdRef.current !== myBuildId) return
                           // hls.js can publish a transient adaptive currentLevel
@@ -3847,7 +3852,7 @@ export default function Watch() {
           type: subtitleMountTrack.type,
           name: subtitleMountTrack.label,
           encoding: 'utf-8',
-          style: getSubtitleStyle(subtitlePreferencesRef.current),
+          style: getSubtitleStyle(subtitlePreferencesRef.current)._visualStyle || getSubtitleStyle(subtitlePreferencesRef.current),
         }
       }
 
@@ -3948,7 +3953,7 @@ export default function Watch() {
           art.subtitle.show = art._anirakuSubtitleEnabled
         } catch {}
         if (art._anirakuSubtitleEnabled) {
-          try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
+          try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)._visualStyle || getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
           applySubtitleStyle(art, subtitlePreferencesRef.current)
         }
       })
@@ -3960,7 +3965,7 @@ export default function Watch() {
           return
         }
         // Re-apply custom styles after each cue update
-        try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
+        try { art.subtitle.style(getSubtitleStyle(subtitlePreferencesRef.current)._visualStyle || getSubtitleStyle(subtitlePreferencesRef.current)) } catch {}
         applySubtitleStyle(art, subtitlePreferencesRef.current)
       })
 
