@@ -402,8 +402,8 @@ const SUBTITLE_BACKGROUND_OPTIONS = [
   { value: 'none', label: 'No box' },
 ]
 const SUBTITLE_POSITION_OPTIONS = [
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'middle', label: 'Lower middle' },
+  { value: 'bottom', label: 'Bottom (above controls)' },
+  { value: 'middle', label: 'Middle' },
   { value: 'top', label: 'Top' },
 ]
 const SUBTITLE_FONT_OPTIONS = [
@@ -596,10 +596,13 @@ function getSubtitleStyle(preferences) {
     none: 'none',
   }[preferences?.outline] || '0 1px 3px rgba(0, 0, 0, 0.92)'
   const position = {
-    bottom: { bottom: '8%', top: 'auto' },
-    middle: { bottom: '28%', top: 'auto' },
-    top: { bottom: 'auto', top: '12%' },
-  }[preferences?.position] || { bottom: '8%', top: 'auto' }
+    // Positions sit above the control bar (which is ~52px tall on desktop,
+    // ~44px on mobile). Using percentage-based bottom values keeps them
+    // proportional to the video height.
+    bottom: { bottom: '12%', top: 'auto' },   // just above the control bar
+    middle: { bottom: '38%', top: 'auto' },   // centered between middle and bottom
+    top: { bottom: 'auto', top: '8%' },       // near the top, below the top bar
+  }[preferences?.position] || { bottom: '12%', top: 'auto' }
   // ── New: spacing (letter-spacing + word-spacing) ──
   const spacingOption = SUBTITLE_SPACING_OPTIONS.find(
     (item) => item.value === preferences?.spacing
@@ -1662,6 +1665,9 @@ export default function Watch() {
   // auto-next, and speed.
   const currentDownloadUrlRef = useRef('')
   const subtitleTracksRef = useRef([])
+  // State mirror of subtitle tracks so the CC panel re-renders when
+  // tracks are loaded (refs don't trigger re-renders).
+  const [ccSubtitleTracks, setCcSubtitleTracks] = useState([])
   const switchSubtitleTrackRef = useRef(null)
   const subtitleSwitchGenerationRef = useRef(0)
   const downloadUrlSourceRef = useRef('')
@@ -2762,7 +2768,9 @@ export default function Watch() {
           try {
             // Fire-and-forget: failures must never block playback. Warm both
             // transports so a direct fallback is not cold when the proxy fails.
-            fetch(target, { method: 'HEAD', mode, cache: 'no-store' }).catch(() => {})
+            // Use 'default' cache mode so the browser CAN cache the response —
+            // 'no-store' would bust the cache on every rebuild.
+            fetch(target, { method: 'HEAD', mode, cache: 'default' }).catch(() => {})
           } catch {}
         }
         prewarm(proxied(streamUrl), 'cors')
@@ -3000,8 +3008,10 @@ export default function Watch() {
         }
         return result
       }
-      // Expose for CC panel (moved out of ArtPlayer settings)
+      // Expose for CC panel — update BOTH the ref (for handlers) and state
+      // (for re-rendering the panel when tracks load).
       subtitleTracksRef.current = subtitleTracks
+      setCcSubtitleTracks(subtitleTracks)
       switchSubtitleTrackRef.current = switchSubtitleTrack
       // Also keep refs for download persistence across controls — don't overwrite existing download URLs
       if (!downloadUrlSourceRef.current) {
@@ -3959,6 +3969,21 @@ export default function Watch() {
         }
       })
 
+      // When the Artplayer settings (gear) panel opens, hide the CC panel
+      // so the two never overlap. Also hide CC panel on any control click
+      // that isn't the CC button itself.
+      art.on('setting', (state) => {
+        if (state) {
+          setShowCCPanel(false)
+          setCcPanelView(null)
+        }
+      })
+      // Also close CC panel when the user clicks elsewhere on the player
+      art.on('video:click', () => {
+        setShowCCPanel(false)
+        setCcPanelView(null)
+      })
+
       // Save watch history
       let lastSave = 0
       let lastRender = 0
@@ -4438,8 +4463,9 @@ export default function Watch() {
             const proxyUrl = `${PROXY_BASE}/proxy?url=${encodeURIComponent(mediaEntry.url)}${headersParam}&rn=${warmNonce}`
             // Warm both legs concurrently. Failures are intentionally ignored;
             // the real player still owns all transport and fallback decisions.
-            fetch(proxyUrl, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
-            fetch(mediaEntry.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
+            // Use 'default' cache so the browser can reuse cached responses.
+            fetch(proxyUrl, { method: 'HEAD', cache: 'default' }).catch(() => {})
+            fetch(mediaEntry.url, { method: 'HEAD', mode: 'no-cors', cache: 'default' }).catch(() => {})
           }
         }
         return hasAnyStreamSource(data) ? data : null
@@ -5945,7 +5971,7 @@ export default function Watch() {
               sub-list (checkmark on selected). Compact: 220px wide,
               36px rows, 12px font. Fully responsive + scrollable. */}
           {showCCPanel && !activeEmbedUrl && (() => {
-            const tracks = subtitleTracksRef.current || []
+            const tracks = ccSubtitleTracks || []
             const prefs = subtitlePreferences
             const cats = [
               ...(tracks.length > 0 ? [{
@@ -6749,18 +6775,19 @@ export default function Watch() {
            outer layer inside the player, then make every option panel a real
            touch/mouse-scroll container. */
         .watch-art-mount .art-video-player {
-          --art-settings-max-height: min(68dvh, 360px);
-          --art-selector-max-height: min(62dvh, 320px);
+          --art-settings-max-height: min(60dvh, 320px);
+          --art-selector-max-height: min(56dvh, 280px);
         }
         .watch-art-mount .art-settings {
           box-sizing: border-box;
-          width: min(250px, calc(100% - 16px)) !important;
+          width: min(220px, calc(100% - 16px)) !important;
           max-width: calc(100% - 16px) !important;
           height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
           max-height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
           min-height: 0 !important;
           overflow: hidden !important;
           overscroll-behavior: contain;
+          font-size: 12px !important;
         }
         .watch-art-mount .art-settings,
         .watch-art-mount .art-settings * {
@@ -7013,19 +7040,20 @@ export default function Watch() {
             --art-control-height: 42px;
             --art-control-icon-size: 28px;
             --art-padding: 8px;
-            --art-settings-max-height: min(78dvh, 420px);
-            --art-selector-max-height: min(68dvh, 320px);
+            --art-settings-max-height: min(70dvh, 380px);
+            --art-selector-max-height: min(60dvh, 280px);
           }
           .watch-art-mount .art-video-player .art-controls {
             padding-inline: 2px;
           }
           .watch-art-mount .art-settings {
-            width: min(250px, calc(100vw - 16px)) !important;
+            width: min(220px, calc(100vw - 16px)) !important;
             max-width: calc(100vw - 16px) !important;
             height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
             max-height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
             right: 8px !important;
             bottom: 44px !important;
+            font-size: 12px !important;
           }
           .watch-art-mount .art-setting-panel,
           .watch-art-mount .art-setting-panel .art-selector-list {
@@ -7173,22 +7201,22 @@ export default function Watch() {
         .watch-art-mount .art-settings .art-settings-build,
         .watch-art-mount .art-setting-selector {
           box-sizing: border-box !important;
-          max-width: min(280px, calc(100vw - 16px), 100%) !important;
+          max-width: min(240px, calc(100vw - 16px), 100%) !important;
         }
         .watch-art-mount .art-settings {
-          max-height: min(78vh, 420px) !important;
-          max-height: min(78dvh, 420px) !important;
+          max-height: min(68vh, 360px) !important;
+          max-height: min(68dvh, 360px) !important;
           overflow: hidden !important;
         }
         .watch-art-mount .art-setting-panel {
-          width: min(280px, calc(100vw - 16px), 100%) !important;
-          max-height: min(78vh, 420px) !important;
-          max-height: min(78dvh, 420px) !important;
+          width: min(240px, calc(100vw - 16px), 100%) !important;
+          max-height: min(68vh, 360px) !important;
+          max-height: min(68dvh, 360px) !important;
           overflow: hidden auto !important;
           overscroll-behavior: contain;
         }
         .watch-art-mount .art-setting-panel .art-setting-item {
-          min-height: 36px !important;
+          min-height: 34px !important;
           width: 100% !important;
           min-width: 0 !important;
           overflow: hidden !important;
@@ -7277,7 +7305,11 @@ export default function Watch() {
         }
         .watch-art-mount .art-control-cc .watch-cc-btn-icon svg { width: 22px; height: 22px; }
         /* ── CC Panel (compact, Artplayer-native look) ── */
-        .watch-cc-panel { animation: watch-cc-in 160ms ease-out; }
+        .watch-cc-panel {
+          animation: watch-cc-in 160ms ease-out;
+          /* Must sit above Artplayer's own layers but below fullscreen overlays */
+          z-index: 20 !important;
+        }
         @keyframes watch-cc-in {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -7298,11 +7330,20 @@ export default function Watch() {
           .watch-art-mount .art-video-player .art-control-download {
             width: 36px !important; min-width: 36px !important;
           }
+          /* On mobile, the CC panel should be wider to fit option labels */
+          .watch-cc-panel {
+            width: min(240px, calc(100vw - 16px)) !important;
+          }
         }
         @media (max-width: 360px) {
           .watch-art-mount .art-video-player .art-control-cc,
           .watch-art-mount .art-video-player .art-control-download {
             width: 32px !important; min-width: 32px !important;
+          }
+          /* On very narrow screens, the CC panel goes near-full-width */
+          .watch-cc-panel {
+            width: min(260px, calc(100vw - 12px)) !important;
+            right: 6px !important;
           }
         }
       `}</style>
