@@ -8,7 +8,6 @@ import React, {
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   FaStepForward,
-  FaStepBackward,
   FaCommentDots,
   FaWifi,
   FaExclamationTriangle,
@@ -46,14 +45,9 @@ import {
   getHlsBufferPolicy,
   getHlsLoadPolicies,
   getHlsRequestCacheMode,
-  getNativeMediaBufferPolicy,
 } from '../lib/watchBufferPolicy'
 import { attemptSkipSegment, shouldShowManualSkipOverlay } from '../lib/skipOverlayPolicy'
 import {
-  createHlsQualitySelection,
-  getHlsDataSaverCap,
-  getHlsQualitySettingDisplay,
-  getQualitySettingTitle,
   selectQualityInList,
 } from '../lib/watchQualityMenuState'
 import {
@@ -66,7 +60,6 @@ import {
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
-import { createBufferedTimelineIndicator } from '../lib/watchTimelineBuffer'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
 import {
   isConfirmedUpcomingEpisode,
@@ -173,7 +166,7 @@ function classifyStreamError(err, data) {
 // ────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────
-const SEEK_SECONDS = 10
+const SEEK_SECONDS = 15
 
 // Some older episode payloads were serialized as 10, 20, 30, ... instead of
 // 1, 2, 3, .... Correct only that unmistakable sequence; valid provider
@@ -364,90 +357,103 @@ function qualityOptionHtml(presentation) {
         return `<span class="watch-quality-option"><span class="watch-quality-name">${escapeHtml(presentation.label)}</span>${badge}</span>`
 }
 
+// Presentation for a concrete manifest rendition height (e.g. 1080 →
+// "1080p / Full HD"). Heights outside the well-known ladder keep a clean
+// numeric label without the "Source" badge.
+function getHeightPresentation(height) {
+        const presentation = getQualityPresentation(`${Number(height)}p`)
+        return presentation.rank > 0 ? presentation : { ...presentation, badge: '' }
+}
+
 const SUBTITLE_PREFERENCES_LS_KEY = 'aniraku-subtitle-preferences-v1'
 const PLAYER_PREFERENCES_LS_KEY = 'aniraku-player-preferences-v1'
+// Player is styled after the reference Artplayer build:
+// - size       → percent scale of the 20px base (50%–200%)
+// - position   → pixel offset from the player bottom (0–400px)
+// - color      → text color, one of SUBTITLE_COLOR_OPTIONS
+// - outlineThickness → 0–4 stroke weight
+// - outlineColor     → stroke color, one of SUBTITLE_COLOR_OPTIONS
+// - background → caption box style
+// - font       → font family key, one of SUBTITLE_FONT_OPTIONS
 const DEFAULT_SUBTITLE_PREFERENCES = Object.freeze({
   track: 'auto',
-  size: 'medium',
+  size: '100',
   color: '#ffffff',
-  background: 'dark',
-  position: 'bottom',
-  font: 'system',
+  outlineThickness: '4',
+  outlineColor: '#000000',
+  background: 'transparent',
+  position: '100',
+  font: 'helvetica',
   weight: '600',
-  outline: 'soft',
   opacity: '100',
 })
 
-const SUBTITLE_SIZE_OPTIONS = [
-  { value: 'small', label: 'Small · 16px', fontSize: '16px' },
-  { value: 'medium', label: 'Medium · 20px', fontSize: '20px' },
-  { value: 'large', label: 'Large · 26px', fontSize: '26px' },
-  { value: 'xl', label: 'Extra large · 32px', fontSize: '32px' },
-]
 const SUBTITLE_COLOR_OPTIONS = [
   { value: '#ffffff', label: 'White' },
-  { value: '#fde68a', label: 'Warm yellow' },
-  { value: '#bfdbfe', label: 'Soft blue' },
-  { value: '#bbf7d0', label: 'Soft green' },
-  { value: '#fecaca', label: 'Soft red' },
+  { value: '#d4d4d4', label: 'Light Gray' },
+  { value: '#a3a3a3', label: 'Gray' },
+  { value: '#5f5f5f', label: 'Dark Gray' },
+  { value: '#000000', label: 'Black' },
+  { value: '#ffe14d', label: 'Yellow' },
+  { value: '#ffd700', label: 'Gold' },
+  { value: '#ffa500', label: 'Orange' },
+  { value: '#ff4d4d', label: 'Red' },
+  { value: '#ff85a2', label: 'Pink' },
+  { value: '#b57edc', label: 'Purple' },
+  { value: '#61a5ff', label: 'Blue' },
+  { value: '#4dd9ff', label: 'Cyan' },
+  { value: '#4ade80', label: 'Green' },
 ]
 const SUBTITLE_BACKGROUND_OPTIONS = [
-  { value: 'dark', label: 'Dark box' },
-  { value: 'solid', label: 'Solid box' },
-  { value: 'light', label: 'Light box' },
-  { value: 'none', label: 'No box' },
-]
-const SUBTITLE_POSITION_OPTIONS = [
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'middle', label: 'Lower middle' },
-  { value: 'top', label: 'Top' },
+  { value: 'transparent', label: 'Transparent' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
 ]
 const SUBTITLE_FONT_OPTIONS = [
-  { value: 'system', label: 'System sans' },
-  { value: 'serif', label: 'Serif' },
-  { value: 'mono', label: 'Monospace' },
-  { value: 'rounded', label: 'Rounded' },
+  { value: 'helvetica', label: 'Helvetica' },
+  { value: 'arial', label: 'Arial' },
+  { value: 'verdana', label: 'Verdana' },
+  { value: 'tahoma', label: 'Tahoma' },
+  { value: 'times-new-roman', label: 'Times New Roman' },
+  { value: 'georgia', label: 'Georgia' },
+  { value: 'courier-new', label: 'Courier New' },
   { value: 'homemade-apple', label: 'Homemade Apple' },
   { value: 'butterfly-kids', label: 'Butterfly Kids' },
 ]
-const SUBTITLE_WEIGHT_OPTIONS = [
-  { value: '400', label: 'Regular' },
-  { value: '600', label: 'Semi-bold' },
-  { value: '800', label: 'Bold' },
-]
-const SUBTITLE_OUTLINE_OPTIONS = [
-  { value: 'soft', label: 'Soft outline' },
-  { value: 'strong', label: 'Strong outline' },
-  { value: 'none', label: 'No outline' },
-]
-const SUBTITLE_OPACITY_OPTIONS = [
-  { value: '70', label: '70%' },
-  { value: '85', label: '85%' },
-  { value: '100', label: '100%' },
-]
+const SUBTITLE_SIZE_RANGE = [100, 50, 200, 5]
+const SUBTITLE_POSITION_RANGE = [100, 0, 400, 10]
+const SUBTITLE_OUTLINE_RANGE = [4, 0, 4, 1]
 
-const ADAPTIVE_BANDWIDTH_THRESHOLDS = [
-  { minMbps: 1.8, maxHeight: 1080, label: '1080p' },
-  { minMbps: 1.0, maxHeight: 720, label: '720p' },
-  { minMbps: 0, maxHeight: 480, label: '480p' },
-]
-
-const FIXED_QUALITY_OPTIONS = [
-  { value: '1080', label: '1080P', height: 1080, maxBitrate: 2_000_000 },
-  { value: '720', label: '720P', height: 720, maxBitrate: 1_000_000 },
-  { value: '480', label: '480P', height: 480, maxBitrate: 750_000 },
-  { value: '360', label: '360P', height: 360, maxBitrate: 500_000 },
-]
-
-const SPEED_LIMIT_OPTIONS = [
-  { value: 'adaptive', label: 'Adaptive bandwidth · 480p/720p/1080p', maxBitrate: Infinity, maxHeight: Infinity },
-  { value: 'auto', label: 'Auto · all qualities', maxBitrate: Infinity, maxHeight: Infinity },
-  { value: '0.5', label: '0.5 Mbps · ≤360p', maxBitrate: 500_000, maxHeight: 360 },
-  { value: '1', label: '1 Mbps · ≤480p', maxBitrate: 1_000_000, maxHeight: 480 },
-  { value: '2', label: '2 Mbps · ≤720p', maxBitrate: 2_000_000, maxHeight: 720 },
-  { value: '4', label: '4 Mbps · ≤1080p', maxBitrate: 4_000_000, maxHeight: 1080 },
-  { value: '8', label: '8 Mbps · ≤1440p', maxBitrate: 8_000_000, maxHeight: 1440 },
-]
+// Legacy preference keys (pre–player redesign) were named/valued
+// differently; normalize them so stored viewers keep a sensible style.
+function normalizeSubtitlePreferences(stored) {
+  const legacySize = { small: '80', medium: '100', large: '130', xl: '160' }
+  const legacyPosition = { bottom: '100', middle: '200', top: '300' }
+  const legacyOutline = { soft: '3', strong: '4', none: '0' }
+  const legacyFont = { system: 'helvetica', serif: 'georgia', mono: 'courier-new', rounded: 'verdana' }
+  const legacyBackground = { none: 'transparent', solid: 'dark' }
+  const isHex = (value) => /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || ''))
+  const numeric = (value, fallback, min, max) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? String(Math.min(max, Math.max(min, parsed))) : fallback
+  }
+  const size = legacySize[stored?.size] || numeric(stored?.size, '100', 50, 200)
+  const position = legacyPosition[stored?.position] || numeric(stored?.position, '100', 0, 400)
+  const outlineThickness = legacyOutline[stored?.outline] || numeric(stored?.outlineThickness, '4', 0, 4)
+  return {
+    ...DEFAULT_SUBTITLE_PREFERENCES,
+    ...(stored && typeof stored === 'object' ? stored : {}),
+    size,
+    position,
+    outlineThickness,
+    outlineColor: isHex(stored?.outlineColor) ? stored.outlineColor : '#000000',
+    color: isHex(stored?.color) ? stored.color : '#ffffff',
+    background: legacyBackground[stored?.background] ||
+      (['transparent', 'dark', 'light'].includes(stored?.background) ? stored.background : 'transparent'),
+    font: legacyFont[stored?.font] ||
+      (SUBTITLE_FONT_OPTIONS.some((option) => option.value === stored?.font) ? stored.font : 'helvetica'),
+  }
+}
 
 function readCookie(name) {
   try {
@@ -475,7 +481,12 @@ function readPlayerPreferences() {
       muted: Boolean(stored?.muted),
       playbackRate: Number.isFinite(Number(stored?.playbackRate)) ? Math.max(0.5, Math.min(2, Number(stored.playbackRate))) : 1,
       qualityMode: stored?.qualityMode === 'auto' ? 'auto' : stored?.qualityMode === 'adaptive' ? 'adaptive' : null,
-      qualityTarget: [1080, 720, 480, 360].includes(Number(stored?.qualityTarget)) ? Number(stored.qualityTarget) : null,
+      // Accept any sane rendition height, not just the fixed 360–1080 ladder —
+      // sources expose 1440p/2160p masters and the menu lists real levels.
+      qualityTarget: Number.isFinite(Number(stored?.qualityTarget)) &&
+        Number(stored.qualityTarget) >= 144 && Number(stored.qualityTarget) <= 4320
+        ? Number(stored.qualityTarget)
+        : null,
     }
   } catch {
     return { volume: 0.7, muted: false, playbackRate: 1, qualityMode: null, qualityTarget: null }
@@ -495,7 +506,7 @@ function persistPlayerPreferences(preferences) {
 function readSubtitlePreferences() {
   try {
     const stored = JSON.parse(localStorage.getItem(SUBTITLE_PREFERENCES_LS_KEY) || '{}')
-    return { ...DEFAULT_SUBTITLE_PREFERENCES, ...(stored && typeof stored === 'object' ? stored : {}) }
+    return normalizeSubtitlePreferences(stored)
   } catch {
     return { ...DEFAULT_SUBTITLE_PREFERENCES }
   }
@@ -545,46 +556,63 @@ function getDefaultSubtitleTrack(tracks) {
 }
 
 function getSubtitleStyle(preferences) {
-  const size = SUBTITLE_SIZE_OPTIONS.find((item) => item.value === preferences?.size) || SUBTITLE_SIZE_OPTIONS[1]
+  const clampNumber = (value, fallback, min, max) => {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return fallback
+    return Math.min(max, Math.max(min, parsed))
+  }
+  const sizePercent = clampNumber(preferences?.size, 100, 50, 200)
+  const positionPx = clampNumber(preferences?.position, 100, 0, 400)
+  const thickness = clampNumber(preferences?.outlineThickness, 4, 0, 4)
+  const outlineColor = preferences?.outlineColor || '#000000'
+  const color = preferences?.color || '#ffffff'
   const background = {
     dark: 'rgba(0, 0, 0, 0.72)',
-    solid: 'rgba(15, 23, 42, 0.94)',
     light: 'rgba(255, 255, 255, 0.92)',
-    none: 'transparent',
-  }[preferences?.background] || 'rgba(0, 0, 0, 0.72)'
+    transparent: 'transparent',
+  }[preferences?.background] || 'transparent'
   const fontFamily = {
-    system: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    serif: 'Georgia, "Times New Roman", serif',
-    mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-    rounded: 'ui-rounded, "Trebuchet MS", Arial, sans-serif',
+    helvetica: 'Helvetica, "Helvetica Neue", Arial, sans-serif',
+    arial: 'Arial, "Helvetica Neue", sans-serif',
+    verdana: 'Verdana, Geneva, sans-serif',
+    tahoma: 'Tahoma, Geneva, sans-serif',
+    'times-new-roman': '"Times New Roman", Times, serif',
+    georgia: 'Georgia, "Times New Roman", serif',
+    'courier-new': '"Courier New", Courier, monospace',
     'homemade-apple': '"Homemade Apple", cursive',
     'butterfly-kids': '"Butterfly Kids", cursive',
-  }[preferences?.font] || 'Inter, ui-sans-serif, system-ui, sans-serif'
-  const textShadow = {
-    soft: '0 1px 3px rgba(0, 0, 0, 0.92)',
-    strong: '0 2px 5px rgba(0, 0, 0, 1), 0 0 2px rgba(0, 0, 0, 1)',
-    none: 'none',
-  }[preferences?.outline] || '0 1px 3px rgba(0, 0, 0, 0.92)'
-  const position = {
-    bottom: { bottom: '8%', top: 'auto' },
-    middle: { bottom: '28%', top: 'auto' },
-    top: { bottom: 'auto', top: '12%' },
-  }[preferences?.position] || { bottom: '8%', top: 'auto' }
+  }[preferences?.font] || 'Helvetica, "Helvetica Neue", Arial, sans-serif'
+  // Outline renders like the reference player: a solid colored stroke built
+  // from -webkit-text-stroke plus layered shadows so non-WebKit browsers keep
+  // a visible edge. Thickness 0 disables both.
+  const strokeWidth = thickness > 0 ? (thickness * 0.45).toFixed(2) : null
+  const textShadow = thickness > 0
+    ? [
+        `0 0 ${thickness}px ${outlineColor}`,
+        `0 0 ${thickness * 2}px ${outlineColor}`,
+        `1px 1px ${outlineColor}`,
+        `-1px -1px ${outlineColor}`,
+        `1px -1px ${outlineColor}`,
+        `-1px 1px ${outlineColor}`,
+      ].join(', ')
+    : 'none'
   return {
-    ...position,
+    top: 'auto',
+    bottom: `${positionPx}px`,
     left: '4%',
     right: '4%',
     width: '92%',
-    color: preferences?.color || '#ffffff',
-    fontSize: size.fontSize,
+    color,
+    fontSize: `${Math.round((20 * sizePercent) / 100)}px`,
     fontFamily,
     fontWeight: preferences?.weight || '600',
     lineHeight: '1.35',
     backgroundColor: background,
-    borderRadius: preferences?.background === 'none' ? '0' : '5px',
-    padding: preferences?.background === 'none' ? '2px 0' : '4px 10px',
+    borderRadius: background === 'transparent' ? '0' : '5px',
+    padding: background === 'transparent' ? '2px 0' : '4px 10px',
+    WebkitTextStroke: strokeWidth ? `${strokeWidth}px ${outlineColor}` : 'unset',
     textShadow,
-    opacity: `${Number(preferences?.opacity || 100) / 100}`,
+    opacity: `${clampNumber(preferences?.opacity, 100, 0, 100) / 100}`,
     boxSizing: 'border-box',
     textAlign: 'center',
     letterSpacing: ['homemade-apple', 'butterfly-kids'].includes(preferences?.font) ? '0.015em' : 'normal',
@@ -603,6 +631,7 @@ function applySubtitleStyle(art, preferences) {
       fontSize: style.fontSize,
       fontWeight: style.fontWeight,
       lineHeight: style.lineHeight,
+      WebkitTextStroke: style.WebkitTextStroke,
       textShadow: style.textShadow,
       letterSpacing: style.letterSpacing,
     })
@@ -629,7 +658,9 @@ function syncArtPlayerSetting(art, name, value, label) {
   const setting = art?.setting?.find?.(name)
   if (!setting) return
   if (label) {
-    setting.html = label
+    // Only the gray value chip updates — the row keeps its fixed title
+    // ("Captions", "Quality"…) so the menu never turns into a stack of
+    // mismatched labels.
     setting.tooltip = label
   }
   if (Array.isArray(setting.selector)) {
@@ -646,10 +677,6 @@ function syncArtPlayerSetting(art, name, value, label) {
   }
 }
 
-function getSpeedLimitOption(value) {
-  return SPEED_LIMIT_OPTIONS.find((item) => item.value === String(value)) || SPEED_LIMIT_OPTIONS[0]
-}
-
 function getHlsLevelLabel(level) {
   const height = Number(level?.height || 0)
   const bitrate = Number(level?.bitrate || 0)
@@ -658,29 +685,8 @@ function getHlsLevelLabel(level) {
   return 'Source'
 }
 
-function getAdaptiveBandwidthPolicy(downlinkMbps, levels = []) {
-  const speed = Number(downlinkMbps)
-  const threshold = Number.isFinite(speed) && speed > 0
-    ? ADAPTIVE_BANDWIDTH_THRESHOLDS.find((item) => speed >= item.minMbps) || ADAPTIVE_BANDWIDTH_THRESHOLDS.at(-1)
-    : null
-  if (!threshold) return { mode: 'auto', speedMbps: 0, maxHeight: Infinity, label: 'Auto' }
-  const usable = (Array.isArray(levels) ? levels : [])
-    .filter((level) => Number(level?.height) > 0)
-    .sort((a, b) => Number(b.height) - Number(a.height) || Number(b.bitrate) - Number(a.bitrate))
-  const selected = usable.find((level) => Number(level.height) <= threshold.maxHeight) || usable.at(-1) || null
-  return {
-    mode: 'bandwidth',
-    speedMbps: speed,
-    maxHeight: threshold.maxHeight,
-    label: threshold.label,
-    level: selected,
-  }
-}
-
 function selectLevelForQualityTarget(levels, targetHeight, maxBitrate = Infinity) {
-  const usable = (Array.isArray(levels) ? levels : []).filter((level) =>
-    Number(level?.height) > 0 || Number(level?.bitrate) > 0
-  )
+  const usable = (Array.isArray(levels) ? levels : []).filter((level) => Number(level?.height) > 0)
   if (!usable.length) return null
   const target = Number(targetHeight)
   const underBudget = usable.filter((level) => {
@@ -688,30 +694,19 @@ function selectLevelForQualityTarget(levels, targetHeight, maxBitrate = Infinity
     return bitrate <= 0 || bitrate <= Number(maxBitrate)
   })
   const candidates = underBudget.length ? underBudget : usable
+  // Rank by (1) at-or-under the requested height first, (2) closest to the
+  // requested height, (3) higher bitrate as the final tie-break. The previous
+  // comparator sorted distances in descending order, which silently picked
+  // the FARTHEST rendition — choosing 1080p could pin 480p and made the
+  // quality menu look broken.
   return [...candidates].sort((a, b) => {
-    const aHeight = Number(a.height) || 0
-    const bHeight = Number(b.height) || 0
-    if (aHeight > 0 && bHeight > 0) {
-      const aUnderTarget = aHeight <= target
-      const bUnderTarget = bHeight <= target
-      if (aUnderTarget !== bUnderTarget) return aUnderTarget ? -1 : 1
-      const aDiff = Math.abs(aHeight - target)
-      const bDiff = Math.abs(bHeight - target)
-      if (aDiff !== bDiff) return aDiff - bDiff
-      return bHeight - aHeight
-    }
-    return 0
+    const aHeight = Number(a.height)
+    const bHeight = Number(b.height)
+    const aUnderTarget = aHeight <= target
+    const bUnderTarget = bHeight <= target
+    if (aUnderTarget !== bUnderTarget) return aUnderTarget ? -1 : 1
+    return (Math.abs(aHeight - target) - Math.abs(bHeight - target)) || (bHeight - aHeight)
   })[0]
-}
-
-function selectLevelForSpeed(levels, speedValue) {
-  const option = getSpeedLimitOption(speedValue)
-  if (option.value === 'auto') return null
-  const usable = (Array.isArray(levels) ? levels : []).filter((level) => Number(level?.height) > 0)
-  const byBitrate = usable.filter((level) => Number(level?.bitrate) > 0 && Number(level.bitrate) <= option.maxBitrate)
-  const byHeight = usable.filter((level) => Number(level.height) <= option.maxHeight)
-  const candidates = byBitrate.length > 0 ? byBitrate : byHeight
-  return [...(candidates.length > 0 ? candidates : usable)].sort((a, b) => Number(b.height) - Number(a.height) || Number(b.bitrate) - Number(a.bitrate))[0] || null
 }
 
 const streamCacheKey = (source, episode) => `${source?.id || `${source?.provider || ''}:${source?.lang || ''}`}:${episode}`
@@ -843,11 +838,12 @@ function buildQualityList(sources, suppressedUrls = new Set()) {
   // signed token is definitive enough to omit before playback/failover.
   return entries
     .filter((entry) => !entry.expiredToken && !suppressedUrls.has(entry.url))
-    // Prefer the provider's own Auto/adaptive
-    // URL and then the highest numeric quality without inventing a new URL.
+    // Playback ALWAYS starts on the highest rendition the provider exposes,
+    // so numeric ranks lead the list and the adaptive/Auto URL trails it.
+    // Auto stays selectable from the quality menu at any time.
     .sort((a, b) => {
       if (a.presentation.isAuto !== b.presentation.isAuto) {
-        return a.presentation.isAuto ? -1 : 1
+        return a.presentation.isAuto ? 1 : -1
       }
       if (a.presentation.rank !== b.presentation.rank) {
         return b.presentation.rank - a.presentation.rank
@@ -873,21 +869,116 @@ function hasAnyStreamSource(payload) {
 }
 
 function seekControlHtml(direction) {
-  // Material-style replay-10 / forward-10 artwork: a single bold loop and
-  // arrow with the number set directly inside, avoiding the previous
-  // overlapping text chip that made the control look like undo/redo.
-  const path = direction < 0
-    ? 'M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8'
-    : 'M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8z'
-  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${path}" fill="currentColor"/><text x="12" y="15.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="5.6" font-weight="800" fill="currentColor">10</text></svg></span>`
+  // Official Material Design "replay" / "forward" glyph geometry — the
+  // arrowhead is part of the same filled path as the ring, so the icon
+  // renders seamlessly at any size with no stray joints. Rewind's ring
+  // sweeps clockwise into a left-pointing head; forward is its exact
+  // mirrored twin. The seek amount sits optically centered in the ring
+  // on the player's UI font stack for crisp rendering.
+  const label = String(SEEK_SECONDS)
+  const body = direction < 0
+    ? 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z'
+    : 'M12 5V1L17 6l-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z'
+  return `<span class="watch-art-seek-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" shape-rendering="geometricPrecision"><path d="${body}" fill="currentColor"/><text x="12" y="15.35" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif" font-size="6.6" font-weight="800" letter-spacing="-0.2" fill="currentColor">${label}</text></svg></span>`
+}
+
+function prevEpisodeControlHtml() {
+  // Exact Material Design "skip_previous" glyph — solid geometry, no stray
+  // thin joints: bar on the left, triangle pointing into it.
+  return `<span class="watch-art-prev-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" fill="currentColor"/></svg></span>`
+}
+
+function nextEpisodeControlHtml() {
+  // Exact Material Design "skip_next" glyph — the mirrored twin of the
+  // previous-episode icon: bar on the right, triangle pointing into it.
+  return `<span class="watch-art-next-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M16 6h2v12h-2zM6 6v12l8.5-6z" fill="currentColor"/></svg></span>`
+}
+
+function chromecastControlHtml() {
+  // Exact Material Design "cast" glyph: rounded screen with the signal waves
+  // emanating from the bottom-left corner.
+  return `<span class="watch-art-cast-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z" fill="currentColor"/></svg></span>`
 }
 
 function ccControlHtml() {
   return `<span class="watch-art-cc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="14.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-weight="800" fill="currentColor">CC</text></svg></span>`
 }
 
-function downloadControlHtml() {
-  return `<span class="watch-art-download-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 17v2c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
+// Settings-row icons — exact Material Design filled paths (24×24 grid) so
+// every glyph renders identically crisp at any DPI. Auto Skip / Auto Next /
+// Subtitle Settings / Quality share the classic "tune" sliders icon from the
+// reference build.
+const SETTING_ICON_PLAY_SPEED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.1 8.2v7.6l6.1-3.8z" fill="currentColor"/></svg>`
+const SETTING_ICON_ASPECT_RATIO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16.01H3V4.99h18v14.02z" fill="currentColor"/></svg>`
+const SETTING_ICON_CAPTIONS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1z" fill="currentColor"/></svg>`
+const SETTING_ICON_TUNE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" fill="currentColor"/></svg>`
+// Invisible spacer that keeps slider rows on the same label grid as every
+// other row, without drawing a decorative gear inside the sub-menu.
+const SETTING_ICON_BLANK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"></svg>`
+
+// Full-range cached-timeline cue. Draws EVERY buffered range instead of a
+// windowed clip around the playhead — with the unlimited cache policy the
+// bar shows the whole downloaded episode, ahead of and behind the playhead.
+function createFullBufferIndicator(video, container) {
+  if (!video || !container) return () => {}
+  const layer = document.createElement('div')
+  layer.className = 'watch-buffer-indicator'
+  layer.setAttribute('aria-hidden', 'true')
+  container.appendChild(layer)
+  let frame = 0
+  let lastKey = ''
+  const draw = () => {
+    frame = 0
+    const duration = Number(video.duration)
+    if (!Number.isFinite(duration) || duration <= 0) {
+      if (lastKey) { layer.innerHTML = ''; lastKey = '' }
+      return
+    }
+    const buffered = video.buffered
+    let key = ''
+    for (let index = 0; index < buffered.length; index += 1) {
+      key += `${Math.round(buffered.start(index) * 10)},${Math.round(buffered.end(index) * 10)};`
+    }
+    if (key === lastKey) return
+    lastKey = key
+    let html = ''
+    for (let index = 0; index < buffered.length; index += 1) {
+      const start = buffered.start(index)
+      const end = buffered.end(index)
+      const left = Math.min(100, Math.max(0, (start / duration) * 100))
+      const width = Math.min(100 - left, Math.max(0, ((end - start) / duration) * 100))
+      if (width < 0.25) continue
+      html += `<span class="watch-buffer-indicator-segment" style="left:${left}%;width:${width}%"></span>`
+    }
+    layer.innerHTML = html
+  }
+  const schedule = () => {
+    if (!frame) frame = requestAnimationFrame(draw)
+  }
+  const events = ['loadedmetadata', 'progress', 'timeupdate', 'canplay', 'playing', 'seeked', 'seeking']
+  events.forEach((name) => video.addEventListener(name, schedule))
+  schedule()
+  return () => {
+    events.forEach((name) => video.removeEventListener(name, schedule))
+    if (frame) cancelAnimationFrame(frame)
+    frame = 0
+    layer.remove()
+  }
+}
+
+// Row labels for the settings panel. Speeds render like the reference
+// player: "0.5 / 0.8 / Normal / 1.3 / 1.5 / 2.0"; quality names collapse
+// provider labels such as "1080P" to the familiar "1080p".
+function playSpeedSettingLabel(rate) {
+  const numeric = Number(rate)
+  if (!Number.isFinite(numeric) || numeric === 1) return 'Normal'
+  return numeric.toFixed(1)
+}
+
+function qualitySettingLabel(entry) {
+  const label = String(entry?.label || entry?.html || '').replace(/<[^>]*>/g, '').trim()
+  if (!label) return 'Auto'
+  return label.replace(/(\d+)\s*p\b/gi, '$1p')
 }
 
 function formatAiringDate(unixTimestamp) {
@@ -1130,8 +1221,8 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
       if (key === 'ArrowLeft' || key === 'KeyJ') {
         e.preventDefault()
         if (art) {
-          art.video.currentTime = Math.max(0, art.video.currentTime - 10)
-          showToast(`−10s ${formatTime(art.video.currentTime)}`)
+          art.video.currentTime = Math.max(0, art.video.currentTime - SEEK_SECONDS)
+          showToast(`−${SEEK_SECONDS}s ${formatTime(art.video.currentTime)}`)
         }
         return
       }
@@ -1140,9 +1231,9 @@ function useKeyboardShortcuts(playerRef, videoRef, options) {
         if (art) {
           art.video.currentTime = Math.min(
             art.video.duration || Infinity,
-            art.video.currentTime + 10
+            art.video.currentTime + SEEK_SECONDS
           )
-          showToast(`+10s ${formatTime(art.video.currentTime)}`)
+          showToast(`+${SEEK_SECONDS}s ${formatTime(art.video.currentTime)}`)
         }
         return
       }
@@ -1387,6 +1478,10 @@ export default function Watch() {
   const skipQuietProviderReloadRef = useRef(null)
   const lastBlockCycleRef = useRef(0)
   const handleProviderBlockedRef = useRef(null)
+  // Quality chosen DURING this page session only. Playback always starts on
+  // the highest rendition; an explicit in-session pick is honored across
+  // player rebuilds until the episode (or a page reload) resets it.
+  const sessionQualityTargetRef = useRef(null)
   const streamCacheRef = useRef(new Map())   // short-TTL working streams
   const providerWarmRequestsRef = useRef(new Map())
   const embedFrameRef = useRef(null)
@@ -1848,6 +1943,7 @@ export default function Watch() {
         return new Set([...previous, streamUrl])
       })
     }
+    showToast('This failed stream link was removed for this episode. Refresh to request a fresh link or choose another quality manually.', { long: true })
   }, [showToast])
 
   const restoreWorkingStream = useCallback((urls) => {
@@ -2580,11 +2676,27 @@ export default function Watch() {
       hlsInstance.current = null
     }
     if (artInstance.current) {
+      const art = artInstance.current
+      // Stop audio instantly — a detached <video> keeps playing otherwise.
+      try { art.video?.pause?.() } catch {}
       try {
-        artInstance.current.destroy(false)
+        // destroy(false) only tags the template with an "art-destroy" class
+        // (no CSS hides it) and leaves the whole player — video element
+        // included — inside the mount node. Episode changes and quality
+        // rebuilds then stack a NEW player under the DEAD one: the viewer
+        // stares at the old black surface while the new player's audio
+        // plays out of view. Always tear the old template down for real.
+        art.destroy(false)
       } catch {}
       artInstance.current = null
-      if (artRef.current) artRef.current.__artplayer = null
+      if (artRef.current) {
+        artRef.current.__artplayer = null
+        try {
+          artRef.current
+            .querySelectorAll('.art-video-player')
+            .forEach((node) => node.remove())
+        } catch {}
+      }
     }
     recoveryBusyRef.current = false
   }, [])
@@ -2611,7 +2723,7 @@ export default function Watch() {
   )
 
   const buildPlayer = useCallback(
-    async (streamUrl, sourceType, qualityList, subtitles, headers, onBlocked) => {
+    async (streamUrl, sourceType, qualityList, subtitles, headers, onBlocked, engineHint) => {
       destroyPlayer()
       kiwiFragmentRangesRef.current = null
       setActiveEmbedUrl('')
@@ -2719,7 +2831,7 @@ export default function Watch() {
               // considered.
               video.removeAttribute('crossorigin')
             }
-            video.preload = getNativeMediaBufferPolicy().preload
+            video.preload = 'auto'
             video.src = target
             video.load()
             const p = video.play()
@@ -2801,6 +2913,9 @@ export default function Watch() {
                 if (recoveryBusyRef.current) return
                 recoveryBusyRef.current = true
                 recoveryBusyRef.current = false
+                showToast('Playback interrupted — choose another server manually.', {
+                  long: true,
+                })
                 if (onBlocked) onBlocked('playback-error')
         else setError('Stream playback error. Try a different server.')
       }
@@ -2808,15 +2923,18 @@ export default function Watch() {
       const subtitleTracks = normalizeSubtitleTracks(subtitles)
       setSubtitleTrackCount(subtitleTracks.length)
       const savedSubtitleTrack = subtitlePreferencesRef.current.track
-      const preferredSubtitleTrack = savedSubtitleTrack === 'off'
-        ? null
-        : subtitleTracks.find((track) => track.url === savedSubtitleTrack) || getDefaultSubtitleTrack(subtitleTracks)
+      // Subtitles are ALWAYS on by default: an 'off' marker saved by an older
+      // session never suppresses captions on a fresh mount. The viewer can
+      // still pick another language (or Off) from the Captions menu at any
+      // time, but every new player starts with the best track enabled.
+      const preferredSubtitleTrack =
+        subtitleTracks.find((track) => track.url === savedSubtitleTrack) || getDefaultSubtitleTrack(subtitleTracks)
       // Keep one source track mounted so ArtPlayer can switch tracks later even
-      // when the viewer starts with captions turned off.
+      // when the viewer turns captions off mid-session.
       const initialSubtitleTrack = preferredSubtitleTrack || subtitleTracks[0] || null
       const subtitleSettingOptions = subtitleTracks.length > 0
         ? [
-            { default: savedSubtitleTrack === 'off', html: 'Off', value: 'off' },
+            { default: false, html: 'Off', value: 'off' },
             ...subtitleTracks.map((track) => ({
               default: track.url === preferredSubtitleTrack?.url,
               html: escapeHtml(track.label),
@@ -2827,44 +2945,83 @@ export default function Watch() {
       const subtitleSetting = subtitleTracks.length > 0
         ? {
             name: 'subtitleTrack',
-            width: 260,
-            html: `Subtitles · ${preferredSubtitleTrack?.label || 'Off'}`,
+            width: 232,
+            html: 'Captions',
+            icon: SETTING_ICON_CAPTIONS,
+            tooltip: preferredSubtitleTrack?.label || 'Off',
             selector: subtitleSettingOptions,
             onSelect: (item) => {
               const track = subtitleTracks.find((candidate) => candidate.url === item.value) || null
-              const subtitleLabel = item.value === 'off' ? 'Subtitles · Off' : `Subtitles · ${track?.label || 'Track'}`
+              const subtitleLabel = item.value === 'off' ? 'Off' : (track?.label || 'Track')
               switchSubtitleTrack(track)
               syncArtPlayerSetting(artInstance.current, 'subtitleTrack', item.value, subtitleLabel)
               return subtitleLabel
             },
           }
         : null
-      const makeSubtitleStyleSetting = (name, label, key, options, getLabel = (item) => item.label) => ({
+
+      // Nested "Subtitle Settings" panel — mirrors the reference player:
+      // two sliders (percent font size, pixel position), then Font Family /
+      // Text Color / Background selectors, an outline thickness slider and
+      // an outline color selector. Values live in subtitle preferences and
+      // apply to the captions immediately while dragging.
+      const subtitlePrefNumber = (key, fallback, min, max) => {
+        const parsed = Number(subtitlePreferencesRef.current?.[key])
+        if (!Number.isFinite(parsed)) return fallback
+        return Math.min(max, Math.max(min, parsed))
+      }
+      const findOptionLabel = (options, value) =>
+        options.find((option) => String(option.value) === String(value))?.label
+      const makeSubtitleSelectorSetting = (name, label, key, options) => ({
         name,
-        width: 260,
-        html: `${label} · ${getLabel(options.find((option) => String(subtitlePreferencesRef.current[key]) === String(option.value)) || options[0] || {})}`,
-        selector: options.map((item) => ({
-          default: String(subtitlePreferencesRef.current[key]) === String(item.value),
-          html: escapeHtml(getLabel(item)),
-          value: item.value,
+        width: 232,
+        html: label,
+        tooltip: findOptionLabel(options, subtitlePreferencesRef.current?.[key]) || options[0]?.label || '',
+        selector: options.map((option) => ({
+          default: String(subtitlePreferencesRef.current?.[key]) === String(option.value),
+          html: escapeHtml(option.label),
+          value: option.value,
         })),
         onSelect: (item) => {
           setSubtitlePreference(key, item.value)
-          const selectedLabel = getLabel(options.find((option) => String(option.value) === String(item.value)) || item)
-          syncArtPlayerSetting(artInstance.current, name, item.value, `${label} · ${selectedLabel}`)
-          return `${label} · ${selectedLabel}`
+          const selectedLabel = findOptionLabel(options, item.value) || item.html
+          return selectedLabel
+        },
+      })
+      const makeSubtitleRangeSetting = (name, label, key, range, format) => ({
+        name,
+        width: 232,
+        html: label,
+        icon: SETTING_ICON_BLANK,
+        range: [subtitlePrefNumber(key, range[0], range[1], range[2]), range[1], range[2], range[3]],
+        tooltip: format(subtitlePrefNumber(key, range[0], range[1], range[2])),
+        onChange: (item) => {
+          const value = Number(item.range[0]) || 0
+          setSubtitlePreference(key, String(value))
+          return format(value)
+        },
+        onRange: (item) => {
+          const value = Number(item.range[0]) || 0
+          setSubtitlePreference(key, String(value))
+          return format(value)
         },
       })
       const subtitleStyleSettings = [
-        makeSubtitleStyleSetting('subtitleSize', 'Caption size', 'size', SUBTITLE_SIZE_OPTIONS),
-        makeSubtitleStyleSetting('subtitleColor', 'Caption color', 'color', SUBTITLE_COLOR_OPTIONS),
-        makeSubtitleStyleSetting('subtitleBackground', 'Caption background', 'background', SUBTITLE_BACKGROUND_OPTIONS),
-        makeSubtitleStyleSetting('subtitlePosition', 'Caption position', 'position', SUBTITLE_POSITION_OPTIONS),
-        makeSubtitleStyleSetting('subtitleFont', 'Caption font', 'font', SUBTITLE_FONT_OPTIONS),
-        makeSubtitleStyleSetting('subtitleWeight', 'Caption weight', 'weight', SUBTITLE_WEIGHT_OPTIONS),
-        makeSubtitleStyleSetting('subtitleOutline', 'Caption outline', 'outline', SUBTITLE_OUTLINE_OPTIONS),
-        makeSubtitleStyleSetting('subtitleOpacity', 'Caption opacity', 'opacity', SUBTITLE_OPACITY_OPTIONS),
+        makeSubtitleRangeSetting('subtitleSize', 'Font Size', 'size', SUBTITLE_SIZE_RANGE, (value) => `${value}%`),
+        makeSubtitleRangeSetting('subtitlePosition', 'Position', 'position', SUBTITLE_POSITION_RANGE, (value) => `${value}px`),
+        makeSubtitleSelectorSetting('subtitleFont', 'Font Family', 'font', SUBTITLE_FONT_OPTIONS),
+        makeSubtitleSelectorSetting('subtitleColor', 'Text Color', 'color', SUBTITLE_COLOR_OPTIONS),
+        makeSubtitleSelectorSetting('subtitleBackground', 'Background', 'background', SUBTITLE_BACKGROUND_OPTIONS),
+        makeSubtitleRangeSetting('subtitleOutlineThickness', 'Thickness', 'outlineThickness', SUBTITLE_OUTLINE_RANGE, (value) => `${value}`),
+        makeSubtitleSelectorSetting('subtitleOutlineColor', 'Outline Color', 'outlineColor', SUBTITLE_COLOR_OPTIONS),
       ]
+      const subtitleSettingsSetting = {
+        name: 'subtitleSettings',
+        width: 232,
+        html: 'Subtitle Settings',
+        icon: SETTING_ICON_TUNE,
+        selector: subtitleStyleSettings,
+      }
 
       const switchSubtitleTrack = async (track) => {
         const switchGeneration = ++subtitleSwitchGenerationRef.current
@@ -2949,142 +3106,131 @@ export default function Watch() {
         // TV remotes have no rotation sensor; keep the player orientation
         // locked so Android TV never flips it.
         autoOrientation: !IS_TV,
-        airplay: true,
+        // Casting is exposed through the custom "Chromecast" control below;
+        // art.airplay() opens Safari's playback target picker and ArtPlayer
+        // raises its own notice on browsers without one.
+        airplay: false,
+        screenshot: !IS_TV,
         setting: true,
         hotkey: false,
-        theme: '#e2e8f0',
+        theme: '#648FFC',
         volume: playerPreferencesRef.current.volume,
         isLive: false,
         lang:
           (navigator.language || 'en').toLowerCase() === 'zh-cn' ? 'zh-cn' : 'en',
         moreVideoAttr: {
           crossOrigin: 'anonymous',
-          preload: getNativeMediaBufferPolicy().preload,
+          preload: 'auto',
           playsInline: true,
           'webkit-playsinline': 'true',
           'x5-playsinline': 'true',
         },
-        // Artplayer inserts these between Play and Sound (the built-in
-        // volume control uses index 20). They remain visible on desktop,
-        // keyboard-accessible, and use the same seek helper as touch UI.
+        // Control bar mirrors the reference build. Artplayer registers its
+        // built-ins at fixed indices — play 10 / volume 20 / time 30 on the
+        // left, screenshot 20 / setting 30 / pip 40 / fullscreenWeb 60 /
+        // fullscreen 70 on the right — so the customs below slot exactly
+        // where the recorded player places them:
+        //   play · prev-episode · next-episode · rewind-15 · forward-15 ·
+        //   volume · time
+        //   chromecast · screenshot · setting · pip · web-fullscreen · fullscreen
+        // The Next Episode control only exists while the next episode has
+        // actually been released (present in the episode list).
         controls: [
           {
-            name: 'seekBackward10',
+            name: 'prevEpisode',
             position: 'left',
             index: 15,
+            html: prevEpisodeControlHtml(),
+            tooltip: 'Previous Episode',
+            style: { width: '36px', margin: '0' },
+            click: function () {
+              if (epNumber > 1) {
+                const slug = generateSlug(
+                  anime?.title?.english || anime?.title?.romaji || ''
+                )
+                navigate(`/watch/${slug}-${animeId}-episode-${epNumber - 1}`)
+              } else {
+                showToast('This is the first episode')
+              }
+            },
+          },
+          ...(!isMovie && epNumber < episodes.length
+            ? [
+                {
+                  name: 'nextEpisode',
+                  position: 'left',
+                  index: 16,
+                  html: nextEpisodeControlHtml(),
+                  tooltip: 'Next Episode',
+                  style: { width: '36px', margin: '0' },
+                  click: function () {
+                    const slug = generateSlug(
+                      anime?.title?.english || anime?.title?.romaji || ''
+                    )
+                    navigate(`/watch/${slug}-${animeId}-episode-${epNumber + 1}`)
+                  },
+                },
+              ]
+            : []),
+          {
+            name: 'seekBackward15',
+            position: 'left',
+            index: 17,
             html: seekControlHtml(-1),
-            tooltip: 'Back 10 seconds',
-            style: { width: '42px', margin: '0 1px' },
+            tooltip: `Rewind ${SEEK_SECONDS}s`,
+            style: { width: '36px', margin: '0' },
             click: function () {
               const nextTime = seekVideoBy(this, -SEEK_SECONDS)
               if (nextTime !== null) {
-                showToast(`−10s · ${formatTime(nextTime)}`)
+                showToast(`−${SEEK_SECONDS}s · ${formatTime(nextTime)}`)
               }
             },
           },
           {
-            name: 'seekForward10',
+            name: 'seekForward15',
             position: 'left',
-            index: 16,
+            index: 18,
             html: seekControlHtml(1),
-            tooltip: 'Forward 10 seconds',
-            style: { width: '42px', margin: '0 1px' },
+            tooltip: `Forward ${SEEK_SECONDS}s`,
+            style: { width: '36px', margin: '0' },
             click: function () {
               const nextTime = seekVideoBy(this, SEEK_SECONDS)
               if (nextTime !== null) {
-                showToast(`+10s · ${formatTime(nextTime)}`)
+                showToast(`+${SEEK_SECONDS}s · ${formatTime(nextTime)}`)
               }
             },
           },
           {
-            name: 'download',
+            name: 'chromecast',
             position: 'right',
-            index: 29,
-            html: downloadControlHtml(),
-            tooltip: 'Download',
-            style: { width: '42px', margin: '0 1px' },
+            index: 15,
+            html: chromecastControlHtml(),
+            tooltip: 'Chromecast',
+            style: { width: '36px', margin: '0' },
             click: function () {
-              const rawUrl = downloadUrlSourceRef.current || currentDownloadUrlRef.current
-              if (!rawUrl || rawUrl.includes('/api/v1/proxy') || rawUrl.includes('.m3u8')) {
-                showToast('No download available for this source', { icon: 'warn' })
-                return
+              try {
+                this.airplay()
+              } catch {
+                showToast('Chromecast is not available in this browser', { icon: 'warn' })
               }
-              window.open(rawUrl, '_blank', 'noopener')
-              showToast(rawUrl.includes('pahe.') || rawUrl.includes('nekostream') ? 'Opening download page…' : 'Opening download…')
             },
           },
         ],
+        // Settings panel mirrors the reference build row-for-row:
+        //   Play Speed › / Aspect Ratio › / Auto Skip (switch) /
+        //   Auto Next (switch) / Captions › / Subtitle Settings › / Quality ›
         settings: [
           {
-            name: 'quality',
-            width: 220,
-            html: getQualitySettingTitle(qualityList.find((item) => item.default) || qualityList[0]),
-            selector: qualityList.map((item) => ({
-              default: Boolean(item.default),
-              html: item.html,
-              value: item.url,
+            name: 'playSpeed',
+            width: 232,
+            html: 'Play Speed',
+            icon: SETTING_ICON_PLAY_SPEED,
+            tooltip: playSpeedSettingLabel(playerPreferencesRef.current.playbackRate),
+            selector: [0.5, 0.8, 1, 1.3, 1.5, 2].map((rate) => ({
+              default: Number(playerPreferencesRef.current.playbackRate) === rate,
+              html: playSpeedSettingLabel(rate),
+              value: rate,
             })),
-            onSelect: (item) => {
-              const selected = qualityList.find((quality) => quality.url === item.value)
-              const art = artInstance.current
-              if (selected && art) {
-                const currentUrl = art.video?.currentSrc || art.option?.url || ''
-                if (selected.url !== currentUrl) {
-                  const resumeAt = Number(art.video?.currentTime || 0)
-                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
-                  buildPlayer(
-                    selected.url,
-                    selected.type || 'hls',
-                    selectQualityInList(qualityList, selected.url),
-                    subtitles,
-                    headers,
-                    onBlocked
-                  )
-                }
-              }
-              return getQualitySettingTitle(selected)
-            },
-          },
-          // Subtitle track selector
-          ...(subtitleSetting ? [subtitleSetting] : []),
-          // Subtitle style settings (compact, one per row, matching quality/auto-skip style)
-          ...subtitleStyleSettings,
-          {
-            name: 'autoSkip',
-            width: 220,
-            html: 'Auto-skip intro & outro',
-            switch: autoSkipRef.current,
-            onSwitch: (item) => {
-              const next = setAutoSkipPreference(!autoSkipRef.current)
-              item.switch = next
-              return next
-            },
-          },
-          {
-            name: 'autoNext',
-            width: 220,
-            html: 'Auto-next episode',
-            switch: autoNextRef.current,
-            onSwitch: (item) => {
-              const next = setAutoNextPreference(!autoNextRef.current)
-              item.switch = next
-              return next
-            },
-          },
-
-          {
-            name: 'playbackSpeed',
-            width: 180,
-            html: `Playback speed · ${playerPreferencesRef.current.playbackRate}×`,
-            selector: [
-              { default: playerPreferencesRef.current.playbackRate === 0.5, html: '0.5×', value: 0.5 },
-              { default: playerPreferencesRef.current.playbackRate === 0.75, html: '0.75×', value: 0.75 },
-              { default: playerPreferencesRef.current.playbackRate === 1, html: 'Normal (1×)', value: 1 },
-              { default: playerPreferencesRef.current.playbackRate === 1.25, html: '1.25×', value: 1.25 },
-              { default: playerPreferencesRef.current.playbackRate === 1.5, html: '1.5×', value: 1.5 },
-              { default: playerPreferencesRef.current.playbackRate === 1.75, html: '1.75×', value: 1.75 },
-              { default: playerPreferencesRef.current.playbackRate === 2, html: '2×', value: 2 },
-            ],
             onSelect: (item) => {
               const video = artInstance.current?.video
               if (video && Number.isFinite(Number(item.value))) {
@@ -3094,7 +3240,95 @@ export default function Watch() {
                 persistPlayerPreferences(playerPreferencesRef.current)
                 showToast(`Speed ${item.value}x`, { icon: 'ok' })
               }
-              return `Playback speed · ${item.value}×`
+              return playSpeedSettingLabel(item.value)
+            },
+          },
+          {
+            name: 'aspectRatio',
+            width: 232,
+            html: 'Aspect Ratio',
+            icon: SETTING_ICON_ASPECT_RATIO,
+            tooltip: 'Default',
+            selector: [
+              { default: true, html: 'Default', value: 'default' },
+              { html: '4:3', value: '4:3' },
+              { html: '16:9', value: '16:9' },
+            ],
+            onSelect: (item) => {
+              const art = artInstance.current
+              if (art) {
+                try {
+                  art.aspectRatio = item.value
+                } catch {
+                  /* aspect ratio is best-effort */
+                }
+              }
+              return item.html
+            },
+          },
+          {
+            name: 'autoSkip',
+            width: 232,
+            html: 'Auto Skip',
+            icon: SETTING_ICON_TUNE,
+            tooltip: autoSkipRef.current ? 'ON' : 'OFF',
+            switch: autoSkipRef.current,
+            onSwitch: (item) => {
+              const next = setAutoSkipPreference(!autoSkipRef.current)
+              item.switch = next
+              item.tooltip = next ? 'ON' : 'OFF'
+              return next
+            },
+          },
+          {
+            name: 'autoNext',
+            width: 232,
+            html: 'Auto Next',
+            icon: SETTING_ICON_TUNE,
+            tooltip: autoNextRef.current ? 'ON' : 'OFF',
+            switch: autoNextRef.current,
+            onSwitch: (item) => {
+              const next = setAutoNextPreference(!autoNextRef.current)
+              item.switch = next
+              item.tooltip = next ? 'ON' : 'OFF'
+              return next
+            },
+          },
+          // Captions selector (name kept for syncArtPlayerSetting callers)
+          ...(subtitleSetting ? [subtitleSetting] : []),
+          subtitleSettingsSetting,
+          {
+            name: 'quality',
+            width: 232,
+            html: 'Quality',
+            icon: SETTING_ICON_TUNE,
+            tooltip: qualitySettingLabel(qualityList.find((item) => item.default) || qualityList[0]),
+            selector: qualityList.map((item) => ({
+              default: Boolean(item.default),
+              html: escapeHtml(qualitySettingLabel(item)),
+              value: item.url,
+            })),
+            onSelect: (item) => {
+              const selected = qualityList.find((quality) => quality.url === item.value)
+              const art = artInstance.current
+              if (selected && art) {
+                const currentUrl = String(art.video?.currentSrc || art.option?.url || '')
+                const rawMatches = selected.url && (selected.url === currentUrl || currentUrl.includes(selected.url))
+                if (!rawMatches) {
+                  const resumeAt = Number(art.video?.currentTime || 0)
+                  if (resumeAt > 0) pendingResumeRef.current = resumeAt
+                  buildPlayer(
+                    selected.url,
+                    selected.type || 'hls',
+                    selectQualityInList(qualityList, selected.url),
+                    subtitles,
+                    headers,
+                    onBlocked,
+                    engineHint
+                  )
+                }
+              }
+              return qualitySettingLabel(selected)
             },
           },
         ],
@@ -3108,6 +3342,8 @@ export default function Watch() {
               dash = mod.default || mod
             } catch {
               if (buildIdRef.current === myBuildId) {
+                // Silent: onBlocked hands playback to the same provider's
+                // embed fallback in the background.
                 onBlocked?.('unsupported-format')
               }
               return
@@ -3117,7 +3353,14 @@ export default function Watch() {
               const player = dash.MediaPlayer().create()
               player.updateSettings?.({
                 streaming: {
-                  buffer: getDashBufferPolicy(netHintRef.current),
+                  buffer: {
+                    ...getDashBufferPolicy(netHintRef.current),
+                    // Uncapped cache: chase the full title duration ahead and
+                    // keep already-played ranges instead of pruning them.
+                    stableBufferTime: 21600,
+                    bufferTimeAtTopQuality: 21600,
+                    bufferTimeAtTopQualityLongForm: 21600,
+                  },
                 },
               })
               const dashProxy = (request) => {
@@ -3173,57 +3416,62 @@ export default function Watch() {
                         if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
                       }
                       variants.sort((a, b) => b.height - a.height)
-              // Allow single variant to still expose Auto + that variant (real cap, not fake).
               if (variants.length < 1 || !art?.setting?.update) return
-              // If only 1 variant, synthesize bandwidth caps for lower heights via same URL but capped via hls cap emulation
-              // by still showing FIXED options that map to that single level (cap logic downstream picks best available).
-              if (variants.length === 1) {
-                const sole = variants[0]
-                // Add synthetic caps so user sees 1080/720/480 even if master only lists one height
-                const existingHeights = new Set(variants.map(v=>v.height))
-                for (const opt of FIXED_QUALITY_OPTIONS) {
-                  if (!existingHeights.has(opt.height)) {
-                    // Use same URL but will be capped via autoLevelCapping in hls.js path; for native, same URL with capped label
-                    // Native path can't truly downscale, but we expose the label as capped choice (no fake URL).
-                    // We keep variants as-is; fixed options will be added via hls.js path later.
-                  }
-                }
-              }
+              // The menu lists ONLY renditions that truly exist in the master
+              // (plus Auto). Native HLS can play a variant playlist directly,
+              // but it can never cap the adaptive ladder, so a pinned
+              // rendition is honored by rebuilding through the MSE engine
+              // (hls.js), which can force the exact level.
+              // Session-level picks survive native rebuilds; a fresh episode
+              // or page load always presents Auto as the unselected default
+              // and starts the stream at the top of the ladder.
+              const currentTarget = Number(sessionQualityTargetRef.current) || null
               const nativeQualityList = [
-                { default: !playerPreferencesRef.current.qualityTarget, html: qualityOptionHtml(getQualityPresentation('auto')), url, type: 'hls' },
-                ...FIXED_QUALITY_OPTIONS.map((option) => {
-                  const selected = selectLevelForQualityTarget(variants, option.height)
-                  return {
-                    default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
-                    html: qualityOptionHtml(getQualityPresentation(option.label)),
-                    url: selected?.url || url,
-                    type: 'hls',
-                  }
-                }),
+                { default: !currentTarget, html: qualityOptionHtml(getQualityPresentation('auto')), url, type: 'hls' },
+                ...variants.map((variant) => ({
+                  default: currentTarget === variant.height,
+                  html: qualityOptionHtml(getHeightPresentation(variant.height)),
+                  url: variant.url,
+                  type: 'hls',
+                })),
               ]
               art.setting.update({
                 name: 'quality',
-                width: 220,
-                html: `Quality · ${playerPreferencesRef.current.qualityTarget ? `${playerPreferencesRef.current.qualityTarget}P` : 'Auto'}`,
+                width: 232,
+                icon: SETTING_ICON_TUNE,
+                html: 'Quality',
+                tooltip: currentTarget ? `${currentTarget}P` : 'Auto',
                 selector: [
-                  { default: !playerPreferencesRef.current.qualityTarget, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
-                  ...FIXED_QUALITY_OPTIONS.map((option) => ({
-                    default: Number(playerPreferencesRef.current.qualityTarget) === option.height,
-                    html: qualityOptionHtml(getQualityPresentation(option.label)),
-                    value: `target:${option.height}`,
+                  { default: !currentTarget, html: qualityOptionHtml(getQualityPresentation('auto')), value: 'auto' },
+                  ...variants.map((variant) => ({
+                    default: currentTarget === variant.height,
+                    html: qualityOptionHtml(getHeightPresentation(variant.height)),
+                    value: `target:${variant.height}`,
                   })),
                 ],
                 onSelect: (item) => {
-                  const targetHeight = String(item.value).startsWith('target:') ? Number(String(item.value).replace('target:', '')) : null
-                  const targetOption = FIXED_QUALITY_OPTIONS.find((option) => option.height === targetHeight)
-                  const selected = targetOption ? selectLevelForQualityTarget(variants, targetOption.height) : null
-                  const next = selected?.url || url
-                  playerPreferencesRef.current = { ...playerPreferencesRef.current, qualityTarget: targetOption?.height || null }
+                  const targetHeight = String(item.value).startsWith('target:')
+                    ? Number(String(item.value).replace('target:', ''))
+                    : null
+                  sessionQualityTargetRef.current = targetHeight
+                  playerPreferencesRef.current = {
+                    ...playerPreferencesRef.current,
+                    qualityMode: 'auto',
+                    qualityTarget: targetHeight,
+                  }
                   persistPlayerPreferences(playerPreferencesRef.current)
                   const resumeAt = Number(video.currentTime || 0)
                   if (resumeAt > 0) pendingResumeRef.current = resumeAt
-                  buildPlayer(next, 'hls', nativeQualityList, subtitles, headers, onBlocked)
-                  return targetOption?.label || 'Auto'
+                  buildPlayer(
+                    url,
+                    'hls',
+                    nativeQualityList,
+                    subtitles,
+                    headers,
+                    onBlocked,
+                    targetHeight ? 'mse' : undefined
+                  )
+                  return targetHeight ? `${targetHeight}P` : 'Auto'
                 },
               })
             } catch {}
@@ -3232,9 +3480,11 @@ export default function Watch() {
             // Kiwi is verified on the native proxy-first HLS branch. Ally and
             // other manifests remain on hls.js, whose bounded buffer and media
             // recovery avoid falling through to an expired embed page.
-            if (shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
+            // engineHint === 'mse' skips the native branch so a user-pinned
+            // rendition can be forced through hls.js level control.
+            if (engineHint !== 'mse' && shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
                               try {
-                                video.preload = getNativeMediaBufferPolicy().preload
+                                video.preload = 'auto'
                                 video.src = hlsTransportPlan[hlsTransportIndex].url
                         if (pendingHandoffRef.current?.shouldPlay !== false) {
                           const p = video.play()
@@ -3253,12 +3503,15 @@ export default function Watch() {
               const mod = (await (hlsPreloadPromiseRef.current || import('hls.js')))
               Hls = mod?.default || mod
             } catch (e) {
+              if (buildIdRef.current === myBuildId) {
+                showToast('HLS engine failed to load — try another server.', { long: true })
+              }
               return
             }
                     if (!Hls.isSupported()) {
                       // last-resort native
                               try {
-                                video.preload = getNativeMediaBufferPolicy().preload
+                                video.preload = 'auto'
                                 video.src = proxiedH(url)
                         if (pendingHandoffRef.current?.shouldPlay !== false) video.play().catch(() => {})
                       } catch {}
@@ -3276,10 +3529,16 @@ export default function Watch() {
               // viewport-size cap. The quality menu owns this policy.
               capLevelToPlayerSize: false,
               minAutoBitrate: 0,
-              // Hold a substantial forward reserve for VOD playback. The
-              // policy scales down on constrained networks and remains bounded
-              // to let the browser's MediaSource eviction protect device RAM.
+              // No cache limit for forward or backward playback: the forward
+              // buffer may grow for the whole title and nothing behind the
+              // playhead is evicted, so every seek plays from cache instead
+              // of re-downloading. These unbounded values are applied AFTER
+              // the policy spread so they always win.
               ...bufferPolicy,
+              maxBufferLength: 21600,
+              maxMaxBufferLength: 21600,
+              maxBufferSize: 8 * 1024 * 1024 * 1024,
+              backBufferLength: Infinity,
               startFragPrefetch: true,
               lowLatencyMode: false,
               appendInSequenceGaps: true,
@@ -3375,6 +3634,9 @@ export default function Watch() {
                                                                 hlsTransportIndex += 1
                                                         try {
                                                                 mediaRetries = 0
+                                                                // Transport fallback runs completely in the
+                                                                // background — the viewer just sees playback
+                                                                // start, never a running commentary.
                                                                 hls.loadSource(hlsTransportPlan[hlsTransportIndex].url)
                                                                 return
                                                         } catch {}
@@ -3402,72 +3664,46 @@ export default function Watch() {
                         .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate)
               if (levels.length > 0 && art?.setting?.update) {
                 const auto = getQualityPresentation('auto')
-                        const hlsQualitySelection = createHlsQualitySelection(hls.currentLevel)
-                const dataSaver = getHlsDataSaverCap(levels)
-                let dataSaverCap = null
-                const adaptivePolicy = getAdaptiveBandwidthPolicy(netHintRef.current?.downlink, levels)
-                let adaptiveCap = adaptivePolicy.level?.index ?? null
-                let speedLimit = playerPreferencesRef.current.qualityMode || (adaptivePolicy.mode === 'bandwidth' ? 'adaptive' : 'auto')
+                // Real renditions from the manifest, highest first. The menu
+                // shows exactly what the source offers — no phantom options.
+                const renditionHeights = [...new Set(
+                  levels.map((level) => Number(level.height)).filter((height) => height > 0)
+                )].sort((a, b) => b - a)
                 let forcedLevel = null
-                const persistedQualityTarget = playerPreferencesRef.current.qualityTarget
-                let forcedQualityLabel = persistedQualityTarget ? `${persistedQualityTarget}P` : (adaptivePolicy.maxHeight === Infinity ? '1080P' : `${adaptivePolicy.maxHeight}P`)
-                const getLiveAdaptiveSpeedMbps = () => {
-                  const measured = Number(hls.bandwidthEstimate) / 1_000_000
-                  const browserHint = Number(netHintRef.current?.downlink)
-                  return Number.isFinite(measured) && measured > 0
-                    ? measured
-                    : Number.isFinite(browserHint) && browserHint > 0 ? browserHint : 0
-                }
-                const applyAdaptiveCap = () => {
-                  const adaptive = getAdaptiveBandwidthPolicy(getLiveAdaptiveSpeedMbps(), levels)
-                  adaptiveCap = adaptive.level?.index ?? null
-                  hls._anirakuAdaptiveCap = adaptiveCap
-                  hls.autoLevelCapping = adaptiveCap ?? -1
-                  hls.config.minAutoBitrate = 0
-                  hls.startLevel = -1
-                  hls.nextAutoLevel = -1
-                  hls.currentLevel = -1
-                  hls.nextLevel = -1
-                  return adaptive
-                }
-                hls._anirakuForcedLevel = null
-                hls._anirakuAdaptiveCap = adaptiveCap
-                if (persistedQualityTarget) {
-                  const persistedTargetLevel = selectLevelForQualityTarget(
-                    levels,
-                    persistedQualityTarget,
-                    FIXED_QUALITY_OPTIONS.find((option) => option.height === persistedQualityTarget)?.maxBitrate
-                  )
-                  adaptiveCap = persistedTargetLevel?.index ?? adaptiveCap
-                  hls._anirakuAdaptiveCap = adaptiveCap
-                  hls.autoLevelCapping = adaptiveCap ?? -1
-                  hls.currentLevel = -1
-                  hls.nextLevel = -1
-                } else if (speedLimit === 'adaptive' && adaptiveCap !== null) {
-                  hls.autoLevelCapping = adaptiveCap
+                let forcedQualityLabel = null
+                // Playback ALWAYS starts on the highest rendition. Only an
+                // explicit quality picked during this page session wins over
+                // that default — a pick stored by an older session never
+                // downgrades a fresh start. The pinned level is enforced, not
+                // merely capped, so the picture really plays the requested
+                // rendition.
+                const sessionQualityTarget = Number(sessionQualityTargetRef.current) || null
+                const startupLevel = sessionQualityTarget
+                  ? selectLevelForQualityTarget(levels, sessionQualityTarget)
+                  : levels[0]
+                if (startupLevel) {
+                  forcedLevel = startupLevel.index
+                  forcedQualityLabel = `${startupLevel.height}P`
+                  hls._anirakuForcedLevel = forcedLevel
+                  hls._anirakuAdaptiveCap = null
+                  hls.autoLevelCapping = -1
+                  hls.startLevel = forcedLevel
+                  hls.currentLevel = forcedLevel
+                  hls.nextLevel = forcedLevel
+                } else {
+                  hls._anirakuForcedLevel = null
+                  hls._anirakuAdaptiveCap = null
+                  hls.autoLevelCapping = -1
                 }
                 const getSpeedCappedDisplay = (level) => {
                   const selected = levels.find((candidate) => Number(candidate.index) === Number(level))
                   if (forcedQualityLabel) {
-                    return { label: forcedQualityLabel, title: getQualitySettingTitle({ label: forcedQualityLabel }) }
+                    return { label: forcedQualityLabel, title: 'Quality' }
                   }
-                  if (speedLimit === 'adaptive' && adaptiveCap !== null) {
-                    const cap = levels.find((candidate) => Number(candidate.index) === Number(adaptiveCap))
-                    const label = cap ? `Adaptive · ≤${getHlsLevelLabel(cap)} (${adaptivePolicy.speedMbps.toFixed(1)} Mbps)` : 'Adaptive bandwidth'
-                    return { label, title: getQualitySettingTitle({ label }) }
-                  }
-                  if (speedLimit === 'auto' && dataSaverCap === null) {
-                    const label = Number(level) === -1 ? 'Auto' : getHlsLevelLabel(selected)
-                    return { label, title: getQualitySettingTitle({ label }) }
-                  }
-                  if (speedLimit !== 'auto') {
-                    const cap = selectLevelForSpeed(levels, speedLimit)
-                    const label = cap ? `Auto · ≤${getHlsLevelLabel(cap)}` : 'Auto'
-                    return { label, title: getQualitySettingTitle({ label }) }
-                  }
-                  return getHlsQualitySettingDisplay(levels, level, dataSaverCap)
+                  const label = Number(level) === -1 ? 'Auto' : getHlsLevelLabel(selected)
+                  return { label, title: 'Quality' }
                 }
-                const syncHlsQualitySetting = (level = hlsQualitySelection.getSelectedLevel()) => {
+                const syncHlsQualitySetting = (level = hls.currentLevel) => {
                           const display = getSpeedCappedDisplay(level)
                           const qualitySetting = art.setting.find('quality')
                   if (qualitySetting) {
@@ -3493,57 +3729,53 @@ export default function Watch() {
                   const activeDisplay = getSpeedCappedDisplay(activeLevel)
                           return {
                             name: 'quality',
-                            width: 220,
+                            width: 232,
+                            icon: SETTING_ICON_TUNE,
                             html: activeDisplay.title,
                             tooltip: activeDisplay.label,
                             selector: [
                               {
-                        default: !forcedQualityLabel && activeLevel === -1 && dataSaverCap === null,
+                        default: !forcedQualityLabel && activeLevel === -1,
                         html: qualityOptionHtml(auto),
                                 value: 'auto',
                               },
-                      ...FIXED_QUALITY_OPTIONS.map((option) => ({
-                        default: dataSaverCap === null && forcedQualityLabel === option.label,
-                        html: qualityOptionHtml(getQualityPresentation(option.label)),
-                        value: `target:${option.height}`,
+                      ...renditionHeights.map((height) => ({
+                        default: forcedQualityLabel === `${height}P`,
+                        html: qualityOptionHtml(getHeightPresentation(height)),
+                        value: `target:${height}`,
                       })),
                             ],
                     onSelect: (item) => {
-                      if (item.value === 'saver' && dataSaver) {
-                                dataSaverCap = dataSaver.index
-                                hlsQualitySelection.selectLevel(-1)
-                                hls.autoLevelCapping = dataSaver.index
-                                hls.currentLevel = -1
-                                hls.nextLevel = -1
-                      } else {
-                        const targetHeight = String(item.value).startsWith('target:')
-                          ? Number(String(item.value).replace('target:', ''))
-                          : null
-                        const targetOption = FIXED_QUALITY_OPTIONS.find((option) => option.height === targetHeight)
-                        const selectedTarget = targetOption
-                          ? selectLevelForQualityTarget(levels, targetOption.height)
-                          : null
-                        const nextLevel = targetOption
-                          ? selectedTarget?.index ?? -1
-                          : item.value === 'auto' ? -1 : hlsQualitySelection.selectLevel(String(item.value).replace('level:', ''))
-                        dataSaverCap = null
-                        forcedQualityLabel = targetOption?.label || null
-                        playerPreferencesRef.current = {
-                          ...playerPreferencesRef.current,
-                          qualityMode: 'auto',
-                          qualityTarget: targetOption?.height || null,
-                        }
-                        persistPlayerPreferences(playerPreferencesRef.current)
-                        forcedLevel = item.value === 'auto' ? null : nextLevel
-                        hls._anirakuForcedLevel = forcedLevel
-                        hls._anirakuAdaptiveCap = null
-                        hls.autoLevelCapping = -1
-                        hls.startLevel = nextLevel
-                        hls.loadLevel = nextLevel
-                        hls.currentLevel = nextLevel
-                        hls.nextLevel = nextLevel
-                        hlsQualitySelection.selectLevel(nextLevel)
-                              }
+                      const targetHeight = String(item.value).startsWith('target:')
+                        ? Number(String(item.value).replace('target:', ''))
+                        : null
+                      const selectedTarget = targetHeight
+                        ? selectLevelForQualityTarget(levels, targetHeight)
+                        : null
+                      const nextLevel = selectedTarget ? selectedTarget.index : -1
+                      // Show (and pin) the rendition that actually resolves
+                      // from the manifest, so the label never lies about the
+                      // picture the viewer gets. The pick lives for this page
+                      // session; a fresh episode or reload starts on highest.
+                      forcedQualityLabel = targetHeight && selectedTarget ? `${selectedTarget.height}P` : null
+                      sessionQualityTargetRef.current = selectedTarget ? selectedTarget.height : null
+                      playerPreferencesRef.current = {
+                        ...playerPreferencesRef.current,
+                        qualityMode: 'auto',
+                        qualityTarget: selectedTarget ? selectedTarget.height : null,
+                      }
+                      persistPlayerPreferences(playerPreferencesRef.current)
+                      forcedLevel = targetHeight ? nextLevel : null
+                      hls._anirakuForcedLevel = forcedLevel
+                      hls._anirakuAdaptiveCap = null
+                      hls.autoLevelCapping = -1
+                      hls.startLevel = nextLevel
+                      hls.loadLevel = nextLevel
+                      // Assigning currentLevel makes hls.js switch to the
+                      // requested rendition immediately — the picture really
+                      // changes quality, not just the menu text.
+                      hls.currentLevel = nextLevel
+                      hls.nextLevel = nextLevel
                       const nextDisplay = syncHlsQualitySetting()
                       return nextDisplay.label
                             },
@@ -3672,6 +3904,7 @@ export default function Watch() {
         const mod = await import('artplayer')
         Artplayer = mod.default
       } catch (e) {
+        showToast('Player failed to load — check your connection.', { long: true })
         return
       }
 
@@ -3697,12 +3930,9 @@ export default function Watch() {
       const progressInner = art.video
         ?.closest('.art-video-player')
         ?.querySelector('.art-control-progress-inner')
-      bufferIndicatorCleanupRef.current = createBufferedTimelineIndicator(
+      bufferIndicatorCleanupRef.current = createFullBufferIndicator(
         art.video,
-        progressInner,
-        {
-          getRanges: () => kiwiFragmentRangesRef.current,
-        }
+        progressInner
       )
       timelineHoverCleanupRef.current = createTimelineHoverPreview(
         art.video,
@@ -4060,17 +4290,11 @@ export default function Watch() {
         return
       }
       // Fallback: accumulate wall-clock time when no real video time from postMessage
-      // Skip accumulation when tab is hidden to prevent fake time jumps
-      if (typeof document !== 'undefined' && document.hidden) {
-        embedLastTickRef.current = Date.now()
-        return
-      }
       const now = Date.now()
       const last = embedLastTickRef.current || now
       const delta = (now - last) / 1000
       embedLastTickRef.current = now
-      // Cap delta at 5s to prevent runaway jumps from throttled background timers
-      if (delta > 0 && delta < 5) {
+      if (delta > 0 && delta < 120) {
         embedAccumulatedRef.current += delta
       }
       const elapsed = Math.floor(embedAccumulatedRef.current)
@@ -4377,6 +4601,8 @@ export default function Watch() {
           if (embedFallback && !fallbackUsed) {
             fallbackUsed = true
             destroyPlayer()
+            // Silent handoff: the embed takes over in the background without
+            // a fallback narration toast.
             setActiveEmbedUrl(embedFallback.url)
             applySkipSegments(normalizeProviderSkipSegments(payload))
             setStreamLoading(false)
@@ -4854,6 +5080,9 @@ export default function Watch() {
       }
       // New episode: kill the current player FIRST so the old video can
       // never keep playing, then load the stream for the new episode.
+      // A fresh episode also resets the in-session quality pick so playback
+      // always starts again on the highest available rendition.
+      sessionQualityTargetRef.current = null
       destroyPlayer()
       loadStreamRef.current(activeSource)
       return
@@ -6042,26 +6271,9 @@ export default function Watch() {
               className="watch-nav"
               style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, minWidth: 0 }}
             >
-              {!isMovie && epNumber > 1 && (
-                <button
-                  type="button"
-                  onClick={goPrev}
-                  style={navBtnStyle}
-                  aria-label="Previous episode"
-                >
-                  <FaStepBackward /> Previous
-                </button>
-              )}
-              {!isMovie && epNumber < episodes.length && (
-                <button
-                  type="button"
-                  onClick={goNext}
-                  style={navBtnStyle}
-                  aria-label="Next episode"
-                >
-                  Next <FaStepForward />
-                </button>
-              )}
+              {/* Episode navigation lives inside the player controls
+                  (Previous / Next Episode buttons) — the page-level row only
+                  keeps the Anime Page link. */}
               {animeId && anime && (
                 <Link
                   to={`/anime/${generateSlug(
@@ -6282,23 +6494,28 @@ export default function Watch() {
         .watch-art-mount video {
           background: #000;
         }
-        /* Subtitle text overflow fix — long tokens wrap inside the box */
-        .watch-art-mount .art-subtitle,
-        .watch-art-mount .artplayer-subtitle {
-          word-break: break-word !important;
-          overflow-wrap: anywhere !important;
-          white-space: pre-wrap !important;
+        /* ── Player typography ────────────────────────────
+           One crisp UI font stack for every layer (controls, tooltips,
+           settings), with subpixel smoothing and tabular values so
+           timestamps and quality numbers never jitter. */
+        .watch-art-mount .art-video-player {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter,
+            'Helvetica Neue', Arial, sans-serif;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+          font-variant-numeric: tabular-nums;
         }
-        .watch-art-mount .art-subtitle .art-subtitle-line,
-        .watch-art-mount .artplayer-subtitle .art-subtitle-line {
-          word-break: break-word !important;
-          overflow-wrap: anywhere !important;
-          white-space: pre-wrap !important;
+        /* Compact control bar: tighter height + icon box than ArtPlayer's
+           roomy defaults so nothing feels oversized. */
+        .watch-art-mount .art-video-player {
+          --art-control-height: 42px;
+          --art-control-icon-size: 28px;
         }
         /* Quality selector: make the current mode obvious and give every
            option a compact resolution badge instead of a raw source label. */
         .watch-art-mount .art-controls-quality {
-          min-width: 78px;
+          min-width: 66px;
         }
         .watch-art-mount .art-controls-quality .art-selector-value,
         .watch-art-mount .art-controls-quality .art-selector-item {
@@ -6324,16 +6541,16 @@ export default function Watch() {
           text-transform: uppercase;
         }
         .watch-art-mount .art-selector-list {
-          min-width: 170px;
-          padding: 6px;
-          border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 10px;
+          min-width: 158px;
+          padding: 5px;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 9px;
           background: rgba(10, 14, 24, 0.96);
           box-shadow: 0 12px 30px rgba(0,0,0,0.42);
         }
         .watch-art-mount .art-selector-item {
-          border-radius: 7px;
-          padding: 8px 10px;
+          border-radius: 6px;
+          padding: 6px 9px;
           transition: background 160ms ease, color 160ms ease;
         }
         .watch-art-mount .art-selector-item:hover,
@@ -6344,24 +6561,34 @@ export default function Watch() {
         .watch-art-mount .art-selector-item.art-current .watch-quality-badge {
           color: #cbd5e1;
         }
-        /* Responsive settings menu. ArtPlayer's default settings layer can
-           grow beyond the video on phones and can clip nested selectors on
-           desktop when a long label or many options are present. Keep the
-           outer layer inside the player, then make every option panel a real
-           touch/mouse-scroll container. */
+        /* ── Settings panel: compact + organized ────────────────────────
+           One shared grid for every menu and sub-menu: a fixed 16px icon
+           column, single-line labels, right-aligned gray values and a
+           uniform 31px row height with even 1px down-spacing. The panel
+           shrink-wraps its rows (no stretched half-empty box), stays
+           inside the player, and only scrolls when a menu truly needs it. */
         .watch-art-mount .art-video-player {
-          --art-settings-max-height: min(68dvh, 360px);
-          --art-selector-max-height: min(62dvh, 320px);
+          --art-settings-max-height: min(64dvh, 336px);
+          --art-selector-max-height: min(58dvh, 300px);
+          --art-settings-icon-size: 16px;
         }
         .watch-art-mount .art-settings {
           box-sizing: border-box;
-          width: min(250px, calc(100% - 16px)) !important;
+          width: min(232px, calc(100% - 16px)) !important;
           max-width: calc(100% - 16px) !important;
-          height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
+          /* Shrink-wrap: exactly as tall as the rows it shows — never a
+             fixed-height panel with dead space at the bottom. */
+          height: auto !important;
           max-height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
           min-height: 0 !important;
           overflow: hidden !important;
           overscroll-behavior: contain;
+          background: rgba(13, 14, 18, 0.97) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 10px !important;
+          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+          padding: 4px !important;
+          font-size: 12.5px;
         }
         .watch-art-mount .art-settings,
         .watch-art-mount .art-settings * {
@@ -6379,97 +6606,245 @@ export default function Watch() {
           overscroll-behavior: contain;
           -webkit-overflow-scrolling: touch;
           scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.34) transparent;
+          scrollbar-color: rgba(255,255,255,0.32) transparent;
+          padding: 0;
         }
         .watch-art-mount .art-setting-panel::-webkit-scrollbar,
         .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar {
-          width: 6px;
+          width: 5px;
         }
         .watch-art-mount .art-setting-panel::-webkit-scrollbar-thumb,
         .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar-thumb {
           border-radius: 999px;
-          background: rgba(255,255,255,0.34);
-        }
-        .watch-art-mount .art-setting-item,
-        .watch-art-mount .art-setting-item-left,
-        .watch-art-mount .art-setting-item-right,
-        .watch-art-mount .art-selector-item {
-          min-width: 0 !important;
-          max-width: 100%;
-          white-space: normal;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-        .watch-art-mount .art-setting-item {
-          min-height: 35px;
-          height: auto;
+          background: rgba(255,255,255,0.32);
         }
         .watch-art-mount .art-setting-item-left,
         .watch-art-mount .art-setting-item-right {
           overflow: hidden;
-        }
-        .watch-art-mount .art-setting-item-left {
-          flex: 1 1 auto;
-        }
-        .watch-art-mount .art-setting-item-right {
-          flex: 0 1 auto;
-          text-align: right;
         }
         .watch-art-mount .art-selector-list {
           width: 100%;
           min-width: 0 !important;
         }
-        .watch-art-mount .art-selector-item {
-          display: flex;
+        /* One row grid for main options, sub-options, sliders and toggles:
+           identical height, padding, radius and down-space everywhere, so
+           nothing sits a little in front or a little behind. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item {
+          height: 31px !important;
+          min-height: 31px !important;
+          border-radius: 6px;
+          padding: 0 9px !important;
+          margin-block: 1px;
+          gap: 0;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+        }
+        /* Fixed icon column — every label starts on the same x-line.
+           !important matters here: ArtPlayer's runtime stylesheet ships the
+           same selectors with more specificity and would re-center or
+           resize the columns back to its defaults. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left {
+          flex: 1 1 auto !important;
+          min-width: 0;
+          justify-content: flex-start !important;
+          gap: 0 !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon {
+          flex: 0 0 16px !important;
+          width: 16px !important;
+          height: 16px !important;
+          margin-right: 8px !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-text {
+          font-size: 12.5px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        /* Value column: quiet gray, right-aligned, one consistent rhythm. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right {
+          flex: 0 0 auto !important;
+          min-width: 0;
+          justify-content: flex-end !important;
+          gap: 0 !important;
+          font-size: 11.5px !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-tooltip {
+          color: #8f97a3 !important;
+          font-size: 11.5px !important;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 92px;
+          padding-left: 8px;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon {
+          min-width: 18px !important;
+          height: 20px !important;
+          padding-left: 4px;
+        }
+        /* Built-in arrows / checks sized to the compact grid. */
+        .watch-art-mount .art-settings .art-icon {
+          display: inline-flex;
           align-items: center;
-          gap: 8px;
+          justify-content: center;
+          opacity: 0.92;
+        }
+        .watch-art-mount .art-settings .art-icon svg {
           width: 100%;
-          min-height: 35px;
-          height: auto;
-          padding: 8px 10px;
+          height: 100%;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon .art-icon,
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon .art-icon {
+          width: 15px;
+          height: 15px;
+        }
+        /* Selector leaves keep a reserved check gutter; the current row's
+           check turns visible and the row takes the accent color. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-icon-check {
+          visibility: hidden;
+          width: 14px !important;
+          height: 14px !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-icon-check {
+          visibility: visible;
+          fill: var(--art-theme, #648FFC);
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-setting-item-left-text {
+          color: var(--art-theme, #648FFC);
+        }
+        /* Toggle switches: slimmer pill matched to the 31px row. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon svg.icon {
+          width: auto !important;
+          height: 13px !important;
+          max-width: 26px;
+        }
+        /* Back row: same grid, slightly taller, hairline separated. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item-back {
+          height: 34px !important;
+          min-height: 34px !important;
+          margin-block: 1px 3px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item-back .art-setting-item-left-text {
+          font-size: 12.5px;
+          font-weight: 600;
+        }
+        /* Range rows: slim track, round theme thumb; value stays readable
+           next to the slider without widening the row. Full selector chain
+           + !important outranks ArtPlayer's 80px default. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-range {
+          width: 68px !important;
+          height: 3px !important;
+          border-radius: 999px;
+          background-color: rgba(255, 255, 255, 0.22);
+          outline: none;
+          appearance: none;
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .watch-art-mount .art-setting-range::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          border: none;
+          background: var(--art-theme, #648FFC);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+          cursor: pointer;
+        }
+        .watch-art-mount .art-setting-range::-moz-range-thumb {
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          border: none;
+          background: var(--art-theme, #648FFC);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+          cursor: pointer;
+        }
+        .watch-art-mount .art-setting-item-right-icon svg {
+          fill: currentColor;
+        }
+        /* Text safety without breaking the row grid. */
+        .watch-art-mount .art-setting-item,
+        .watch-art-mount .art-selector-item {
+          min-width: 0 !important;
+          max-width: 100%;
         }
         .watch-art-mount .art-selector-item > * {
           min-width: 0;
           max-width: 100%;
         }
-        .watch-art-mount .art-setting-item-right-tooltip,
         .watch-art-mount .art-selector-value {
           max-width: 100%;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: normal;
-          overflow-wrap: anywhere;
         }
-        .watch-art-mount .art-control-seekBackward10,
-        .watch-art-mount .art-control-seekForward10 {
+        /* Control tooltips: smaller, sharper, faster to read. */
+        .watch-art-mount .art-video-player .art-tooltip {
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          padding: 5px 8px;
+          border-radius: 6px;
+          background: rgba(10, 12, 18, 0.95);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+          white-space: nowrap;
+          pointer-events: none;
+        }
+        .watch-art-mount .art-control-seekBackward15,
+        .watch-art-mount .art-control-seekForward15,
+        .watch-art-mount .art-control-prevEpisode,
+        .watch-art-mount .art-control-nextEpisode,
+        .watch-art-mount .art-control-chromecast {
           color: #e2e8f0;
-          opacity: 0.82;
+          opacity: 0.86;
+          border-radius: 7px;
           transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
         }
-        .watch-art-mount .art-control-seekBackward10:hover,
-        .watch-art-mount .art-control-seekForward10:hover {
+        .watch-art-mount .art-control-seekBackward15:hover,
+        .watch-art-mount .art-control-seekForward15:hover,
+        .watch-art-mount .art-control-prevEpisode:hover,
+        .watch-art-mount .art-control-nextEpisode:hover,
+        .watch-art-mount .art-control-chromecast:hover {
           opacity: 1;
           background: rgba(255,255,255,0.1);
         }
-        .watch-art-mount .art-control-seekBackward10:active,
-        .watch-art-mount .art-control-seekForward10:active {
+        .watch-art-mount .art-control-seekBackward15:active,
+        .watch-art-mount .art-control-seekForward15:active,
+        .watch-art-mount .art-control-prevEpisode:active,
+        .watch-art-mount .art-control-nextEpisode:active,
+        .watch-art-mount .art-control-chromecast:active {
           transform: scale(0.94);
+        }
+        .watch-art-mount .art-control-prevEpisode .watch-art-prev-icon,
+        .watch-art-mount .art-control-nextEpisode .watch-art-next-icon,
+        .watch-art-mount .art-control-chromecast .watch-art-cast-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
         .watch-art-seek-icon {
           display: inline-flex;
           align-items: center;
           justify-content: center;
           position: relative;
-          width: 36px;
-          height: 36px;
+          width: 32px;
+          height: 32px;
           line-height: 1;
           pointer-events: none;
         }
         .watch-art-seek-icon svg {
           position: absolute;
           inset: 1px;
-          width: 34px;
-          height: 34px;
+          width: 30px;
+          height: 30px;
         }
         .watch-art-seek-icon text {
           pointer-events: none;
@@ -6490,25 +6865,32 @@ export default function Watch() {
         .watch-art-mount .art-video-player .art-controls-right {
           min-width: 0;
           margin-inline: 0;
+          /* Even breathing room between every control — the icon clusters
+             on both ends of the bar previously sat flush against each other. */
+          column-gap: 7px;
         }
         .watch-art-mount .art-video-player .art-controls .art-control {
           min-width: 0;
           flex: 0 0 auto;
         }
-        .watch-art-mount .art-video-player .art-control-seekBackward10,
-        .watch-art-mount .art-video-player .art-control-seekForward10 {
-          width: 38px !important;
-          min-width: 38px !important;
+        .watch-art-mount .art-video-player .art-control-seekBackward15,
+        .watch-art-mount .art-video-player .art-control-seekForward15,
+        .watch-art-mount .art-video-player .art-control-prevEpisode,
+        .watch-art-mount .art-video-player .art-control-nextEpisode,
+        .watch-art-mount .art-video-player .art-control-chromecast {
+          width: 36px !important;
+          min-width: 36px !important;
           margin-inline: 0 !important;
           padding-inline: 0 !important;
         }
         .watch-art-mount .art-video-player .art-controls-quality {
-          min-width: 64px;
+          min-width: 58px;
         }
-        /* A YouTube-like downloaded-range cue, clipped to the intended
-           120-second cache window. It sits behind ArtPlayer's red played line
-           and thumb, never captures input, and keeps the Nothing-style signal
-           red reserved for the actual playback position. */
+        /* A YouTube-like downloaded-range cue that draws EVERY cached range —
+           forward and behind the playhead — because the cache itself has no
+           limit. It sits behind ArtPlayer's red played line and thumb, never
+           captures input, and keeps the Nothing-style signal red reserved
+           for the actual playback position. */
         .watch-art-mount .art-control-progress-inner {
           overflow: hidden;
         }
@@ -6611,19 +6993,24 @@ export default function Watch() {
                     white-space: nowrap;
                   }
           .watch-art-mount .art-video-player {
-            --art-control-height: 42px;
-            --art-control-icon-size: 28px;
+            --art-control-height: 40px;
+            --art-control-icon-size: 26px;
             --art-padding: 8px;
-            --art-settings-max-height: min(78dvh, 420px);
-            --art-selector-max-height: min(68dvh, 320px);
+            --art-settings-max-height: min(76dvh, 400px);
+            --art-selector-max-height: min(66dvh, 320px);
           }
           .watch-art-mount .art-video-player .art-controls {
             padding-inline: 2px;
           }
+          .watch-art-mount .art-video-player .art-controls-left,
+          .watch-art-mount .art-video-player .art-controls-right {
+            column-gap: 4px;
+          }
           .watch-art-mount .art-settings {
-            width: min(250px, calc(100vw - 16px)) !important;
+            width: min(232px, calc(100vw - 16px)) !important;
             max-width: calc(100vw - 16px) !important;
-            height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
+            /* Same shrink-wrap behavior as desktop: rows define the height. */
+            height: auto !important;
             max-height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
             right: 8px !important;
             bottom: 44px !important;
@@ -6645,13 +7032,13 @@ export default function Watch() {
             height: 26px;
           }
           .watch-art-mount .art-video-player .art-controls-quality {
-            width: 60px;
-            min-width: 60px;
+            width: 56px;
+            min-width: 56px;
           }
-          .watch-art-mount .art-video-player .art-control-seekBackward10,
-          .watch-art-mount .art-video-player .art-control-seekForward10 {
-            width: 36px !important;
-            min-width: 36px !important;
+          .watch-art-mount .art-video-player .art-control-seekBackward15,
+          .watch-art-mount .art-video-player .art-control-seekForward15 {
+            width: 34px !important;
+            min-width: 34px !important;
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -6748,6 +7135,10 @@ export default function Watch() {
           .watch-art-mount .art-video-player .art-controls {
             padding-inline: 0;
           }
+          .watch-art-mount .art-video-player .art-controls-left,
+          .watch-art-mount .art-video-player .art-controls-right {
+            column-gap: 3px;
+          }
           .watch-art-mount .art-video-player .art-controls .art-control {
             width: 32px;
             padding-inline: 1px;
@@ -6768,28 +7159,28 @@ export default function Watch() {
             display: none !important;
           }
         }
-        /* Settings panel: never exceed the player or viewport. */
+        /* Settings panel: never exceed the player or viewport. These are the
+           final safety caps — kept in sync with the compact 232px grid so
+           the inner panel can never be wider than the box that clips it. */
         .watch-art-mount .art-settings,
-        .watch-art-mount .art-setting-panel,
-        .watch-art-mount .art-settings .art-settings-build,
-        .watch-art-mount .art-setting-selector {
+        .watch-art-mount .art-setting-panel {
           box-sizing: border-box !important;
-          max-width: min(280px, calc(100vw - 16px), 100%) !important;
+          max-width: min(232px, calc(100vw - 16px), 100%) !important;
         }
         .watch-art-mount .art-settings {
-          max-height: min(78vh, 420px) !important;
-          max-height: min(78dvh, 420px) !important;
+          max-height: min(76vh, 400px) !important;
+          max-height: min(76dvh, 400px) !important;
           overflow: hidden !important;
         }
         .watch-art-mount .art-setting-panel {
-          width: min(280px, calc(100vw - 16px), 100%) !important;
-          max-height: min(78vh, 420px) !important;
-          max-height: min(78dvh, 420px) !important;
+          width: 100% !important;
+          max-height: min(76vh, 400px) !important;
+          max-height: min(76dvh, 400px) !important;
           overflow: hidden auto !important;
           overscroll-behavior: contain;
         }
         .watch-art-mount .art-setting-panel .art-setting-item {
-          min-height: 36px !important;
+          min-height: 31px !important;
           width: 100% !important;
           min-width: 0 !important;
           overflow: hidden !important;
@@ -6806,21 +7197,11 @@ export default function Watch() {
           text-overflow: ellipsis !important;
           white-space: nowrap !important;
         }
-        .watch-art-mount .art-setting-panel .art-setting-selector {
-          width: 100% !important;
-          max-height: min(48vh, 240px) !important;
-          max-height: min(48dvh, 240px) !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-          overscroll-behavior: contain;
-        }
         @media (max-width: 480px) {
           .watch-art-mount .art-settings,
-          .watch-art-mount .art-setting-panel,
-          .watch-art-mount .art-settings .art-settings-build {
-            width: min(240px, calc(100vw - 12px), 100%) !important;
-            max-width: min(240px, calc(100vw - 12px), 100%) !important;
-            font-size: 12px !important;
+          .watch-art-mount .art-setting-panel {
+            width: min(232px, calc(100vw - 12px), 100%) !important;
+            max-width: min(232px, calc(100vw - 12px), 100%) !important;
           }
           .watch-art-mount .art-setting-panel .art-setting-item {
             padding-inline: 8px !important;
@@ -6840,10 +7221,7 @@ export default function Watch() {
         }
         @media (max-width: 768px) {
           .watch-art-mount .art-setting-panel {
-            max-width: min(240px, calc(100vw - 16px)) !important;
-          }
-          .watch-art-mount .art-settings .art-settings-build {
-            max-width: min(240px, calc(100vw - 16px)) !important;
+            max-width: min(232px, calc(100vw - 16px)) !important;
           }
           .watch-art-mount .art-video-player .art-control-download {
             width: 36px !important;
