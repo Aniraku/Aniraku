@@ -7046,6 +7046,19 @@ export default function Watch() {
           .watch-art-mount .art-video-player .art-controls-left .art-control-time {
             display: none !important;
           }
+          /* Narrow screens: the full desktop control set physically cannot
+             fit next to the progress bar — at 360px the left and right
+             groups overlapped by ~50px and icons stacked on top of each
+             other. Keep the essential transport plus settings and
+             fullscreen; phones adjust volume with hardware keys, and
+             PiP / Cast / web-fullscreen are unreliable or redundant on
+             touch devices. */
+          .watch-art-mount .art-video-player .art-control-volume,
+          .watch-art-mount .art-video-player .art-control-chromecast,
+          .watch-art-mount .art-video-player .art-control-pip,
+          .watch-art-mount .art-video-player .art-control-fullscreenWeb {
+            display: none !important;
+          }
           .watch-nav button { flex: 1 1 auto; min-width: 0; font-size: 12px; padding: 8px 12px; }
           .watch-rating {
             gap: 6px !important;
@@ -7159,23 +7172,26 @@ export default function Watch() {
             display: none !important;
           }
         }
-        /* Settings panel: never exceed the player or viewport. These are the
-           final safety caps — kept in sync with the compact 232px grid so
-           the inner panel can never be wider than the box that clips it. */
+        /* Settings panel: never exceed the PLAYER. These are the final safety
+           caps — kept in sync with the compact 232px grid so the inner panel
+           can never be wider than the box that clips it.
+           The height caps are player-relative on purpose: a portrait phone's
+           inline player is only ~200px tall, and a viewport cap (76dvh ≈
+           400px) let the panel grow way past the video and get clipped at
+           the player's top edge. In fullscreen the player IS the viewport,
+           so calc(100% - …) stays correct there too. */
         .watch-art-mount .art-settings,
         .watch-art-mount .art-setting-panel {
           box-sizing: border-box !important;
           max-width: min(232px, calc(100vw - 16px), 100%) !important;
         }
         .watch-art-mount .art-settings {
-          max-height: min(76vh, 400px) !important;
-          max-height: min(76dvh, 400px) !important;
+          max-height: min(400px, calc(100% - 52px)) !important;
           overflow: hidden !important;
         }
         .watch-art-mount .art-setting-panel {
           width: 100% !important;
-          max-height: min(76vh, 400px) !important;
-          max-height: min(76dvh, 400px) !important;
+          max-height: min(400px, calc(100% - 52px)) !important;
           overflow: hidden auto !important;
           overscroll-behavior: contain;
         }
@@ -7210,8 +7226,9 @@ export default function Watch() {
         @media (max-height: 520px) {
           .watch-art-mount .art-settings,
           .watch-art-mount .art-setting-panel {
-            max-height: min(70vh, 300px) !important;
-            max-height: min(70dvh, 300px) !important;
+            /* Player-relative for the same reason as above: landscape phones
+               keep the whole menu inside the video frame. */
+            max-height: min(300px, calc(100% - 48px)) !important;
           }
         }
         /* Download control in bottom bar */
