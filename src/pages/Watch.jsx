@@ -59,6 +59,7 @@ import {
   shouldPreferNativeHls,
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
+import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
 import {
@@ -72,7 +73,6 @@ import {
   PROVIDER_DISCOVERY_RETRY_DELAYS_MS,
   mergeProviderServers,
 } from '../lib/watchProviderDiscovery'
-import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
 
 // ────────────────────────────────────────────────────────────────
 // Constants
@@ -868,6 +868,30 @@ function hasAnyStreamSource(payload) {
   return Array.isArray(payload?.sources) && payload.sources.some((source) => source?.url)
 }
 
+// Provider payloads frequently wrap media in their backend's proxy shape:
+//   https://<origin>/proxy?url=<encodeURIComponent(cdn-url)>&headers=<json>
+// Unwrapping yields the inner CDN URL plus the exact upstream headers the
+// provider attached, so the app can also try the inner CDN through its own
+// proxy (headers re-attached server-side) or straight from the viewer's
+// browser — routes that still work when the payload's upstream proxy is
+// firewall-blocked by the CDN.
+function unwrapProxyShapedStreamUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''))
+    if (!/\/proxy\/?$/.test(parsed.pathname)) return null
+    const inner = parsed.searchParams.get('url')
+    if (!inner || !/^https?:\/\//i.test(inner)) return null
+    let headers = null
+    const rawHeaders = parsed.searchParams.get('headers')
+    if (rawHeaders) {
+      try { headers = JSON.parse(rawHeaders) } catch { headers = null }
+    }
+    return { innerUrl: inner, headers }
+  } catch {
+    return null
+  }
+}
+
 function seekControlHtml(direction) {
   // Official Material Design "replay" / "forward" glyph geometry — the
   // arrowhead is part of the same filled path as the ring, so the icon
@@ -1478,6 +1502,9 @@ export default function Watch() {
   const skipQuietProviderReloadRef = useRef(null)
   const lastBlockCycleRef = useRef(0)
   const handleProviderBlockedRef = useRef(null)
+  // Per-episode memory of servers the auto-fallback already tried, so the
+  // blocked-provider sweep always terminates.
+  const autoFallbackTriedRef = useRef({ key: '', tried: [] })
   // Quality chosen DURING this page session only. Playback always starts on
   // the highest rendition; an explicit in-session pick is honored across
   // player rebuilds until the episode (or a page reload) resets it.
@@ -2736,8 +2763,15 @@ export default function Watch() {
       if (!container) return
 
       const myBuildId = ++buildIdRef.current
-      const headersParam = headers
-        ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
+      // Provider payloads deliver media through their backend's proxy shape
+      // (<origin>/proxy?url=<cdn>&headers=<json>). Unwrap ONCE at the
+      // playback entry: when that upstream proxy is firewall-blocked by the
+      // CDN, the inner CDN can still be reached through our own proxy
+      // (headers re-attached server-side) or straight from the browser.
+      const proxyShapedSource = unwrapProxyShapedStreamUrl(streamUrl)
+      const effectiveHeaders = headers || proxyShapedSource?.headers || null
+      const headersParam = effectiveHeaders
+        ? `&headers=${encodeURIComponent(JSON.stringify(effectiveHeaders))}`
         : ''
       // Per-build nonce: every playback session gets fresh proxy URLs, so
       // stale edge-cache variants can never be served to the browser.
@@ -2763,6 +2797,12 @@ export default function Watch() {
         }
         prewarm(proxied(streamUrl), 'cors')
         prewarm(streamUrl, 'no-cors')
+        if (proxyShapedSource?.innerUrl && proxyShapedSource.innerUrl !== streamUrl) {
+          // Heat the unwrapped legs too — the inner CDN is the only route
+          // that can work when the payload's upstream proxy is blocked.
+          prewarm(proxied(proxyShapedSource.innerUrl), 'cors')
+          prewarm(proxyShapedSource.innerUrl, 'no-cors')
+        }
       }
               // hls.js pre-warm: the dynamic import is the single biggest
               // startup cost on the HLS path (parser compile + ~120KB of JS).
@@ -2792,21 +2832,23 @@ export default function Watch() {
                 document.addEventListener('securitypolicyviolation', onPolicyViolation)
                 cspViolationCleanupRef.current = () => document.removeEventListener('securitypolicyviolation', onPolicyViolation)
               }
-                        const activeQuality = Array.isArray(qualityList)
-                                ? qualityList.find((quality) => quality?.url === streamUrl)
-                                : null
-                              const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
+      const activeQuality = Array.isArray(qualityList)
+        ? qualityList.find((quality) => quality?.url === streamUrl)
+        : null
+      const sourceVerification = String(activeQuality?.verification || '').trim().toLowerCase()
       const selectedSource = [...SOURCES.sub, ...SOURCES.dub].find(
         (candidate) => candidate.id === activeSource
       )
       const transportOverride = getProviderTransportOverride(selectedSource)
       const bonkProxyOnly = Boolean(transportOverride?.proxyOnly)
       const peweDirectPreferred = Boolean(transportOverride?.directPreferred)
-      // Legacy playback path: proxy first for every provider, with one bounded
-      // direct fallback. Bonk remains proxy-only under its provider rule.
-      // Pewe prefers direct/native playback without embed fallback.
-      // Per-provider transport overrides are resolved through
-      // `getProviderTransportOverride`.
+      // Legacy playback path — the provider-verified working method: proxy
+      // first for every provider, with one bounded direct fallback. Bonk
+      // remains proxy-only under its provider rule. Pewe prefers
+      // direct/native playback without embed fallback. Per-provider
+      // transport overrides are resolved through getProviderTransportOverride,
+      // and the plan honors each source's verification flag — the same
+      // createMediaTransportPlan call the project shipped with.
 
       // This covers MP4, WebM, Ogg, MPEG and extensionless URLs whose
       // Content-Type is a format the browser can decode.
@@ -2818,6 +2860,14 @@ export default function Watch() {
         proxyOnly: bonkProxyOnly,
         directPreferred: peweDirectPreferred,
       })
+                if (proxyShapedSource?.innerUrl && proxyShapedSource.innerUrl !== url) {
+                  // The payload URL routes through the provider's backend
+                  // proxy. If that upstream is blocked, the inner CDN is the
+                  // fallback: through our own proxy (headers re-attached
+                  // server-side) or straight from the viewer's browser.
+                  transportPlan.push({ url: proxied(proxyShapedSource.innerUrl), mode: 'proxy' })
+                  transportPlan.push({ url: proxyShapedSource.innerUrl, mode: 'direct' })
+                }
                 let transportIndex = 0
                 let hlsTried = false
         const tryUrl = (target, withCors) => {
@@ -2899,7 +2949,6 @@ export default function Watch() {
                     return
                   }
           if (shouldTryHlsFallback(url) && await tryHls()) return
-                  showToast('Playback failed.', { long: true })
           if (onBlocked) onBlocked('native-media-error')
           else setError('Playback failed.')
         }
@@ -3396,6 +3445,14 @@ export default function Watch() {
                                         proxyUrl: proxiedH(url),
                                         directPreferred: peweDirectPreferred,
                                 })
+                                if (proxyShapedSource?.innerUrl && proxyShapedSource.innerUrl !== url) {
+                                  // Same chain as everywhere else: if the
+                                  // payload's upstream proxy is blocked, try
+                                  // the inner CDN via our own proxy, then
+                                  // straight from the browser.
+                                  hlsTransportPlan.push({ url: proxiedH(proxyShapedSource.innerUrl), mode: 'proxy' })
+                                  hlsTransportPlan.push({ url: proxyShapedSource.innerUrl, mode: 'direct' })
+                                }
                                 let hlsTransportIndex = 0
                           const updateNativeHlsQualities = async () => {
                             try {
@@ -3482,24 +3539,54 @@ export default function Watch() {
             // recovery avoid falling through to an expired embed page.
             // engineHint === 'mse' skips the native branch so a user-pinned
             // rendition can be forced through hls.js level control.
+            const startNativeHlsAttempt = () => {
+              video.preload = 'auto'
+              video.src = hlsTransportPlan[hlsTransportIndex].url
+              if (pendingHandoffRef.current?.shouldPlay !== false) {
+                const p = video.play()
+                if (p && typeof p.catch === 'function') p.catch(() => {})
+              }
+              void updateNativeHlsQualities()
+            }
             if (engineHint !== 'mse' && shouldPreferNativeHls(url) && video.canPlayType('application/vnd.apple.mpegurl')) {
-                              try {
-                                video.preload = 'auto'
-                                video.src = hlsTransportPlan[hlsTransportIndex].url
-                        if (pendingHandoffRef.current?.shouldPlay !== false) {
-                          const p = video.play()
-                          if (p && typeof p.catch === 'function') p.catch(() => {})
-                        }
-                      void updateNativeHlsQualities()
+              // Proxy manifest first, then direct — the same chain as every
+              // other path. A media-level failure (403/404/expired link)
+              // fires a video error; advancing the transport plan here used
+              // to be missing entirely, which left native-HLS providers
+              // stuck on a dead proxied manifest with no direct attempt.
+              video.onerror = () => {
+                if (buildIdRef.current !== myBuildId) return
+                if (hlsTransportIndex + 1 < hlsTransportPlan.length) {
+                  hlsTransportIndex += 1
+                  try {
+                    startNativeHlsAttempt()
+                  } catch {
+                    video.onerror = null
+                    void startHlsJsEngine()
+                  }
+                  return
+                }
+                // Both transports failed at the media level — continue the
+                // chain through the hls.js engine, whose terminal errors
+                // hand off to the same-provider embed.
+                void startHlsJsEngine()
+              }
+              try {
+                startNativeHlsAttempt()
               } catch {
-                // fall through to hls.js
+                video.onerror = null
+                await startHlsJsEngine()
               }
               return
             }
+            // The hls.js (MSE) engine — extracted so the native-HLS branch
+            // can fall through to it when the proxy/direct transport chain
+            // is exhausted. Its own terminal errors hand off to the
+            // same-provider embed through onBlocked.
+            const startHlsJsEngine = async () => {
+            video.onerror = null
             let Hls
             try {
-              // Reuse the warm import kicked off in buildPlayer; fall back
-              // to a fresh import if the pre-warm never started or failed.
               const mod = (await (hlsPreloadPromiseRef.current || import('hls.js')))
               Hls = mod?.default || mod
             } catch (e) {
@@ -3880,6 +3967,8 @@ export default function Watch() {
             } catch {
               fail('backend')
             }
+            }
+            await startHlsJsEngine()
           },
         },
       }
@@ -4491,6 +4580,11 @@ export default function Watch() {
             // the real player still owns all transport and fallback decisions.
             fetch(proxyUrl, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
             fetch(mediaEntry.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
+            const warmInner = unwrapProxyShapedStreamUrl(mediaEntry.url)
+            if (warmInner?.innerUrl && warmInner.innerUrl !== mediaEntry.url) {
+              fetch(`${PROXY_BASE}/proxy?url=${encodeURIComponent(warmInner.innerUrl)}${headersParam}&rn=${warmNonce}`, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
+              fetch(warmInner.innerUrl, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
+            }
           }
         }
         return hasAnyStreamSource(data) ? data : null
@@ -5030,14 +5124,56 @@ export default function Watch() {
   const loadStreamRef = useRef(loadStream)
   loadStreamRef.current = loadStream
 
-          // A playback issue never changes the selected provider. The visible server
-          // controls remain the only way to select another provider.
+          // The visible server controls remain the source of truth for the
+          // selection, but when the SAME provider is hard-blocked — every
+          // transport leg exhausted and it ships no embed of its own —
+          // playback must still start: continue on the next source that
+          // actually has playable content (usually an embed-capable server).
+          // Each attempted server is remembered per episode, so the sweep
+          // always terminates instead of cycling forever.
           const handleProviderBlocked = useCallback((reason) => {
             const now = Date.now()
-            if (now - lastBlockCycleRef.current < 3_000) return
+            if (now - lastBlockCycleRef.current < 1_500) return
             lastBlockCycleRef.current = now
-            showToast('Playback failed.', { long: true })
-          }, [showToast])
+            const ordered = [...SOURCES.sub, ...SOURCES.dub]
+            const currentId = activeSourceRef.current || activeSource
+            const episodeKey = `${currentId}@${epNumber}`
+            if (autoFallbackTriedRef.current.key !== episodeKey) {
+              autoFallbackTriedRef.current = { key: episodeKey, tried: [currentId] }
+            }
+            const tried = autoFallbackTriedRef.current.tried
+            const blockedSource = ordered.find((s) => s.id === currentId)
+            const next = ordered.find((s) => {
+              if (tried.includes(s.id)) return false
+              if (!isBonkProvider(s) && !isPeweProvider(s)) {
+                if ((s.initialSources || []).some(isBrowserPlayableEmbedSource)) return true
+              }
+              return (s.initialSources || []).some((src) => getSourcePlaybackType(src) !== 'embed' && src?.url)
+            })
+            if (!next) {
+              showToast('Playback failed.', { long: true })
+              return
+            }
+            tried.push(next.id)
+            warmProviderStream(next.id)
+            // Mirror handleSourceSwitch's core so the server selector and the
+            // quiet-switch machinery stay consistent.
+            activeSourceRef.current = next.id
+            quietProviderSwitchRef.current = artInstance.current
+              ? beginQuietProviderSwitch({
+                  from: currentId,
+                  to: next.id,
+                  episode: epNumber,
+                  resumeAt: 0,
+                  shouldPlay: false,
+                })
+              : null
+            setActiveSource(next.id)
+            showToast(
+              `${blockedSource?.label || 'This server'} is blocked — continuing on ${next.label}.`,
+              { long: true, icon: 'warn' }
+            )
+          }, [showToast, SOURCES, activeSource, epNumber, warmProviderStream])
 
   handleProviderBlockedRef.current = handleProviderBlocked
 
