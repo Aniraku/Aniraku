@@ -2,7 +2,13 @@ const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
 const SITE = 'https://www.aniraku.tech'
 const FALLBACK_IMAGE = `${SITE}/og-image.png`
 
-const BOT_RE = /bot|crawler|spider|googlebot|bingbot|yandex|facebookexternalhit|twitterbot|whatsapp|linkedin|slack|telegram|discord|pinterest|slurp|duckduckbot|baiduspider|youtube|embedly|preview|headless|ia_archiver|applebot|facebook|twitter/i
+// Link-preview fetchers and crawlers only. Deliberately NOT matched: the
+// in-app browsers of Discord/WhatsApp/Telegram/Twitter etc. — their UAs
+// contain the same vendor tokens as the preview bots, but the sec-fetch-mode
+// check below tells real browsers (which always send it on navigations) from
+// fetchers (which never do), so in-app users get the full SPA while their
+// apps' link previews still get this shell.
+const BOT_RE = /bot|crawler|spider|googlebot|bingbot|yandex|facebookexternalhit|twitterbot|linkedin|slackbot|telegrambot|discordbot|whatsapp|pinterest|slurp|duckduckbot|baiduspider|embedly|headless|ia_archiver|applebot/i
 
 function escape(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\n/g, ' ')
@@ -111,6 +117,11 @@ export default async function middleware(request) {
     }
 
     const ua = request.headers.get('user-agent') || ''
+    // A top-level navigation with Sec-Fetch-Mode is a real browser (every
+    // Chromium/WebKit engine sends it — including in-app webviews). Never
+    // serve those the SEO shell.
+    const fetchMode = (request.headers.get('sec-fetch-mode') || '').toLowerCase()
+    if (fetchMode === 'navigate') return
     if (!BOT_RE.test(ua)) return
 
     // /anime/:slug-:id  (slug never contains "/" — this also guarantees a

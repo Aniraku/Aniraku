@@ -21,8 +21,14 @@ export function shouldShowManualSkipOverlay({
   currentTime,
   autoSkip,
   autoSkipFailed,
+  autoSkipHandled,
 }) {
   if (!isSkipPromptWindow(segment, currentTime)) return false
+  // While auto-skip is armed the prompt stays hidden ONLY until the automatic
+  // seek has actually happened for this pass. If the viewer seeks back into
+  // the segment afterwards (autoSkippedRef stays true), the manual button
+  // must come back — otherwise both skip paths are dead inside the window.
+  if (autoSkipHandled === true) return true
   return !autoSkip || autoSkipFailed === true
 }
 

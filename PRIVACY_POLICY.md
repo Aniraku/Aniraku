@@ -22,7 +22,7 @@ If you browse without an account, everything stays on your device (localStorage)
 
 ## What we don't
 
-- No analytics, no tracking cookies, no ad networks on our own pages.
+- No tracking cookies, no ad networks on our own pages. We do load Vercel Web Analytics and Speed Insights — they are cookieless and only record aggregate page views and page-load performance for this site. No cross-site tracking, no advertising profiles.
 - Your data isn't sold to anyone, shared with advertisers, or used to build profiles about you.
 - We don't track you across other websites.
 
@@ -35,7 +35,9 @@ If you browse without an account, everything stays on your device (localStorage)
 
 - **AniList** — we fetch anime metadata (titles, artwork, descriptions, relations, schedule) from their public GraphQL API. Your search terms and the titles you open are sent to them.
 - **Jikan / MyAnimeList** — used as a fallback for search results.
-- **Miruro (video hosts)** — video streams are resolved by our backend and played through a proxy, so the upstream hosts don't see your IP address. These third-party hosts may display ads inside their players.
+- **Streaming providers (Anikoto, FlixCloud and similar video hosts)** — video streams are resolved by our backend and are played through its proxy where possible, but some connections are made directly from your browser to the video CDN — in those cases the CDN operator can see your IP address. These third-party hosts may display ads inside their players.
+- **Giphy** — powers the GIF picker in comments. Searches are sent to Giphy's API.
+- **AniSkip** — receives the anime's MAL ID and episode number to fetch opening/ending skip timestamps.
 - **Supabase** — authentication and database. Your password never touches our servers.
 - **Vercel** — hosts the frontend.
 - **Render** — hosts the streaming backend. Like any web server, it records basic request metadata (IP address, user agent) in transient logs for rate limiting and abuse prevention; these are not used for tracking.

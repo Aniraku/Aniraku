@@ -109,71 +109,15 @@ export const filterAdult = (items, nsfwEnabled) => {
   return items.filter(item => !isNsfw(item))
 }
 
-// Most hentai on AniList has no Miruro stream — surface only what can play.
-// The backend probe actually resolves + reachability-verifies a real source,
-// so a "playable" result means the first episode really can stream. Results
-// are cached per anime so re-renders and repeated views cost nothing.
-// TTLs: a positive probe stays trusted for 30m (streams rarely vanish), but
-// a negative one only 5m — negatives usually mean Miruro was momentarily
-// down (Cloudflare challenge, 502), so hentai listings must recover quickly
-// instead of hiding titles off one bad probe.
-const streamCache = new Map() // id -> { promise, playable, at }
-const STREAM_TTL_PLAYABLE = 30 * 60 * 1000
-const STREAM_TTL_MISSING = 5 * 60 * 1000
-
-function hasMiruroStreams(id) {
-  if (!id) return Promise.resolve(false)
-  const now = Date.now()
-  const hit = streamCache.get(id)
-  if (hit) {
-    const ttl = hit.playable ? STREAM_TTL_PLAYABLE : STREAM_TTL_MISSING
-    if (now - hit.at < ttl) return Promise.resolve(hit.playable)
-    streamCache.delete(id)
-  }
-  const entry = { promise: null, playable: false, at: now }
-  entry.promise = (async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/miruro/probe/${id}`)
-      if (!res.ok) return false
-      const d = await res.json()
-      return d?.playable === true
-    } catch {
-      return false
-    }
-  })().then(v => {
-    entry.playable = !!v
-    return !!v
-  })
-  // Shared promise: concurrent callers await the same in-flight probe.
-  streamCache.set(id, entry)
-  return entry.promise
-}
-
-// useStreamable keeps normal anime as-is and drops hentai entries that have
-// no playable Miruro stream (checked against the backend, cached). When NSFW
-// is disabled it drops all hentai, mirroring filterAdult.
+// Hentai titles are no longer pre-filtered by stream availability: the
+// Miruro provider (and its backend probe) was removed, and playability is
+// handled at play time by the anikoto/flixcloud provider fallback chain,
+// exactly like every other title.
 export const useStreamable = (items) => {
   const { nsfwEnabled } = useNsfw()
   const list = useMemo(() => (Array.isArray(items) ? items : []), [items])
   const rest = useMemo(() => list.filter(it => !isNsfw(it)), [list])
   const adult = useMemo(() => list.filter(isNsfw), [list])
-  const [extra, setExtra] = useState([])
 
-  useEffect(() => {
-    if (!nsfwEnabled || adult.length === 0) {
-      setExtra(prev => (prev.length ? [] : prev))
-      return
-    }
-    let cancelled = false
-    Promise.all(adult.map(async it => ((await hasMiruroStreams(it.id)) ? it : null)))
-      .then(kept => {
-        if (cancelled) return
-        const next = kept.filter(Boolean)
-        setExtra(prev => prev.length === next.length && prev.every((p, i) => p.id === next[i].id) ? prev : next)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [nsfwEnabled, adult])
-
-  return nsfwEnabled ? [...rest, ...extra] : rest
+  return nsfwEnabled ? [...rest, ...adult] : rest
 }

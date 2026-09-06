@@ -108,15 +108,6 @@ export function getHlsLoadPolicies() {
 }
 
 /**
- * Native media elements do not expose a portable byte or second buffer target.
- * `auto` is the strongest standards-based hint: direct and proxied files may
- * prefetch as their network, cache headers, and local storage permit.
- */
-export function getNativeMediaBufferPolicy() {
-  return { preload: 'auto' }
-}
-
-/**
  * Express the same no-fixed-cap policy through dash.js's forward and backward
  * buffer settings. dash.js does not have a "default reserve" the way hls.js
  * does, so we hand it the same forward/back values the hls.js default would

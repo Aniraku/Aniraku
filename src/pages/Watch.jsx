@@ -62,6 +62,7 @@ import {
 import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
+import { createTimelineChapters } from '../lib/watchTimelineChapters'
 import {
   isConfirmedUpcomingEpisode,
   UPCOMING_EPISODE_MESSAGE,
@@ -1564,6 +1565,7 @@ export default function Watch() {
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
   const timelineHoverCleanupRef = useRef(null)
+  const chapterTrackCleanupRef = useRef(null)
   const cspViolationCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
@@ -2774,6 +2776,8 @@ export default function Watch() {
     bufferIndicatorCleanupRef.current = null
     timelineHoverCleanupRef.current?.cleanup?.()
     timelineHoverCleanupRef.current = null
+    chapterTrackCleanupRef.current?.()
+    chapterTrackCleanupRef.current = null
     // Release the per-source Kiwi fragment ledger with the player so episode
     // changes and long binge sessions cannot retain old range arrays.
     kiwiFragmentRangesRef.current = null
@@ -2843,6 +2847,11 @@ export default function Watch() {
       destroyPlayer()
       kiwiFragmentRangesRef.current = null
       setActiveEmbedUrl('')
+      // Remember the quality the viewer is on so the Download button can
+      // offer the matching rendition (falls back to the generic download
+      // when the provider has no same-quality link).
+      const activeQualityEntry = (Array.isArray(qualityList) ? qualityList : []).find((item) => item.default) || qualityList?.[0] || null
+      selectedQualityLabelRef.current = activeQualityEntry?.label || ''
       // Store for Download button — preserve any download URL already set from server list
       if (!downloadUrlSourceRef.current) {
         currentDownloadUrlRef.current = streamUrl || ''
@@ -3410,7 +3419,32 @@ export default function Watch() {
               try {
                 this.airplay()
               } catch {
-                showToast('Chromecast is not available in this browser', { icon: 'warn' })
+                showToast('AirPlay is not available in this browser', { icon: 'warn' })
+              }
+            },
+          },
+          {
+            name: 'download',
+            position: 'right',
+            index: 16,
+            html: downloadControlHtml(),
+            tooltip: 'Download',
+            style: { width: '36px', margin: '0' },
+            click: function () {
+              // Prefer a provider download that matches the quality the
+              // viewer is watching (e.g. 1080p playback → 1080p download);
+              // fall back to the provider's generic download link.
+              const match = pickDownloadForQuality(downloadsListRef.current, selectedQualityLabelRef.current)
+              const rawUrl = match?.url || downloadUrlSourceRef.current || currentDownloadUrlRef.current
+              if (!rawUrl || rawUrl.includes('/api/v1/proxy') || rawUrl.includes('.m3u8')) {
+                showToast('No download available for this source', { icon: 'warn' })
+                return
+              }
+              window.open(rawUrl, '_blank', 'noopener')
+              if (match && selectedQualityLabelRef.current) {
+                showToast(`Opening ${selectedQualityLabelRef.current} download…`)
+              } else {
+                showToast(rawUrl.includes('pahe.') || rawUrl.includes('nekostream') ? 'Opening download page…' : 'Opening download…')
               }
             },
           },
@@ -3509,6 +3543,7 @@ export default function Watch() {
             })),
             onSelect: (item) => {
               const selected = qualityList.find((quality) => quality.url === item.value)
+              if (selected) selectedQualityLabelRef.current = selected.label || ''
               const art = artInstance.current
               if (selected && art) {
                 const currentUrl = String(art.video?.currentSrc || art.option?.url || '')
@@ -4169,6 +4204,9 @@ export default function Watch() {
       const progressInner = art.video
         ?.closest('.art-video-player')
         ?.querySelector('.art-control-progress-inner')
+      const progressControl = art.video
+        ?.closest('.art-video-player')
+        ?.querySelector('.art-control-progress')
       bufferIndicatorCleanupRef.current = createFullBufferIndicator(
         art.video,
         progressInner
@@ -4176,6 +4214,13 @@ export default function Watch() {
       timelineHoverCleanupRef.current = createTimelineHoverPreview(
         art.video,
         progressInner,
+        () => skipSegmentsRef.current
+      )
+      // Intro / Episode / Outro chapters — same segment data as Skip
+      // Intro/Outro, drawn as a clickable strip above the seek bar.
+      chapterTrackCleanupRef.current = createTimelineChapters(
+        art.video,
+        progressControl,
         () => skipSegmentsRef.current
       )
 
@@ -5025,6 +5070,7 @@ export default function Watch() {
         // Capture Anikoto download links (downloads[0].url = pahe link) — direct, no proxy
         if (Array.isArray(data?.downloads) && data.downloads.length > 0 && data.downloads[0]?.url) {
           downloadUrlSourceRef.current = String(data.downloads[0].url)
+          downloadsListRef.current = data.downloads.filter((entry) => entry?.url)
         } else if (Array.isArray(data?.sources) && data.sources[0]?.url) {
           downloadUrlSourceRef.current = String(data.sources[0].url)
         }
@@ -5037,6 +5083,7 @@ export default function Watch() {
               const dlJson = await dlRes.json()
               if (Array.isArray(dlJson.downloads) && dlJson.downloads[0]?.url) {
                 downloadUrlSourceRef.current = String(dlJson.downloads[0].url)
+                downloadsListRef.current = dlJson.downloads.filter((entry) => entry?.url)
                 data.downloads = dlJson.downloads
               }
             }
@@ -5621,12 +5668,14 @@ export default function Watch() {
     currentTime: t,
     autoSkip,
     autoSkipFailed: autoSkipFailures.intro,
+    autoSkipHandled: autoSkippedRef.current.intro,
   })
   const showSkipOutro = shouldShowManualSkipOverlay({
     segment: outro,
     currentTime: t,
     autoSkip,
     autoSkipFailed: autoSkipFailures.outro,
+    autoSkipHandled: autoSkippedRef.current.outro,
   })
   const handleSkipSegment = (type) => {
     skipSegmentNow(type)
@@ -7200,6 +7249,58 @@ export default function Watch() {
         .watch-art-mount .art-progress-played,
         .watch-art-mount .art-progress-indicator {
           z-index: 3;
+        }
+        /* Chapter track — Intro / Episode / Outro strip floating above the
+           seek bar. Clicks seek to the chapter start and never fall through
+           to ArtPlayer's own seek surface. */
+        .watch-art-mount .art-control-progress {
+          overflow: visible;
+        }
+        .watch-art-mount .watch-chapter-track {
+          position: absolute;
+          left: 5px;
+          right: 5px;
+          top: -11px;
+          height: 8px;
+          display: flex;
+          pointer-events: none;
+          z-index: 4;
+          opacity: 0;
+          transition: opacity 0.15s ease;
+        }
+        .watch-art-mount .art-control-progress:hover .watch-chapter-track,
+        .watch-art-mount .art-video-player.art-hide-cursor .watch-chapter-track {
+          opacity: 1;
+        }
+        .watch-art-mount .watch-chapter-segment {
+          position: absolute;
+          top: 0;
+          height: 8px;
+          border: none;
+          border-radius: 3px;
+          padding: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          font-size: 9px;
+          font-weight: 800;
+          line-height: 8px;
+          letter-spacing: 0.02em;
+          color: rgba(255, 255, 255, 0.95);
+          text-align: center;
+          cursor: pointer;
+          pointer-events: auto;
+          background: rgba(255, 255, 255, 0.16);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+        }
+        .watch-art-mount .watch-chapter-intro {
+          background: rgba(234, 179, 8, 0.4);
+        }
+        .watch-art-mount .watch-chapter-outro {
+          background: rgba(234, 179, 8, 0.4);
+        }
+        .watch-art-mount .watch-chapter-segment:hover {
+          filter: brightness(1.35);
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
