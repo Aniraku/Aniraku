@@ -345,6 +345,23 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;')
 }
 
+// Third-party (AniList) synopsis → plain text. Tags are dropped and common
+// entities decoded so the result renders as a React text node — no
+// dangerouslySetInnerHTML, so nothing third-party-controlled can ever
+// become markup here.
+function htmlToPlainText(html) {
+  return String(html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .trim()
+}
+
 function getQualityPresentation(value) {
   const raw = String(value || '').trim()
   const normalized = raw.toLowerCase()
@@ -494,7 +511,7 @@ function readCookie(name) {
 
 function writeCookie(name, value) {
   try {
-    document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=31536000; Path=/; SameSite=Lax`
+    document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=31536000; Path=/; SameSite=Lax; Secure`
   } catch {
     // Cookies can be disabled; localStorage remains the fallback.
   }
@@ -952,6 +969,35 @@ function chromecastControlHtml() {
   return `<span class="watch-art-cast-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z" fill="currentColor"/></svg></span>`
 }
 
+function downloadControlHtml() {
+  // Exact Material Design "download" glyph: tray with the arrow dropping in.
+  return `<span class="watch-art-download-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg></span>`
+}
+
+// Rendition height encoded in a download label (e.g. "Pahe 1080p",
+// "Nekostream 720P"). Returns 0 when the label carries no height.
+function downloadLabelHeight(label) {
+  const withP = String(label || '').match(/(\d{3,4})\s*p\b/i)
+  if (withP) return Number(withP[1])
+  const bare = String(label || '').match(/(?:^|\D)(\d{3,4})(?:\D|$)/)
+  return bare ? Number(bare[1]) : 0
+}
+
+// The download that matches the quality the viewer is actually watching:
+// an entry whose label carries the selected rendition's height wins; any
+// other selection (or unlabeled entries) falls back to the provider's
+// generic download (first entry).
+function pickDownloadForQuality(downloads, qualityLabel) {
+  const list = (Array.isArray(downloads) ? downloads : []).filter((entry) => entry?.url)
+  if (list.length === 0) return null
+  const target = downloadLabelHeight(qualityLabel)
+  if (target > 0) {
+    const same = list.find((entry) => downloadLabelHeight(entry.label) === target)
+    if (same) return same
+  }
+  return list[0]
+}
+
 function ccControlHtml() {
   return `<span class="watch-art-cc-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="20" height="20"><rect x="2" y="5" width="20" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="14.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-weight="800" fill="currentColor">CC</text></svg></span>`
 }
@@ -1217,7 +1263,11 @@ async function checkBackendHealth() {
         cache: 'no-store',
       })
       clearTimeout(t)
-      if (res.ok || res.status === 404) return true
+      // Only a real 2xx proves the API base is correct. Accepting 404 let a
+      // misconfigured API_BASE (any random web server) pass the check; the
+      // backend serves /api/v1/health with 200, so a 404 here is a real
+      // mismatch, not a missing route.
+      if (res.ok) return true
     } catch {
       // try next candidate
     }
@@ -1738,6 +1788,11 @@ export default function Watch() {
   const switchSubtitleTrackRef = useRef(null)
   const subtitleSwitchGenerationRef = useRef(0)
   const downloadUrlSourceRef = useRef('')
+  // Every download link the current provider payload carries (with labels)
+  // plus the quality the viewer has selected — the Download button pairs a
+  // same-quality download with the active rendition when one exists.
+  const downloadsListRef = useRef([])
+  const selectedQualityLabelRef = useRef('')
   // Force re-render for CC style changes
   const [, forceCCUpdate] = useState(0)
   const handleCCStyleChange = useCallback((key, value) => {
@@ -1964,6 +2019,12 @@ export default function Watch() {
     lastBlockCycleRef.current = 0
     recoveryBusyRef.current = false
     streamRetries.current = {}
+    // Download state belongs to one episode: a stale link would otherwise
+    // open the previous episode's download page after navigation.
+    downloadUrlSourceRef.current = ''
+    currentDownloadUrlRef.current = ''
+    downloadsListRef.current = []
+    selectedQualityLabelRef.current = ''
         }, [animeId, epNumber])
 
   // Keep the active episode row visible in the sidebar.
@@ -2806,8 +2867,15 @@ export default function Watch() {
       // The backend strips "rn" before dialing the CDN.
       const nonce =
         Math.random().toString(36).slice(2) + Date.now().toString(36)
-              const proxied = (u) =>
-                `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+      // Idempotence guard: the backend delivers some URLs already in our
+      // proxy shape (legacy playback paths pass source URLs straight
+      // through). Re-wrapping a proxy URL double-encodes the target and the
+      // request 403s at the proxy gate — pass those through untouched; they
+      // already carry their own headers param.
+      const proxied = (u) => {
+        if (typeof u === 'string' && u.includes('/api/v1/proxy?url=')) return u
+        return `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+      }
               // First-proxy pre-warm: start the network handshake against the
               // proxy as soon as we know the selected source. DNS, TCP, TLS and
               // the proxy's cold edge cache can each add 100-400ms on the first
@@ -2940,8 +3008,46 @@ export default function Watch() {
             return false
           }
           if (!Hls?.isSupported?.() || buildIdRef.current !== myBuildId) return false
+          // Megaplay hosts video segments on TikTok's CDN disguised with a
+          // 252-byte PNG canary prefix (anti-hotlink; megaplay's own player
+          // strips it via STRIP_BYTES). Those segments must load directly
+          // from the viewer's browser — the backend proxy cannot fetch them
+          // (TikTok's CDN refuses datacenter IPs) — so strip the canary here.
+          const MEGA_SEG_RE = /(?:tiktokcdn\.com|ipstatp\.com|ibyteimg\.com|yoot\.akirax\.buzz)/i
+          class CanaryStripLoader extends Hls.DefaultConfig.loader {
+            load(context, config, callbacks) {
+              const origOnSuccess = callbacks?.onSuccess
+              if (origOnSuccess) {
+                callbacks = {
+                  ...callbacks,
+                  onSuccess: (response, stats, ctx, networkDetails) => {
+                    try {
+                      const u = ctx?.url || context?.url || ''
+                      if (MEGA_SEG_RE.test(u) && response?.data != null) {
+                        if (typeof response.data === 'string') {
+                          if (response.data.charCodeAt(0) === 0x89 && response.data.slice(1, 4) === 'PNG') {
+                            response = { ...response, data: response.data.slice(252) }
+                          }
+                        } else {
+                          const buf = response.data instanceof ArrayBuffer ? response.data : response.data.buffer
+                          const head = new Uint8Array(buf, 0, Math.min(8, buf.byteLength))
+                          if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) {
+                            response = { ...response, data: buf.slice(252) }
+                          }
+                        }
+                      }
+                    } catch {}
+                    origOnSuccess(response, stats, ctx, networkDetails)
+                  },
+                }
+              }
+              super.load(context, config, callbacks)
+            }
+          }
           const hls = new Hls({
             enableWorker: false,
+            loader: CanaryStripLoader,
+            fLoader: CanaryStripLoader,
             ...getHlsBufferPolicy(netHintRef.current, { kiwi: shouldPreferNativeHls(url) }),
             ...getHlsLoadPolicies(),
             // No cache limit for forward or backward playback on this
@@ -3002,8 +3108,10 @@ export default function Watch() {
               const recoverPlayback = () => {
                 if (buildIdRef.current !== myBuildId) return
                 if (recoveryBusyRef.current) return
+                // Debounce: ArtPlayer's reconnect loop can fire recovery
+                // repeatedly; one toast + one onBlocked per 3s window.
                 recoveryBusyRef.current = true
-                recoveryBusyRef.current = false
+                setTimeout(() => { recoveryBusyRef.current = false }, 3000)
                 showToast('Playback interrupted — choose another server manually.', {
                   long: true,
                 })
@@ -4660,8 +4768,9 @@ export default function Watch() {
         } catch {}
         streamAbortRef.current = null
       }
-      loadingRef.current = false
-      if (loadingRef.current && !forceRefresh) return
+      // Concurrent loads are deduped by aborting the in-flight request above
+      // and letting the new attempt proceed; a boolean gate here can never
+      // fire (loadingRef was just reset) and previously dead-coded the check.
 
       // Capture the target episode NOW. If the user navigates while the
       // request is in flight, the stale response must never touch the
@@ -4759,6 +4868,7 @@ export default function Watch() {
         // Capture Anikoto downloads from server list payload (before /stream call)
         if (Array.isArray(payload.downloads) && payload.downloads.length > 0 && payload.downloads[0]?.url) {
           downloadUrlSourceRef.current = String(payload.downloads[0].url)
+          downloadsListRef.current = payload.downloads.filter((entry) => entry?.url)
         }
         const qualityList = buildQualityList(payload.sources, suppressedQualityUrls)
         if (qualityList.length > 0) {
@@ -6524,12 +6634,9 @@ export default function Watch() {
                   >
                     Synopsis
                   </h3>
-                  <div
-                    style={{ color: 'var(--text-primary)' }}
-                    dangerouslySetInnerHTML={{
-                      __html: anime.description.replace(/<[^>]*>/g, ''),
-                    }}
-                  />
+                  <div style={{ color: 'var(--text-primary)' }}>
+                    {htmlToPlainText(anime.description)}
+                  </div>
                 </div>
               )}
             </section>
