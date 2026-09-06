@@ -14,7 +14,7 @@
     {
       "name": "Search anime",
       "short_name": "Search",
-      "url": "/search",
+      "url": "/catalog?search=",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {

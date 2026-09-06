@@ -41,11 +41,14 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response.ok) {
             const copy = response.clone()
-            caches.open(VERSION).then((cache) => cache.put('/', copy))
+            // Cache each navigation under its own URL (not always '/'), so a
+            // bot-prerendered page (middleware.js serves SEO shells to bot
+            // UAs) can never become the offline fallback for other routes.
+            caches.open(VERSION).then((cache) => cache.put(event.request, copy))
           }
           return response
         })
-        .catch(() => caches.match('/'))
+        .catch(() => caches.match(event.request).then((hit) => hit || caches.match('/')))
     )
     return
   }
