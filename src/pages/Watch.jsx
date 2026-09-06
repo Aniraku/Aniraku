@@ -87,6 +87,34 @@ const STREAM_FETCH_TIMEOUT = 60_000
 const EPISODE_RATINGS_LS_KEY = 'aniraku-episode-ratings'
 
 // ────────────────────────────────────────────────────────────────
+// Unlimited cache policy (Proxy + Direct playback)
+// 21600s = 6h — far beyond any episode runtime, so the forward buffer
+// keeps growing across the whole title instead of stopping at an
+// adaptive cap. Backward data is never evicted (backBufferLength /
+// pruneBufferTime), so every seek — forward or backward — plays from
+// cache instead of re-downloading. These overrides are applied AFTER
+// each engine's adaptive policy spread so they always win, on both the
+// proxy and the direct transport legs.
+// ────────────────────────────────────────────────────────────────
+const UNLIMITED_CACHE_SECONDS = 21600
+const UNLIMITED_CACHE_MAX_BYTES = 8 * 1024 * 1024 * 1024
+// hls.js (MSE) engines — main source and the native-fallback engine.
+const UNLIMITED_HLS_CACHE = {
+  maxBufferLength: UNLIMITED_CACHE_SECONDS,
+  maxMaxBufferLength: UNLIMITED_CACHE_SECONDS,
+  maxBufferSize: UNLIMITED_CACHE_MAX_BYTES,
+  backBufferLength: Infinity,
+}
+// dash.js engine — forward targets plus the behind-the-playhead prune
+// guard, which is what actually keeps backward seeks cached.
+const UNLIMITED_DASH_CACHE = {
+  stableBufferTime: UNLIMITED_CACHE_SECONDS,
+  bufferTimeAtTopQuality: UNLIMITED_CACHE_SECONDS,
+  bufferTimeAtTopQualityLongForm: UNLIMITED_CACHE_SECONDS,
+  pruneBufferTime: UNLIMITED_CACHE_SECONDS,
+}
+
+// ────────────────────────────────────────────────────────────────
 // Device / environment detection
 // ────────────────────────────────────────────────────────────────
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent : ''
@@ -2881,6 +2909,14 @@ export default function Watch() {
               // considered.
               video.removeAttribute('crossorigin')
             }
+            // Browser-managed playback (both proxy and direct legs).
+            // 'auto' is the strongest preload hint the HTMLMediaElement
+            // spec exposes — the browser then keeps as much of the title
+            // in its media/HTTP cache as it allows, and seeks inside
+            // already-downloaded ranges (forward or backward) are served
+            // from that cache without re-downloading. No JS-side cap
+            // exists to lift here; the unlimited MSE policies below only
+            // apply once an engine takes over the source.
             video.preload = 'auto'
             video.src = target
             video.load()
@@ -2908,6 +2944,12 @@ export default function Watch() {
             enableWorker: false,
             ...getHlsBufferPolicy(netHintRef.current, { kiwi: shouldPreferNativeHls(url) }),
             ...getHlsLoadPolicies(),
+            // No cache limit for forward or backward playback on this
+            // engine either — it serves both the proxy and direct legs of
+            // the native-fallback chain, so it must match the main MSE
+            // engine's unlimited policy. Applied after the policy spreads
+            // so these values always win.
+            ...UNLIMITED_HLS_CACHE,
             startFragPrefetch: true,
             lowLatencyMode: false,
           })
@@ -3406,9 +3448,12 @@ export default function Watch() {
                     ...getDashBufferPolicy(netHintRef.current),
                     // Uncapped cache: chase the full title duration ahead and
                     // keep already-played ranges instead of pruning them.
-                    stableBufferTime: 21600,
-                    bufferTimeAtTopQuality: 21600,
-                    bufferTimeAtTopQualityLongForm: 21600,
+                    // pruneBufferTime is the backward half of the policy —
+                    // dash.js prunes everything older than it behind the
+                    // playhead (default 30s), so raising it to the same
+                    // unlimited value is what makes BACKWARD seeks play
+                    // from cache instead of re-downloading.
+                    ...UNLIMITED_DASH_CACHE,
                   },
                 },
               })
@@ -3619,13 +3664,10 @@ export default function Watch() {
               // No cache limit for forward or backward playback: the forward
               // buffer may grow for the whole title and nothing behind the
               // playhead is evicted, so every seek plays from cache instead
-              // of re-downloading. These unbounded values are applied AFTER
-              // the policy spread so they always win.
+              // of re-downloading. The shared unlimited overrides are applied
+              // AFTER the policy spread so they always win.
               ...bufferPolicy,
-              maxBufferLength: 21600,
-              maxMaxBufferLength: 21600,
-              maxBufferSize: 8 * 1024 * 1024 * 1024,
-              backBufferLength: Infinity,
+              ...UNLIMITED_HLS_CACHE,
               startFragPrefetch: true,
               lowLatencyMode: false,
               appendInSequenceGaps: true,
