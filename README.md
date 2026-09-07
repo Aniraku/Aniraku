@@ -26,15 +26,15 @@ Aniraku is open source. Voluntary support helps fund **hosting, releases, and op
 
 <a href="https://patreon.com/ShoIslam"><img src="https://user-images.githubusercontent.com/61944859/180249027-678b01b8-c336-451e-b147-6d84a5b9d0e7.png" width="250"/></a>
 
-| Optional crypto support | Value |
-|:--|:--|
-| Asset | USDT |
-| Network | **BNB Smart Chain (BEP20) only** |
-| Address | `0x0dc085fc880f2f67b4e200f125bc0de352da904e` |
+## Binance Pay
 
-> **Send USDT on BNB Smart Chain (BEP20) only.** Do not use Ethereum, Polygon, Arbitrum, or another network. Verify both the asset and network before sending because crypto transfers cannot be reversed.
+Send directly via Binance Pay to UID:
 
-<img src="./docs/assets/usdt-bep20-support-qr.png" width="180" alt="USDT on BNB Smart Chain BEP20 support QR code" />
+```
+1098400042
+```
+
+Open Binance > Pay > Enter UID > Send. No network fees.
 
 Read the full [Support Guide](./SUPPORT.md).
 
