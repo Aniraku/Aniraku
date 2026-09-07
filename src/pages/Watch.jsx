@@ -2417,7 +2417,12 @@ export default function Watch() {
             { maxRetries: 2, timeoutMs: 12_000 }
           )
           if (!cancelled && animeResp) {
-            animeRes = await animeResp.json().catch(() => null)
+            const parsed = await animeResp.json().catch(() => null)
+            // A backend failure body ({"error":"failed to fetch anime
+            // metadata"}) parses fine but is not metadata — treating it as
+            // anime left the page stuck on "Loading…" with no idMal, which
+            // silently killed AniSkip and therefore Skip Intro/Outro.
+            animeRes = parsed && (parsed.title || parsed.id || parsed.idMal) ? parsed : null
           }
         } catch {
           animeRes = null
@@ -2536,18 +2541,26 @@ export default function Watch() {
   // and timestamp mapping, while retaining backend episode/availability fields.
   const malId = getMalId(anime)
   useEffect(() => {
-    if (!animeId || !anime || anilistSeoHydratedRef.current === String(animeId)) return
+    if (!animeId) return
+    // Re-hydrate whenever the stored record has no usable title (e.g. a
+    // backend 502 error body). Gating on the title instead of anime?.id
+    // matters: an error object has no id, so an id-based dependency never
+    // changes and this effect silently never runs.
+    const hasTitle = Boolean(anime?.title?.english || anime?.title?.romaji || anime?.title?.userPreferred)
+    if (hasTitle || anilistSeoHydratedRef.current === String(animeId)) return
     anilistSeoHydratedRef.current = String(animeId)
     let cancelled = false
     anilistQuery(ANIME_DETAIL_QUERY, { id: parseInt(animeId, 10) })
       .then(({ data }) => {
         if (!cancelled && data?.Media) {
-          setAnime((prev) => prev ? { ...prev, ...data.Media, id: prev.id || animeId } : prev)
+          setAnime((prev) => prev
+            ? { ...prev, ...data.Media, id: prev.id || animeId }
+            : { ...data.Media, id: animeId })
         }
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [animeId, anime?.id])
+  }, [animeId, anime])
 
   useEffect(() => {
     skipSegmentsRef.current = { intro: null, outro: null }
@@ -7250,9 +7263,10 @@ export default function Watch() {
         .watch-art-mount .art-progress-indicator {
           z-index: 3;
         }
-        /* Chapter track — Intro / Episode / Outro strip floating above the
+        /* Chapter markers — subtle Intro/Outro segments riding just above the
            seek bar. Clicks seek to the chapter start and never fall through
-           to ArtPlayer's own seek surface. */
+           to ArtPlayer's own seek surface. Rendered only when verified skip
+           timestamps exist for the episode. */
         .watch-art-mount .art-control-progress {
           overflow: visible;
         }
@@ -7260,47 +7274,26 @@ export default function Watch() {
           position: absolute;
           left: 5px;
           right: 5px;
-          top: -11px;
-          height: 8px;
-          display: flex;
+          top: -7px;
+          height: 4px;
           pointer-events: none;
           z-index: 4;
-          opacity: 0;
-          transition: opacity 0.15s ease;
-        }
-        .watch-art-mount .art-control-progress:hover .watch-chapter-track,
-        .watch-art-mount .art-video-player.art-hide-cursor .watch-chapter-track {
-          opacity: 1;
         }
         .watch-art-mount .watch-chapter-segment {
           position: absolute;
           top: 0;
-          height: 8px;
+          height: 4px;
           border: none;
-          border-radius: 3px;
+          border-radius: 2px;
           padding: 0;
-          overflow: hidden;
-          white-space: nowrap;
-          text-overflow: ellipsis;
-          font-size: 9px;
-          font-weight: 800;
-          line-height: 8px;
-          letter-spacing: 0.02em;
-          color: rgba(255, 255, 255, 0.95);
-          text-align: center;
+          margin: 0;
           cursor: pointer;
           pointer-events: auto;
-          background: rgba(255, 255, 255, 0.16);
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-        }
-        .watch-art-mount .watch-chapter-intro {
-          background: rgba(234, 179, 8, 0.4);
-        }
-        .watch-art-mount .watch-chapter-outro {
-          background: rgba(234, 179, 8, 0.4);
+          background: rgba(234, 179, 8, 0.5);
+          box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
         }
         .watch-art-mount .watch-chapter-segment:hover {
-          filter: brightness(1.35);
+          background: rgba(234, 179, 8, 0.85);
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the

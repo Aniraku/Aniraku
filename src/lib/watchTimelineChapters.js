@@ -4,28 +4,21 @@
 // Skip Intro/Outro (provider payloads + AniSkip), so a chapter only appears
 // when verified timestamp data exists for it.
 
-// Chapter boundaries. The Intro chapter spans the cold-open plus the detected
-// opening (0 → intro.end); the Outro chapter spans the detected ending to the
-// end of the episode. What remains in between is the episode itself.
+// Chapter markers for the player timeline. Only chapters backed by verified
+// timestamp data are rendered (Intro = cold-open + detected opening, Outro =
+// detected ending → episode end) — an empty result means nothing is drawn,
+// never a full-width "whole episode" filler segment.
 export function buildTimelineChapters(segments = {}, duration = 0) {
   const total = Number(duration)
   if (!Number.isFinite(total) || total <= 0) return []
 
   const introEnd = Number(segments?.intro?.end)
   const outroStart = Number(segments?.outro?.start)
-  const hasIntro = Number.isFinite(introEnd) && introEnd > 1 && introEnd < total
-  const hasOutro = Number.isFinite(outroStart) && outroStart > 1 && outroStart < total
-
   const chapters = []
-  if (hasIntro) {
+  if (Number.isFinite(introEnd) && introEnd > 1 && introEnd < total) {
     chapters.push({ key: 'intro', label: 'Intro', start: 0, end: introEnd })
   }
-  const mainStart = hasIntro ? introEnd : 0
-  const mainEnd = hasOutro ? outroStart : total
-  if (mainEnd - mainStart > 1) {
-    chapters.push({ key: 'main', label: 'Episode', start: mainStart, end: mainEnd })
-  }
-  if (hasOutro) {
+  if (Number.isFinite(outroStart) && outroStart > 1 && outroStart < total) {
     chapters.push({ key: 'outro', label: 'Outro', start: outroStart, end: total })
   }
   return chapters.map((chapter) => ({
@@ -58,7 +51,8 @@ export function createTimelineChapters(video, container, getSegments) {
       const el = document.createElement('button')
       el.type = 'button'
       el.className = `watch-chapter-segment watch-chapter-${chapter.key}`
-      el.textContent = chapter.label
+      // No visible text — the label surfaces via the native tooltip so the
+      // seek bar stays clean at any player size.
       el.title = chapter.label
       el.style.left = `${chapter.leftPercent}%`
       el.style.width = `${chapter.widthPercent}%`
