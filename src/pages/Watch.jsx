@@ -62,7 +62,6 @@ import {
 import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
-import { createTimelineChapters } from '../lib/watchTimelineChapters'
 import {
   isConfirmedUpcomingEpisode,
   UPCOMING_EPISODE_MESSAGE,
@@ -1565,7 +1564,6 @@ export default function Watch() {
   const dashInstance = useRef(null)
   const bufferIndicatorCleanupRef = useRef(null)
   const timelineHoverCleanupRef = useRef(null)
-  const chapterTrackCleanupRef = useRef(null)
   const cspViolationCleanupRef = useRef(null)
   const loadingRef = useRef(false)
   const playerContainerRef = useRef(null)
@@ -2789,8 +2787,6 @@ export default function Watch() {
     bufferIndicatorCleanupRef.current = null
     timelineHoverCleanupRef.current?.cleanup?.()
     timelineHoverCleanupRef.current = null
-    chapterTrackCleanupRef.current?.()
-    chapterTrackCleanupRef.current = null
     // Release the per-source Kiwi fragment ledger with the player so episode
     // changes and long binge sessions cannot retain old range arrays.
     kiwiFragmentRangesRef.current = null
@@ -4217,9 +4213,6 @@ export default function Watch() {
       const progressInner = art.video
         ?.closest('.art-video-player')
         ?.querySelector('.art-control-progress-inner')
-      const progressControl = art.video
-        ?.closest('.art-video-player')
-        ?.querySelector('.art-control-progress')
       bufferIndicatorCleanupRef.current = createFullBufferIndicator(
         art.video,
         progressInner
@@ -4227,13 +4220,6 @@ export default function Watch() {
       timelineHoverCleanupRef.current = createTimelineHoverPreview(
         art.video,
         progressInner,
-        () => skipSegmentsRef.current
-      )
-      // Intro / Episode / Outro chapters — same segment data as Skip
-      // Intro/Outro, drawn as a clickable strip above the seek bar.
-      chapterTrackCleanupRef.current = createTimelineChapters(
-        art.video,
-        progressControl,
         () => skipSegmentsRef.current
       )
 
@@ -7262,38 +7248,6 @@ export default function Watch() {
         .watch-art-mount .art-progress-played,
         .watch-art-mount .art-progress-indicator {
           z-index: 3;
-        }
-        /* Chapter markers — subtle Intro/Outro segments riding just above the
-           seek bar. Clicks seek to the chapter start and never fall through
-           to ArtPlayer's own seek surface. Rendered only when verified skip
-           timestamps exist for the episode. */
-        .watch-art-mount .art-control-progress {
-          overflow: visible;
-        }
-        .watch-art-mount .watch-chapter-track {
-          position: absolute;
-          left: 5px;
-          right: 5px;
-          top: -7px;
-          height: 4px;
-          pointer-events: none;
-          z-index: 4;
-        }
-        .watch-art-mount .watch-chapter-segment {
-          position: absolute;
-          top: 0;
-          height: 4px;
-          border: none;
-          border-radius: 2px;
-          padding: 0;
-          margin: 0;
-          cursor: pointer;
-          pointer-events: auto;
-          background: rgba(234, 179, 8, 0.5);
-          box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
-        }
-        .watch-art-mount .watch-chapter-segment:hover {
-          background: rgba(234, 179, 8, 0.85);
         }
         /* Episode sidebar: never taller than the visible viewport.
            100dvh tracks iOS Safari's collapsing toolbar; 100vh is the
