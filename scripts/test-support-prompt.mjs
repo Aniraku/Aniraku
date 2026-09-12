@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
 import {
+  BINANCE_PAY_LABEL,
+  BINANCE_PAY_UID,
   PATREON_URL,
   SUPPORT_PROMPT_ACTIVE_MS,
   SUPPORT_PROMPT_DISMISS_KEY,
   SUPPORT_PROMPT_DISMISS_MS,
-  USDT_ASSET,
-  USDT_BEP20_ADDRESS,
-  USDT_NETWORK_SHORT,
   dismissSupportPrompt,
   isSupportPromptDismissed,
   isSupportPromptExcluded,
@@ -18,9 +17,8 @@ const storage = { getItem: (key) => storageValues.get(key) ?? null, setItem: (ke
 const now = 1_000_000
 
 assert.equal(PATREON_URL, 'https://patreon.com/ShoIslam')
-assert.equal(USDT_ASSET, 'USDT')
-assert.equal(USDT_NETWORK_SHORT, 'BEP20')
-assert.equal(USDT_BEP20_ADDRESS, '0x0dc085fc880f2f67b4e200f125bc0de352da904e')
+assert.equal(BINANCE_PAY_UID, '1098400042')
+assert.equal(BINANCE_PAY_LABEL, 'Binance Pay')
 assert.equal(isSupportPromptExcluded('/watch/attack-on-titan-1'), true)
 assert.equal(isSupportPromptExcluded('/catalog'), false)
 assert.equal(shouldShowSupportPrompt({ activeMs: SUPPORT_PROMPT_ACTIVE_MS - 1, pathname: '/catalog', now }), false)
