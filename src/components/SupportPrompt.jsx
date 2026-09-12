@@ -3,13 +3,11 @@ import { useLocation } from 'react-router-dom'
 import styled from 'styled-components'
 import { FaCopy, FaExternalLinkAlt, FaHeart, FaTimes } from 'react-icons/fa'
 import {
+  BINANCE_PAY_LABEL,
+  BINANCE_PAY_UID,
   PATREON_URL,
   SUPPORT_FUNDING_COPY,
   SUPPORT_PROMPT_DISMISS_KEY,
-  USDT_ASSET,
-  USDT_BEP20_ADDRESS,
-  USDT_NETWORK,
-  USDT_NETWORK_SHORT,
   dismissSupportPrompt,
   isSupportPromptExcluded,
   shouldShowSupportPrompt,
@@ -17,10 +15,10 @@ import {
 
 const TICK_MS = 15_000
 
-function copyAddress() {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(USDT_BEP20_ADDRESS)
+function copyUid() {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(BINANCE_PAY_UID)
   const input = document.createElement('textarea')
-  input.value = USDT_BEP20_ADDRESS
+  input.value = BINANCE_PAY_UID
   input.style.position = 'fixed'
   input.style.opacity = '0'
   document.body.appendChild(input)
@@ -85,7 +83,7 @@ const SupportPrompt = () => {
 
   const handleCopy = async () => {
     try {
-      await copyAddress()
+      await copyUid()
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1800)
     } catch {
@@ -102,11 +100,11 @@ const SupportPrompt = () => {
       <h2 id="support-prompt-title">Keep Aniraku<br /><em>moving.</em></h2>
       <p id="support-prompt-copy">If Aniraku has helped you find something to watch, voluntary support funds {SUPPORT_FUNDING_COPY.toLowerCase()}</p>
       <PrimaryLink href={PATREON_URL} target="_blank" rel="noreferrer" onClick={dismiss}><span><FaHeart /> SUPPORT ON PATREON</span><FaExternalLinkAlt /></PrimaryLink>
-      <CryptoPanel>
-        <CryptoHeading><span>{USDT_ASSET} · {USDT_NETWORK_SHORT}</span><b>OPTIONAL</b></CryptoHeading>
-        <CryptoBody><img src="/assets/usdt-bep20-support-qr.png" alt="USDT BNB Smart Chain payment QR code" /><div><strong>{USDT_NETWORK}</strong><code>{USDT_BEP20_ADDRESS}</code><button type="button" onClick={() => void handleCopy()}><FaCopy /> {copied ? 'ADDRESS COPIED' : 'COPY ADDRESS'}</button></div></CryptoBody>
-        <CryptoWarning>SEND USDT ON BNB SMART CHAIN (BEP20) ONLY. VERIFY THE NETWORK BEFORE SENDING.</CryptoWarning>
-      </CryptoPanel>
+      <BinancePanel>
+        <BinanceHeading><span>{BINANCE_PAY_LABEL} · UID</span><b>OPTIONAL</b></BinanceHeading>
+        <BinanceBody><div><strong>Send via {BINANCE_PAY_LABEL}</strong><code>{BINANCE_PAY_UID}</code><button type="button" onClick={() => void handleCopy()}><FaCopy /> {copied ? 'UID COPIED' : 'COPY UID'}</button></div></BinanceBody>
+        <BinanceNote>OPEN BINANCE &gt; PAY &gt; ENTER UID &gt; SEND. NO NETWORK FEES.</BinanceNote>
+      </BinancePanel>
       <LaterButton type="button" onClick={dismiss}>NOT NOW · ASK AGAIN IN 7 DAYS</LaterButton>
     </Sheet>
   </Backdrop>
@@ -154,27 +152,25 @@ const PrimaryLink = styled.a`
   span { display: inline-flex; gap: 8px; align-items: center; } &:hover { background: #ff4d4d; } &:active { transform: scale(.98); }
 `
 
-const CryptoPanel = styled.div`
+const BinancePanel = styled.div`
   margin-top: 10px; padding: 11px; border: 1px solid #343434; background: #0d0d0d;
 `
 
-const CryptoHeading = styled.div`
+const BinanceHeading = styled.div`
   display: flex; align-items: center; justify-content: space-between; color: #f6f6f2; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .62rem; letter-spacing: .06em;
   b { color: #96d37b; font-size: .54rem; }
 `
 
-const CryptoBody = styled.div`
-  display: grid; grid-template-columns: 92px 1fr; gap: 10px; margin-top: 10px; align-items: center;
-  img { width: 92px; height: 92px; background: #fff; }
+const BinanceBody = styled.div`
+  display: grid; gap: 10px; margin-top: 10px; align-items: center;
   div { min-width: 0; display: grid; gap: 7px; }
   strong { color: #f6f6f2; font-size: .72rem; }
-  code { overflow-wrap: anywhere; color: #a2a2a0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .58rem; line-height: 1.45; }
+  code { overflow-wrap: anywhere; color: #a2a2a0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .68rem; line-height: 1.45; letter-spacing: .06em; }
   button { display: inline-flex; width: fit-content; align-items: center; gap: 6px; padding: 0; color: #f6f6f2; background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .58rem; letter-spacing: .04em; } button:hover { color: #ff4d4d; }
-  @media (max-width: 360px) { grid-template-columns: 72px 1fr; img { width: 72px; height: 72px; } }
 `
 
-const CryptoWarning = styled.p`
-  margin: 10px 0 0; color: #ff7777; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .52rem; font-weight: 700; line-height: 1.45; letter-spacing: .035em;
+const BinanceNote = styled.p`
+  margin: 10px 0 0; color: #a2a2a0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .52rem; font-weight: 700; line-height: 1.45; letter-spacing: .035em;
 `
 
 const LaterButton = styled.button`
