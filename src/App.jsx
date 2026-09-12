@@ -6,7 +6,6 @@ import { AuthProvider } from "./hooks/useAuth"
 import { setTitle } from "./lib/seo"
 import NavBar from "./components/NavBar/NavBar"
 import MobileBottomNav from "./components/MobileBottomNav"
-import AndroidAppFallback from "./components/AndroidAppFallback"
 import SupportPrompt from "./components/SupportPrompt"
 import Error from "./pages/Error"
 import Home from "./pages/Home"
@@ -166,7 +165,6 @@ const App = () => {
           <NavBar />
           <AniListAvailabilityBanner />
           <MobileBottomNav />
-          <AndroidAppFallback />
           <SupportPrompt />
           <Routes>
             <Route path="/" element={<Home />} />
