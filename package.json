@@ -10,8 +10,6 @@
     "preview:full": "node scripts/preview-server.mjs",
     "lint": "eslint .",
     "test:bots": "node scripts/bot-smoke-test.mjs",
-    "test:android-app-fallback": "node scripts/test-android-app-fallback.mjs",
-    "test:android-app-fallback-browser": "node scripts/test-android-app-fallback-browser.mjs",
     "test:embed-csp": "node scripts/test-embed-csp-policy.mjs",
     "test:kiwi-resolver": "node scripts/test-kiwi-resolver.mjs",
     "test:anime-detail-loading": "node scripts/test-anime-detail-loading.mjs",
