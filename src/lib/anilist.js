@@ -244,7 +244,12 @@ async function hydrateMediaDetails(media) {
     const payload = await requestAniListEndpoint(JSON.stringify({ query: `{ ${fields} }`, variables: {} }))
     ids.forEach((id, i) => {
       const item = payload?.data?.[`h${i}`]
-      if (item?.id) byId.set(id, normalizeMedia(item))
+      if (!item?.id) return
+      const normalized = normalizeMedia(item)
+      // The mirror DB is anime-only and carries no `type` field, but
+      // AnimeDetail gates relations on node.type === 'ANIME'.
+      if (normalized.type == null) normalized.type = 'ANIME'
+      byId.set(id, normalized)
     })
   } catch (error) {
     console.warn('Recommendation hydration failed:', error?.message || error)
