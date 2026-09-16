@@ -122,6 +122,7 @@ async function directAniListRequest(query, variables = {}) {
   anilistInFlight.set(requestKey, request)
   try {
     const result = normalizeOfflinePayload(await request)
+    await hydrateMediaDetails(result?.data?.Media)
     responseCache.set(requestKey, { data: result, ts: Date.now() })
     // Evict stale entries when cache grows large
     if (responseCache.size > 200) {
@@ -144,12 +145,28 @@ async function directAniListRequest(query, variables = {}) {
 // such fields, so this only runs against the offline endpoint), then rebuild
 // the expected shapes on the way back so every consumer keeps working.
 const NEXT_AIRING_OBJECT_RE = /nextAiringEpisode\s*\{\s*episode\s+airingAt\s*\}/g
+const RECS_NODES_RE = /recommendations(\s*\([^)]*\))?\s*\{\s*nodes/g
+const RELS_EDGES_RE = /relations(\s*\([^)]*\))?\s*\{\s*edges/g
 
 function patchQueryForOfflineApi(query) {
   if (!IS_OFFLINE_API || typeof query !== 'string') return query
-  if (!NEXT_AIRING_OBJECT_RE.test(query)) return query
-  NEXT_AIRING_OBJECT_RE.lastIndex = 0
-  return query.replace(NEXT_AIRING_OBJECT_RE, (m) => `${m} next_airing_episode next_airing_at`)
+  let out = query
+  if (NEXT_AIRING_OBJECT_RE.test(out)) {
+    NEXT_AIRING_OBJECT_RE.lastIndex = 0
+    out = out.replace(NEXT_AIRING_OBJECT_RE, (m) => `${m} next_airing_episode next_airing_at`)
+  }
+  // The mirror stores recs/relations as flat rows — also select the raw
+  // scalars so hydrateMediaDetails can rebuild the nested shapes below.
+  // Official AniList has none of these fields, so this is offline-only.
+  if (RECS_NODES_RE.test(out)) {
+    RECS_NODES_RE.lastIndex = 0
+    out = out.replace(RECS_NODES_RE, (m, args) => `recommendations${args || ''} { id title rating nodes`)
+  }
+  if (RELS_EDGES_RE.test(out)) {
+    RELS_EDGES_RE.lastIndex = 0
+    out = out.replace(RELS_EDGES_RE, (m, args) => `relations${args || ''} { relationType id title type edges`)
+  }
+  return out
 }
 
 function normalizeMedia(m) {
@@ -178,9 +195,12 @@ function normalizeMedia(m) {
   delete m.next_airing_episode
   delete m.next_airing_at
   // Unmappable nested selections come back as placeholder junk — collapse them
-  // to the empty shapes consumers already handle.
-  if (Array.isArray(m.recommendations)) m.recommendations = { nodes: [] }
-  if (Array.isArray(m.relations)) m.relations = { edges: [] }
+  // to the empty shapes consumers already handle. Flat rows carrying ids are
+  // kept: hydrateMediaDetails rebuilds them into real nodes below.
+  const hasFlatRecs = Array.isArray(m.recommendations) && m.recommendations.some((r) => r && Number.isInteger(r.id))
+  const hasFlatRels = Array.isArray(m.relations) && m.relations.some((r) => r && Number.isInteger(r.id))
+  if (Array.isArray(m.recommendations) && !hasFlatRecs) m.recommendations = { nodes: [] }
+  if (Array.isArray(m.relations) && !hasFlatRels) m.relations = { edges: [] }
   if (!Array.isArray(m.streamingEpisodes)) m.streamingEpisodes = m.streamingEpisodes ?? []
   const recNodes = m.recommendations?.nodes
   if (Array.isArray(recNodes)) recNodes.forEach((n) => normalizeMedia(n?.mediaRecommendation))
@@ -199,9 +219,51 @@ function normalizeOfflinePayload(payload) {
     if (!value || typeof value !== 'object') continue
     if (/^m\d+$/.test(key)) normalizeMedia(value) // anilistBatchDetail aliases
     else if (key === 'Media') normalizeMedia(value)
-    else if (Array.isArray(value.media)) visitPage(value) // Page + aliased Pages
+    else if (Array.isArray(value.media)) value.media.forEach(normalizeMedia) // Page + aliased Pages
   }
   return payload
+}
+
+// Rebuild recommendations/relations nodes from the mirror's flat rows.
+// Runs only when flat rows survived (offline mirror); official responses
+// already carry real nodes and skip this entirely.
+const HYDRATE_CARD_FIELDS = 'id title { romaji english userPreferred } coverImage { extraLarge large medium color } format episodes averageScore status genres isAdult'
+
+async function hydrateMediaDetails(media) {
+  if (!media || typeof media !== 'object') return media
+  const flatRecs = (Array.isArray(media.recommendations) ? media.recommendations : [])
+    .filter((r) => r && Number.isInteger(r.id) && r.id > 0)
+    .slice(0, 12)
+  const flatRels = (Array.isArray(media.relations) ? media.relations : [])
+    .filter((r) => r && Number.isInteger(r.id) && r.id > 0)
+  if (!flatRecs.length && !flatRels.length) return media
+  const ids = [...new Set([...flatRecs.map((r) => r.id), ...flatRels.map((r) => r.id)])]
+  const fields = ids.map((id, i) => `h${i}: Media(id: ${id}) { ${HYDRATE_CARD_FIELDS} }`).join('\n')
+  const byId = new Map()
+  try {
+    const payload = await requestAniListEndpoint(JSON.stringify({ query: `{ ${fields} }`, variables: {} }))
+    ids.forEach((id, i) => {
+      const item = payload?.data?.[`h${i}`]
+      if (item?.id) byId.set(id, normalizeMedia(item))
+    })
+  } catch (error) {
+    console.warn('Recommendation hydration failed:', error?.message || error)
+  }
+  if (flatRecs.length) {
+    const nodes = flatRecs
+      .map((r) => (byId.has(r.id) ? { mediaRecommendation: byId.get(r.id), rating: r.rating ?? null } : null))
+      .filter(Boolean)
+    if (nodes.length) media.recommendations = { nodes }
+    else media.recommendations = { nodes: [] }
+  }
+  if (flatRels.length) {
+    const edges = flatRels
+      .map((r) => (byId.has(r.id) ? { relationType: r.relationType || null, node: byId.get(r.id) } : null))
+      .filter(Boolean)
+    if (edges.length) media.relations = { edges }
+    else media.relations = { edges: [] }
+  }
+  return media
 }
 
 function titleFromSchedule(value) {
