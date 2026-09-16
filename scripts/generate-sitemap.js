@@ -4,7 +4,7 @@ import { generateSlug } from '../src/lib/slug.js'
 
 // SEO metadata and slug mapping come directly from AniList. The public
 // backend URL is reserved for runtime episode queries in the frontend.
-const ANILIST_ENDPOINT = 'https://graphql.anilist.co'
+const ANILIST_ENDPOINT = 'https://anilist-offline-db-phi.vercel.app/'
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
 const PER_PAGE = 50

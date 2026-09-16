@@ -1,5 +1,9 @@
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status'
-const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
+// Zero-rate-limit offline mirror (drop-in GraphQL clone of graphql.anilist.co).
+// Override with VITE_ANILIST_ENDPOINT to point back at the official API.
+const OFFLINE_ANILIST_ENDPOINT = 'https://anilist-offline-db-phi.vercel.app/'
+const ANILIST_GRAPHQL_ENDPOINT = import.meta.env.VITE_ANILIST_ENDPOINT || OFFLINE_ANILIST_ENDPOINT
+const IS_OFFLINE_API = !/anilist\.co/i.test(ANILIST_GRAPHQL_ENDPOINT)
 const ANILIST_MAX_RETRIES = 2
 
 // Sliding-window rate limiter.  AniList allows 30 requests per minute per IP.
@@ -58,7 +62,8 @@ async function acquireRequestSlot() {
 }
 
 async function requestAniListEndpoint(body) {
-  await acquireRequestSlot()
+  // The offline mirror has no rate limits — skip the strict throttle entirely.
+  if (!IS_OFFLINE_API) await acquireRequestSlot()
   const response = await fetch(ANILIST_GRAPHQL_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -80,8 +85,9 @@ const ANILIST_CACHE_TTL_MS = 120_000
 const responseCache = new Map()
 
 async function directAniListRequest(query, variables = {}) {
-  const body = JSON.stringify({ query, variables })
-  const requestKey = body
+  const patchedQuery = patchQueryForOfflineApi(query)
+  const body = JSON.stringify({ query: patchedQuery, variables })
+  const requestKey = JSON.stringify({ query: patchedQuery, variables })
 
   // Return cached response if still fresh
   const cached = responseCache.get(requestKey)
@@ -115,7 +121,7 @@ async function directAniListRequest(query, variables = {}) {
   })()
   anilistInFlight.set(requestKey, request)
   try {
-    const result = await request
+    const result = normalizeOfflinePayload(await request)
     responseCache.set(requestKey, { data: result, ts: Date.now() })
     // Evict stale entries when cache grows large
     if (responseCache.size > 200) {
@@ -128,6 +134,74 @@ async function directAniListRequest(query, variables = {}) {
   } finally {
     anilistInFlight.delete(requestKey)
   }
+}
+
+// --- Offline-mirror compatibility -------------------------------------------
+// The offline API stores airing data as flat scalars (next_airing_episode /
+// next_airing_at) instead of AniList's nextAiringEpisode object, and omits
+// userPreferred / extraLarge / idMal plus the AiringSchedule root. Patch
+// outgoing queries to also fetch the raw scalars (official AniList has no
+// such fields, so this only runs against the offline endpoint), then rebuild
+// the expected shapes on the way back so every consumer keeps working.
+const NEXT_AIRING_OBJECT_RE = /nextAiringEpisode\s*\{\s*episode\s+airingAt\s*\}/g
+
+function patchQueryForOfflineApi(query) {
+  if (!IS_OFFLINE_API || typeof query !== 'string') return query
+  if (!NEXT_AIRING_OBJECT_RE.test(query)) return query
+  NEXT_AIRING_OBJECT_RE.lastIndex = 0
+  return query.replace(NEXT_AIRING_OBJECT_RE, (m) => `${m} next_airing_episode next_airing_at`)
+}
+
+function normalizeMedia(m) {
+  if (!m || typeof m !== 'object') return m
+  const t = m.title
+  if (t && typeof t === 'object' && t.userPreferred == null) {
+    t.userPreferred = t.english || t.romaji || t.native || 'Unknown title'
+  }
+  const c = m.coverImage
+  if (c && typeof c === 'object' && c.extraLarge == null && c.large) {
+    c.extraLarge = c.large
+  }
+  // Rebuild nextAiringEpisode from the raw scalars when the object is absent.
+  const na = m.nextAiringEpisode
+  const looksBare = na == null || typeof na === 'number'
+  if (looksBare && (m.next_airing_episode != null || m.next_airing_at != null)) {
+    const episode = Number(m.next_airing_episode)
+    const airingAt = Number(m.next_airing_at)
+    m.nextAiringEpisode = {
+      episode: Number.isInteger(episode) && episode > 0 ? episode : null,
+      airingAt: Number.isInteger(airingAt) && airingAt > 0 ? airingAt : null,
+    }
+  } else if (looksBare) {
+    m.nextAiringEpisode = null
+  }
+  delete m.next_airing_episode
+  delete m.next_airing_at
+  // Unmappable nested selections come back as placeholder junk — collapse them
+  // to the empty shapes consumers already handle.
+  if (Array.isArray(m.recommendations)) m.recommendations = { nodes: [] }
+  if (Array.isArray(m.relations)) m.relations = { edges: [] }
+  if (!Array.isArray(m.streamingEpisodes)) m.streamingEpisodes = m.streamingEpisodes ?? []
+  const recNodes = m.recommendations?.nodes
+  if (Array.isArray(recNodes)) recNodes.forEach((n) => normalizeMedia(n?.mediaRecommendation))
+  const relEdges = m.relations?.edges
+  if (Array.isArray(relEdges)) relEdges.forEach((e) => normalizeMedia(e?.node))
+  return m
+}
+
+function normalizeOfflinePayload(payload) {
+  if (!IS_OFFLINE_API || !payload || typeof payload !== 'object' || !payload.data) return payload
+  const data = payload.data
+  const visitPage = (page) => {
+    if (page && Array.isArray(page.media)) page.media.forEach(normalizeMedia)
+  }
+  for (const [key, value] of Object.entries(data)) {
+    if (!value || typeof value !== 'object') continue
+    if (/^m\d+$/.test(key)) normalizeMedia(value) // anilistBatchDetail aliases
+    else if (key === 'Media') normalizeMedia(value)
+    else if (Array.isArray(value.media)) visitPage(value) // Page + aliased Pages
+  }
+  return payload
 }
 
 function titleFromSchedule(value) {
@@ -227,6 +301,12 @@ export async function getAnirakuSchedule({ page = 1, perPage = 50, startAt, endA
   const safeEndAt = Math.floor(Number(endAt))
   const boundedWindow = Number.isInteger(safeStartAt) && Number.isInteger(safeEndAt) && safeStartAt > 0 && safeEndAt > safeStartAt
   if (boundedWindow) return getAnirakuCalendarWeek(safePage, safePerPage, { startAt: safeStartAt, endAt: safeEndAt })
+  if (IS_OFFLINE_API) {
+    // The offline mirror has no AiringSchedule root — use the media-based
+    // calendar path with a next-7-days window instead.
+    const nowSec = Math.floor(Date.now() / 1000)
+    return getAnirakuCalendarWeek(safePage, safePerPage, { startAt: nowSec, endAt: nowSec + (7 * 24 * 60 * 60) })
+  }
   return getAnirakuAiringScheduleFallback(safePage, safePerPage, {
     startAt: Math.floor(Date.now() / 1000),
     endAt: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60),

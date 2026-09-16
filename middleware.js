@@ -1,4 +1,6 @@
-const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co'
+// Zero-rate-limit offline mirror (drop-in GraphQL clone). Official endpoint
+// kept for reference: 'https://graphql.anilist.co'
+const ANILIST_GRAPHQL_ENDPOINT = 'https://anilist-offline-db-phi.vercel.app/'
 const SITE = 'https://www.aniraku.tech'
 const FALLBACK_IMAGE = `${SITE}/og-image.png`
 

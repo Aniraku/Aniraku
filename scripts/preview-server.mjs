@@ -59,7 +59,7 @@ async function proxyAniList(req, res) {
   }
 
   try {
-    const upstream = await fetch('https://graphql.anilist.co', {
+    const upstream = await fetch('https://anilist-offline-db-phi.vercel.app/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ query: payload.query, variables: payload.variables || {} }),
