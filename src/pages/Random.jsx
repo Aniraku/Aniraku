@@ -14,7 +14,7 @@ const MODES = [
 ]
 
 const titleOf = (anime) => anime?.title?.english || anime?.title?.romaji || anime?.title?.userPreferred || 'Untitled title'
-const textOf = (value = '') => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+const textOf = (value = '') => String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 const detailHref = (anime) => `/anime/${generateSlug(titleOf(anime))}-${anime.id}`
 const watchHref = (anime) => `/watch/${generateSlug(titleOf(anime))}-${anime.id}-episode-1`
 const formatOf = (value) => (value || 'ANIME').replace(/_/g, ' ')

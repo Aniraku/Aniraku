@@ -500,7 +500,7 @@ const uniqueMedia = (items) => {
 }
 const detailHref = (item) => `/anime/${generateSlug(titleFor(item))}-${item.id}`
 const watchHref = (item) => `/watch/${generateSlug(titleFor(item))}-${item.id}-episode-1`
-const stripHtml = (text = '') => text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+const stripHtml = (text = '') => String(text ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 const mediaMeta = (item) => `${item?.format || 'TV'}${item?.episodes ? ` · ${item.episodes} eps` : ''}${item?.averageScore ? ` · ${item.averageScore}%` : ''}`
 
 function PosterCollection({ items, limit = 12 }) {

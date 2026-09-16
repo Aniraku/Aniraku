@@ -236,30 +236,52 @@ async function hydrateMediaDetails(media) {
     .slice(0, 12)
   const flatRels = (Array.isArray(media.relations) ? media.relations : [])
     .filter((r) => r && Number.isInteger(r.id) && r.id > 0)
-  if (!flatRecs.length && !flatRels.length) return media
+  const genres = Array.isArray(media.genres) ? media.genres.filter((g) => typeof g === 'string') : []
+  // Top up a thin rail with popular same-genre titles (no sort = cheap
+  // search-index pagination on the mirror, only needed shards fetched).
+  const need = Math.max(0, 12 - flatRecs.length)
+  const backfillIds = new Set([media.id, ...flatRecs.map((r) => r.id)])
+  const backfillQuery = genres.length > 0 && need > 0
+    ? `{ Page(page: 1, perPage: ${need + backfillIds.size + 2}) { media(genre_in: $hgenres) { ${HYDRATE_CARD_FIELDS} } } }`
+    : null
+  if (!flatRecs.length && !flatRels.length && !backfillQuery) return media
   const ids = [...new Set([...flatRecs.map((r) => r.id), ...flatRels.map((r) => r.id)])]
   const fields = ids.map((id, i) => `h${i}: Media(id: ${id}) { ${HYDRATE_CARD_FIELDS} }`).join('\n')
   const byId = new Map()
-  try {
-    const payload = await requestAniListEndpoint(JSON.stringify({ query: `{ ${fields} }`, variables: {} }))
-    ids.forEach((id, i) => {
-      const item = payload?.data?.[`h${i}`]
-      if (!item?.id) return
-      const normalized = normalizeMedia(item)
-      // The mirror DB is anime-only and carries no `type` field, but
-      // AnimeDetail gates relations on node.type === 'ANIME'.
-      if (normalized.type == null) normalized.type = 'ANIME'
-      byId.set(id, normalized)
-    })
-  } catch (error) {
-    console.warn('Recommendation hydration failed:', error?.message || error)
-  }
-  if (flatRecs.length) {
+  let backfill = []
+  const cardPromise = ids.length
+    ? requestAniListEndpoint(JSON.stringify({ query: `{ ${fields} }`, variables: {} }))
+      .then((payload) => {
+        ids.forEach((id, i) => {
+          const item = payload?.data?.[`h${i}`]
+          if (!item?.id) return
+          const normalized = normalizeMedia(item)
+          // The mirror DB is anime-only and carries no `type` field, but
+          // AnimeDetail gates relations on node.type === 'ANIME'.
+          if (normalized.type == null) normalized.type = 'ANIME'
+          byId.set(id, normalized)
+        })
+      })
+      .catch((error) => console.warn('Recommendation hydration failed:', error?.message || error))
+    : Promise.resolve()
+  const backfillPromise = backfillQuery
+    ? requestAniListEndpoint(JSON.stringify({ query: backfillQuery, variables: { hgenres: genres.slice(0, 3) } }))
+      .then((payload) => { backfill = payload?.data?.Page?.media || [] })
+      .catch((error) => console.warn('Similar-title backfill failed:', error?.message || error))
+    : Promise.resolve()
+  await Promise.all([cardPromise, backfillPromise])
+  if (flatRecs.length || backfill.length) {
     const nodes = flatRecs
       .map((r) => (byId.has(r.id) ? { mediaRecommendation: byId.get(r.id), rating: r.rating ?? null } : null))
       .filter(Boolean)
-    if (nodes.length) media.recommendations = { nodes }
-    else media.recommendations = { nodes: [] }
+    for (const item of backfill) {
+      if (nodes.length >= 12 || !item?.id || backfillIds.has(item.id)) continue
+      backfillIds.add(item.id)
+      const normalized = normalizeMedia(item)
+      if (normalized.type == null) normalized.type = 'ANIME'
+      nodes.push({ mediaRecommendation: normalized, rating: null })
+    }
+    media.recommendations = { nodes }
   }
   if (flatRels.length) {
     const edges = flatRels
