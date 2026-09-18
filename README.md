@@ -46,12 +46,14 @@ The main flow is:
 
 `discover` → `watch` → `remember`
 
-The catalog uses AniList metadata, schedules, recommendations, and search. The player supports adaptive playback, provider fallback, subtitles, dubs, quality selection, seeking, and intro/outro skipping where the data is available. Progress and personal context remain attached to the title instead of disappearing after playback.
+The catalog uses a Custom [AniList](https://github.com/Shoislam0311/anilist-offline-db) `what's Same as GRAPHQL but without any Rate limits i am trying to achieve without Limits API of it..` metadata, schedules, recommendations, and search. The player supports adaptive playback, provider fallback, subtitles, dubs, quality selection, seeking, and intro/outro skipping where the data is available. Progress and personal context remain attached to the title instead of disappearing after playback.
 
 ## Open the project
 
-<a href="https://www.aniraku.tech/"><img src="https://img.shields.io/badge/OPEN%20ANIRAKU-Visit%20the%20live%20site-3B82F6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open Aniraku live site" /></a>
+<a href="https://test.aniraku.tech/"><img src="https://img.shields.io/badge/OPEN%20ANIRAKU-Visit%20the%20live%20site-3B82F6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open Aniraku live site" /></a>
 <a href="https://github.com/Aniraku/Aniraku-App"><img src="https://img.shields.io/badge/ANDROID-App%20repository-111827?style=for-the-badge&logo=android&logoColor=3DDC84" alt="Open Aniraku Android repository" /></a>
+<a href="https://github.com/Shoislam0311/anilist-offline-db"><img src="https://img.shields.io/badge/AniList-Custom_Mirror_Repository-111827?style=for-the-badge&logo=anilist&logoColor=02A9FF" alt="Open the in-development mirror of the AniList repository" />
+</a>
 
 ## Main areas
 
