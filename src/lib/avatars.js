@@ -115,20 +115,38 @@ export const AVATAR_LIST = FILES.map((name, index) => toAvatar({ name }, index))
 
 const IMAGE_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp)$/i
 
-/**
- * Read the bucket contents so additions and removals made in Supabase are
- * reflected in the profile without a code deploy.
- */
-export async function listAvatars() {
-  const { data, error } = await supabase.storage.from(AVATAR_BUCKET).list('', {
+async function listStorageFiles(prefix = '', visited = new Set()) {
+  if (visited.has(prefix)) return []
+  visited.add(prefix)
+
+  const { data, error } = await supabase.storage.from(AVATAR_BUCKET).list(prefix, {
     limit: 1000,
     sortBy: { column: 'name', order: 'asc' },
   })
   if (error) throw error
 
-  return (data || [])
-    .filter(file => file.name && IMAGE_FILE_PATTERN.test(file.name))
-    .map((file, index) => toAvatar(file, index))
+  const files = []
+  for (const entry of data || []) {
+    if (!entry.name) continue
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name
+    // Supabase returns folders without an id; recurse so avatars also work
+    // when the bucket files are organized under one or more directories.
+    if (!entry.id) {
+      files.push(...await listStorageFiles(path, visited))
+    } else if (IMAGE_FILE_PATTERN.test(entry.name)) {
+      files.push({ ...entry, name: path })
+    }
+  }
+  return files
+}
+
+/**
+ * Read the bucket contents so additions and removals made in Supabase are
+ * reflected in the profile without a code deploy.
+ */
+export async function listAvatars() {
+  const files = await listStorageFiles()
+  return files.map((file, index) => toAvatar(file, index))
 }
 
 export function defaultAvatar(seed = 0, avatars = AVATAR_LIST) {
