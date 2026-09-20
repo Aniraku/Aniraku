@@ -197,16 +197,23 @@ export async function exportProviderList(provider) {
 // Human-readable count summary for import/export results.
 export function describeImport(r) {
   if (!r) return ''
+  if (r.error) return r.error
   const parts = []
   if (r.imported > 0) parts.push(`${r.imported} imported`)
   if (r.already > 0) parts.push(`${r.already} already in your library`)
+  if (r.episodes > 0) parts.push(`${r.episodes} episodes of progress`)
+  if (r.scores > 0) parts.push(`${r.scores} scores`)
+  if (r.unmapped > 0) parts.push(`${r.unmapped} had no Aniraku match`)
+  if (r.limited) parts.push('more episodes remain — import again to continue')
   return parts.join(' · ') || 'Nothing new to import'
 }
 
 export function describeExport(r) {
   if (!r) return ''
+  if (r.error) return r.error
   const parts = []
-  if (r.exported > 0) parts.push(`${r.exported} progress entries updated`)
+  if (r.exported > 0) parts.push(`${r.exported} titles updated`)
+  if (r.scores > 0) parts.push(`${r.scores} scores`)
   if (r.skipped > 0) parts.push(`${r.skipped} already completed`)
   if (r.failed > 0) parts.push(`${r.failed} failed`)
   if (r.limited) parts.push('more titles remain — export again to continue')
