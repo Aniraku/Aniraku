@@ -5,6 +5,15 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 export const AVATAR_BUCKET = 'Anixen Avatars'
 
 const FILES = [
+  // Original avatar presets retained for existing profile selections.
+  '01.png', '02.png', '03.png', '06.png', '07.png',
+  'avatar-02.png', 'avatar-04.png', 'avatar-12.png', 'avatar-17.png',
+  'avatar-18.png', 'avatar-20.png', 'avatar-22.png', 'avatar-23.png',
+  'avatar2-08.png', 'avatar2-10.png',
+  'beerus.png', 'vegeta.png',
+  'File2.jpg', 'File4.png', 'File6.png', 'File9.jpg',
+  'user-00.jpeg', 'user-01.jpeg', 'user-02.jpeg', 'user-04.jpeg',
+  'user-07.jpeg', 'user-08.jpeg',
   'attack_on_titan_final_season_01_avatar_01.png',
   'attack_on_titan_final_season_02_avatar_02.png',
   'attack_on_titan_final_season_03_avatar_03.png',
@@ -93,6 +102,26 @@ const FILES = [
   'smoking_behind_supermarket_10_avatar_10.png',
 ]
 
+const HIDDEN_AVATARS = new Set([
+  'smoking_behind_supermarket_03_avatar_03.png',
+  'smoking_behind_supermarket_04_avatar_04.png',
+  'smoking_behind_supermarket_05_avatar_05.png',
+  'smoking_behind_supermarket_07_avatar_07.png',
+  'smoking_behind_supermarket_08_avatar_08.png',
+  'smoking_behind_supermarket_09_avatar_09.png',
+  'smoking_behind_supermarket_10_avatar_10.png',
+  'link_click_01_avatar_01.png',
+  'link_click_02_avatar_02.png',
+  'link_click_03_avatar_03.png',
+  'link_click_04_avatar_04.png',
+  'link_click_05_avatar_05.png',
+  'link_click_06_avatar_06.png',
+  'link_click_07_avatar_07.png',
+  'link_click_08_avatar_08.png',
+  'link_click_09_avatar_09.png',
+  'link_click_10_avatar_10.png',
+])
+
 function encodeStoragePath(path) {
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/')
 }
@@ -111,7 +140,9 @@ function toAvatar(file, index) {
   }
 }
 
-export const AVATAR_LIST = FILES.map((name, index) => toAvatar({ name }, index))
+export const AVATAR_LIST = FILES
+  .filter(name => !HIDDEN_AVATARS.has(name))
+  .map((name, index) => toAvatar({ name }, index))
 
 const IMAGE_FILE_PATTERN = /\.(?:avif|gif|jpe?g|png|webp)$/i
 
@@ -133,7 +164,7 @@ async function listStorageFiles(prefix = '', visited = new Set()) {
     // when the bucket files are organized under one or more directories.
     if (!entry.id) {
       files.push(...await listStorageFiles(path, visited))
-    } else if (IMAGE_FILE_PATTERN.test(entry.name)) {
+    } else if (IMAGE_FILE_PATTERN.test(entry.name) && !HIDDEN_AVATARS.has(entry.name)) {
       files.push({ ...entry, name: path })
     }
   }
