@@ -63,7 +63,6 @@ import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
 import {
   buildProxyUrl,
   isOwnProxyUrl,
-  unwrapProxyShapedStreamUrl,
 } from '../lib/watchProxyUrl'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
@@ -2855,13 +2854,13 @@ export default function Watch() {
       if (!container) return
 
       const myBuildId = ++buildIdRef.current
-      // Provider payloads deliver media through their backend's proxy shape
-      // (<origin>/proxy?url=<cdn>&headers=<json>). Unwrap ONCE at the
-      // playback entry: when that upstream proxy is firewall-blocked by the
-      // CDN, the inner CDN can still be reached through our own proxy
-      // (headers re-attached server-side) or straight from the browser.
-      const proxyShapedSource = unwrapProxyShapedStreamUrl(streamUrl)
-      const effectiveHeaders = headers || proxyShapedSource?.headers || null
+      // The backend resolves streams server-side and returns URLs that are
+      // ALREADY fully proxied (<API>/api/v1/proxy?url=<cdn>&headers=<json>).
+      // Use them exactly as delivered: never unwrap them back to the raw CDN
+      // (that only produces 403 hotlink rejections and CSP connect-src
+      // violations in the browser) and never re-wrap them (double-wrapping
+      // 403s at the proxy gate).
+      const effectiveHeaders = headers || null
       // Per-build nonce: every playback session gets fresh proxy URLs, so
       // stale edge-cache variants can never be served to the browser.
       // The backend strips "rn" before dialing the CDN.
@@ -2895,13 +2894,6 @@ export default function Watch() {
           } catch {}
         }
         prewarm(proxied(streamUrl), 'cors')
-        prewarm(streamUrl, 'no-cors')
-        if (proxyShapedSource?.innerUrl && proxyShapedSource.innerUrl !== streamUrl) {
-          // Heat the unwrapped legs too — the inner CDN is the only route
-          // that can work when the payload's upstream proxy is blocked.
-          prewarm(proxied(proxyShapedSource.innerUrl), 'cors')
-          prewarm(proxyShapedSource.innerUrl, 'no-cors')
-        }
       }
               // hls.js pre-warm: the dynamic import is the single biggest
               // startup cost on the HLS path (parser compile + ~120KB of JS).
@@ -2956,17 +2948,12 @@ export default function Watch() {
                                 verification: sourceVerification,
                                 directUrl: url,
         proxyUrl: proxied(url),
-        proxyOnly: bonkProxyOnly,
+        // Backend URLs arrive already proxied end-to-end — a "direct" leg
+        // would just re-fetch the raw CDN from the browser (403 hotlink
+        // rejections, CSP connect-src blocks). Proxy-only for those.
+        proxyOnly: bonkProxyOnly || isOwnProxyUrl(url),
         directPreferred: peweDirectPreferred,
       })
-                if (proxyShapedSource?.innerUrl && proxyShapedSource.innerUrl !== url) {
-                  // The payload URL routes through the provider's backend
-                  // proxy. If that upstream is blocked, the inner CDN is the
-                  // fallback: through our own proxy (headers re-attached
-                  // server-side) or straight from the viewer's browser.
-                  transportPlan.push({ url: proxied(proxyShapedSource.innerUrl), mode: 'proxy' })
-                  transportPlan.push({ url: proxyShapedSource.innerUrl, mode: 'direct' })
-                }
                 let transportIndex = 0
                 let hlsTried = false
         const tryUrl = (target, withCors) => {
@@ -3625,16 +3612,12 @@ export default function Watch() {
                                         verification: sourceVerification,
                                         directUrl: url,
                                         proxyUrl: proxiedH(url),
+                                        // Same rule as the native path: an
+                                        // already-proxied backend URL must
+                                        // never fall back to the raw CDN.
+                                        proxyOnly: bonkProxyOnly || isOwnProxyUrl(url),
                                         directPreferred: peweDirectPreferred,
                                 })
-                                if (proxyShapedSource?.innerUrl && proxyShapedSource.innerUrl !== url) {
-                                  // Same chain as everywhere else: if the
-                                  // payload's upstream proxy is blocked, try
-                                  // the inner CDN via our own proxy, then
-                                  // straight from the browser.
-                                  hlsTransportPlan.push({ url: proxiedH(proxyShapedSource.innerUrl), mode: 'proxy' })
-                                  hlsTransportPlan.push({ url: proxyShapedSource.innerUrl, mode: 'direct' })
-                                }
                                 let hlsTransportIndex = 0
                           const updateNativeHlsQualities = async () => {
                             try {
@@ -3649,7 +3632,8 @@ export default function Watch() {
                         const height = Number(streamInfo.match(/RESOLUTION=\d+x(\d+)/i)?.[1] || 0)
                         if (!child || !height) continue
                         const childCandidate = new URL(child, window.location.origin)
-                        const childUrl = childCandidate.origin === new URL(PROXY_BASE).origin && childCandidate.pathname.endsWith('/proxy')
+                        const proxyOrigin = (() => { try { return new URL(PROXY_BASE, window.location.origin).origin } catch { return window.location.origin } })()
+                        const childUrl = childCandidate.origin === proxyOrigin && childCandidate.pathname.endsWith('/proxy')
                           ? childCandidate.searchParams.get('url') || new URL(child, url).toString()
                           : new URL(child, url).toString()
                         if (!variants.some((item) => item.height === height)) variants.push({ height, url: childUrl })
@@ -4750,18 +4734,11 @@ export default function Watch() {
           setCachedStream(source, data)
           const mediaEntry = buildQualityList(data.sources)[0]
           if (mediaEntry?.url && typeof fetch === 'function') {
-            const warmHeaders = data.headers && typeof data.headers === 'object' ? data.headers : null
-            const warmNonce = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
-            const proxyUrl = buildProxyUrl({ target: mediaEntry.url, headers: warmHeaders, nonce: warmNonce, proxyBase: PROXY_BASE })
-            // Warm both legs concurrently. Failures are intentionally ignored;
-            // the real player still owns all transport and fallback decisions.
-            fetch(proxyUrl, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
-            fetch(mediaEntry.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
-            const warmInner = unwrapProxyShapedStreamUrl(mediaEntry.url)
-            if (warmInner?.innerUrl && warmInner.innerUrl !== mediaEntry.url) {
-              fetch(buildProxyUrl({ target: warmInner.innerUrl, headers: warmHeaders, nonce: warmNonce, proxyBase: PROXY_BASE }), { method: 'HEAD', cache: 'no-store' }).catch(() => {})
-              fetch(warmInner.innerUrl, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
-            }
+            // The backend URL is already proxied — warm it exactly as it will
+            // be played (buildProxyUrl passes proxy-shaped URLs through
+            // untouched). No raw-CDN legs: those only cause 403 hotlink
+            // rejections and CSP blocks.
+            fetch(mediaEntry.url, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
           }
         }
         return hasAnyStreamSource(data) ? data : null
