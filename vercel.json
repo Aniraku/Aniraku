@@ -3,6 +3,8 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
+    { "source": "/health", "destination": "https://api-host.redacted.invalid/health" },
+    { "source": "/api/v1/(.*)", "destination": "https://api-host.redacted.invalid/api/v1/$1" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/sitemaps/(.*)", "destination": "/sitemaps/$1" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
