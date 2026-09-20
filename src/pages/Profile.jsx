@@ -556,8 +556,10 @@ const Profile = () => {
               <h3 style={{ fontSize: 16, marginBottom: 8 }}>Library</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
                 Move your list between Aniraku and your streaming accounts. Import pulls a
-                provider's library into your Aniraku favorites; export writes each title's
-                current Aniraku watch progress and status there. Both use the connection from{' '}
+                provider's library into Aniraku — favorites, episode progress and scores
+                (progress only advances, existing ratings are kept). Export writes each
+                title's current Aniraku watch progress, completed status and average
+                score there. Both use the connection from{' '}
                 <Link to="/profile/settings" style={{ color: 'var(--accent)' }}>Settings → Library Sync</Link>.
               </p>
 
@@ -649,8 +651,9 @@ const Profile = () => {
                         fontSize: 13, lineHeight: 1.5,
                       }}>
                         <p style={{ color: 'var(--text-secondary)', marginBottom: 10 }}>
-                          Add your Aniraku favorites to your {PROVIDER_LABELS[provider]} library as
-                          <strong> Completed</strong>? Already-completed titles are skipped.
+                          Add your Aniraku favorites to your {PROVIDER_LABELS[provider]} library,
+                          preserving watch progress, completed status and scores?
+                          Already-completed titles are skipped.
                         </p>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => runExport(provider)} disabled={busy} style={smallBtn(true)}>
