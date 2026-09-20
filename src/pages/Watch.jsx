@@ -60,6 +60,11 @@ import {
   shouldTryHlsFallback,
 } from '../lib/watchSourceTransport'
 import { getProviderTransportOverride } from '../lib/watchProviderPlayer'
+import {
+  buildProxyUrl,
+  isOwnProxyUrl,
+  unwrapProxyShapedStreamUrl,
+} from '../lib/watchProxyUrl'
 import { chooseBrowserPlayableEmbed } from '../lib/watchEmbedFallback'
 import { createTimelineHoverPreview } from '../lib/watchTimelineHover'
 import {
@@ -913,29 +918,9 @@ function hasAnyStreamSource(payload) {
   return Array.isArray(payload?.sources) && payload.sources.some((source) => source?.url)
 }
 
-// Provider payloads frequently wrap media in their backend's proxy shape:
-//   https://<origin>/proxy?url=<encodeURIComponent(cdn-url)>&headers=<json>
-// Unwrapping yields the inner CDN URL plus the exact upstream headers the
-// provider attached, so the app can also try the inner CDN through its own
-// proxy (headers re-attached server-side) or straight from the viewer's
-// browser — routes that still work when the payload's upstream proxy is
-// firewall-blocked by the CDN.
-function unwrapProxyShapedStreamUrl(url) {
-  try {
-    const parsed = new URL(String(url || ''))
-    if (!/\/proxy\/?$/.test(parsed.pathname)) return null
-    const inner = parsed.searchParams.get('url')
-    if (!inner || !/^https?:\/\//i.test(inner)) return null
-    let headers = null
-    const rawHeaders = parsed.searchParams.get('headers')
-    if (rawHeaders) {
-      try { headers = JSON.parse(rawHeaders) } catch { headers = null }
-    }
-    return { innerUrl: inner, headers }
-  } catch {
-    return null
-  }
-}
+// unwrapProxyShapedStreamUrl lives in lib/watchProxyUrl.js — it now peels
+// MULTIPLE wrapping layers, so a legacy double-wrapped URL collapses to the
+// bare CDN URL instead of surfacing a still-proxy-shaped half-unwrap.
 
 function seekControlHtml(direction) {
   // Official Material Design "replay" / "forward" glyph geometry — the
@@ -2877,9 +2862,6 @@ export default function Watch() {
       // (headers re-attached server-side) or straight from the browser.
       const proxyShapedSource = unwrapProxyShapedStreamUrl(streamUrl)
       const effectiveHeaders = headers || proxyShapedSource?.headers || null
-      const headersParam = effectiveHeaders
-        ? `&headers=${encodeURIComponent(JSON.stringify(effectiveHeaders))}`
-        : ''
       // Per-build nonce: every playback session gets fresh proxy URLs, so
       // stale edge-cache variants can never be served to the browser.
       // The backend strips "rn" before dialing the CDN.
@@ -2891,8 +2873,11 @@ export default function Watch() {
       // request 403s at the proxy gate — pass those through untouched; they
       // already carry their own headers param.
       const proxied = (u) => {
-        if (typeof u === 'string' && u.includes('/api/v1/proxy?url=')) return u
-        return `${PROXY_BASE}/proxy?url=${encodeURIComponent(u)}${headersParam}&rn=${nonce}`
+        // Idempotence: return proxy URLs untouched instead of double-wrapping
+        // them (proxy?url=proxy?url=cdn 403s at the proxy gate). Query-marker
+        // detection covers any mount path, not just /api/v1/proxy.
+        if (typeof u === 'string' && isOwnProxyUrl(u)) return u
+        return buildProxyUrl({ target: u, headers: effectiveHeaders, nonce, proxyBase: PROXY_BASE })
       }
               // First-proxy pre-warm: start the network handshake against the
               // proxy as soon as we know the selected source. DNS, TCP, TLS and
@@ -3445,7 +3430,7 @@ export default function Watch() {
               // fall back to the provider's generic download link.
               const match = pickDownloadForQuality(downloadsListRef.current, selectedQualityLabelRef.current)
               const rawUrl = match?.url || downloadUrlSourceRef.current || currentDownloadUrlRef.current
-              if (!rawUrl || rawUrl.includes('/api/v1/proxy') || rawUrl.includes('.m3u8')) {
+              if (!rawUrl || isOwnProxyUrl(rawUrl) || rawUrl.includes('.m3u8')) {
                 showToast('No download available for this source', { icon: 'warn' })
                 return
               }
@@ -4765,18 +4750,16 @@ export default function Watch() {
           setCachedStream(source, data)
           const mediaEntry = buildQualityList(data.sources)[0]
           if (mediaEntry?.url && typeof fetch === 'function') {
-            const headersParam = data.headers
-              ? `&headers=${encodeURIComponent(JSON.stringify(data.headers))}`
-              : ''
+            const warmHeaders = data.headers && typeof data.headers === 'object' ? data.headers : null
             const warmNonce = `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
-            const proxyUrl = `${PROXY_BASE}/proxy?url=${encodeURIComponent(mediaEntry.url)}${headersParam}&rn=${warmNonce}`
+            const proxyUrl = buildProxyUrl({ target: mediaEntry.url, headers: warmHeaders, nonce: warmNonce, proxyBase: PROXY_BASE })
             // Warm both legs concurrently. Failures are intentionally ignored;
             // the real player still owns all transport and fallback decisions.
             fetch(proxyUrl, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
             fetch(mediaEntry.url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
             const warmInner = unwrapProxyShapedStreamUrl(mediaEntry.url)
             if (warmInner?.innerUrl && warmInner.innerUrl !== mediaEntry.url) {
-              fetch(`${PROXY_BASE}/proxy?url=${encodeURIComponent(warmInner.innerUrl)}${headersParam}&rn=${warmNonce}`, { method: 'HEAD', cache: 'no-store' }).catch(() => {})
+              fetch(buildProxyUrl({ target: warmInner.innerUrl, headers: warmHeaders, nonce: warmNonce, proxyBase: PROXY_BASE }), { method: 'HEAD', cache: 'no-store' }).catch(() => {})
               fetch(warmInner.innerUrl, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' }).catch(() => {})
             }
           }
