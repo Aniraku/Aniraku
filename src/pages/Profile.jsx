@@ -57,7 +57,11 @@ const Profile = () => {
       try {
         const next = await listAvatars()
         if (!cancelled) {
-          setAvatars(next)
+          // A public object can be readable while Storage list permissions
+          // are restricted. Keep the supplied catalog visible in that case;
+          // a non-empty live result remains the source of truth for adds and
+          // removals whenever listing is available.
+          setAvatars(next.length ? next : AVATAR_LIST)
           setAvatarLibraryReady(true)
         }
       } catch (err) {
