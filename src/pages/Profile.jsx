@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Footer from '../components/Footer/Footer'
-import { AVATAR_LIST, avatarUrl, defaultAvatar } from '../lib/avatars'
+import { AVATAR_BUCKET, AVATAR_LIST, avatarUrl, defaultAvatar, listAvatars } from '../lib/avatars'
 import { supabase } from '../lib/supabase'
 import { generateSlug, titleText } from '../lib/slug'
 import {
@@ -39,10 +39,56 @@ const Profile = () => {
   const [syncBusy, setSyncBusy] = useState('') // 'mal-import' | 'mal-export' | ...
   const [syncResult, setSyncResult] = useState({}) // provider -> { type, text, error }
   const [confirmExport, setConfirmExport] = useState('') // provider being confirmed
+  const [avatars, setAvatars] = useState(AVATAR_LIST)
+  const [avatarLibraryReady, setAvatarLibraryReady] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) navigate('/login')
   }, [user, loading, navigate])
+
+  // The bucket is the source of truth for the avatar picker. Realtime gives
+  // quick updates when enabled for storage.objects; polling keeps this
+  // working even when the project has not added storage to its publication.
+  useEffect(() => {
+    if (activeTab !== 'avatars') return undefined
+    let cancelled = false
+
+    const loadAvatars = async () => {
+      try {
+        const next = await listAvatars()
+        if (!cancelled) {
+          setAvatars(next)
+          setAvatarLibraryReady(true)
+        }
+      } catch (err) {
+        console.error('avatar library fetch error:', err)
+        if (!cancelled) {
+          setAvatars(AVATAR_LIST)
+          setAvatarLibraryReady(true)
+        }
+      }
+    }
+
+    loadAvatars()
+    const interval = window.setInterval(loadAvatars, 15000)
+    const channel = supabase
+      .channel(`avatar-library-${user?.id || 'public'}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'storage',
+        table: 'objects',
+      }, (payload) => {
+        const bucket = payload?.new?.bucket_id || payload?.old?.bucket_id
+        if (bucket === AVATAR_BUCKET) loadAvatars()
+      })
+      .subscribe()
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
+  }, [activeTab, user?.id])
 
   // Load server-side bookmarks (the same table import writes to) as the
   // source of truth, migrating any guest-only local bookmarks up first and
@@ -347,8 +393,11 @@ const Profile = () => {
             <div className="profile-card" style={{ background: 'var(--bg-card)', borderRadius: 12, padding: 24, border: '1px solid var(--border)' }}>
               <h3 style={{ fontSize: 16, marginBottom: 8 }}>Choose an avatar</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>Community presets from the Aniraku avatar library.</p>
-              <div className="profile-avatar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 12 }}>
-                {AVATAR_LIST.map(av => {
+              {avatarLibraryReady && avatars.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No avatars are currently available.</p>
+              ) : (
+                <div className="profile-avatar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 12 }}>
+                {avatars.map(av => {
                   const selected = profile?.avatar_url === av.url || profile?.avatar_url?.endsWith(av.name)
                   return (
                     <button
@@ -370,7 +419,8 @@ const Profile = () => {
                     </button>
                   )
                 })}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
