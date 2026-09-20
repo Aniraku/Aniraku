@@ -556,8 +556,8 @@ const Profile = () => {
               <h3 style={{ fontSize: 16, marginBottom: 8 }}>Library</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
                 Move your list between Aniraku and your streaming accounts. Import pulls a
-                provider's library into your Aniraku favorites; export writes your favorites
-                there as <em>Completed</em>. Both use the connection from{' '}
+                provider's library into your Aniraku favorites; export writes each title's
+                current Aniraku watch progress and status there. Both use the connection from{' '}
                 <Link to="/profile/settings" style={{ color: 'var(--accent)' }}>Settings → Library Sync</Link>.
               </p>
 

@@ -175,18 +175,23 @@ export async function importProviderList(provider) {
 }
 
 export async function exportProviderList(provider) {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/export/${provider}`, {
-      method: 'POST',
-      headers: await authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({}),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { error: data.error || 'Export failed' }
-    return data
-  } catch {
-    return { error: 'Could not reach the server' }
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/export/${provider}`, {
+        method: 'POST',
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) return data
+      const retryable = res.status === 408 || res.status === 429 || res.status >= 500
+      if (!retryable || attempt === 2) return { error: data.error || 'Export failed' }
+    } catch {
+      if (attempt === 2) return { error: 'Could not reach the server' }
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 700 * (attempt + 1)))
   }
+  return { error: 'Export failed' }
 }
 
 // Human-readable count summary for import/export results.
@@ -201,7 +206,7 @@ export function describeImport(r) {
 export function describeExport(r) {
   if (!r) return ''
   const parts = []
-  if (r.exported > 0) parts.push(`${r.exported} added as completed`)
+  if (r.exported > 0) parts.push(`${r.exported} progress entries updated`)
   if (r.skipped > 0) parts.push(`${r.skipped} already completed`)
   if (r.failed > 0) parts.push(`${r.failed} failed`)
   if (r.limited) parts.push('more titles remain — export again to continue')
