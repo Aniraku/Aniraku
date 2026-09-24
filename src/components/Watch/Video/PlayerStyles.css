@@ -1,0 +1,942 @@
+@import '@vidstack/react/player/styles/default/theme.css';
+@import '@vidstack/react/player/styles/default/layouts/audio.css';
+@import '@vidstack/react/player/styles/default/layouts/video.css';
+
+.player {
+  --brand-color: #f5f5f5;
+  --focus-color: #4e9cf6;
+
+  --audio-brand: var(--brand-color);
+  --audio-focus-ring-color: var(--focus-color);
+  --audio-border-radius: var(--global-border-radius);
+
+  --video-brand: var(--brand-color);
+  --video-focus-ring-color: var(--focus-color);
+  --video-border-radius: var(--global-border-radius);
+  --video-border: none;
+
+  /* 👉 https://vidstack.io/docs/player/components/layouts/default#css-variables for more. */
+}
+
+.player[data-view-type='audio'] .vds-poster {
+  display: none;
+  border-radius: 5rem;
+}
+
+.player[data-view-type='video'] {
+  aspect-ratio: 16 /9;
+}
+
+.src-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  margin-top: 40px;
+  margin-inline: auto;
+  max-width: 300px;
+}
+
+.vds-poster {
+  object-fit: cover;
+}
+
+/* Subtitles are handled entirely by Vidstack's default caption renderer
+   plus its Settings → Accessibility menu (font family/size/color/shadow),
+   which drives --media-user-* CSS vars — same as miruro.to.
+   Do NOT add font-size / color / text-shadow overrides on .vds-captions or
+   the cue parts here (especially with !important): they silently disable
+   the Accessibility menu, and resizing the .vds-captions box breaks
+   Vidstack's cue-position math (cues collapse to line-height 0). */
+
+/* Floating Subtitle Settings panel (mirrors the Aniraku web client) */
+.cc-panel-wrap {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 3.25rem;
+  z-index: 30;
+}
+.cc-panel {
+  width: 17.5rem;
+  background: #000;
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.7rem 0.7rem;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.6);
+  animation: popIn 0.18s ease-in-out;
+}
+.cc-panel-title {
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+.cc-panel-title span {
+  display: inline-block;
+  background: #fff;
+  color: #000;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.25rem;
+}
+.cc-panel .cc-row {
+  margin: 0.35rem 0;
+}
+.cc-panel .cc-row-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+.cc-panel .cc-row-head span:last-child {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+.cc-panel input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: #7c6cf0;
+  cursor: pointer;
+}
+.cc-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.45rem 0 0.15rem;
+}
+.cc-tabs button,
+.cc-wide-btn {
+  flex: 1;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.2rem;
+  cursor: pointer;
+}
+.cc-wide-btn {
+  width: 100%;
+  margin-top: 0.35rem;
+}
+.cc-tabs button.active,
+.cc-wide-btn.active {
+  background: rgb(255 255 255 / 0.16);
+  border-color: #fff;
+}
+.cc-opt-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 11rem;
+  overflow-y: auto;
+  margin: 0.25rem 0 0.15rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 0.3rem;
+}
+.cc-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  color: #fff;
+  border: none;
+  text-align: left;
+  font-size: 0.78rem;
+  padding: 0.32rem 0.55rem;
+  cursor: pointer;
+}
+.cc-opt:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+.cc-opt.active {
+  background: rgb(255 255 255 / 0.12);
+}
+.cc-opt .cc-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  flex-shrink: 0;
+}
+.cc-opt .cc-check {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+/* Player action menu (mirrors live 5axbr module) */
+.player-menu {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 2.1rem;
+  padding: 0.2rem;
+  background-color: var(--global-div-tr);
+  border: 1px solid var(--global-border-color);
+  border-radius: var(--global-border-radius);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.player-menu .epNav {
+  margin-left: auto;
+}
+
+/* epShort (EP n) shows on small screens, epLong (Episode n) on desktop */
+.player-menu .epShort {
+  display: none;
+}
+.player-menu .epLong {
+  display: inline;
+}
+@media (max-width: 700px) {
+  .player-menu .epShort {
+    display: inline;
+  }
+  .player-menu .epLong {
+    display: none;
+  }
+}
+
+.player-menu [data-autoskip='true'] {
+  color: var(--primary-accent);
+}
+.player-menu [data-autoskip='true'] svg {
+  color: var(--primary-accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ArtPlayer layer (ported): player typography, settings panel, quality menu,
+   custom transport/cast controls, mobile control sizing, fullscreen scroll
+   lock and intro/outro timeline markers. The vidstack @imports above are
+   retained (license headers) even though no vidstack component mounts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Fullscreen scroll lock (also iOS native fullscreen) */
+.body-hidden {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  top: 0; bottom: 0; right: 0; left: 0;
+}
+
+/* ArtPlayer base overrides (mobile polish + desktop radius) */
+@media (max-width: 768px) {
+  .art-settings .art-settings-build {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
+/* Artplayer mobile overrides */
+@media (max-width: 768px) {
+  .art-video-player {
+    border-radius: 0 !important;
+  }
+  .art-bottom {
+    padding: 0 8px 4px !important;
+  }
+  .art-setting-panel {
+    border-radius: 8px !important;
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+  }
+  .art-contextmenus {
+    border-radius: 8px !important;
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+  }
+  .art-subtitle-wrap span {
+    font-size: 18px !important;
+  }
+}
+/* Artplayer desktop tweaks */
+@media (min-width: 769px) {
+  .art-video-player {
+    border-radius: 4px !important;
+  }
+}
+
+/* ══ ArtPlayer core: typography, quality menu, settings, transport ══ */
+        .watch-art-mount video {
+          background: #000;
+        }
+        /* ── Player typography ────────────────────────────
+           One crisp UI font stack for every layer (controls, tooltips,
+           settings), with subpixel smoothing and tabular values so
+           timestamps and quality numbers never jitter. */
+        .watch-art-mount .art-video-player {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter,
+            'Helvetica Neue', Arial, sans-serif;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+          font-variant-numeric: tabular-nums;
+        }
+        /* Compact control bar: tighter height + icon box than ArtPlayer's
+           roomy defaults so nothing feels oversized. */
+        .watch-art-mount .art-video-player {
+          --art-control-height: 42px;
+          --art-control-icon-size: 28px;
+        }
+        /* Banner poster (our port only — the reference build has none): sits
+           above the art root at z 2 as a PlayerViewport sibling, so its
+           bottom edge is cut clear of the whole ArtPlayer bottom cluster
+           (controls 42px + progress + safe-area). The strip is therefore
+           hittable before first play; the hide triggers in Player.tsx
+           (video:play / video:playing / mousemove / setting) clear the
+           poster on first interaction. Keeps click → /info. */
+        .watch-art-poster {
+          position: absolute;
+          inset: 0 0 calc(60px + env(safe-area-inset-bottom, 0px)) 0;
+          z-index: 2;
+        }
+        /* Quality selector: make the current mode obvious and give every
+           option a compact resolution badge instead of a raw source label. */
+        .watch-art-mount .art-controls-quality {
+          min-width: 66px;
+        }
+        .watch-art-mount .art-controls-quality .art-selector-value,
+        .watch-art-mount .art-controls-quality .art-selector-item {
+          font-variant-numeric: tabular-nums;
+        }
+        .watch-art-mount .watch-quality-option {
+          display: inline-flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          width: 100%;
+          min-width: 92px;
+        }
+        .watch-art-mount .watch-quality-name {
+          font-weight: 700;
+          letter-spacing: 0.01em;
+        }
+        .watch-art-mount .watch-quality-badge {
+          color: rgba(226, 232, 240, 0.62);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+        .watch-art-mount .art-selector-list {
+          min-width: 158px;
+          padding: 5px;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 9px;
+          background: rgba(10, 14, 24, 0.96);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.42);
+        }
+        .watch-art-mount .art-selector-item {
+          border-radius: 6px;
+          padding: 6px 9px;
+          transition: background 160ms ease, color 160ms ease;
+        }
+        .watch-art-mount .art-selector-item:hover,
+        .watch-art-mount .art-selector-item.art-current {
+          background: rgba(226,232,240,0.14);
+          color: #fff;
+        }
+        .watch-art-mount .art-selector-item.art-current .watch-quality-badge {
+          color: #cbd5e1;
+        }
+        /* ── Settings panel: compact + organized ────────────────────────
+           One shared grid for every menu and sub-menu: a fixed 16px icon
+           column, single-line labels, right-aligned gray values and a
+           uniform 31px row height with even 1px down-spacing. The panel
+           shrink-wraps its rows (no stretched half-empty box), stays
+           inside the player, and only scrolls when a menu truly needs it. */
+        .watch-art-mount .art-video-player {
+          --art-settings-max-height: min(64dvh, 336px);
+          --art-selector-max-height: min(58dvh, 300px);
+          --art-settings-icon-size: 16px;
+        }
+        .watch-art-mount .art-settings {
+          box-sizing: border-box;
+          width: min(232px, calc(100% - 16px)) !important;
+          max-width: calc(100% - 16px) !important;
+          /* Shrink-wrap: exactly as tall as the rows it shows — never a
+             fixed-height panel with dead space at the bottom. */
+          height: auto !important;
+          max-height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+          overscroll-behavior: contain;
+          background: rgba(13, 14, 18, 0.97) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 10px !important;
+          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+          padding: 4px !important;
+          font-size: 12.5px;
+        }
+        .watch-art-mount .art-settings,
+        .watch-art-mount .art-settings * {
+          box-sizing: border-box;
+        }
+        .watch-art-mount .art-setting-panel,
+        .watch-art-mount .art-setting-panel .art-selector-list {
+          flex: 1 1 auto;
+          min-height: 0 !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          max-height: none !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.32) transparent;
+          padding: 0;
+        }
+        .watch-art-mount .art-setting-panel::-webkit-scrollbar,
+        .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar {
+          width: 5px;
+        }
+        .watch-art-mount .art-setting-panel::-webkit-scrollbar-thumb,
+        .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar-thumb {
+          border-radius: 999px;
+          background: rgba(255,255,255,0.32);
+        }
+        .watch-art-mount .art-setting-item-left,
+        .watch-art-mount .art-setting-item-right {
+          overflow: hidden;
+        }
+        .watch-art-mount .art-selector-list {
+          width: 100%;
+          min-width: 0 !important;
+        }
+        /* One row grid for main options, sub-options, sliders and toggles:
+           identical height, padding, radius and down-space everywhere, so
+           nothing sits a little in front or a little behind. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item {
+          height: 31px !important;
+          min-height: 31px !important;
+          border-radius: 6px;
+          padding: 0 9px !important;
+          margin-block: 1px;
+          gap: 0;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item:hover {
+          background-color: rgba(255, 255, 255, 0.08);
+        }
+        /* Fixed icon column — every label starts on the same x-line.
+           !important matters here: ArtPlayer's runtime stylesheet ships the
+           same selectors with more specificity and would re-center or
+           resize the columns back to its defaults. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left {
+          flex: 1 1 auto !important;
+          min-width: 0;
+          justify-content: flex-start !important;
+          gap: 0 !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon {
+          flex: 0 0 16px !important;
+          width: 16px !important;
+          height: 16px !important;
+          margin-right: 8px !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-text {
+          font-size: 12.5px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        /* Value column: quiet gray, right-aligned, one consistent rhythm. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right {
+          flex: 0 0 auto !important;
+          min-width: 0;
+          justify-content: flex-end !important;
+          gap: 0 !important;
+          font-size: 11.5px !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-tooltip {
+          color: #8f97a3 !important;
+          font-size: 11.5px !important;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 92px;
+          padding-left: 8px;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon {
+          min-width: 18px !important;
+          height: 20px !important;
+          padding-left: 4px;
+        }
+        /* Built-in arrows / checks sized to the compact grid. */
+        .watch-art-mount .art-settings .art-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.92;
+        }
+        .watch-art-mount .art-settings .art-icon svg {
+          width: 100%;
+          height: 100%;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon .art-icon,
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon .art-icon {
+          width: 15px;
+          height: 15px;
+        }
+        /* Selector leaves keep a reserved check gutter; the current row's
+           check turns visible and the row takes the accent color. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-icon-check {
+          visibility: hidden;
+          width: 14px !important;
+          height: 14px !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-icon-check {
+          visibility: visible;
+          fill: var(--art-theme, #648FFC);
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-setting-item-left-text {
+          color: var(--art-theme, #648FFC);
+        }
+        /* Toggle switches: slimmer pill matched to the 31px row. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon svg.icon {
+          width: auto !important;
+          height: 13px !important;
+          max-width: 26px;
+        }
+        /* Back row: same grid, slightly taller, hairline separated. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item-back {
+          height: 34px !important;
+          min-height: 34px !important;
+          margin-block: 1px 3px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item-back .art-setting-item-left-text {
+          font-size: 12.5px;
+          font-weight: 600;
+        }
+        /* Range rows: slim track, round theme thumb; value stays readable
+           next to the slider without widening the row. Full selector chain
+           + !important outranks ArtPlayer's 80px default. */
+        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-range {
+          width: 68px !important;
+          height: 3px !important;
+          border-radius: 999px;
+          background-color: rgba(255, 255, 255, 0.22);
+          outline: none;
+          appearance: none;
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .watch-art-mount .art-setting-range::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          border: none;
+          background: var(--art-theme, #648FFC);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+          cursor: pointer;
+        }
+        .watch-art-mount .art-setting-range::-moz-range-thumb {
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          border: none;
+          background: var(--art-theme, #648FFC);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+          cursor: pointer;
+        }
+        .watch-art-mount .art-setting-item-right-icon svg {
+          fill: currentColor;
+        }
+        /* Text safety without breaking the row grid. */
+        .watch-art-mount .art-setting-item,
+        .watch-art-mount .art-selector-item {
+          min-width: 0 !important;
+          max-width: 100%;
+        }
+        .watch-art-mount .art-selector-item > * {
+          min-width: 0;
+          max-width: 100%;
+        }
+        .watch-art-mount .art-selector-value {
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        /* Control tooltips: smaller, sharper, faster to read. */
+        .watch-art-mount .art-video-player .art-tooltip {
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          padding: 5px 8px;
+          border-radius: 6px;
+          background: rgba(10, 12, 18, 0.95);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+          white-space: nowrap;
+          pointer-events: none;
+        }
+        .watch-art-mount .art-control-seekBackward15,
+        .watch-art-mount .art-control-seekForward15,
+        .watch-art-mount .art-control-prevEpisode,
+        .watch-art-mount .art-control-nextEpisode,
+        .watch-art-mount .art-control-chromecast {
+          color: #e2e8f0;
+          opacity: 0.86;
+          border-radius: 7px;
+          transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
+        }
+        .watch-art-mount .art-control-seekBackward15:hover,
+        .watch-art-mount .art-control-seekForward15:hover,
+        .watch-art-mount .art-control-prevEpisode:hover,
+        .watch-art-mount .art-control-nextEpisode:hover,
+        .watch-art-mount .art-control-chromecast:hover {
+          opacity: 1;
+          background: rgba(255,255,255,0.1);
+        }
+        .watch-art-mount .art-control-seekBackward15:active,
+        .watch-art-mount .art-control-seekForward15:active,
+        .watch-art-mount .art-control-prevEpisode:active,
+        .watch-art-mount .art-control-nextEpisode:active,
+        .watch-art-mount .art-control-chromecast:active {
+          transform: scale(0.94);
+        }
+        .watch-art-mount .art-control-prevEpisode .watch-art-prev-icon,
+        .watch-art-mount .art-control-nextEpisode .watch-art-next-icon,
+        .watch-art-mount .art-control-chromecast .watch-art-cast-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .watch-art-seek-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          width: 32px;
+          height: 32px;
+          line-height: 1;
+          pointer-events: none;
+        }
+        .watch-art-seek-icon svg {
+          position: absolute;
+          inset: 1px;
+          width: 30px;
+          height: 30px;
+        }
+        .watch-art-seek-icon text {
+          pointer-events: none;
+          paint-order: stroke;
+          stroke: rgba(8, 12, 20, 0.24);
+          stroke-width: 0.35px;
+        }
+        /* Artplayer applies negative side margins on its mobile control groups.
+           The player itself clips overflow, so the rightmost settings/fullscreen
+           icon can disappear at the edge on narrow phones. */
+        .watch-art-mount .art-video-player .art-controls {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          padding-inline: 4px;
+        }
+        .watch-art-mount .art-video-player .art-controls-left,
+        .watch-art-mount .art-video-player .art-controls-right {
+          min-width: 0;
+          margin-inline: 0;
+          /* Even breathing room between every control — the icon clusters
+             on both ends of the bar previously sat flush against each other. */
+          column-gap: 7px;
+        }
+        .watch-art-mount .art-video-player .art-controls .art-control {
+          min-width: 0;
+          flex: 0 0 auto;
+        }
+        .watch-art-mount .art-video-player .art-control-seekBackward15,
+        .watch-art-mount .art-video-player .art-control-seekForward15,
+        .watch-art-mount .art-video-player .art-control-prevEpisode,
+        .watch-art-mount .art-video-player .art-control-nextEpisode,
+        .watch-art-mount .art-video-player .art-control-chromecast {
+          width: 36px !important;
+          min-width: 36px !important;
+          margin-inline: 0 !important;
+          padding-inline: 0 !important;
+        }
+        .watch-art-mount .art-video-player .art-controls-quality {
+          min-width: 58px;
+        }
+        /* A YouTube-like downloaded-range cue that draws EVERY cached range —
+           forward and behind the playhead — because the cache itself has no
+           limit. It sits behind ArtPlayer's red played line and thumb, never
+           captures input, and keeps the Nothing-style signal red reserved
+           for the actual playback position. */
+        .watch-art-mount .art-control-progress-inner {
+          overflow: hidden;
+        }
+        .watch-art-mount .watch-buffer-indicator {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .watch-art-mount .watch-buffer-indicator-segment {
+          position: absolute;
+          top: 50%;
+          height: 3px;
+          transform: translateY(-50%);
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.55);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+        }
+        .watch-art-mount .art-progress-loaded {
+          display: none !important;
+        }
+        .watch-art-mount .art-progress-played,
+        .watch-art-mount .art-progress-indicator {
+          z-index: 3;
+        }
+        /* Chapter segments (Intro │ Main episode │ Outro) — the layer is
+           appended AFTER .watch-buffer-indicator and the hover-marker layer
+           in .art-control-progress-inner. z-index 25 clears ArtPlayer's
+           native played fill (z20, which captures pointer events and would
+           otherwise shadow the strips) yet stays under the highlight (z30),
+           seek thumb (z40) and time tip (z50): the thumb stays grabbable
+           above us, and the played fill plus the buffer cue and
+           intro/outro/main bands stay visible through this transparent
+           layer. Decorative pieces never capture input — only the narrow
+           segment-start hit strips do, and they exist only when chapter
+           segments do (empty layer otherwise). Hover labels ride on the
+           body-level timeline tooltip (lib), because this inner track
+           clips any box we put inside it (overflow: hidden above). */
+        .watch-art-mount .watch-chapter-segments {
+          position: absolute;
+          inset: 0;
+          z-index: 25;
+          pointer-events: none;
+        }
+        .watch-art-mount .watch-chapter-segment__divider {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          transform: translateX(-50%);
+          background: rgba(255, 255, 255, 0.7);
+          box-shadow: 0 0 3px rgba(0, 0, 0, 0.55);
+          pointer-events: none;
+        }
+        .watch-art-mount .watch-chapter-segment__hit {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 14px;
+          cursor: pointer;
+          pointer-events: auto;
+        }
+
+        /* Hover labels live in the lib tooltip (all three chapters) — no
+           chip element anymore. */
+
+/* ArtPlayer mobile control sizing (<=768px) */
+@media (max-width: 768px) {
+          .watch-art-mount .art-video-player {
+            --art-control-height: 40px;
+            --art-control-icon-size: 26px;
+            --art-padding: 8px;
+            --art-settings-max-height: min(76dvh, 400px);
+            --art-selector-max-height: min(66dvh, 320px);
+          }
+          .watch-art-poster {
+            inset: 0 0 calc(58px + env(safe-area-inset-bottom, 0px)) 0;
+          }
+          .watch-art-mount .art-video-player .art-controls {
+            padding-inline: 2px;
+          }
+          .watch-art-mount .art-video-player .art-controls-left,
+          .watch-art-mount .art-video-player .art-controls-right {
+            column-gap: 4px;
+          }
+          .watch-art-mount .art-settings {
+            width: min(232px, calc(100vw - 16px)) !important;
+            max-width: calc(100vw - 16px) !important;
+            /* Same shrink-wrap behavior as desktop: rows define the height. */
+            height: auto !important;
+            max-height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
+            right: 8px !important;
+            bottom: 44px !important;
+          }
+          .watch-art-mount .art-setting-panel,
+          .watch-art-mount .art-setting-panel .art-selector-list {
+            flex: 1 1 auto;
+            max-height: none !important;
+          }
+          .watch-art-mount .art-setting-panel .art-selector-list {
+            max-height: min(var(--art-selector-max-height), 320px) !important;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control {
+            width: 34px;
+            padding-inline: 2px;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control .art-icon {
+            width: 26px;
+            height: 26px;
+          }
+          .watch-art-mount .art-video-player .art-controls-quality {
+            width: 56px;
+            min-width: 56px;
+          }
+          .watch-art-mount .art-video-player .art-control-seekBackward15,
+          .watch-art-mount .art-video-player .art-control-seekForward15 {
+            width: 34px !important;
+            min-width: 34px !important;
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+          .watch-art-mount .art-video-player .art-controls-left .art-control-time {
+            display: none !important;
+          }
+          /* Narrow screens: the full desktop control set physically cannot
+             fit next to the progress bar — at 360px the left and right
+             groups overlapped by ~50px and icons stacked on top of each
+             other. Keep the essential transport plus settings and
+             fullscreen; phones adjust volume with hardware keys, and
+             PiP / Cast / web-fullscreen are unreliable or redundant on
+             touch devices. */
+          .watch-art-mount .art-video-player .art-control-volume,
+          .watch-art-mount .art-video-player .art-control-chromecast,
+          .watch-art-mount .art-video-player .art-control-pip,
+          .watch-art-mount .art-video-player .art-control-fullscreenWeb {
+            display: none !important;
+          }
+}
+
+/* Coarse tablets: taller touch controls */
+@media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+          .watch-art-mount .art-controls { min-height: 42px; }
+}
+
+/* Phones (<=480px): compact control rows */
+@media (max-width: 480px) {
+          .watch-art-mount .art-video-player .art-controls {
+            padding-inline: 0;
+          }
+          .watch-art-mount .art-video-player .art-controls-left,
+          .watch-art-mount .art-video-player .art-controls-right {
+            column-gap: 3px;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control {
+            width: 32px;
+            padding-inline: 1px;
+          }
+          .watch-art-mount .art-video-player .art-controls .art-control .art-icon {
+            width: 24px;
+            height: 24px;
+          }
+          .watch-art-mount .art-video-player .art-controls-quality {
+            width: 56px;
+            min-width: 56px;
+          }
+}
+
+/* Tiny screens (<=360px): drop the duplicate quality label */
+        @media (max-width: 360px) {
+          /* Quality remains available from settings; remove its duplicate
+             compact label only when the essential controls cannot all fit. */
+          .watch-art-mount .art-video-player .art-controls-quality {
+            display: none !important;
+          }
+        }
+
+/* Settings panel safety caps: never exceed the player */
+        /* Settings panel: never exceed the PLAYER. These are the final safety
+           caps — kept in sync with the compact 232px grid so the inner panel
+           can never be wider than the box that clips it.
+           The height caps are player-relative on purpose: a portrait phone's
+           inline player is only ~200px tall, and a viewport cap (76dvh ≈
+           400px) let the panel grow way past the video and get clipped at
+           the player's top edge. In fullscreen the player IS the viewport,
+           so calc(100% - …) stays correct there too. */
+        .watch-art-mount .art-settings,
+        .watch-art-mount .art-setting-panel {
+          box-sizing: border-box !important;
+          max-width: min(232px, calc(100vw - 16px), 100%) !important;
+        }
+        .watch-art-mount .art-settings {
+          max-height: min(400px, calc(100% - 52px)) !important;
+          overflow: hidden !important;
+        }
+        .watch-art-mount .art-setting-panel {
+          width: 100% !important;
+          max-height: min(400px, calc(100% - 52px)) !important;
+          overflow: hidden auto !important;
+          overscroll-behavior: contain;
+        }
+        .watch-art-mount .art-setting-panel .art-setting-item {
+          min-height: 31px !important;
+          width: 100% !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+        }
+        .watch-art-mount .art-setting-panel .art-setting-item-left,
+        .watch-art-mount .art-setting-panel .art-setting-item-left-text,
+        .watch-art-mount .art-setting-panel .art-setting-item-right,
+        .watch-art-mount .art-setting-panel .art-setting-item-right-tooltip,
+        .watch-art-mount .art-setting-panel .art-selector-item,
+        .watch-art-mount .art-setting-panel .art-selector-value {
+          min-width: 0 !important;
+          max-width: 100% !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          white-space: nowrap !important;
+        }
+        @media (max-width: 480px) {
+          .watch-art-mount .art-settings,
+          .watch-art-mount .art-setting-panel {
+            width: min(232px, calc(100vw - 12px), 100%) !important;
+            max-width: min(232px, calc(100vw - 12px), 100%) !important;
+          }
+          .watch-art-mount .art-setting-panel .art-setting-item {
+            padding-inline: 8px !important;
+          }
+        }
+        @media (max-height: 520px) {
+          .watch-art-mount .art-settings,
+          .watch-art-mount .art-setting-panel {
+            /* Player-relative for the same reason as above: landscape phones
+               keep the whole menu inside the video frame. */
+            max-height: min(300px, calc(100% - 48px)) !important;
+          }
+        }
+
+/* Intro/outro timeline markers (yellow) */
+/* Bands sit above the white buffer cue (equal z2 — the buffer div is
+           appended first, markers next, so later DOM order wins) and below
+           the played fill; the chapter layer (z25) sits above all of it. */
+        .watch-timeline-marker {
+          z-index: 2;
+        }
+        .watch-timeline-marker-intro,
+.watch-timeline-marker-outro { background: #facc15 !important; box-shadow: 0 0 8px rgba(250, 204, 21, 0.38); }
+        .watch-timeline-marker-main {
+          background: rgba(148, 163, 184, 0.22) !important;
+          box-shadow: none;
+        }
+
+/* Manual skip overlay placement (ported): phone / coarse tablet / landscape */
+@media (max-width: 768px) {
+  .watch-skip-overlay { right: 8px !important; max-width: calc(100% - 16px) !important; }
+  .watch-skip-btn { min-height: 44px !important; padding: 8px 10px !important; font-size: 12px !important; }
+}
+@media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .watch-skip-overlay { bottom: calc(44px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* Resume countdown dialog (Aniraku Watch.jsx:6069-6130 — Item 2): the
+   base panel is inline-styled in Player.tsx following the ended/skip
+   overlay conventions; only the narrow-viewport adjustment lives here. */
+@media (max-width: 768px) {
+  .watch-resume { max-width: calc(100% - 16px) !important; }
+}

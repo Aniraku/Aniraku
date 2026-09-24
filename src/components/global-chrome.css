@@ -1,0 +1,156 @@
+/* ==========================================================================
+ * GLOBAL CHROME parity rules — navbar search micro-parity, footer restructure,
+ * DropSearch pikachu loader and the app-icon logo mask.
+ *
+ * src/styles/** is read-only for this mission, so the missing live rules live
+ * here. This file is imported from App.tsx, i.e. AFTER the index.html-linked
+ * globals.css, so equal-specificity overrides win.
+ * ========================================================================== */
+
+/* --- live `.app-icon` (style.css, declarations verbatim) ------------------
+ * Masks the element with the logo asset and tints it with the theme text
+ * color. LOGO SWAP DONE (CSS side): the url() below is a RELATIVE bundled
+ * import of the user's custom logo (source of truth =
+ * src/assets/aniraku_logo.png, also imported by BRAND_LOGO in
+ * src/lib/brand.ts) so Vite rewrites it to the hashed asset URL at build
+ * time — never hardcode a hashed /assets/*.png filename here (stale builds
+ * 404). The portrait png carries true
+ * alpha (rounded-square corners), so it masks cleanly and tints correctly. */
+.app-icon {
+  background-color: var(--global-text);
+  -webkit-mask-image: url('../assets/aniraku_logo.png');
+  mask-image: url('../assets/aniraku_logo.png');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* --- user's custom logo = SQUARE portrait (legacy logos were wide padded
+ *      glyphs). globals.css sizes .navLogo/.sideMenuLogo img at width:7rem
+ *      with the old width=112 height=28 hint →112×28 object-fit:fill box
+ *      squashed the portrait. Force square boxes here (this file loads after
+ *      globals.css). ------------------------------------------------------------ */
+.navLogo img,
+.sideMenuLogo img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+/* --- navbar: in-box slash hint focus state (live `_slashToggleBtn` with
+ *      data-focused=true brightens the hint) ------------------------------ */
+.slashToggleBtn[data-focused='true'] {
+  opacity: 1;
+}
+
+/* --- navbar: live hides the search action buttons (submit/random) at
+ *      <=500px — the search box itself is already hidden by the existing
+ *      .navSearchBar <=500px rule ---------------------------------------- */
+@media (max-width: 500px) {
+  .searchSection .actionButtons {
+    display: none;
+  }
+}
+
+/* --- DropSearch pikachu loader (live `_loadingWrapper_9iqh4_34` /
+ *      `_loadingImage_9iqh4_40`, declarations verbatim, readable local
+ *      class names) -------------------------------------------------------- */
+.searchLoadingWrapper {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.searchLoadingImage {
+  width: 9rem;
+  max-width: 9rem;
+}
+
+/* --- footer wrapper (live `_pageWrapper_1yuuo_1`, verbatim) --------------- */
+.footerPageWrapper {
+  width: 100%;
+}
+
+@media (max-width: 1000px) {
+  .footerPageWrapper {
+    width: auto;
+    padding: 0 0.5rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .footerPageWrapper[data-is-pwa='true'] {
+    padding-bottom: 1rem;
+  }
+}
+
+/* --- footer link lists (live `_linkList_1yuuo_41`, verbatim) -------------- */
+.footerLinkList {
+  display: flex;
+  flex-direction: column;
+  margin: auto 0 0;
+}
+
+/* --- footer text variants (live `_text_1yuuo_87[data-issub]` + strong) ---- */
+.footerText[data-issub='true'] {
+  padding: 1rem 0;
+  line-height: 1.5rem;
+}
+
+.footerText[data-issub='false'] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.footerText strong {
+  color: var(--global-text);
+}
+
+/* --- footer site link (live `_siteLink_1yuuo_111`, verbatim) -------------- */
+.siteLink {
+  color: var(--global-text-muted);
+}
+
+/* --- social share links (live `_shareButton_1yuuo_142`, verbatim; the
+ *      existing `.socialLinksContainer a` block carries the same base decls,
+ *      underline-on-hover is the one delta) -------------------------------- */
+.shareButton {
+  display: flex;
+  color: var(--global-text-muted);
+  transition: 0.2s ease-in-out;
+}
+
+.shareButton svg {
+  font-size: 1.2rem;
+}
+
+.shareButton:hover {
+  color: var(--global-button-text);
+  text-decoration: underline;
+  transform: scale(1.15);
+}
+
+/* --- footer legal links (user mandate: Privacy/Terms/DMCA/AGPL/
+ *      Community Guidelines sit in the GLOBAL footer, bottom of every
+ *      page — styles mirror the retired AuthLegalFooter strip) --------- */
+.footerLegalNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  justify-content: center;
+  padding: 0.25rem 0;
+  font-size: 12px;
+}
+
+.footerLegalNav a {
+  color: var(--global-text-muted-strong);
+  text-decoration: none;
+}
+
+.footerLegalNav a:hover {
+  color: var(--primary-accent);
+  text-decoration: underline;
+}

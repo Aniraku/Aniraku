@@ -1,0 +1,137 @@
+/* ==========================================================================
+ * MOBILE BOTTOM NAV — port of Aniraku `src/components/MobileBottomNav.jsx`
+ * (Bar :5-25, Item :27-53) + Aniraku `src/index.css` shell clearance
+ * (:398-413 .bottom-nav-spacer, :986-995 --mobile-dock-clearance), re-based
+ * onto our theme tokens (their --text-muted → our --global-text-muted; their
+ * hardcoded white-on-dark active pill → our site-wide active pair
+ * primary-accent + primary-accent-dk-tr, same as .navItem.active).
+ *
+ * Visibility: reference breakpoint ≤768px (MobileBottomNav.jsx:23). Route
+ * hiding (/watch/* + auth/legal focused routes) is decided in BottomNav.tsx.
+ * ========================================================================== */
+
+.bottomNav {
+  position: fixed;
+  inset: auto 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  /* page content < nav dropdowns(300) < navbar(600) < mobile-menu(700) <
+     backdrop(800) < sidebar/drawer(900) < modals(1000) — sits above page
+     content, below every overlay the player/modals can raise */
+  z-index: var(--z-index-navbar);
+  display: none;
+  align-items: stretch;
+  justify-content: center;
+  width: auto;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 5px;
+  border: 1px solid var(--global-border-color);
+  border-radius: 18px;
+  background: var(--global-div-tr);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+@media (max-width: 768px) {
+  .bottomNav {
+    display: flex;
+  }
+}
+
+@media (max-width: 360px) {
+  .bottomNav {
+    inset-inline: 8px;
+    border-radius: 16px;
+  }
+}
+
+.bottomNavTab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px; /* ≥44px tap target (Aniraku Item :34) */
+  padding: 6px 4px;
+  border: none;
+  border-radius: 13px;
+  color: var(--global-text-muted);
+  background: transparent;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.2s ease-in-out,
+    background-color 0.2s ease-in-out,
+    transform 0.2s ease-in-out;
+}
+
+.bottomNavTab:active {
+  transform: scale(0.96);
+}
+
+.bottomNavTab:hover {
+  color: var(--global-text);
+}
+
+.bottomNavTab[data-active='true'] {
+  color: var(--primary-accent);
+  background: var(--primary-accent-dk-tr);
+  font-weight: 750;
+}
+
+.bottomNavTab svg {
+  flex-shrink: 0;
+}
+
+.bottomNavTab > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .bottomNavTab {
+    min-height: 46px;
+    font-size: 9px;
+  }
+}
+
+/* Unread badge — same visual language as .notificationBadge (globals.css:378)
+   but corner-anchored inside the tab. */
+.bottomNavBadge {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 18px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.9rem;
+  height: 0.9rem;
+  padding: 0.04rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary-accent-bg);
+  background-color: var(--primary-accent);
+  border: 1px solid var(--primary-accent-bg);
+  border-radius: 999px;
+}
+
+/* --- App-shell clearance: BottomNav.tsx toggles body.has-bottom-nav while
+ *      the bar can show (route-dependent); padding applies only inside the
+ *      bar's own display breakpoint so desktop is untouched. Mirrors Aniraku
+ *      index.css:986-995 (`main`/page padding = 88px + safe-bottom) but as
+ *      body padding so the FOOTER — which lives outside the routes div in
+ *      App.tsx:189 — is never covered. body.has-bottom-nav (0,1,1) beats the
+ *      base `body` padding shorthand (0,0,1) in globals.css:14/:31. ------- */
+@media (max-width: 768px) {
+  body.has-bottom-nav {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
+}

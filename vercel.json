@@ -1,0 +1,98 @@
+{
+  "buildCommand": "npm run build",
+  "installCommand": "bun install --frozen-lockfile",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/health", "destination": "https://api.aniraku.tech/health" },
+    { "source": "/api/v1/(.*)", "destination": "https://api.aniraku.tech/api/v1/$1" },
+    { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
+    { "source": "/sitemaps/(.*)", "destination": "/sitemaps/$1" },
+    { "source": "/robots.txt", "destination": "/robots.txt" },
+    { "source": "/manifest.json", "destination": "/manifest.json" },
+    { "source": "/favicon.svg", "destination": "/favicon.svg" },
+    { "source": "/og-image.png", "destination": "/og-image.png" },
+    { "source": "/google0e4c03928112e656.html", "destination": "/google0e4c03928112e656.html" },
+    { "source": "/icons/(.*)", "destination": "/icons/$1" },
+    { "source": "/sw.js", "destination": "/sw.js" },
+    { "source": "/((?!api/|assets/|fonts/|favicon\\.svg|favicon\\.ico|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.png|google0e4c03928112e656\\.html|icons/|sw\\.js|registerSW\\.js|workbox-.*\\.js|random-pool\\.json|Duzn7\\.jpg).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'sha256-GqosFni6H+rFQG4/w+jrRWp2GvLDn+kIrLLnuCNhPHM=' 'sha256-uc8KA5+UbrnigEr1yhnEaCAUbb7XsuaPJxigTSEhbsI=' 'sha256-9lFSd1uPMEhZ11eiOyxm+/HRIWONN0IQkuBcQglvCbY=' https://www.googletagmanager.com https://theanimecommunity.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://theanimecommunity.com; font-src 'self' https://fonts.gstatic.com https://theanimecommunity.com data:; img-src 'self' data: https:; media-src 'self' blob: data: https:; connect-src 'self' https://*.supabase.co https://api.aniraku.tech https://api.giphy.com https://graphql.anilist.co https://theanimecommunity.com https://www.googletagmanager.com https://*.google-analytics.com https://corsproxy.io https://api.allorigins.win https://api.codetabs.com https://*.akirax.buzz https://*.kotocdn.site https://*.norami.top https://*.uwucdn.top https://*.owocdn.top https://*.fast4speed.rsvp https://*.ibyteimg.com https://*.ipstatp.com https://*.anidb.app https://*.allmanga.to https://*.vivibebe.site https://*.workers.dev https://api.aniskip.com https://flixcloud.cc https://anikototv.to https://megaplay.buzz https://cdn.kryntal.top https://*.imgnex.top https://cdn.imgnex.top https://*.shiora.top https://*.tiktokcdn.com https://fetch.nexabloom.top https://*.aniwatchtv.uk wss://sbjdrjaovcgvttfnpfsz.supabase.co; frame-src 'self' https:; worker-src 'self' blob:; frame-ancestors 'none'; form-action 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600, s-maxage=3600" }
+      ]
+    },
+    {
+      "source": "/sitemaps/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600, s-maxage=3600" }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=86400" },
+        { "key": "Content-Security-Policy", "value": "none" }
+      ]
+    },
+    {
+      "source": "/manifest.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=86400" }
+      ]
+    },
+    {
+      "source": "/og-image.png",
+      "headers": [
+        { "key": "Content-Type", "value": "image/png" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/icons/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/favicon.svg",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
+  ],
+  "env": {
+    "VITE_API_URL": "https://api.aniraku.tech",
+    "VITE_PROXY_URL": ""
+  }
+}

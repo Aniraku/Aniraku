@@ -1,0 +1,50 @@
+/* Self-hosted variable fonts — miruro.to 1:1 */
+@font-face {
+  font-family: Geist;
+  font-style: normal;
+  font-weight: 100 900;
+  src: url(/fonts/geist/sans/Geist.woff2) format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url(/fonts/geist/mono/GeistMono.woff2) format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: Nunito;
+  font-style: normal;
+  font-weight: 200 1000;
+  src: url(/fonts/nunito/Nunito.woff2) format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Trebuchet MS';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/fonts/trebuchet/TrebuchetMS.woff2) format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Trebuchet MS';
+  font-style: normal;
+  font-weight: 700;
+  src: url(/fonts/trebuchet/TrebuchetMS-Bold.woff2) format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url(/fonts/fira-sans/FiraSans-400.woff2) format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url(/fonts/fira-sans/FiraSans-700.woff2) format('woff2');
+  font-display: swap;
+}
