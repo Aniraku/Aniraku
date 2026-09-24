@@ -10,7 +10,7 @@
 // and ALL banner_url UI (column unused; no upload/edit/preview). Preserved:
 // settings-as-modal (?settings=1 + <Settings />) + gear — required by the
 // App /settings routes and GlobalShortcutsBridge.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { IoClose, IoLogOutOutline } from 'react-icons/io5';
@@ -33,10 +33,14 @@ import {
 import {
   describeExport,
   describeImport,
-  exportProviderList,
+  getExportJobs,
   getSyncStatus,
   importProviderList,
   PROVIDER_LABELS,
+  startExportJob,
+  subscribeExportJobs,
+  type ExportJobs,
+  type ExportJobStatus,
   type SyncStatus,
 } from '../lib/sync';
 import ProviderIcon from '../components/ProviderIcon';
@@ -834,6 +838,41 @@ export const Profile: React.FC = () => {
   >({});
   const [confirmExport, setConfirmExport] = useState(''); // provider being confirmed
   const [avatarLibraryReady, setAvatarLibraryReady] = useState(false);
+  // Background export jobs (lib/sync.ts runner): progress renders below,
+  // terminal transitions toast + fill the result slot. Seen-statuses ref
+  // keeps toasts to genuine running→done/error edges (no stale toasts).
+  const [exportJobs, setExportJobs] = useState<ExportJobs>(() => getExportJobs());
+  const exportSeenRef = useRef<Record<string, ExportJobStatus>>({});
+
+  useEffect(
+    () =>
+      subscribeExportJobs((jobs) => {
+        setExportJobs({ ...jobs });
+        for (const [provider, job] of Object.entries(jobs)) {
+          const prev = exportSeenRef.current[provider];
+          exportSeenRef.current[provider] = job.status;
+          if (prev !== 'running') continue;
+          if (job.status === 'done') {
+            const text =
+              job.message ??
+              describeExport({
+                exported: job.exported,
+                scores: job.scores,
+                skipped: job.skipped,
+                failed: job.failed,
+                limited: false,
+              });
+            setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text } }));
+            showToast(text, { type: 'success' });
+          } else if (job.status === 'error') {
+            const text = job.message ?? 'Export failed';
+            setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text } }));
+            showToast(text, { type: 'error' });
+          }
+        }
+      }),
+    [],
+  );
 
   const guest = !user;
 
@@ -1041,23 +1080,21 @@ export const Profile: React.FC = () => {
     loadBookmarks();
   };
 
-  const runExport = async (provider: string) => {
-    const key = `${provider}-export`;
+  // Background export: fire-and-forget paced chunk loop (lib/sync.ts runner,
+  // ~30 entries/min). Progress renders below; completion lands in the bell.
+  const runExport = (provider: string) => {
     if (syncBusy) return;
     setConfirmExport('');
-    setSyncBusy(key);
-    setSyncResult((r) => ({ ...r, [provider]: null }));
-    const data = await exportProviderList(provider);
-    setSyncBusy('');
-    if (data.error) {
-      const text = data.error;
-      setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text } }));
-      showToast(text, { type: 'error' });
+    const job = getExportJobs()[provider];
+    if (job?.status === 'running') {
+      showToast(
+        `Export to ${PROVIDER_LABELS[provider]} is already running in the background`,
+        { type: 'warning' },
+      );
       return;
     }
-    const text = describeExport(data);
-    setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text } }));
-    showToast(text, { type: 'success' });
+    setSyncResult((r) => ({ ...r, [provider]: null }));
+    startExportJob(provider);
   };
 
   const handleSignOut = async () => {
@@ -1383,9 +1420,12 @@ export const Profile: React.FC = () => {
               {['mal', 'anilist'].map((provider) => {
                 const connected = providerConnected(provider);
                 const result = syncResult[provider];
+                const job = exportJobs[provider];
+                const jobRunning = job?.status === 'running';
                 const busy =
                   syncBusy === `${provider}-import` ||
-                  syncBusy === `${provider}-export`;
+                  syncBusy === `${provider}-export` ||
+                  jobRunning;
                 const confirming = confirmExport === provider;
                 return (
                   <LibraryRow key={provider}>
@@ -1428,9 +1468,7 @@ export const Profile: React.FC = () => {
                             disabled={busy}
                             onClick={() => setConfirmExport(provider)}
                           >
-                            {syncBusy === `${provider}-export`
-                              ? 'Exporting…'
-                              : 'Export'}
+                            {jobRunning ? 'Exporting…' : 'Export'}
                           </SmallBtn>
                         </BtnRow>
                       ) : (
@@ -1444,6 +1482,15 @@ export const Profile: React.FC = () => {
                       <ResultBox $tone={result.type} role='status'>
                         {result.type === 'error' ? '⚠ ' : '✓ '}
                         {result.text}
+                      </ResultBox>
+                    )}
+
+                    {jobRunning && (
+                      <ResultBox $tone='ok' role='status'>
+                        Exporting to {PROVIDER_LABELS[provider]} in the
+                        background… {job.exported} titles so far (chunk{' '}
+                        {job.chunks}) — you can leave this page, the bell will
+                        notify you when it finishes.
                       </ResultBox>
                     )}
 
@@ -1462,9 +1509,7 @@ export const Profile: React.FC = () => {
                             disabled={busy}
                             onClick={() => void runExport(provider)}
                           >
-                            {syncBusy === `${provider}-export`
-                              ? 'Exporting…'
-                              : 'Yes, export'}
+                            {jobRunning ? 'Exporting…' : 'Yes, export'}
                           </SmallBtn>
                           <SmallBtn
                             $primary={false}

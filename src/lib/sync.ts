@@ -583,14 +583,48 @@ export async function fetchNotifications(
     const res = await fetch(`${API_BASE}/api/v1/notifications`, { headers });
     if (!res.ok) return notificationItems;
     const payload: unknown = await res.json();
-    const rows = (Array.isArray(payload) ? payload : [])
+    const backendRows = (Array.isArray(payload) ? payload : [])
       .map(mapApiNotification)
       .filter((row): row is NotificationItem => row !== null);
-    setNotificationItems(rows);
-    return rows;
+    // Own Supabase rows first (episode alerts, export receipts — user-
+    // actionable), then backend rows; id spaces are disjoint, deduped anyway.
+    const rows = [...(await fetchOwnSupabaseNotifications()), ...backendRows];
+    const seen = new Set<string>();
+    const merged = rows.filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+    setNotificationItems(merged);
+    return merged;
   } catch {
     // offline / unconfigured — keep last-known rows
     return notificationItems;
+  }
+}
+
+/**
+ * Own Supabase `notifications` rows. Same shape the backend serves
+ * (`id, type, message, anime_id, read, created_at`), so mapApiNotification
+ * parses them unchanged. RLS scopes to the signed-in user automatically.
+ */
+async function fetchOwnSupabaseNotifications(): Promise<NotificationItem[]> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData.session?.user.id;
+    if (!uid) return [];
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id,type,message,anime_id,read,created_at')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error || !Array.isArray(data)) return [];
+    return data
+      .map(mapApiNotification)
+      .filter((row): row is NotificationItem => row !== null);
+  } catch {
+    return [];
   }
 }
 
@@ -620,6 +654,13 @@ async function putNotificationRead(id: string): Promise<void> {
     });
   } catch {
     // offline — the next 30s poll reconciles the row with the server
+  }
+  // Supabase-owned rows (episode alerts, export receipts) live outside the
+  // backend — flip them directly; backend-owned ids match nothing here.
+  try {
+    await supabase.from('notifications').update({ read: true }).eq('id', id);
+  } catch {
+    // RLS/offline — row stays unread until the next successful pass
   }
 }
 
@@ -1052,4 +1093,253 @@ export function describeExport(r: ExportResult | null | undefined): string {
   if ((r.failed ?? 0) > 0) parts.push(`${r.failed} failed`);
   if (r.limited) parts.push('more titles remain — export again to continue');
   return parts.join(' · ') || 'Nothing to export';
+}
+
+// ── Background export runner (rate-limited, Supabase-notified) ──
+// The provider mutations themselves run inside the backend
+// (`POST /api/v1/export/{provider}`), which processes one chunk per call and
+// answers `limited: true` while titles remain. This runner loops those chunk
+// calls WITHOUT blocking the UI and paces them so provider-side writes stay
+// at/below ~30 entries/min (AniList's documented write limit): after each
+// chunk it waits `entries/30min`, clamped to 4s..120s. True per-mutation
+// pacing inside a chunk lives in the Go backend; this spaces chunk requests.
+// On terminal state it inserts a Supabase `notifications` row (type
+// `export_complete` / `export_failed`) so the bell badge + drawer — which
+// merge Supabase rows in fetchNotifications — notify the user even if they
+// navigated away. Job state persists in LS (one slot per provider); a reload
+// marks a mid-flight job `interrupted` (chunks are idempotent server-side
+// via skipped/already handling, so re-running is safe).
+
+export type ExportJobStatus = 'running' | 'done' | 'error' | 'interrupted';
+
+export interface ExportJobState {
+  provider: string;
+  status: ExportJobStatus;
+  startedAt: number;
+  updatedAt: number;
+  chunks: number;
+  exported: number;
+  scores: number;
+  skipped: number;
+  failed: number;
+  /** Final human-readable line (terminal states only). */
+  message?: string;
+}
+
+export type ExportJobs = Record<string, ExportJobState>;
+
+const EXPORT_JOB_KEY = 'aniraku:export-job';
+const EXPORT_PACE_MIN_MS = 4000;
+const EXPORT_PACE_MAX_MS = 120000;
+const EXPORT_ENTRIES_PER_MINUTE = 30;
+
+let exportJobInFlight = false;
+let exportJobs: ExportJobs = {};
+const exportJobListeners = new Set<(jobs: ExportJobs) => void>();
+
+function readExportJobs(): void {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(EXPORT_JOB_KEY);
+  } catch {
+    return; // storage unavailable — jobs stay memory-only
+  }
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, ExportJobState>;
+    for (const [provider, job] of Object.entries(parsed)) {
+      if (!job || typeof job !== 'object') continue;
+      exportJobs[provider] = {
+        ...job,
+        provider,
+        status: job.status === 'running' ? 'interrupted' : job.status,
+        updatedAt: Date.now(),
+      };
+    }
+  } catch {
+    // corrupt payload — start clean
+  }
+}
+
+readExportJobs();
+
+function persistExportJobs(): void {
+  try {
+    window.localStorage.setItem(EXPORT_JOB_KEY, JSON.stringify(exportJobs));
+  } catch {
+    // storage unavailable — memory-only
+  }
+}
+
+function setExportJob(next: ExportJobState): void {
+  exportJobs = { ...exportJobs, [next.provider]: next };
+  persistExportJobs();
+  exportJobListeners.forEach((listener) => {
+    try {
+      listener(exportJobs);
+    } catch {
+      // a broken listener must not break the store
+    }
+  });
+}
+
+/** Snapshot of the background export jobs, keyed by provider. */
+export function getExportJobs(): ExportJobs {
+  return exportJobs;
+}
+
+/** Subscribe to export-job updates; fires immediately with current jobs. */
+export function subscribeExportJobs(
+  listener: (jobs: ExportJobs) => void,
+): () => void {
+  exportJobListeners.add(listener);
+  try {
+    listener(exportJobs);
+  } catch {
+    // ignore listener errors
+  }
+  return () => {
+    exportJobListeners.delete(listener);
+  };
+}
+
+function exportPaceDelayMs(entries: number): number {
+  const paced = Math.round(
+    (Math.max(0, entries) / EXPORT_ENTRIES_PER_MINUTE) * 60000,
+  );
+  return Math.min(EXPORT_PACE_MAX_MS, Math.max(EXPORT_PACE_MIN_MS, paced));
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function notifyExportFinished(
+  provider: string,
+  totals: { exported: number; scores: number; skipped: number; failed: number },
+  error?: string,
+): Promise<string> {
+  const label = PROVIDER_LABELS[provider] ?? provider;
+  const message = error
+    ? `Export to ${label} stopped after ${totals.exported} titles: ${error} — run export again to continue`
+    : `Export to ${label} finished: ${describeExport({ ...totals, limited: false })}`;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user.id;
+    if (uid) {
+      await supabase.from('notifications').insert({
+        user_id: uid,
+        type: error ? 'export_failed' : 'export_complete',
+        message,
+        anime_id: null,
+      });
+    }
+  } catch {
+    // notification insert is best-effort; the bell refresh below still runs
+  }
+  try {
+    await fetchNotifications();
+  } catch {
+    // store keeps last-known rows
+  }
+  return message;
+}
+
+/**
+ * Run the provider export in the background: loops chunk POSTs while the
+ * backend answers `limited`, pacing chunk requests at ~30 entries/min.
+ * Non-blocking — resolves with the terminal snapshot; progress flows through
+ * subscribeExportJobs and completion lands in the notifications bell.
+ */
+export async function runExportJob(provider: string): Promise<ExportJobState> {
+  const current = exportJobs[provider];
+  if (exportJobInFlight || current?.status === 'running') {
+    return (
+      current ?? {
+        provider,
+        status: 'running',
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+        chunks: 0,
+        exported: 0,
+        scores: 0,
+        skipped: 0,
+        failed: 0,
+      }
+    );
+  }
+  exportJobInFlight = true;
+  const startedAt = Date.now();
+  const totals = { exported: 0, scores: 0, skipped: 0, failed: 0 };
+  let chunks = 0;
+  const progress = (): ExportJobState => ({
+    provider,
+    status: 'running',
+    startedAt,
+    updatedAt: Date.now(),
+    chunks,
+    ...totals,
+  });
+  setExportJob(progress());
+  try {
+    for (;;) {
+      const chunk = await exportProviderList(provider);
+      chunks += 1;
+      if (chunk.error) {
+        const message = await notifyExportFinished(
+          provider,
+          totals,
+          chunk.error,
+        );
+        const terminal: ExportJobState = {
+          ...progress(),
+          status: 'error',
+          message,
+        };
+        setExportJob(terminal);
+        return terminal;
+      }
+      totals.exported += chunk.exported ?? 0;
+      totals.scores += chunk.scores ?? 0;
+      totals.skipped += chunk.skipped ?? 0;
+      totals.failed += chunk.failed ?? 0;
+      if (!chunk.limited) {
+        const message = await notifyExportFinished(provider, totals);
+        const terminal: ExportJobState = {
+          ...progress(),
+          status: 'done',
+          message,
+        };
+        setExportJob(terminal);
+        return terminal;
+      }
+      setExportJob(progress());
+      await sleepMs(
+        exportPaceDelayMs(chunk.exported ?? EXPORT_ENTRIES_PER_MINUTE),
+      );
+    }
+  } finally {
+    exportJobInFlight = false;
+  }
+}
+
+/** Fire-and-forget wrapper for UI handlers. */
+export function startExportJob(provider: string): ExportJobState {
+  void runExportJob(provider);
+  const snapshot = getExportJobs()[provider];
+  return (
+    snapshot ?? {
+      provider,
+      status: 'running',
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      chunks: 0,
+      exported: 0,
+      scores: 0,
+      skipped: 0,
+      failed: 0,
+    }
+  );
 }
