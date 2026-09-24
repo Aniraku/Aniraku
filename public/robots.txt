@@ -1,0 +1,39 @@
+# =============================================================
+# robots.txt for Aniraku — https://www.aniraku.tech
+# Last updated: 2026-09-24
+# =============================================================
+
+User-agent: *
+Allow: /
+Allow: /trending
+Allow: /schedule
+Allow: /search
+Allow: /info/
+Allow: /watch/
+Allow: /privacy
+Allow: /terms
+Allow: /dmca
+Allow: /license
+Allow: /community-guidelines
+
+# Allow sitemap files (required for Google to follow sitemap index)
+Allow: /sitemaps/
+
+# Block private/auth routes only
+Disallow: /login
+Disallow: /signup
+Disallow: /profile
+Disallow: /settings
+Disallow: /auth/
+Disallow: /callback
+Disallow: /sync/callback
+Disallow: /history
+Disallow: /api/
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 2
+
+# =============================================================
+# Sitemaps
+# =============================================================
+Sitemap: https://www.aniraku.tech/sitemap.xml

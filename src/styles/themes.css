@@ -1,0 +1,203 @@
+/* ============================================================
+   Miruro theme system — 1:1 with miruro.to (v1.14.x)
+   Five themes switched via [data-theme] on <html>:
+     dark (default) | light | anilist | catppuccin
+   "system" resolves to dark or light via prefers-color-scheme.
+   A `dark-mode` class is kept on <html> for dark for compat.
+   ============================================================ */
+
+:root {
+  --app-font-family: 'Geist', ui-sans-serif, system-ui, sans-serif,
+    Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+
+  /* z-index scale (miruro.to parity) */
+  --z-index-below: -1;
+  --z-index-base: 0;
+  --z-index-above: 1;
+  --z-index-sticky: 10;
+  --z-index-content: 100;
+  --z-index-loading: 200;
+  --z-index-dropdown: 300;
+  --z-index-tooltip: 400;
+  --z-index-popover: 500;
+  --z-index-navbar: 600;
+  --z-index-mobile-menu: 700;
+  --z-index-modal-backdrop: 800;
+  --z-index-sidebar: 900;
+  --z-index-modal: 1000;
+  --z-index-popup: 1100;
+  --z-index-max: 9999;
+
+  /* shared tokens (miruro.to parity) */
+  --global-border-radius: 0.5rem;
+  --primary-accent-bg: #595991;
+  --primary-accent-tr: rgba(128, 128, 207, 0.25);
+  --primary-accent-dk-tr: rgba(128, 128, 207, 0.1);
+  --completed: #00aaff;
+  --cancelled: #ff0000;
+  --not-yet-aired: #ffa500;
+  --favourite: #e85d8a;
+  --favourite-bg: rgb(232 93 138 / 10%);
+  --global-shadow-light: rgba(0, 0, 0, 0.3);
+}
+
+/* touch devices get a larger radius (miruro.to parity) */
+@media (pointer: coarse) {
+  :root {
+    --global-border-radius: 1rem;
+  }
+}
+
+/* DARK (default) */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --global-primary-bg: #080808;
+  --global-primary-bg-tr: rgba(8, 8, 8, 0.9);
+  --global-secondary-bg: #141414;
+  --global-tertiary-bg: #222222;
+  --global-div: #141414;
+  --global-div-tr: #0e0e0e;
+  --global-div-tr-2: rgba(14, 14, 14, 0.3);
+  --global-border-color: rgba(245, 245, 245, 0.1);
+  --global-text: #e8e8e8;
+  --global-text-muted: #696969;
+  --global-text-muted-strong: #a8a8a8;
+  --global-card-bg: #181818;
+  --global-card-title-bg: #151515;
+  --global-card-shadow: rgba(0, 0, 0, 0.6);
+  --global-primary-skeleton: rgba(85, 85, 85, 0.1);
+  --global-secondary-skeleton: rgba(85, 85, 85, 0.3);
+  --global-button-bg: #202020;
+  --global-button-bg-light: #222222;
+  --global-button-hover-bg: #292929;
+  --global-button-text: #ebebeb;
+  --global-button-shadow: rgba(0, 0, 0, 0.6);
+  --global-shadow: rgba(0, 0, 0, 0.6);
+  --global-border-radius: 0.5rem;
+  --primary-accent: #b5a8ff;
+  --primary-accent-bg: #595991;
+  --ongoing: #aaff00;
+  --ongoing-dot-color: #aaff00;
+  --completed-indicator-color: #00aaff;
+  --cancelled-indicator-color: #ff0000;
+  --not-yet-aired-indicator-color: #ffa500;
+  --default-indicator-color: #808080;
+  --opposite: #ffffff;
+  --meta-theme-color: #080808;
+}
+
+/* LIGHT */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --global-primary-bg: #f5f5f5;
+  --global-primary-bg-tr: rgba(245, 245, 245, 0.8);
+  --global-secondary-bg: #e0e0e0;
+  --global-tertiary-bg: #dcdcdc;
+  --global-div: #e0e0e0;
+  --global-div-tr: #eaeaea;
+  --global-div-tr-2: rgba(234, 234, 234, 0.3);
+  --global-border-color: rgba(8, 8, 8, 0.1);
+  --global-text: #333;
+  --global-text-muted: #888;
+  --global-text-muted-strong: #5d5d5d;
+  --global-card-bg: #eee;
+  --global-card-title-bg: #e8e8e8;
+  --global-card-shadow: rgba(0, 0, 0, 0.3);
+  --global-primary-skeleton: rgba(165, 165, 165, 0.1);
+  --global-secondary-skeleton: rgba(165, 165, 165, 0.3);
+  --global-button-bg: #1a1919;
+  --global-button-bg-light: #d4d4d4;
+  --global-button-hover-bg: #cfcfcf;
+  --global-button-text: #333;
+  --global-button-shadow: rgba(255, 255, 255, 0.5);
+  --global-shadow: rgba(0, 0, 0, 0.3);
+  --global-shadow-light: rgba(0, 0, 0, 0.15);
+  --global-border-radius: 0.5rem;
+  --primary-accent: #b5a8ff;
+  --primary-accent-bg: #595991;
+  --ongoing: #4d8a00;
+  --ongoing-dot-color: #4d8a00;
+  --completed-indicator-color: #00aaff;
+  --cancelled-indicator-color: #ff0000;
+  --not-yet-aired-indicator-color: #ffa500;
+  --default-indicator-color: #808080;
+  --opposite: #000000;
+  --meta-theme-color: #f5f5f5;
+}
+
+/* ANILIST */
+:root[data-theme='anilist'] {
+  color-scheme: dark;
+  --global-primary-bg: rgb(11, 22, 34);
+  --global-primary-bg-tr: rgba(11, 22, 34, 0.9);
+  --global-secondary-bg: rgb(21, 31, 46);
+  --global-tertiary-bg: rgb(15, 22, 31);
+  --global-div: #151f2e;
+  --global-div-tr: #0f1928;
+  --global-div-tr-2: rgba(15, 25, 40, 0.3);
+  --global-border-color: rgba(159, 173, 189, 0.1);
+  --global-text: rgb(159, 173, 189);
+  --global-text-muted: rgb(114, 138, 161);
+  --global-text-muted-strong: rgb(137, 156, 175);
+  --global-card-bg: rgb(15, 22, 31);
+  --global-card-title-bg: rgb(6, 12, 19);
+  --global-card-shadow: rgba(0, 5, 15, 0.6);
+  --global-primary-skeleton: rgba(159, 173, 189, 0.1);
+  --global-secondary-skeleton: rgba(159, 173, 189, 0.3);
+  --global-button-bg: rgb(30, 42, 56);
+  --global-button-bg-light: rgb(6, 12, 19);
+  --global-button-hover-bg: rgb(21, 31, 46);
+  --global-button-text: rgb(159, 173, 189);
+  --global-button-shadow: rgba(0, 5, 15, 0.6);
+  --global-shadow: rgba(0, 5, 15, 0.6);
+  --global-border-radius: 0.5rem;
+  --primary-accent: #b5a8ff;
+  --primary-accent-bg: #595991;
+  --ongoing: #aaff00;
+  --ongoing-dot-color: #aaff00;
+  --completed-indicator-color: #00aaff;
+  --cancelled-indicator-color: #ff0000;
+  --not-yet-aired-indicator-color: #ffa500;
+  --default-indicator-color: #808080;
+  --opposite: #ffffff;
+  --meta-theme-color: #0b1622;
+}
+
+/* CATPPUCCIN */
+:root[data-theme='catppuccin'] {
+  color-scheme: dark;
+  --global-primary-bg: #1e1e2e;
+  --global-primary-bg-tr: rgba(30, 30, 46, 0.9);
+  --global-secondary-bg: #313244;
+  --global-tertiary-bg: #11111b;
+  --global-div: #282838;
+  --global-div-tr: #181825;
+  --global-div-tr-2: rgba(24, 24, 37, 0.3);
+  --global-border-color: rgba(205, 214, 244, 0.1);
+  --global-text: #cdd6f4;
+  --global-text-muted: #bac2de;
+  --global-text-muted-strong: rgb(196, 204, 233);
+  --global-card-bg: #313244;
+  --global-card-title-bg: #181825;
+  --global-card-shadow: rgba(17, 17, 27, 0.6);
+  --global-primary-skeleton: rgba(205, 214, 244, 0.1);
+  --global-secondary-skeleton: rgba(205, 214, 244, 0.3);
+  --global-button-bg: #181825;
+  --global-button-bg-light: #575268;
+  --global-button-hover-bg: #585b70;
+  --global-button-text: #cdd6f4;
+  --global-button-shadow: rgba(0, 0, 0, 0.6);
+  --global-shadow: rgba(17, 17, 27, 0.6);
+  --global-border-radius: 0.5rem;
+  --primary-accent: #b5a8ff;
+  --primary-accent-bg: #595991;
+  --ongoing: #aaff00;
+  --ongoing-dot-color: #aaff00;
+  --completed-indicator-color: #00aaff;
+  --cancelled-indicator-color: #ff0000;
+  --not-yet-aired-indicator-color: #ffa500;
+  --default-indicator-color: #808080;
+  --opposite: #ffffff;
+  --meta-theme-color: #1e1e2e;
+}

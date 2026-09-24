@@ -1,0 +1,241 @@
+/* ============================================================
+   Base animation system — miruro.to parity.
+   Keyframes + helper classes driven by --animation-* vars.
+   ============================================================ */
+
+:root {
+  --animation-duration: 0s;
+  --animation-timing: ease;
+  --animation-delay: 0s;
+  --animation-iteration-count: 1;
+  --animation-fill-mode: none;
+}
+
+@keyframes grow {
+  0% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes grow10 {
+  0% {
+    transform: scale(0.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes growY {
+  0% {
+    transform: scaleY(0);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes popIn0 {
+  0% {
+    opacity: 0;
+    scale: 0.95;
+  }
+  50% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes popIn50 {
+  0% {
+    opacity: 0;
+    scale: 0.95;
+  }
+  50% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes popIn98 {
+  0% {
+    opacity: 0;
+    scale: 0.98;
+  }
+  50% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes popInSk {
+  0%,
+  100% {
+    opacity: 0;
+    scale: 0.95;
+  }
+  50% {
+    opacity: 1;
+    scale: 1;
+  }
+  75% {
+    opacity: 0.5;
+    scale: 1;
+  }
+}
+
+@keyframes shrinkIn {
+  0% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.95;
+  }
+}
+
+@keyframes slideLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animFadeIn {
+  animation: fadeIn var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+.animPopIn {
+  animation: popIn0 var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+.animPopInSk {
+  animation: popInSk var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+.animShrinkIn {
+  animation: shrinkIn var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+.animSlideUp {
+  animation: slideUp var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+.animSlideRight {
+  animation: slideRight var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+.animSlideLeft {
+  animation: slideLeft var(--animation-duration) var(--animation-timing)
+    var(--animation-delay) var(--animation-iteration-count)
+    var(--animation-fill-mode);
+}
+
+/* ---- local keyframes (kept) ---- */
+
+@keyframes slideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dropDown {
+  0% {
+    max-height: 0;
+  }
+  100% {
+    max-height: 500px;
+  }
+}
+
+@keyframes slideDropDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 500px;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
