@@ -274,6 +274,17 @@ const Navbar = () => {
                     aria-label="Search Anime"
                     value={query}
                     onChange={(e) => handleSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter submits to the full search page (same as the
+                      // submit button); isComposing guard keeps IME
+                      // confirmations from submitting mid-composition.
+                      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                      const q = query.trim();
+                      if (!q) return;
+                      handleCloseResults();
+                      inputRef.current?.blur();
+                      navigate(`/search?query=${encodeURIComponent(q)}`);
+                    }}
                     onFocus={() => {
                       setIsSearchFocused(true);
                       if (query) setShowResults(true);
