@@ -38,6 +38,21 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,woff2,svg}'],
           navigateFallback: 'index.html', // SPA offline shell
+          // Explicit denylist so the SW NEVER serves the app shell for
+          // non-HTML URLs (SEO files, manifests, PWA internals). Without
+          // this, a navigation to /sitemap.xml could render the SPA 404
+          // page from cache instead of the real XML.
+          navigateFallbackDenylist: [
+            /^\/_/,
+            /\/[^/?]+\.[^/]+$/,
+            /^\/sitemap\.xml$/,
+            /^\/sitemaps\//,
+            /^\/robots\.txt$/,
+            /^\/manifest\.json$/,
+            /^\/sw\.js$/,
+            /^\/registerSW\.js$/,
+            /^\/workbox-.*\.js$/,
+          ],
         },
       }),
     ],
