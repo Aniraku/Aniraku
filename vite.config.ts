@@ -38,6 +38,13 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,woff2,svg}'],
           navigateFallback: 'index.html', // SPA offline shell
+          // Take control ASAP: without clientsClaim, tabs opened before a
+          // deploy keep running the old bundle for hours (SPA navigation
+          // never reloads), so stale code keeps reading/writing stale
+          // shapes. skipWaiting activates the new worker immediately,
+          // clientsClaim hands existing tabs over on next navigation.
+          skipWaiting: true,
+          clientsClaim: true,
           // Explicit denylist so the SW NEVER serves the app shell for
           // non-HTML URLs (SEO files, manifests, PWA internals). Without
           // this, a navigation to /sitemap.xml could render the SPA 404

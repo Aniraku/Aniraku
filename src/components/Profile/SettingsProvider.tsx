@@ -299,12 +299,17 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
 
   useEffect(() => {
     // Persist into the unified record (live `O.set(A.USER_SETTINGS, r)`):
-    // merge-write so `theme` and `schemaVersion` written by ThemeContext /
-    // migration are preserved. Runs on mount too, so a fresh install lands
-    // `aniraku:settings` for the pre-paint bootstrap to read next load.
+    // merge-write over the FRESH record (not a blind replace) so unknown
+    // fields written by a newer bundle (or another tab) survive — a stale
+    // writer must never delete settings it doesn't know about. Runs on
+    // mount too, so a fresh install lands `aniraku:settings` for the
+    // pre-paint bootstrap to read next load.
     try {
       const record = readRecord();
-      record.settings = stored;
+      const prevSettings = isPlainObject(record.settings)
+        ? (record.settings as Record<string, unknown>)
+        : {};
+      record.settings = { ...prevSettings, ...stored };
       if (record.schemaVersion === undefined) {
         record.schemaVersion = SCHEMA_VERSION;
       }
