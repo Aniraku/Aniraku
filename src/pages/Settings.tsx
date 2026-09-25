@@ -608,8 +608,8 @@ export const Settings: React.FC = () => {
 
   const [preferences, setPreferences] = useState<Preferences>({
     defaultLanguage: settings.defaultLanguage,
-    titleLanguage: 'Romaji (Shingeki no Kyojin)',
-    characterNameLanguage: 'Romaji (Zoldyck Killua)',
+    titleLanguage: titleLabelFor(settings.titleLanguage),
+    characterNameLanguage: characterLabelFor(settings.characterNameLanguage),
     openKeyboardShortcuts: 'Open',
     autoskipIntroOutro: settings.autoSkip ? 'Enabled' : 'Disabled',
     autoPlay: settings.autoPlay ? 'Enabled' : 'Disabled',
@@ -623,6 +623,8 @@ export const Settings: React.FC = () => {
     setPreferences((prev) => ({
       ...prev,
       defaultLanguage: settings.defaultLanguage,
+      titleLanguage: titleLabelFor(settings.titleLanguage),
+      characterNameLanguage: characterLabelFor(settings.characterNameLanguage),
       autoskipIntroOutro: settings.autoSkip ? 'Enabled' : 'Disabled',
       autoPlay: settings.autoPlay ? 'Enabled' : 'Disabled',
       autoNext: settings.autoNext ? 'Enabled' : 'Disabled',
@@ -651,8 +653,28 @@ export const Settings: React.FC = () => {
       case 'defaultLanguage':
         setSettings({ defaultLanguage: value });
         break;
+      case 'titleLanguage':
+        setSettings({ titleLanguage: value });
+        break;
+      case 'characterNameLanguage':
+        setSettings({ characterNameLanguage: value });
+        break;
     }
   };
+
+  // Stored `langTitle`/`langCharacter` values ↔ dropdown labels.
+  function titleLabelFor(value: unknown): string {
+    const v = String(value ?? '');
+    if (/native/i.test(v)) return 'Native (進撃の巨人)';
+    if (/romaji/i.test(v)) return 'Romaji (Shingeki no Kyojin)';
+    return 'English (Attack on Titan)';
+  }
+
+  function characterLabelFor(value: unknown): string {
+    const v = String(value ?? '');
+    if (/native/i.test(v)) return 'Native (キルア=ゾルディック)';
+    return 'Romaji (Zoldyck Killua)';
+  }
 
   const handleRestoreDefaults = () => {
     setSettings({
@@ -660,11 +682,13 @@ export const Settings: React.FC = () => {
       autoPlay: false,
       autoNext: true,
       defaultLanguage: 'sub',
+      titleLanguage: 'English (Attack on Titan)',
+      characterNameLanguage: 'Romaji (Zoldyck Killua)',
     });
     setTheme('system');
     setPreferences({
       defaultLanguage: 'sub',
-      titleLanguage: 'Romaji (Shingeki no Kyojin)',
+      titleLanguage: 'English (Attack on Titan)',
       characterNameLanguage: 'Romaji (Zoldyck Killua)',
       openKeyboardShortcuts: 'Open',
       autoskipIntroOutro: 'Enabled',

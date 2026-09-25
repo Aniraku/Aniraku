@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { IoChevronForward, IoChevronDown } from 'react-icons/io5';
 import { TbCards } from 'react-icons/tb';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { FaStar, FaCalendarAlt } from 'react-icons/fa';
 import { Anime, StatusIndicator } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
@@ -283,9 +284,7 @@ export const SidePanel: React.FC<{
               ))
             : visible.map((anime, index) => {
                 const name =
-                  anime.title?.english ||
-                  anime.title?.romaji ||
-                  'Untitled';
+                  resolveDisplayTitle(anime.title) || 'Untitled';
                 const eps =
                   anime.totalEpisodes || Number(anime.episodes) || null;
                 const isPartial =

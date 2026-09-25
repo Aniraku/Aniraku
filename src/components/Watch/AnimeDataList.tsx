@@ -5,6 +5,7 @@ import { TbCards } from 'react-icons/tb';
 import { FaStar } from 'react-icons/fa';
 import { Anime, StatusIndicator } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
 const Sidebar = styled.div`
   display: flex;
@@ -147,37 +148,24 @@ export const AnimeDataList: React.FC<{ animeData: Anime }> = ({
                   to={infoPathFor(relation)}
                   key={relation.id}
                   style={{ textDecoration: 'none', color: 'inherit' }}
-                  title={`Watch ${
-                    relation.title.english ??
-                    relation.title.romaji ??
-                    relation.title.native ??
-                    relation.title.userPreferred
-                  }`}
-                  aria-label={`Watch ${
-                    relation.title.english ??
-                    relation.title.romaji ??
-                    relation.title.native ??
-                    relation.title.userPreferred
-                  }`}
+                  title={`Watch ${resolveDisplayTitle(relation.title)}`}
+                  aria-label={`Watch ${resolveDisplayTitle(relation.title)}`}
                 >
                   <Card style={{ animationDelay: `${index * 0.1}s` }}>
                     <AnimeImage
                       src={relation.image}
-                      alt={relation.title.userPreferred}
+                      alt={resolveDisplayTitle(relation.title)}
                       loading='lazy'
                     />
                     <Info>
                       <TitleWithDot>
                         <StatusIndicator status={relation.status} />
                         <Title>
-                          {relation.title.english ??
-                            relation.title.romaji ??
-                            relation.title.native ??
-                            relation.title.userPreferred}
+                          {resolveDisplayTitle(relation.title)}
                         </Title>
                       </TitleWithDot>
                       <Details
-                        aria-label={`Details about ${relation.title.userPreferred}`}
+                        aria-label={`Details about ${resolveDisplayTitle(relation.title)}`}
                       >
                         {/* Conditionally render each piece of detail only if it's not null or empty */}
                         {relation.type && <DetailPill>{relation.type}</DetailPill>}
@@ -212,37 +200,24 @@ export const AnimeDataList: React.FC<{ animeData: Anime }> = ({
                   to={infoPathFor(recommendation)}
                   key={recommendation.id}
                   style={{ textDecoration: 'none', color: 'inherit' }}
-                  title={`Watch ${
-                    recommendation.title.english ??
-                    recommendation.title.romaji ??
-                    recommendation.title.native ??
-                    recommendation.title.userPreferred
-                  }`}
-                  aria-label={`Watch ${
-                    recommendation.title.english ??
-                    recommendation.title.romaji ??
-                    recommendation.title.native ??
-                    recommendation.title.userPreferred
-                  }`}
+                  title={`Watch ${resolveDisplayTitle(recommendation.title)}`}
+                  aria-label={`Watch ${resolveDisplayTitle(recommendation.title)}`}
                 >
                   <Card style={{ animationDelay: `${index * 0.1}s` }}>
                     <AnimeImage
                       src={recommendation.image}
-                      alt={recommendation.title.userPreferred}
+                      alt={resolveDisplayTitle(recommendation.title)}
                       loading='lazy'
                     />
                     <Info>
                       <TitleWithDot>
                         <StatusIndicator status={recommendation.status} />
                         <Title>
-                          {recommendation.title.english ??
-                            recommendation.title.romaji ??
-                            recommendation.title.native ??
-                            recommendation.title.userPreferred}
+                          {resolveDisplayTitle(recommendation.title)}
                         </Title>
                       </TitleWithDot>
                       <Details
-                        aria-label={`Details about ${recommendation.title.userPreferred}`}
+                        aria-label={`Details about ${resolveDisplayTitle(recommendation.title)}`}
                       >
                         {/* Similar conditional rendering for recommendation details */}
                         {recommendation.type && (

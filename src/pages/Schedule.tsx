@@ -13,6 +13,7 @@ import { FiChevronRight } from 'react-icons/fi';
 import { fetchAiringDay, type AiringEntry } from '../index';
 import { useNsfw, filterAdult } from '../hooks/useNsfw';
 import { watchPathFor } from '../utils/animePaths';
+import { resolveDisplayTitle } from '../lib/displayLanguage';
 import { useSeo, breadcrumbLd } from '../utils/seo';
 
 const PageWrapper = styled.div`
@@ -385,7 +386,7 @@ const ScheduleSlotCard = ({ entry }: { entry: AiringEntry }) => {
   // Normalized from the legacy 3-seg `/watch/{id}/{slug}/{ep}` to the
   // canonical slug+`?ep=` form (Watch reads ?ep first — trivially safe).
   const to = watchPathFor({ id, title }, entry.episode);
-  const displayTitle = title?.english || title?.romaji || title?.native;
+  const displayTitle = resolveDisplayTitle(title);
   const tooltip = [title?.english, title?.romaji, title?.native]
     .filter((value, index, list) => value && list.indexOf(value) === index)
     .join(' — ');
@@ -408,7 +409,7 @@ const ScheduleSlotCard = ({ entry }: { entry: AiringEntry }) => {
           </SlotTimeTag>
           {anime?.image && (
             <SlotThumb>
-              <SlotThumbImg src={anime.image} alt={title?.english || ''} />
+              <SlotThumbImg src={anime.image} alt={resolveDisplayTitle(title)} />
             </SlotThumb>
           )}
           <SlotDetails>

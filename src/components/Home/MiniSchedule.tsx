@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { fetchAiringDay, type AiringEntry } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
 // ---------------------------------------------------------------------------
 // MiniSchedule (the live site 1:1) — "Estimated Airing Schedule" widget in the
@@ -384,8 +385,7 @@ export const MiniSchedule: React.FC = () => {
                 const time = formatTime(e.airingAt);
                 const prevTime =
                   i > 0 ? formatTime(dayEntries[i - 1].airingAt) : null;
-                const name =
-                  e.anime.title?.english || e.anime.title?.romaji || '';
+                const name = resolveDisplayTitle(e.anime.title);
                 return (
                   <Row
                     key={`${e.anime.id}-${e.episode}-${e.airingAt}`}

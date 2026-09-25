@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { Relation } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
 const CompactGrid = styled.div`
   display: grid;
@@ -98,17 +99,15 @@ export const RelationsCompact: React.FC<{ relations: Relation[] }> = ({
         <Row
           key={relation.id}
           to={infoPathFor(relation)}
-          title={`${relation.relationType} — ${relation.title.userPreferred}`}
+          title={`${relation.relationType} — ${resolveDisplayTitle(relation.title)}`}
         >
           <Thumb
             src={relation.image}
-            alt={relation.title.userPreferred}
+            alt={resolveDisplayTitle(relation.title)}
             loading='lazy'
           />
           <Title>
-            {relation.title.english ||
-              relation.title.romaji ||
-              relation.title.userPreferred}
+            {resolveDisplayTitle(relation.title)}
           </Title>
           <TypeBadge>{relation.relationType?.replace(/_/g, ' ')}</TypeBadge>
         </Row>

@@ -51,6 +51,10 @@ import {
 // shared helper: title/desc/keywords/og/twitter/canonical/JSON-LD + cleanup.
 import { SITE_URL, useSeo } from '../utils/seo';
 import { infoPathFor } from '../utils/animePaths';
+import {
+  resolveCharacterName,
+  resolveDisplayTitle,
+} from '../lib/displayLanguage';
 
 // ---------------------------------------------------------------------------
 // Info page — the live site 1:1, hydrated tabbed rebuild.
@@ -147,12 +151,9 @@ const metaDescription = (html: string): string => {
   return text.length > 154 ? `${text.slice(0, 154)}…` : text;
 };
 
-// Display title for h1 / document.title / og:title (English || Romaji || Native).
+// Display title for h1 / document.title / og:title (stored preference).
 const displayTitle = (anime: Anime): string =>
-  anime.title?.english ||
-  anime.title?.romaji ||
-  anime.title?.native ||
-  'No Title';
+  resolveDisplayTitle(anime.title) || 'No Title';
 
 const capitalize = (value: string): string =>
   value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : '';
@@ -217,9 +218,9 @@ const genreTagVars = (color: string): React.CSSProperties =>
     '--genre-tag-hover-color': `color-mix(in srgb, ${color || 'grey'}, black 70%)`,
   }) as React.CSSProperties;
 
-// Link text uses the display title (english-first), unlike slug pickTitle.
+// Link text uses the stored Title Language preference (unlike slug pickTitle).
 const listTitleOf = (title: LinkableTitle): string =>
-  title.english || title.romaji || title.userPreferred || title.native || 'No Title';
+  resolveDisplayTitle(title) || 'No Title';
 
 // Relation/Recommendation node → CardItem's Anime shape for the `ulm8c` drag
 // lists. The relations GraphQL (useApi, read-only) has no releaseDate, so the
@@ -236,8 +237,7 @@ const toCardAnime = (
 
 // live ut(): YouTube search URL for the trailer fallback.
 const trailerSearchUrl = (anime: Anime): string | null => {
-  const title =
-    anime.title?.english || anime.title?.romaji || anime.title?.native;
+  const title = resolveDisplayTitle(anime.title);
   if (!title) return null;
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(
     `${title} ${anime.startDate?.year || ''} anime trailer`,
@@ -4052,7 +4052,7 @@ const Info: React.FC = () => {
                               ? characterLanguage
                               : characterLanguages[0]),
                         );
-                        const characterName = listTitleOf(character.name);
+                        const characterName = resolveCharacterName(character.name);
                         const characterUrl = `https://anilist.co/character/${character.id}`;
                         const staffUrl = actor
                           ? `https://anilist.co/staff/${actor.id}`
@@ -4086,7 +4086,7 @@ const Info: React.FC = () => {
                                       target='_blank'
                                       rel='noopener noreferrer'
                                     >
-                                      {listTitleOf(actor.name) ||
+                                      {resolveCharacterName(actor.name) ||
                                         'Unknown Voice Actor'}
                                     </a>
                                     <CharMuted>{actor.language}</CharMuted>
@@ -4095,12 +4095,12 @@ const Info: React.FC = () => {
                                     href={staffUrl}
                                     target='_blank'
                                     rel='noopener noreferrer'
-                                    aria-label={listTitleOf(actor.name)}
+                                    aria-label={resolveCharacterName(actor.name)}
                                   >
                                     <CharImage
                                       src={actor.image || POSTER_PLACEHOLDER}
                                       alt={
-                                        listTitleOf(actor.name) ||
+                                        resolveCharacterName(actor.name) ||
                                         'Voice Actor Image'
                                       }
                                     />
