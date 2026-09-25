@@ -10,6 +10,7 @@ import type { Swiper as SwiperClass } from 'swiper';
 import { Autoplay, EffectFade, Keyboard } from 'swiper/modules';
 import 'swiper/swiper-bundle.css';
 import { Anime } from '../../index';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { infoPathFor, watchPathFor } from '../../utils/animePaths';
 
 // ---------------------------------------------------------------------------
@@ -362,7 +363,7 @@ const SlideDetails: FC<{ anime: Anime }> = ({ anime }) => {
           : 'scale(1)';
   const opacity = !slide || slide.isActive ? 1 : slide.isNext || slide.isPrev ? 0.5 : 1;
 
-  const name = anime.title?.english || anime.title?.romaji || '';
+  const name = resolveDisplayTitle(anime.title);
   const colorVars = anime.color
     ? ({
         ['--home-carousel-title-color' as string]: anime.color,
@@ -489,7 +490,7 @@ export const HomeCarousel: FC<HomeCarouselProps> = ({ data = [] }) => {
         onSlideChange={(sw) => setActiveIndex(sw.realIndex)}
       >
         {slides.map((anime, idx) => {
-          const name = anime.title?.english || anime.title?.romaji || '';
+          const name = resolveDisplayTitle(anime.title);
           const src = isSmall
             ? anime.image || anime.cover
             : anime.cover || anime.image;
@@ -517,7 +518,7 @@ export const HomeCarousel: FC<HomeCarouselProps> = ({ data = [] }) => {
         <ActionButtons>
           <ActionButton
             to={infoPathFor(active)}
-            title={`Details ${active.title?.english || active.title?.romaji || ''}`}
+            title={`Details ${resolveDisplayTitle(active.title)}`}
           >
             <MdInfoOutline size={20} />
             <span>DETAILS</span>
@@ -527,7 +528,7 @@ export const HomeCarousel: FC<HomeCarouselProps> = ({ data = [] }) => {
               WATCH NOW string at all; see report corpus finding). */}
           <ActionButton
             to={watchPathFor(active)}
-            title={`Watch ${active.title?.english || active.title?.romaji || ''}`}
+            title={`Watch ${resolveDisplayTitle(active.title)}`}
           >
             <FaRegCirclePlay size={18} />
             <span>WATCH NOW</span>

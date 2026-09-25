@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { Relation } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { FaFilm } from 'react-icons/fa';
 
 const SeasonsSection = styled.div`
@@ -153,16 +154,13 @@ export const Seasons: React.FC<{ relations: Relation[] }> = ({ relations }) => {
             >
               <SeasonCover
                 src={relation.image}
-                alt={`${relation.title.english || relation.title.romaji || relation.title.userPreferred} Cover`}
+                alt={`${resolveDisplayTitle(relation.title)} Cover`}
                 loading='lazy'
               />
               <Content>
                 <SeasonLabel>{label}</SeasonLabel>
                 <SeasonName>
-                  {relation.title.english ||
-                    relation.title.romaji ||
-                    relation.title.native ||
-                    relation.title.userPreferred}
+                  {resolveDisplayTitle(relation.title)}
                 </SeasonName>
               </Content>
             </SeasonCard>

@@ -52,6 +52,7 @@ import {
   saveEpisodeRating,
   updateSyncScore,
 } from '../lib/episodeRatings';
+import { resolveDisplayTitle } from '../lib/displayLanguage';
 // Item 1 (NSFW gate) — Aniraku Watch.jsx:1520/:5578.
 import { isNsfw, useNsfw } from '../hooks/useNsfw';
 // Runtime SEO (SEO layer) — old setWatchSEO (seo.js:190-260) via shared helper.
@@ -1562,7 +1563,7 @@ const WatchInner: React.FC = () => {
   // with helper-managed cleanup. (Replaces the rebrand-sweep title effect.)
   const { pathname: seoPathname } = useLocation();
   const watchSeoTitle =
-    animeInfo?.title?.english || animeInfo?.title?.romaji || 'Unknown Anime';
+    resolveDisplayTitle(animeInfo?.title) || 'Unknown Anime';
   const watchEpNum = Number(currentEpisode.number) || Number(episodeNumber) || 1;
   const watchImage = `https://img.anili.st/media/${animeId}`;
   useSeo({
@@ -1954,9 +1955,7 @@ const WatchInner: React.FC = () => {
           onPrevEpisode={onPrevEpisode}
           onNextEpisode={onNextEpisode}
           onPlaybackStart={handlePlaybackStarted}
-          animeTitle={
-            animeInfo?.title?.english || animeInfo?.title?.romaji
-          }
+          animeTitle={resolveDisplayTitle(animeInfo?.title)}
           animeTitleInfo={animeInfo?.title}
           hasPrev={currentEpisodeIndex > 0}
           hasNext={

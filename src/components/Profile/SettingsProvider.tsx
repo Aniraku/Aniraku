@@ -259,7 +259,26 @@ function toStoredPatch(
     stored.langDefault = patch.defaultLanguage === 'dub' ? 'dub' : 'sub';
   if ('defaultServers' in patch)
     stored.defaultServers = patch.defaultServers || 'Default';
+  if ('titleLanguage' in patch)
+    stored.langTitle = toLangTitle(patch.titleLanguage);
+  if ('characterNameLanguage' in patch)
+    stored.langCharacter = toLangCharacter(patch.characterNameLanguage);
   return stored;
+}
+
+/** Dropdown labels → live `langTitle` values. */
+function toLangTitle(value: unknown): string {
+  const v = String(value ?? '');
+  if (/native/i.test(v)) return 'Native';
+  if (/romaji/i.test(v)) return 'Romaji';
+  return 'English';
+}
+
+/** Dropdown labels → live `langCharacter` values. */
+function toLangCharacter(value: unknown): string {
+  const v = String(value ?? '');
+  if (/native/i.test(v)) return 'Native';
+  return 'Romaji';
 }
 
 // Define the type for the context state
@@ -270,6 +289,8 @@ interface SettingsContextType {
     autoNext: boolean;
     defaultLanguage: string;
     defaultServers: string;
+    titleLanguage: string;
+    characterNameLanguage: string;
   };
   setSettings: (settings: Partial<SettingsContextType['settings']>) => void;
 }
@@ -332,6 +353,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
     autoNext: stored.autoNext,
     defaultLanguage: stored.langDefault,
     defaultServers: stored.defaultServers,
+    titleLanguage: stored.langTitle,
+    characterNameLanguage: stored.langCharacter,
   };
 
   return (

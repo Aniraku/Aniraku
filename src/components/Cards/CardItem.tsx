@@ -13,6 +13,7 @@ import StatusIndicator from '../shared/StatusIndicator';
 import type { Anime } from '../../hooks/animeInterface';
 import { SkeletonBox } from '../Skeletons/Skeletons';
 import { infoPathFor } from '../../utils/animePaths';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { useBookmarks } from '../../hooks/useBookmarks';
 
 // Card corner bookmark control (Wave B) — Aniraku Card.jsx:37-45 toggle
@@ -76,8 +77,7 @@ interface CardItemProps {
 }
 
 const CardItem: React.FC<CardItemProps> = ({ anime }) => {
-  const displayTitle =
-    anime.title.romaji || anime.title.english || anime.title.native;
+  const displayTitle = resolveDisplayTitle(anime.title);
 
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const bookmarked = isBookmarked(anime.id);

@@ -13,6 +13,7 @@ import { MdRecordVoiceOver } from 'react-icons/md';
 import { showToast } from '../Toaster';
 import type { Anime } from '../../hooks/animeInterface';
 import { infoPathFor } from '../../utils/animePaths';
+import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
 interface DropSearchProps {
   results: Anime[];
@@ -173,13 +174,13 @@ const DropSearch = ({
                 >
                   <img
                     src={anime.image}
-                    alt={`Search Result for ${anime.title.romaji || anime.title.english || anime.title.romaji}`}
+                    alt={`Search Result for ${resolveDisplayTitle(anime.title)}`}
                     loading="lazy"
                   />
                   <div className="searchDetails">
                     <div className="searchTitleContainer">
                       <div className="searchTitle">
-                        {anime.title.romaji || anime.title.english || anime.title.romaji}
+                        {resolveDisplayTitle(anime.title)}
                       </div>
                     </div>
                     <div className="searchDetailsRow">
