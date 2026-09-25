@@ -667,9 +667,11 @@
         }
         /* A YouTube-like downloaded-range cue that draws EVERY cached range —
            forward and behind the playhead — because the cache itself has no
-           limit. It sits behind ArtPlayer's red played line and thumb, never
-           captures input, and keeps the Nothing-style signal red reserved
-           for the actual playback position. */
+           limit. It sits behind ArtPlayer's solid-accent played line and
+           thumb, never captures input. Deliberately DIM (white 0.28, no
+           bright ring) so buffered ranges can't be mistaken for the played
+           position — the played fill is the only bright element on the
+           track. */
         .watch-art-mount .art-control-progress-inner {
           overflow: hidden;
         }
@@ -685,8 +687,8 @@
           height: 3px;
           transform: translateY(-50%);
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.55);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+          background: rgba(255, 255, 255, 0.28);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
         }
         .watch-art-mount .art-progress-loaded {
           display: none !important;
