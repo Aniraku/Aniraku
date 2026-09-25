@@ -360,9 +360,9 @@ const NoEpsMessage = styled.p`
   line-height: 1.6;
 `;
 
-// In-player upcoming notice: same slot/chrome as the player (16:9 box) for
-// an explicitly requested future episode (old Aniraku destroyed the player
-// and showed the line instead of silently playing an older episode).
+// In-player upcoming notice — old Aniraku `watch-error` language verbatim:
+// a black 16:9 stage with the no-source icon + message (no action buttons
+// for upcoming — there is nothing to retry, the episode simply is not out).
 const UpcomingPanel = styled.div`
   aspect-ratio: 16 / 9;
   width: 100%;
@@ -370,38 +370,29 @@ const UpcomingPanel = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.8rem;
   text-align: center;
-  padding: 2rem;
-  background: var(--global-primary-bg);
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
-  h2 {
-    margin: 0;
-    font-size: 1.3rem;
-  }
-  p {
-    margin: 0;
-    max-width: 34rem;
-    color: var(--global-text-muted);
-    line-height: 1.6;
-    font-size: 0.95rem;
+  padding: 24px;
+  background: #000;
+  img {
+    width: 84px;
+    height: 84px;
+    margin-bottom: 16px;
+    opacity: 0.9;
   }
 `;
 
-const UpcomingCta = styled.button`
-  margin-top: 0.4rem;
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
-  background: transparent;
+const UpcomingMessage = styled.div`
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  max-width: 460px;
   color: var(--global-text);
-  font-size: 0.9rem;
-  padding: 0.55rem 1.1rem;
-  cursor: pointer;
-  &:hover {
-    border-color: var(--primary-accent);
-    color: var(--primary-accent);
-  }
+`;
+
+const UpcomingEta = styled.div`
+  font-size: 12px;
+  opacity: 0.75;
+  color: var(--global-text);
 `;
 
 const NoEpsImage = styled.div`
@@ -1907,19 +1898,11 @@ const WatchInner: React.FC = () => {
         <SkeletonPlayer />
       ) : futureEpisodeRequested ? (
         <UpcomingPanel role='status'>
-          <h2>
-            Episode {requestedEpNumber} isn&apos;t out yet
-          </h2>
-          <p>{UPCOMING_EPISODE_MESSAGE}</p>
+          <img src='/no-source.svg' alt='' aria-hidden='true' />
+          <UpcomingMessage>{UPCOMING_EPISODE_MESSAGE}</UpcomingMessage>
           {countdown && countdown !== 'Airing now or aired' ? (
-            <p>Next episode airs in {countdown}.</p>
+            <UpcomingEta>Next episode airs in {countdown}.</UpcomingEta>
           ) : null}
-          <UpcomingCta
-            type='button'
-            onClick={() => navigate(window.location.pathname)}
-          >
-            Watch the latest aired episode
-          </UpcomingCta>
         </UpcomingPanel>
       ) : (
         // Zenime composition: ONE Player owns both render modes — HLS chrome
