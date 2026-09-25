@@ -1127,9 +1127,9 @@ export function describeExport(r: ExportResult | null | undefined): string {
 // The provider mutations themselves run inside the backend
 // (`POST /api/v1/export/{provider}`), which processes one chunk per call and
 // answers `limited: true` while titles remain. This runner loops those chunk
-// calls WITHOUT blocking the UI and paces them so provider-side writes stay
-// at/below ~30 entries/min (AniList's documented write limit): after each
-// chunk it waits `entries/30min`, clamped to 4s..120s. True per-mutation
+// calls WITHOUT blocking the UI and paces them at 10 batched requests/min
+// (AniList allows 30 req/min — we stay 3x under), with larger chunks scaling
+// the gap by entry volume. True per-mutation
 // pacing inside a chunk lives in the Go backend; this spaces chunk requests.
 // On terminal state it inserts a Supabase `notifications` row (type
 // `export_complete` / `export_failed`) so the bell badge + drawer — which
@@ -1159,7 +1159,10 @@ export interface ExportJobState {
 export type ExportJobs = Record<string, ExportJobState>;
 
 const EXPORT_JOB_KEY = 'aniraku:export-job';
-const EXPORT_PACE_MIN_MS = 4000;
+// AniList allows 30 req/min; exports run at a conservative 10 batched
+// requests/min (one chunk POST per 6s) so backend bursts stay under the cap.
+// Larger chunks additionally scale the gap by entry volume.
+const EXPORT_MIN_INTERVAL_MS = 6000;
 const EXPORT_PACE_MAX_MS = 120000;
 const EXPORT_ENTRIES_PER_MINUTE = 30;
 // AniList's documented window is 60s; wait a full window + margin when the
@@ -1241,7 +1244,7 @@ function exportPaceDelayMs(entries: number): number {
   const paced = Math.round(
     (Math.max(0, entries) / EXPORT_ENTRIES_PER_MINUTE) * 60000,
   );
-  return Math.min(EXPORT_PACE_MAX_MS, Math.max(EXPORT_PACE_MIN_MS, paced));
+  return Math.min(EXPORT_PACE_MAX_MS, Math.max(EXPORT_MIN_INTERVAL_MS, paced));
 }
 
 function sleepMs(ms: number): Promise<void> {
@@ -1283,7 +1286,7 @@ async function notifyExportFinished(
 
 /**
  * Run the provider export in the background: loops chunk POSTs while the
- * backend answers `limited`, pacing chunk requests at ~30 entries/min.
+ * backend answers `limited`, pacing chunk requests at 10 batched req/min.
  * Non-blocking — resolves with the terminal snapshot; progress flows through
  * subscribeExportJobs and completion lands in the notifications bell.
  */
