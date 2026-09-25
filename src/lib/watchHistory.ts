@@ -15,7 +15,7 @@ import { supabase } from './supabase';
 //
 //  Imported keys (merged on login, read-only here):
 //   - `aniraku-watch-history`   -> Aniraku's legacy entry array
-//   - `aniraku:watching`         -> Miruro pref record (array/entries read
+//   - `aniraku:watching`         -> pref record (array/entries read
 //                                  defensively; prefs fields ignored)
 //
 // Normalized unit everywhere is `HistoryRow` (1:1 with a `watch_history`
@@ -32,7 +32,7 @@ export const LOCAL_HISTORY_KEYS = {
 /** Legacy stores whose rows are folded in during merge-on-login. */
 export const LEGACY_HISTORY_KEYS = ['aniraku-watch-history'];
 
-/** Window event (Aniraku `aniraku:watch-history-changed` → Miruro name). */
+/** Window event broadcast on local history writes. */
 export const WATCH_HISTORY_EVENT = 'aniraku:watch-history-changed';
 
 /** Hard cap on locally-derived rows (Aniraku caps its local list at 100). */
