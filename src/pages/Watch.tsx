@@ -364,15 +364,37 @@ const NoEpsMessage = styled.p`
 // a black 16:9 stage with the no-source icon + message (no action buttons
 // for upcoming — there is nothing to retry, the episode simply is not out).
 const UpcomingPanel = styled.div`
+  position: relative;
   aspect-ratio: 16 / 9;
   width: 100%;
+  overflow: hidden;
+  background: #000;
+`;
+
+const UpcomingArt = styled.img`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+const UpcomingDim = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+`;
+
+const UpcomingContent = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 4;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 24px;
-  background: #000;
   img {
     width: 84px;
     height: 84px;
@@ -1898,11 +1920,21 @@ const WatchInner: React.FC = () => {
         <SkeletonPlayer />
       ) : futureEpisodeRequested ? (
         <UpcomingPanel role='status'>
-          <img src='/no-source.svg' alt='' aria-hidden='true' />
-          <UpcomingMessage>{UPCOMING_EPISODE_MESSAGE}</UpcomingMessage>
-          {countdown && countdown !== 'Airing now or aired' ? (
-            <UpcomingEta>Next episode airs in {countdown}.</UpcomingEta>
+          {selectedBackgroundImage ? (
+            <UpcomingArt
+              src={selectedBackgroundImage}
+              alt=''
+              aria-hidden='true'
+            />
           ) : null}
+          <UpcomingDim />
+          <UpcomingContent>
+            <img src='/no-source.svg' alt='' aria-hidden='true' />
+            <UpcomingMessage>{UPCOMING_EPISODE_MESSAGE}</UpcomingMessage>
+            {countdown && countdown !== 'Airing now or aired' ? (
+              <UpcomingEta>Next episode airs in {countdown}.</UpcomingEta>
+            ) : null}
+          </UpcomingContent>
         </UpcomingPanel>
       ) : (
         // Zenime composition: ONE Player owns both render modes — HLS chrome
