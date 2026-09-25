@@ -1042,10 +1042,30 @@ export async function importProviderList(
   }
 }
 
+/** True when an export error payload/status smells like provider throttling. */
+export function isRateLimitError(message: string | undefined): boolean {
+  if (!message) return false;
+  return /429|too many requests|rate[\s-_]*limit/i.test(message);
+}
+
+/** Parse a `Retry-After` header (delta-seconds or HTTP-date) into ms. */
+function parseRetryAfterMs(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number(trimmed) * 1000;
+  const when = Date.parse(trimmed);
+  if (!Number.isNaN(when)) return Math.max(0, when - Date.now());
+  return null;
+}
+
+const EXPORT_ATTEMPTS = 5;
+const EXPORT_RETRY_MAX_MS = 120000;
+
 export async function exportProviderList(
   provider: string,
 ): Promise<ExportResult> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < EXPORT_ATTEMPTS; attempt += 1) {
+    const last = attempt === EXPORT_ATTEMPTS - 1;
     try {
       const res = await fetch(`${API_BASE}/api/v1/export/${provider}`, {
         method: 'POST',
@@ -1056,15 +1076,23 @@ export async function exportProviderList(
       if (res.ok) return data;
       const retryable =
         res.status === 408 || res.status === 429 || res.status >= 500;
-      if (!retryable || attempt === 2) {
+      if (!retryable || last) {
         return { error: data.error || 'Export failed' };
       }
+      // Honor the server's Retry-After on 429 (AniList window); otherwise
+      // exponential backoff. Caps keep a background job from stalling forever.
+      const headerWait =
+        res.status === 429
+          ? parseRetryAfterMs(res.headers.get('Retry-After'))
+          : null;
+      const backoff = 1000 * 2 ** attempt;
+      await sleepMs(
+        Math.min(EXPORT_RETRY_MAX_MS, Math.max(0, headerWait ?? backoff)),
+      );
     } catch {
-      if (attempt === 2) return { error: 'Could not reach the server' };
+      if (last) return { error: 'Could not reach the server' };
+      await sleepMs(Math.min(EXPORT_RETRY_MAX_MS, 1000 * 2 ** attempt));
     }
-    await new Promise((resolve) => {
-      window.setTimeout(resolve, 700 * (attempt + 1));
-    });
   }
   return { error: 'Export failed' };
 }
@@ -1124,6 +1152,8 @@ export interface ExportJobState {
   failed: number;
   /** Final human-readable line (terminal states only). */
   message?: string;
+  /** Transient progress line (e.g. rate-limit waits). Cleared on progress. */
+  note?: string;
 }
 
 export type ExportJobs = Record<string, ExportJobState>;
@@ -1132,6 +1162,10 @@ const EXPORT_JOB_KEY = 'aniraku:export-job';
 const EXPORT_PACE_MIN_MS = 4000;
 const EXPORT_PACE_MAX_MS = 120000;
 const EXPORT_ENTRIES_PER_MINUTE = 30;
+// AniList's documented window is 60s; wait a full window + margin when the
+// provider throttles us, then retry the SAME chunk (up to the cap below).
+const EXPORT_RATE_WAIT_MS = 65000;
+const EXPORT_RATE_RETRIES = 8;
 
 let exportJobInFlight = false;
 let exportJobs: ExportJobs = {};
@@ -1274,13 +1308,15 @@ export async function runExportJob(provider: string): Promise<ExportJobState> {
   const startedAt = Date.now();
   const totals = { exported: 0, scores: 0, skipped: 0, failed: 0 };
   let chunks = 0;
-  const progress = (): ExportJobState => ({
+  let rateWaits = 0;
+  const progress = (note?: string): ExportJobState => ({
     provider,
     status: 'running',
     startedAt,
     updatedAt: Date.now(),
     chunks,
     ...totals,
+    ...(note ? { note } : {}),
   });
   setExportJob(progress());
   try {
@@ -1288,6 +1324,20 @@ export async function runExportJob(provider: string): Promise<ExportJobState> {
       const chunk = await exportProviderList(provider);
       chunks += 1;
       if (chunk.error) {
+        // Provider throttling is transient: wait out the rate window and
+        // retry the same chunk instead of failing the whole job.
+        if (isRateLimitError(chunk.error) && rateWaits < EXPORT_RATE_RETRIES) {
+          rateWaits += 1;
+          setExportJob(
+            progress(
+              `Rate limited by ${PROVIDER_LABELS[provider] ?? provider} — ` +
+                `waiting ${Math.round(EXPORT_RATE_WAIT_MS / 1000)}s before ` +
+                `retrying (attempt ${rateWaits}/${EXPORT_RATE_RETRIES})…`,
+            ),
+          );
+          await sleepMs(EXPORT_RATE_WAIT_MS);
+          continue;
+        }
         const message = await notifyExportFinished(
           provider,
           totals,
@@ -1301,6 +1351,7 @@ export async function runExportJob(provider: string): Promise<ExportJobState> {
         setExportJob(terminal);
         return terminal;
       }
+      rateWaits = 0; // a clean chunk resets the throttle budget
       totals.exported += chunk.exported ?? 0;
       totals.scores += chunk.scores ?? 0;
       totals.skipped += chunk.skipped ?? 0;

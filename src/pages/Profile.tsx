@@ -1491,6 +1491,12 @@ export const Profile: React.FC = () => {
                         background… {job.exported} titles so far (chunk{' '}
                         {job.chunks}) — you can leave this page, the bell will
                         notify you when it finishes.
+                        {job.note ? (
+                          <>
+                            <br />
+                            {job.note}
+                          </>
+                        ) : null}
                       </ResultBox>
                     )}
 
