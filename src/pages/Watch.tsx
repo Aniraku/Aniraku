@@ -360,6 +360,50 @@ const NoEpsMessage = styled.p`
   line-height: 1.6;
 `;
 
+// In-player upcoming notice: same slot/chrome as the player (16:9 box) for
+// an explicitly requested future episode (old Aniraku destroyed the player
+// and showed the line instead of silently playing an older episode).
+const UpcomingPanel = styled.div`
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  text-align: center;
+  padding: 2rem;
+  background: var(--global-primary-bg);
+  border: 1px solid var(--global-border-color);
+  border-radius: var(--global-border-radius);
+  h2 {
+    margin: 0;
+    font-size: 1.3rem;
+  }
+  p {
+    margin: 0;
+    max-width: 34rem;
+    color: var(--global-text-muted);
+    line-height: 1.6;
+    font-size: 0.95rem;
+  }
+`;
+
+const UpcomingCta = styled.button`
+  margin-top: 0.4rem;
+  border: 1px solid var(--global-border-color);
+  border-radius: var(--global-border-radius);
+  background: transparent;
+  color: var(--global-text);
+  font-size: 0.9rem;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  &:hover {
+    border-color: var(--primary-accent);
+    color: var(--primary-accent);
+  }
+`;
+
 const NoEpsImage = styled.div`
   margin-bottom: 3rem;
   max-width: 100%;
@@ -707,23 +751,39 @@ const WatchInner: React.FC = () => {
   // Title-level (movie vs series) wins; otherwise an explicit future `?ep=N`
   // request at/after the next airing number gets the episode line. A
   // merely-missing list keeps the generic empty copy below.
+  // Legacy `:episodeNumber` path param as a fallback request source.
+  const pathEpNumber =
+    episodeNumber !== undefined &&
+    episodeNumber !== '' &&
+    Number.isFinite(Number(episodeNumber))
+      ? Number(episodeNumber)
+      : null;
   const requestedEpNumber = (() => {
     try {
       const parsed = parseRequestedEpisode(window.location.search);
-      return typeof parsed === 'number' ? parsed : null;
+      if (typeof parsed === 'number') return parsed;
     } catch {
-      return null;
+      // fall through to the path param below
     }
+    return pathEpNumber;
   })();
   const titleUnreleased = isUnreleasedStatus(animeInfo?.status);
   const movieUnreleased =
     titleUnreleased && isMovieFormat(animeInfo?.type);
+  const maxListedEpNumber = episodes.reduce(
+    (max, ep) => Math.max(max, Number(ep.number) || 0),
+    0,
+  );
+  const releasingTitle =
+    animeInfo?.status === 'Ongoing' || animeInfo?.status === 'RELEASING';
   const futureEpisodeRequested =
     !titleUnreleased &&
     requestedEpNumber !== null &&
-    nextEpisodenumber !== null &&
-    nextEpisodenumber !== undefined &&
-    requestedEpNumber >= nextEpisodenumber;
+    (nextEpisodenumber !== null && nextEpisodenumber !== undefined
+      ? requestedEpNumber >= nextEpisodenumber
+      : releasingTitle &&
+        maxListedEpNumber > 0 &&
+        requestedEpNumber > maxListedEpNumber);
   const currentEpisodeIndex = episodes.findIndex(
     (ep) => ep.id === currentEpisode.id,
   );
@@ -1845,6 +1905,22 @@ const WatchInner: React.FC = () => {
           then forced srcOverride onto it — the reported restart bug. */}
       {loading || !infoResolved || !serverGateOpen ? (
         <SkeletonPlayer />
+      ) : futureEpisodeRequested ? (
+        <UpcomingPanel role='status'>
+          <h2>
+            Episode {requestedEpNumber} isn&apos;t out yet
+          </h2>
+          <p>{UPCOMING_EPISODE_MESSAGE}</p>
+          {countdown && countdown !== 'Airing now or aired' ? (
+            <p>Next episode airs in {countdown}.</p>
+          ) : null}
+          <UpcomingCta
+            type='button'
+            onClick={() => navigate(window.location.pathname)}
+          >
+            Watch the latest aired episode
+          </UpcomingCta>
+        </UpcomingPanel>
       ) : (
         // Zenime composition: ONE Player owns both render modes — HLS chrome
         // (PlayerViewport) or the embedded FlixCloud iframe + control bar —
