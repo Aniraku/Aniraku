@@ -569,11 +569,11 @@ export type CommentsProps = {
 // Live initializes its `f` state from `settings.comments` (StoredSettings
 // field, default true). The provider's public useSettings() shape does not
 // expose it, so read the same persisted record the provider writes
-// (`miruro:settings` → .settings.comments) — same source, same snapshot-at-
+// (`aniraku:settings` → .settings.comments) — same source, same snapshot-at-
 // mount semantics as live's useState(a.comments).
 function readCommentsPref(): boolean {
   try {
-    const raw = localStorage.getItem('miruro:settings');
+    const raw = localStorage.getItem('aniraku:settings');
     if (raw) {
       const record = JSON.parse(raw);
       const value = record?.settings?.comments;

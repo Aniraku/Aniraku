@@ -42,7 +42,7 @@
 
 /* Subtitles are handled entirely by Vidstack's default caption renderer
    plus its Settings → Accessibility menu (font family/size/color/shadow),
-   which drives --media-user-* CSS vars — same as miruro.to.
+   which drives --media-user-* CSS vars — same as the live site.
    Do NOT add font-size / color / text-shadow overrides on .vds-captions or
    the cue parts here (especially with !important): they silently disable
    the Accessibility menu, and resizing the .vds-captions box breaks

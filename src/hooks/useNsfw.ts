@@ -4,7 +4,7 @@ import { getSessionUserId, subscribeToSession } from '../lib/sync';
 
 // ---------------------------------------------------------------------------
 // useNsfw — TS port of Aniraku `src/hooks/useNsfw.js` (hook body + shared
-// module state + isNsfw/filterAdult), re-based onto Miruro:
+// module state + isNsfw/filterAdult), based on the live reference:
 //   - session detection goes through lib/sync (`supabase.auth` getSession /
 //     onAuthStateChange bridge) — NO auth-hook import (cross-wave rule),
 //     with an explicit "loading" phase so a stale guest key can never seed

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Backend API base — TS port of Aniraku `src/config.js:1-18` API_BASE
-// resolution, re-based onto Miruro's env:
+// resolution, re-based onto Aniraku's env:
 //   - primary: `VITE_BACKEND_URL` (trailing slash stripped) — .env.local
 //     ships `https://api-host.redacted.invalid/`, so API_BASE resolves to
 //     `https://api-host.redacted.invalid` and endpoints mount at

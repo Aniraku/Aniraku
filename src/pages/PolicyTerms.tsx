@@ -126,7 +126,7 @@ const sections = [
 ];
 
 function PolicyTerms() {
-  // NOTE: live miruro.to has removed the /pptos route (unknown paths render
+  // NOTE: the live site has removed the /pptos route (unknown paths render
   // NotFoundRoute). Title follows the live site's page-title convention
   // (e.g. "Search · Aniraku", "Trending · Aniraku").
   useEffect(() => {

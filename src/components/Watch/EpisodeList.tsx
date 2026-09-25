@@ -21,11 +21,11 @@ import { Episode } from '../../index';
 // Live `hideSpoiler` pref ("Hide Spoilers" — blocks episode images behind a
 // HIDDEN SPOILER overlay). StoredSettings keeps it internal to the settings
 // record (the public useSettings shape doesn't expose it), so EpisodeList
-// reads/merge-writes `miruro:settings` → .settings.hideSpoiler directly —
+// reads/merge-writes `aniraku:settings` → .settings.hideSpoiler directly —
 // same record, same key the provider persists.
 function readHideSpoilerPref(): boolean {
   try {
-    const raw = localStorage.getItem('miruro:settings');
+    const raw = localStorage.getItem('aniraku:settings');
     if (raw) {
       const record = JSON.parse(raw);
       const value = record?.settings?.hideSpoiler;
@@ -39,7 +39,7 @@ function readHideSpoilerPref(): boolean {
 
 function writeHideSpoilerPref(value: boolean): void {
   try {
-    const raw = localStorage.getItem('miruro:settings');
+    const raw = localStorage.getItem('aniraku:settings');
     const record = (raw ? JSON.parse(raw) : {}) || {};
     if (typeof record !== 'object') return;
     const settings =
@@ -47,7 +47,7 @@ function writeHideSpoilerPref(value: boolean): void {
         ? record.settings
         : {};
     record.settings = { ...settings, hideSpoiler: value };
-    localStorage.setItem('miruro:settings', JSON.stringify(record));
+    localStorage.setItem('aniraku:settings', JSON.stringify(record));
   } catch {
     // Storage unavailable — the toggle still applies in-session.
   }
@@ -56,18 +56,18 @@ function writeHideSpoilerPref(value: boolean): void {
 // Live local-history gate: when the user paused history recording, skip
 // persisting watched-episodes (checkmark state still updates in-session).
 // Pref is written by useWatchHistory's writePref as either the
-// `historyPaused` field of the `miruro:watching` record or (legacy) as a
-// JSON boolean under `miruro:watching:history-paused`.
+// `historyPaused` field of the `aniraku:watching` record or (legacy) as a
+// JSON boolean under `aniraku:watching:history-paused`.
 const isHistoryPaused = (): boolean => {
   try {
-    const record = localStorage.getItem('miruro:watching');
+    const record = localStorage.getItem('aniraku:watching');
     if (record) {
       const parsed = JSON.parse(record);
       if (parsed && typeof parsed.historyPaused === 'boolean') {
         return parsed.historyPaused;
       }
     }
-    const legacy = localStorage.getItem('miruro:watching:history-paused');
+    const legacy = localStorage.getItem('aniraku:watching:history-paused');
     if (legacy !== null) return JSON.parse(legacy) === true;
   } catch {
     // Malformed record — treat as not paused.

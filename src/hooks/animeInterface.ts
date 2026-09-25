@@ -97,7 +97,7 @@ export interface Episode {
   imageHash: string;
   airDate: string | null;
   /** ADDITIVE (Info page): live tags filler episodes with the tag icon +
-   *  the #B9986D state color (miruro mapper never sets it). */
+   *  the #B9986D state color (AniList mapper never sets it). */
   filler?: boolean;
 }
 

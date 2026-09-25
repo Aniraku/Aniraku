@@ -13,7 +13,7 @@ import { Anime } from '../../index';
 import { infoPathFor, watchPathFor } from '../../utils/animePaths';
 
 // ---------------------------------------------------------------------------
-// Hero carousel (miruro.to 1:1) — fade crossfade swiper with the action
+// Hero carousel (the live site 1:1) — fade crossfade swiper with the action
 // buttons, airing badge and ‹ n / N › pager rendered outside the swiper.
 // Slide content block bottom-left with animated slide transforms; title uses
 // the per-anime gradient (--home-carousel-title-*).

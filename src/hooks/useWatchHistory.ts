@@ -22,9 +22,9 @@ import {
  *  - `last-anime-visited`      -> Record<animeId, { timestamp: ms, titleEnglish, titleRomaji }>
  *  - `all_episode_times`       -> Record<episodeId, { currentTime, playbackPercentage }>
  *
- * Preference persistence mirrors miruro.to v1.14.x keys:
- *  - history paused: localStorage `miruro:watching:history-paused` (record `miruro:watching`.historyPaused)
- *  - sort order:     localStorage `miruro:filters:order`           (record `miruro:filters`.order)
+ * Preference persistence mirrors the live site v1.14.x keys:
+ *  - history paused: localStorage `aniraku:watching:history-paused` (record `aniraku:watching`.historyPaused)
+ *  - sort order:     localStorage `aniraku:filters:order`           (record `aniraku:filters`.order)
  */
 
 export const LOCAL_STORAGE_KEYS = {
@@ -34,13 +34,13 @@ export const LOCAL_STORAGE_KEYS = {
 } as const;
 
 const PREF_RECORDS = {
-  WATCHING: 'miruro:watching',
-  FILTERS: 'miruro:filters',
+  WATCHING: 'aniraku:watching',
+  FILTERS: 'aniraku:filters',
 } as const;
 
 const PREF_LEGACY_KEYS = {
-  HISTORY_PAUSED: 'miruro:watching:history-paused',
-  ORDER_MODE: 'miruro:filters:order',
+  HISTORY_PAUSED: 'aniraku:watching:history-paused',
+  ORDER_MODE: 'aniraku:filters:order',
 } as const;
 
 export type SortValue = 'last-watched' | 'a-z' | 'episode' | 'air-date';
@@ -96,7 +96,7 @@ function readJSON<T>(key: string, fallback: T): T {
 
 /**
  * Read a preference the way live v1.14.x does: prefer the namespaced record
- * field (`miruro:watching` / `miruro:filters`), fall back to the legacy
+ * field (`aniraku:watching` / `aniraku:filters`), fall back to the legacy
  * standalone key.
  */
 function readPref<T>(recordKey: string, field: string, legacyKey: string, fallback: T): T {
@@ -203,10 +203,10 @@ export interface UseWatchHistoryResult {
   refresh: () => void;
   /** Removes the anime's whole history entry (same behavior as Continue Watching). */
   removeEntry: (animeId: string) => void;
-  /** Persisted like live: `miruro:watching:history-paused`. */
+  /** Persisted like live: `aniraku:watching:history-paused`. */
   historyPaused: boolean;
   setHistoryPaused: (paused: boolean) => void;
-  /** Persisted like live: `miruro:filters:order` (default `last-watched`). */
+  /** Persisted like live: `aniraku:filters:order` (default `last-watched`). */
   order: SortValue;
   setOrder: (order: SortValue) => void;
 }

@@ -66,22 +66,21 @@
     <!-- Apple splash screens: none (Aniraku ships none; legacy splash PNGs orphaned on disk) -->
 
     <!-- Performance hints (streaming server config — provenance: live site) -->
-        <script>window.__SSR_CONFIG__={"streaming":{"bee":{"capabilities":{"sub":false,"ssub":true,"download":false,"skip_times":false,"thumbnails":false},"parent":null,"relationship":null,"visible":true,"player":"native","proxy":{"rotate":false,"segments":true},"cors":false,"hls":{"origin":{"enabled":true,"url":"https://qx-01.quavex.top/"},"query":{"enabled":true,"params":{"skip":"8sG45"}}},"fallback":null},"hop":{"capabilities":{"sub":false,"ssub":true,"download":false,"skip_times":false,"thumbnails":true},"parent":null,"relationship":null,"visible":true,"player":"native","proxy":{"rotate":false,"segments":true},"cors":false,"fallback":null},"kiwi":{"capabilities":{"sub":true,"ssub":false,"download":true,"skip_times":false,"thumbnails":false},"parent":null,"relationship":null,"visible":true,"player":"native","proxy":{"rotate":false,"segments":true},"cors":false,"fallback":null},"ally":{"capabilities":{"sub":true,"ssub":false,"download":true,"skip_times":false,"thumbnails":true},"parent":null,"relationship":null,"visible":true,"player":"native","proxy":false,"cors":true,"fallback":null},"pewe":{"capabilities":{"sub":true,"ssub":false,"download":false,"skip_times":false,"thumbnails":false},"parent":null,"relationship":null,"visible":true,"player":"native","proxy":{"rotate":false,"segments":true},"cors":false,"fallback":null},"moo":{"capabilities":{"sub":true,"ssub":false,"download":true,"skip_times":false,"thumbnails":false},"parent":null,"relationship":null,"visible":true,"player":"native","proxy":{"rotate":false,"segments":true},"cors":false,"fallback":null},"nun":{"capabilities":{"sub":true,"ssub":false,"download":false,"skip_times":false,"thumbnails":false},"parent":"ally","relationship":"embed","visible":true,"player":"iframe","proxy":false,"cors":false,"fallback":null},"bun":{"capabilities":{"sub":false,"ssub":true,"download":false,"skip_times":false,"thumbnails":false},"parent":"bee","relationship":"embed","visible":true,"player":"iframe","proxy":false,"cors":false,"fallback":null},"cog":{"capabilities":{"sub":true,"ssub":false,"download":false,"skip_times":false,"thumbnails":false},"parent":"moo","relationship":"embed","visible":true,"player":"iframe","proxy":false,"cors":false,"fallback":null},"telli":{"capabilities":{"sub":true,"ssub":false,"download":false,"skip_times":false,"thumbnails":false},"parent":"kiwi","relationship":"embed","visible":false,"player":"iframe","proxy":false,"cors":false,"fallback":null}},"providerOrder":["bee","hop","kiwi","ally","pewe","moo","nun","bun","cog","telli"],"meta":{"anilist":{"graphql":"https://graphql.anilist.co"}},"messages":[{"id":"bookmark","enabled":false,"title":"Bookmark Aniraku so you never lose us","text":"Save our official domains so you never lose access.","color":"#d4a017","icon":"warning","href":"https://www.aniraku.tech","cta":"aniraku.tech","dismissible":true,"dismissDays":7},{"id":"server-maintenance","enabled":false,"title":"Some servers are under maintenance. Please switch servers if needed.","text":"Some servers are under maintenance. Please switch servers if needed.","color":"#a56600","icon":"info","dismissible":true,"dismissDays":7}]}</script><script>try{var c=window.__SSR_CONFIG__;c.monkey=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(c.mk),function(b){return b.charCodeAt(0)})));delete c.mk}catch(e){}</script>
     <link rel="dns-prefetch" href="https://s4.anilist.co" />
     <link rel="preconnect" href="https://s4.anilist.co" crossorigin />
     <link rel="dns-prefetch" href="https://image.tmdb.org" />
     <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
     <link rel="dns-prefetch" href="https://artworks.thetvdb.com" />
     <link rel="preconnect" href="https://artworks.thetvdb.com" crossorigin />
+    <!-- Fonts (Google Fonts stack, matching Aniraku: Rubik body, Agbalumo brand, Orbitron display) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      rel="preload"
-      href="/fonts/geist/sans/Geist.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
+      href="https://fonts.googleapis.com/css2?family=Agbalumo&family=Rubik:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap"
+      rel="stylesheet"
     />
 
-    <!-- Self-hosted fonts -->
+    <!-- Font tokens -->
     <link rel="stylesheet" href="/src/styles/fonts.css" />
     <!-- Internal styles -->
     <link rel="stylesheet" href="/src/styles/globals.css" />
@@ -91,10 +90,33 @@
     <link rel="stylesheet" href="/src/styles/themes.css" />
 
     <script>
+      // One-time pre-swap migration (mirrors src/lib/storageMigration.ts):
+      // copy legacy theme keys forward so returning users keep their theme
+      // on first paint, before the bundle boots.
+      try {
+        if (
+          localStorage.getItem('aniraku:settings') == null &&
+          localStorage.getItem('miruro:settings') != null
+        ) {
+          localStorage.setItem(
+            'aniraku:settings',
+            localStorage.getItem('miruro:settings'),
+          );
+        }
+        if (
+          localStorage.getItem('aniraku:settings:theme') == null &&
+          localStorage.getItem('miruro:settings:theme') != null
+        ) {
+          localStorage.setItem(
+            'aniraku:settings:theme',
+            localStorage.getItem('miruro:settings:theme'),
+          );
+        }
+      } catch (e2) {}
       var t = "dark";
       try {
-        var s = JSON.parse(localStorage.getItem("miruro:settings") || "null");
-        t = (s && s.theme) || JSON.parse(localStorage.getItem("miruro:settings:theme")) || null;
+        var s = JSON.parse(localStorage.getItem("aniraku:settings") || "null");
+        t = (s && s.theme) || JSON.parse(localStorage.getItem("aniraku:settings:theme")) || null;
       } catch (e) {}
       if (!t) {
         /* local legacy fallback: pre-migration installs stored the theme here

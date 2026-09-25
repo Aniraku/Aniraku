@@ -34,7 +34,7 @@ import { useSeo } from '../utils/seo';
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 
 // ---------------------------------------------------------------------------
-// Home (miruro.to 1:1 page structure):
+// Home (the live site 1:1 page structure):
 //   sr-only h1 → simpleLayout [hero, genre rail, continue watching,
 //   contentSidebarLayout [mainContent: tabs block (banner + tabs + grid),
 //   sidelist row (JUST FINISHED / TOP MOVIES); side: TOP AIRING, ad slot,
@@ -393,7 +393,7 @@ const Home = () => {
   // Wave B — NEW-EPISODE NOTIFICATION LOOP (mount point = Aniraku's Home,
   // Home.jsx:589-614): logged-in only, once per session user. For each
   // bookmarked anime it compares the last-known episode (LS
-  // `miruro:episode-track`, 6h cooldown), dedupes against the
+  // `aniraku:episode-track`, 6h cooldown), dedupes against the
   // `notifications` table, then inserts {user_id, type:'new_episode',
   // message, anime_id}. Session detection goes through lib/sync
   // (supabase.auth directly — no auth-hook import).

@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Episode ratings transport — TS port of the rating trio in Aniraku
 // `src/lib/sync.js` (fetchEpisodeRatings :115-130, saveEpisodeRating
-// :132-146, updateSyncScore :98-113), re-based onto Miruro:
+// :132-146, updateSyncScore :98-113), based on the live reference:
 //   - Bearer via the Supabase session (same semantics as lib/sync.ts
 //     authHeaders :8-15; duplicated here so lib/sync.ts's export surface and
 //     internals stay untouched — this is a NEW Wave C file).

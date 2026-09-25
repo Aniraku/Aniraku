@@ -3,7 +3,7 @@ import styled from "styled-components";
 import CardItem from "./CardItem";
 import { Anime } from "../../hooks/animeInterface";
 
-// Styled grid container matching live Miruro card grid metrics.
+// Styled grid container matching live card grid metrics.
 // Exported as StyledCardGrid so pages can wrap grid + skeletons in one
 // centered container (matches original app pattern).
 export const StyledCardGrid = styled.div`

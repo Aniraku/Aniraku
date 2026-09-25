@@ -46,7 +46,7 @@ export {
 //   - rows come from the lib/sync store fed by the 30s session poll
 //     (`GET ${API_BASE}/api/v1/notifications`, Bearer — NavBar.jsx:32-55);
 //   - server `read` column is the authority (the LS read-set
-//     `miruro:notifications-read` is retired — no reads/writes here);
+//     `aniraku:notifications-read` is retired — no reads/writes here);
 //   - clicking an UNREAD row runs markRead → optimistic store flip + `PUT
 //     /api/v1/notifications/{id}/read` (NavBar.jsx:57-70, :159), then closes
 //     and routes to the title's info page when `anime_id` is present

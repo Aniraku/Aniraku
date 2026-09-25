@@ -5,7 +5,7 @@ import { fetchAiringDay, type AiringEntry } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
 
 // ---------------------------------------------------------------------------
-// MiniSchedule (miruro.to 1:1) — "Estimated Airing Schedule" widget in the
+// MiniSchedule (the live site 1:1) — "Estimated Airing Schedule" widget in the
 // home side rail: big Sun–Sat day selector with date under the selection,
 // fixed-height list with progress bar, hover poster, max 10 rows + View More.
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ export const MiniSchedule: React.FC = () => {
   const [hovered, setHovered] = useState<number | null>(null);
   const selectedRef = useRef<HTMLParagraphElement>(null);
 
-  // Week starts Sunday (miruro.to parity).
+  // Week starts Sunday (the live site parity).
   const weekDays = useMemo(() => {
     const now = new Date();
     const start = new Date(now);

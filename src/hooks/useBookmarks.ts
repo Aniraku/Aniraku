@@ -16,8 +16,8 @@ import {
 // useBookmarks — local-first bookmark store with merge-on-login Supabase
 // sync (table `bookmarks`, upsert onConflict `user_id,anime_id`).
 //
-// Local store: `miruro:bookmarks` (JSON array of {id,title,image,...}).
-// Merge-on-login folds in BOTH `miruro:bookmarks` and the legacy Aniraku
+// Local store: `aniraku:bookmarks` (JSON array of {id,title,image,...}).
+// Merge-on-login folds in BOTH `aniraku:bookmarks` and the legacy Aniraku
 // key `aniraku-bookmarks` (AnimeDetail.jsx:663-693 pattern): read cloud →
 // upsert local-only rows → store the union. Guests stay LS-only; signed-in
 // toggles are optimistic-LS + server upsert/delete passthrough.

@@ -297,10 +297,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // The local Supabase session is already cleared when this request fails.
     }
     try {
-      localStorage.removeItem('miruro:bookmarks');
-      localStorage.removeItem('miruro:watching');
-      localStorage.removeItem('miruro:episode-track');
-      localStorage.removeItem('miruro:notifications-read');
+      localStorage.removeItem('aniraku:bookmarks');
+      localStorage.removeItem('aniraku:watching');
+      localStorage.removeItem('aniraku:episode-track');
+      localStorage.removeItem('aniraku:notifications-read');
       localStorage.removeItem('aniraku-bookmarks');
       localStorage.removeItem('aniraku-watch-history');
       localStorage.removeItem('aniraku-episode-track');

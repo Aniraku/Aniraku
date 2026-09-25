@@ -9,7 +9,7 @@ export interface UserData {
   avatar: {
     large: string;
   };
-  // miruro.to 1:1 profile fields (AniList Viewer)
+  // the live site 1:1 profile fields (AniList Viewer)
   /** Unix seconds — rendered as "Joined <date>" */
   createdAt?: number | null;
   /** AniList bio — shown in the expandable About section */

@@ -44,7 +44,10 @@ Styles are done with styled-components plus plain CSS files next to their compon
 
 - The site is mobile-first. Test at 375px width. Minimum tap targets are 44px.
 - Dark theme only. Don't add light mode.
-- Don't rename existing `localStorage` keys (the `miruro:*` namespace) — users would lose their saved settings and history.
+- Storage keys live under the `aniraku:` namespace. A one-time boot
+  migration (`src/lib/storageMigration.ts`) copies pre-swap `miruro:*` keys
+  forward — never introduce new `miruro:` references; users would lose their
+  saved settings and history.
 - One PR per thing. Small changes are easier to review.
 - Test with a few different anime — something popular and currently airing, something old, something obscure. The backend handles them differently.
 
