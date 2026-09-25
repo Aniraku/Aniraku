@@ -51,7 +51,7 @@ import {
 //
 // Features added here beyond the modal copy:
 //  1. Clear Bookmarks (two-step confirm) over the shared bookmark data layer
-//     (`miruro:bookmarks` + legacy `aniraku-bookmarks` locally, `bookmarks`
+//     (`aniraku:bookmarks` + legacy `aniraku-bookmarks` locally, `bookmarks`
 //     table server-side when signed in).
 //  2. Inline page-local Undo (8s) after Clear Bookmarks / Clear Watch History
 //     — delete-then-reinsert through the same data layer.
@@ -903,7 +903,8 @@ export const Settings: React.FC = () => {
         if (!key) continue;
         if (
           key.startsWith('aniraku-') ||
-          key.startsWith('miruro:') ||
+          key.startsWith('aniraku:') ||
+          key.startsWith('miruro:') || // legacy pre-swap keys (own backup data)
           key.startsWith('sb-') ||
           native.includes(key)
         ) {

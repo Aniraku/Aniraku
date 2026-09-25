@@ -13,17 +13,17 @@ const DIST_DIR = path.join(__dirname, '../dist');
 const INDEX_FILE = path.join(DIST_DIR, 'index.html');
 
 // Middleware for static assets and JSON parsing
-// CORS for Aniraku API usage: Miruro (:3000) calls https://api.aniraku.tech
-// cross-origin, so the *backend* allowlists Miruro. Here we set our own
-// serving headers + security headers for the Miruro origin.
-const MIRURO_ALLOWED_ORIGINS = new Set([
+// CORS for Aniraku API usage: Local dev (:3000) calls https://api.aniraku.tech
+// cross-origin, so the *backend* allowlists local dev. Here we set our own
+// serving headers + security headers for the local dev origin.
+const ANIRAKU_ALLOWED_ORIGINS = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'https://api.aniraku.tech',
 ]);
 app.use((req, res, next) => {
   const origin = req.headers.origin as string | undefined;
-  if (origin && MIRURO_ALLOWED_ORIGINS.has(origin)) {
+  if (origin && ANIRAKU_ALLOWED_ORIGINS.has(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
@@ -50,7 +50,7 @@ app.use(express.static(DIST_DIR));
 app.use(express.json());
 app.use(bodyParser.json());
 
-// miruro.to 1:1: same-origin health endpoint
+// the live site 1:1: same-origin health endpoint
 // live returns {"status":"ok","timestamp":"...","version":"1.14.2"}
 app.get('/health', (_req, res) => {
   res.json({

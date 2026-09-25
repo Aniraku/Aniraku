@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { IoChevronBack, IoChevronForward } from 'react-icons/io5';
 
 // ---------------------------------------------------------------------------
-// HomeTabs (miruro.to 1:1) — NEWEST / POPULAR / TOP RATED tabs with a compact
+// HomeTabs (the live site 1:1) — NEWEST / POPULAR / TOP RATED tabs with a compact
 // ‹ page › pager and a digits-only go-to-page input (commits onBlur/Enter).
 // ---------------------------------------------------------------------------
 

@@ -8,7 +8,7 @@ import { Anime, StatusIndicator } from '../../index';
 import { infoPathFor } from '../../utils/animePaths';
 
 // ---------------------------------------------------------------------------
-// SidePanels (miruro.to 1:1) — side-list sections: TOP AIRING, UPCOMING,
+// SidePanels (the live site 1:1) — side-list sections: TOP AIRING, UPCOMING,
 // JUST FINISHED, TOP MOVIES. Bordered wrapper contains the header, the 6rem
 // cards (poster + optional grayscale banner + title/status + detail chips)
 // and a boxed chevron-down link at the bottom that NAVIGATES to the full

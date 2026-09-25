@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 // ---------------------------------------------------------------------------
 // Local watch-history shape + merge helpers — TS port of Aniraku
 // `src/lib/watchHistory.js` (entry keys, local upsert/remove/clear/subscribe,
-// server row deletes) re-based onto Miruro's LIVE localStorage contract:
+// server row deletes) re-based onto Aniraku's LIVE localStorage contract:
 //
 //  Native keys (written by Watch/EpisodeList, read by History/Continue
 //  Watching — unchanged by this port):
@@ -15,7 +15,7 @@ import { supabase } from './supabase';
 //
 //  Imported keys (merged on login, read-only here):
 //   - `aniraku-watch-history`   -> Aniraku's legacy entry array
-//   - `miruro:watching`         -> Miruro pref record (array/entries read
+//   - `aniraku:watching`         -> Miruro pref record (array/entries read
 //                                  defensively; prefs fields ignored)
 //
 // Normalized unit everywhere is `HistoryRow` (1:1 with a `watch_history`
@@ -30,10 +30,10 @@ export const LOCAL_HISTORY_KEYS = {
 } as const;
 
 /** Legacy stores whose rows are folded in during merge-on-login. */
-export const LEGACY_HISTORY_KEYS = ['aniraku-watch-history', 'miruro:watching'];
+export const LEGACY_HISTORY_KEYS = ['aniraku-watch-history'];
 
 /** Window event (Aniraku `aniraku:watch-history-changed` → Miruro name). */
-export const WATCH_HISTORY_EVENT = 'miruro:watch-history-changed';
+export const WATCH_HISTORY_EVENT = 'aniraku:watch-history-changed';
 
 /** Hard cap on locally-derived rows (Aniraku caps its local list at 100). */
 const LOCAL_ROW_LIMIT = 200;
@@ -216,7 +216,7 @@ function readNativeRows(): HistoryRow[] {
   return rows;
 }
 
-/** Rows imported from `aniraku-watch-history` (+ defensive `miruro:watching`). */
+/** Rows imported from `aniraku-watch-history` (+ defensive `aniraku:watching`). */
 function readLegacyRows(): HistoryRow[] {
   const rows: HistoryRow[] = [];
 
@@ -228,9 +228,9 @@ function readLegacyRows(): HistoryRow[] {
     }
   }
 
-  // `miruro:watching` is a preference record today; if a build ever stores
+  // `aniraku:watching` is a preference record today; if a build ever stores
   // history entries there (array or `entries`/`history` fields), fold them in.
-  const watching = readJSON<unknown>('miruro:watching', null);
+  const watching = readJSON<unknown>('aniraku:watching', null);
   const candidates: unknown[] = Array.isArray(watching)
     ? watching
     : watching && typeof watching === 'object'

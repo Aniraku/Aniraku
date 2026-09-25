@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 // ---------------------------------------------------------------------------
-// HomeBanner (miruro.to 1:1) — community notice at the top of the tabs block.
+// HomeBanner (the live site 1:1) — community notice at the top of the tabs block.
 // One random avatar, "Love the Site?" + rotating submessages (absolutely
 // positioned, slide + fade every 4s). Social strip (Reddit/Discord/X) removed
 // per Aniraku rebrand (Wave: global social strip).
@@ -99,8 +99,8 @@ const MESSAGES = [
 ];
 
 // Five avatars hotlinked from the live site; the two inline base64 avatars
-// from miruro.to are omitted (reported as a gap).
-const LIVE = '/assets/'; // localized: downloaded to ~/Miruro/assets, served via public/assets symlink
+// from the live site are omitted (reported as a gap).
+const LIVE = '/assets/'; // localized: downloaded to ~/assets, served via public/assets symlink
 const AVATARS = [
   `${LIVE}creepyegg-CYGjjnAR.webp`,
   `${LIVE}down-yHzbyGZh.webp`,

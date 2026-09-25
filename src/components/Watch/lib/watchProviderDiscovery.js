@@ -89,7 +89,7 @@ export function mergeProviderServers(existing = [], incoming = []) {
   const merged = new Map()
   for (const server of [...existing, ...incoming]) {
     if (!server?.name) continue
-    const key = `${server.provider || 'miruro'}:${server.name}:${server.lang || ''}`
+    const key = `${server.provider || 'aniraku'}:${server.name}:${server.lang || ''}`
     const previous = merged.get(key)
     // Empty retry payloads mean “not resolved yet”, not “remove the provider”.
     // Keep a previously source-bearing payload until a later response actually

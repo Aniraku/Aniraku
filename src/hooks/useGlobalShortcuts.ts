@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useTheme } from '../components/ThemeContext';
 
 // ---------------------------------------------------------------------------
-// Global keyboard shortcuts — direct port of live miruro.to's matcher map
+// Global keyboard shortcuts — direct port of live matcher map
 // (`Os`) and dispatcher (`Uh`, live/index.js @227066–227900).
 //
 // Listener target: live attaches to `document`; this port attaches to
@@ -14,15 +14,15 @@ import { useTheme } from '../components/ThemeContext';
 // `strmcx-keydown` relay follows the same placement (live: document; no local
 // dispatcher exists yet).
 //
-// Page-scoped actions use the mission contract: `miruro:shortcut` CustomEvents
+// Page-scoped actions use the mission contract: `aniraku:shortcut` CustomEvents
 // (`next-ep`, `prev-ep`, `theater`). `lights` has NO key on live (button
 // only), so it is never dispatched here.
 // ---------------------------------------------------------------------------
 
 /** Mission contract event emitted for page-scoped (Watch) shortcuts. */
-export const MIRURO_SHORTCUT_EVENT = 'miruro:shortcut';
+export const ANIRAKU_SHORTCUT_EVENT = 'aniraku:shortcut';
 
-export type MiruroShortcutAction = 'prev-ep' | 'next-ep' | 'theater' | 'lights';
+export type AnirakuShortcutAction = 'prev-ep' | 'next-ep' | 'theater' | 'lights';
 
 type Matcher = (e: KeyboardEvent) => boolean;
 
@@ -101,9 +101,9 @@ const emitWindowEvent = (name: string): void => {
   window.dispatchEvent(new Event(name));
 };
 
-const emitShortcut = (action: MiruroShortcutAction): void => {
+const emitShortcut = (action: AnirakuShortcutAction): void => {
   window.dispatchEvent(
-    new CustomEvent(MIRURO_SHORTCUT_EVENT, { detail: { action } })
+    new CustomEvent(ANIRAKU_SHORTCUT_EVENT, { detail: { action } })
   );
 };
 

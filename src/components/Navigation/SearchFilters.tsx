@@ -5,7 +5,7 @@ import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { FaUndo } from 'react-icons/fa';
 
 // ---------------------------------------------------------------------------
-// Filter value model — mirrors the live miruro.to Search route.
+// Filter value model — mirrors the live Search route.
 // URL params written/read: query (handled by the page), tags, genres, format,
 // status, countryOfOrigin, season, startDate_like, source, isAdult,
 // averageScoreMin, averageScoreMax, sort, type, dubLanguage.

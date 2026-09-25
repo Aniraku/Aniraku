@@ -9,8 +9,8 @@ html {
 body {
   font-family: var(--app-font-family);
   margin: 0 auto; /* Center the body content */
-  padding: 4.5rem 0.6rem 1rem; /* miruro.to: 72px 9.6px 16px at 16px root */
-  max-width: 109rem; /* miruro.to: 1744px max width */
+  padding: 4.5rem 0.6rem 1rem; /* the live site: 72px 9.6px 16px at 16px root */
+  max-width: 109rem; /* the live site: 1744px max width */
   background-color: var(
     --global-primary-bg
   ); /* Background color from variable */
@@ -19,7 +19,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* no horizontal scroll on small screens (miruro.to parity) */
+/* no horizontal scroll on small screens (the live site parity) */
 @media (max-width: 768px) {
   html,
   body {
@@ -38,7 +38,7 @@ body {
   }
 }
 
-/* Text Selection Color (miruro.to parity) */
+/* Text Selection Color (the live site parity) */
 ::selection {
   color: var(--primary-accent);
   background-color: var(--primary-accent-bg);
@@ -63,7 +63,7 @@ body {
 }
 
 /* ============================================================
-   GLOBAL CHROME — ported 1:1 from miruro.to style.css
+   GLOBAL CHROME — ported 1:1 from the live site style.css
    Modules: navbar 1dhmn/hlk71/35afg, sidemenu 8assr,
    footer 1yuuo, dropsearch 9iqh4, card eylnt/5iwv2,
    status 17f3f, shortcuts 8w0d1, editlist qaxcl/1pggi/ah05g.

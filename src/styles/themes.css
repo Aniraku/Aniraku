@@ -1,5 +1,5 @@
 /* ============================================================
-   Miruro theme system — 1:1 with miruro.to (v1.14.x)
+   Aniraku theme system — 1:1 with the live site (v1.14.x)
    Five themes switched via [data-theme] on <html>:
      dark (default) | light | anilist | catppuccin
    "system" resolves to dark or light via prefers-color-scheme.
@@ -7,10 +7,10 @@
    ============================================================ */
 
 :root {
-  --app-font-family: 'Geist', ui-sans-serif, system-ui, sans-serif,
+  --app-font-family: 'Rubik', ui-sans-serif, system-ui, sans-serif,
     Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
 
-  /* z-index scale (miruro.to parity) */
+  /* z-index scale (the live site parity) */
   --z-index-below: -1;
   --z-index-base: 0;
   --z-index-above: 1;
@@ -28,7 +28,7 @@
   --z-index-popup: 1100;
   --z-index-max: 9999;
 
-  /* shared tokens (miruro.to parity) */
+  /* shared tokens (the live site parity) */
   --global-border-radius: 0.5rem;
   --primary-accent-bg: #595991;
   --primary-accent-tr: rgba(128, 128, 207, 0.25);
@@ -41,7 +41,7 @@
   --global-shadow-light: rgba(0, 0, 0, 0.3);
 }
 
-/* touch devices get a larger radius (miruro.to parity) */
+/* touch devices get a larger radius (the live site parity) */
 @media (pointer: coarse) {
   :root {
     --global-border-radius: 1rem;

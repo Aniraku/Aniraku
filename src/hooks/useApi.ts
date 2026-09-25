@@ -2,7 +2,7 @@ import axios from 'axios';
 import { year, getCurrentSeason, getNextSeason } from '../index';
 
 // ---------------------------------------------------------------------------
-// Miruro data layer — post-Consumet wiring
+// Aniraku data layer — post-Consumet wiring
 // - Metadata (search, lists, anime info): AniList GraphQL DIRECT from browser
 // - Episodes metadata: Aniraku Backend (AniZip + TMDB merge)
 // - Streaming: Aniraku Backend (POST /api/v1/stream, GET /api/v1/servers)
@@ -38,7 +38,7 @@ export function proxiedMediaUrl(
 const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
 // Module-level AniList availability signal for the global outage banner.
 function reportAnilistStatus(unavailable: boolean): void {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('miruro:anilist-status', { detail: { unavailable } }));
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }));
 }
 
 const SKIP_TIMES = ensureUrlEndsWithSlash(
@@ -57,7 +57,7 @@ const directAxios = axios.create({ timeout: 15000 });
 const anirakuLongAxios = axios.create({ timeout: 100000 });
 
 // ---------------------------------------------------------------------------
-// AniList -> Miruro shape adapters (keep UI components untouched)
+// AniList -> Aniraku shape adapters (keep UI components untouched)
 // ---------------------------------------------------------------------------
 
 function mapAnilistStatus(s?: string | null): string {
@@ -593,7 +593,7 @@ export async function fetchAnimeInfo(animeId: string) {
 // ---------------------------------------------------------------------------
 // Episode metadata via Aniraku Backend (AniZip + TMDB merge)
 // GET {base}api/v1/anime/{id}/episodes -> { episodes: [{number,title,thumbnail,description,airdate}] }
-// Mapped to Miruro Episode[] so EpisodeList/Watch keep working.
+// Mapped to Aniraku Episode[] so EpisodeList/Watch keep working.
 // ---------------------------------------------------------------------------
 
 export async function fetchAnimeEpisodes(
@@ -757,7 +757,7 @@ export async function fetchSkipTimes({
   }
 }
 
-// Reference-style URL helpers (miruro.to 1:1): /info/:id/:slug
+// Reference-style URL helpers (the live site 1:1): /info/:id/:slug
 export function animeSlug(
   title?: { english?: string | null; romaji?: string | null } | null,
   fallback: string = 'anime',

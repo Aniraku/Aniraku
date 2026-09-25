@@ -99,7 +99,7 @@ function RouteFallback() {
 function App() {
   usePreserveScrollOnReload();
   const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID;
-  // miruro.to 1:1: Shift+? is owned by useGlobalShortcuts — the hook matches
+  // the live site 1:1: Shift+? is owned by useGlobalShortcuts — the hook matches
   // the key (real presses AND the Settings row's synthetic window keydown,
   // Settings.tsx:422) and dispatches global-shortcuts:toggle-shortcuts-popup;
   // ShortcutsPopup listens for that event itself, so no local keydown state
@@ -138,9 +138,9 @@ function App() {
               <Suspense fallback={<RouteFallback />}>
                 <Routes>
                   <Route path='/' element={<Home />} />
-                  {/* miruro.to 1:1: /home redirects to / */}
+                  {/* the live site 1:1: /home redirects to / */}
                   <Route path='/home' element={<Navigate to='/' replace />} />
-                  {/* miruro.to 1:1: /airing-schedule redirects to /schedule */}
+                  {/* the live site 1:1: /airing-schedule redirects to /schedule */}
                   <Route
                     path='/airing-schedule'
                     element={<Navigate to='/schedule' replace />}
@@ -148,7 +148,7 @@ function App() {
                   <Route path='/search' element={<Search />} />
                   <Route path='/trending' element={<Trending />} />
                   <Route path='/schedule' element={<Schedule />} />
-                  {/* miruro.to 1:1: dedicated watch-history route */}
+                  {/* the live site 1:1: dedicated watch-history route */}
                   <Route path='/history' element={<History />} />
                   <Route path='/info/:animeId' element={<Info />} />
                   <Route path='/info/:animeId/:slug' element={<Info />} />
@@ -174,7 +174,7 @@ function App() {
                     element={<Navigate to='..' replace />}
                   />
                   <Route path='/profile' element={<Profile />} />
-                  {/* miruro.to 1:1: settings is a modal inside Profile (?settings=1) */}
+                  {/* the live site 1:1: settings is a modal inside Profile (?settings=1) */}
                   <Route
                     path='/profile/settings'
                     element={<Navigate to='/profile?settings=1' replace />}
@@ -183,7 +183,7 @@ function App() {
                     path='/settings'
                     element={<Navigate to='/profile?settings=1' replace />}
                   />
-                  {/* miruro.to 1:1: /about and /pptos do not exist — they 404 */}
+                  {/* the live site 1:1: /about and /pptos do not exist — they 404 */}
                   {/* Wave C — Library Sync OAuth return (Aniraku
                       /sync/callback, App.jsx:187) */}
                   <Route path='/sync/callback' element={<SyncCallback />} />

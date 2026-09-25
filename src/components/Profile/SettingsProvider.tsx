@@ -7,11 +7,11 @@ import React, {
 } from 'react';
 
 // ---------------------------------------------------------------------------
-// Storage parity with live miruro.to
+// Storage parity with live
 //
 // Live centralizes every preference in ONE namespaced JSON record:
 //
-//   localStorage['miruro:settings'] = {
+//   localStorage['aniraku:settings'] = {
 //     schemaVersion: 3,          // live `se`
 //     theme: <ThemeName>,        // written by ThemeContext (not this provider)
 //     settings: { ...user settings, live field names/defaults },
@@ -19,7 +19,7 @@ import React, {
 //
 // Legacy keys are read once by migration (live `we()` semantics: a field is
 // only filled while it's still `undefined` in the record):
-//   - live:   'miruro:settings:user' (JSON) -> record.settings
+//   - live:   'aniraku:settings:user' (JSON) -> record.settings
 //   - local:  autoSkip / autoPlay / autoNext / defaultLanguage / defaultServers
 //
 // The public `useSettings()` shape is unchanged for consumers; the mapping
@@ -28,8 +28,8 @@ import React, {
 //   defaultServers  <-> settings.defaultServers (local-only extension)
 // ---------------------------------------------------------------------------
 
-const SETTINGS_RECORD = 'miruro:settings';
-const LEGACY_LIVE_USER_SETTINGS = 'miruro:settings:user';
+const SETTINGS_RECORD = 'aniraku:settings';
+const LEGACY_LIVE_USER_SETTINGS = 'aniraku:settings:user';
 const SCHEMA_VERSION = 3; // live `se`
 
 /** Exact live settings payload (`ne`/`Ge` in the bundle) + one local-only field. */
@@ -301,7 +301,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
     // Persist into the unified record (live `O.set(A.USER_SETTINGS, r)`):
     // merge-write so `theme` and `schemaVersion` written by ThemeContext /
     // migration are preserved. Runs on mount too, so a fresh install lands
-    // `miruro:settings` for the pre-paint bootstrap to read next load.
+    // `aniraku:settings` for the pre-paint bootstrap to read next load.
     try {
       const record = readRecord();
       record.settings = stored;

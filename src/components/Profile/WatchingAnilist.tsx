@@ -79,7 +79,7 @@ const StatusDropdown = styled.select`
   }
 `;
 
-// Live status labels (AniList list names used by miruro.to)
+// Live status labels (AniList list names used by the live site)
 const statusLabels: Record<string, string> = {
   CURRENT: 'Watching',
   PLANNING: 'Planning',

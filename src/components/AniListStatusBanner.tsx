@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 // ---------------------------------------------------------------------------
 // AniList outage banner — port of Aniraku App.jsx:78-93
 // (AniListAvailabilityBanner). Same window-event wiring
-// (`aniraku:anilist-status` there → our `miruro:anilist-status`, dispatched
+// (`aniraku:anilist-status` there → our `aniraku:anilist-status`, dispatched
 // by useApi.ts anilistQuery on every failed/succeeded AniList GraphQL
 // fetch), same role/aria-live and the reference's copy verbatim ("AniList is
 // temporarily unavailable. Discovery, search, and some metadata will recover
@@ -22,7 +22,7 @@ import { useEffect, useState } from 'react';
 
 // Mirrors useApi.ts's ANILIST_STATUS_EVENT (kept in sync by hand — both
 // files are owned by the same agent; see the signal comment there).
-const ANILIST_STATUS_EVENT = 'miruro:anilist-status';
+const ANILIST_STATUS_EVENT = 'aniraku:anilist-status';
 
 type AniListStatusDetail = { unavailable?: boolean };
 

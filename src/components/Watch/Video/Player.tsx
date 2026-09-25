@@ -59,18 +59,18 @@ const RESUME_MIN_TIME = 30;
 // History-paused gate — byte-for-byte mirror of Watch.tsx:435's
 // isHistoryPaused (Player cannot import it: pages/Watch imports this
 // module, so importing back would create a cycle). Reads the same
-// `miruro:watching` record and legacy `miruro:watching:history-paused`
+// `aniraku:watching` record and legacy `aniraku:watching:history-paused`
 // key. Used by the Item 3 ended-progress save.
 const isHistoryPaused = (): boolean => {
   try {
-    const record = localStorage.getItem('miruro:watching');
+    const record = localStorage.getItem('aniraku:watching');
     if (record) {
       const parsed = JSON.parse(record);
       if (parsed && typeof parsed.historyPaused === 'boolean') {
         return parsed.historyPaused;
       }
     }
-    const legacy = localStorage.getItem('miruro:watching:history-paused');
+    const legacy = localStorage.getItem('aniraku:watching:history-paused');
     if (legacy !== null) return JSON.parse(legacy) === true;
   } catch {
     // Malformed record — treat as not paused.
@@ -198,7 +198,7 @@ type PlayerProps = {
   hasPrev?: boolean;
   hasNext?: boolean;
   // Live "Lights" toggle state (owned by Watch — the button below only
-  // dispatches `miruro:shortcut` {action:'lights'}; Watch's single listener
+  // dispatches `aniraku:shortcut` {action:'lights'}; Watch's single listener
   // performs the toggle).
   lightsOn?: boolean;
   // Zenime composition: embedded (FlixCloud) servers render INSIDE Player as
@@ -694,7 +694,7 @@ function createFullBufferIndicator(
 // read (AniSkip op/ed + provider windows) — chapters are DERIVED, not
 // fetched. Null guards: no intro → Main starts at 0; no outro → Main runs to
 // duration; neither → render nothing at all (a lone full-width "Main
-// episode" bar would be noise). Corpus note: live miruro's bundle has no
+// episode" bar would be noise). Corpus note: live bundle has no
 // progress-bar chapter UI at all (its only Intro/Outro strings are the
 // "Auto Skip Intro/Outro" setting row and the shortcuts-popup row), so the
 // labels follow the requested wording verbatim.
@@ -1161,7 +1161,7 @@ function selectLevelForQualityTarget(
 }
 
 // Ended-overlay actions (ported): card-styled text buttons. Aniraku's var
-// names lead; Miruro's theme name then a literal cover other themes.
+// names lead; Aniraku's theme name then a literal cover other themes.
 const navBtnStyle = {
   background: 'var(--bg-card, var(--global-card-bg, rgba(255,255,255,0.07)))',
   padding: '10px 18px',
@@ -1216,7 +1216,7 @@ export function Player({
     duration: 0,
     hasTriggeredEnd: false,
   });
-  // AniList progress sync: Miruro has no auth bridge (no syncWatchProgress /
+  // AniList progress sync: There is no auth bridge (no syncWatchProgress /
   // getAniListIdFromMalId in this build) — stays null so every guarded call
   // is a structural no-op (reported gap).
   const saveAniListProgressRef = useRef<
@@ -1279,7 +1279,7 @@ export function Player({
   const { settings, setSettings } = useSettings();
   const { autoPlay } = settings;
   // ── Settings-page AUTHORITY for auto-skip/auto-next (mission rule) ────────
-  // The `miruro:settings` record (written by SettingsProvider + the Settings
+  // The `aniraku:settings` record (written by SettingsProvider + the Settings
   // page) is the SINGLE source of truth. Per-elsewhere local values (flat
   // `autoSkip`/`autoNext`, legacy `aniraku-auto-*`) never win — the old
   // mount-time `aniraku-auto-*` seed below was removed for this reason.
@@ -1288,7 +1288,7 @@ export function Player({
   // value (same record) wins, so both toggles stay live in both directions.
   const settingsToggleMissing = (field: 'autoSkip' | 'autoNext'): boolean => {
     try {
-      const raw = localStorage.getItem('miruro:settings');
+      const raw = localStorage.getItem('aniraku:settings');
       const stored = raw ? JSON.parse(raw)?.settings : null;
       return !(stored && typeof stored === 'object' && field in stored);
     } catch {
@@ -2011,7 +2011,7 @@ export function Player({
   };
   const toggleAutoNext = () => {
     // Settings record only — both this menu and the Settings page read the
-    // same `miruro:settings` field (authority rule: no second store).
+    // same `aniraku:settings` field (authority rule: no second store).
     setSettings({ autoNext: !autoNext });
   };
   const toggleAutoSkip = () => {
@@ -2028,7 +2028,7 @@ export function Player({
   // ─── Zenime builtEmbeddedUrl (ported) ─────────────────────────────────────
   // FlixCloud reads its own autoPlay/skI/skO params — autoSkip rides along so
   // embeds honor the same setting as HLS playback. (Zenime's animePahe/kwik
-  // iframe proxy is N/A: Miruro embeds are FlixCloud via Aniraku.)
+  // iframe proxy is N/A: Embeds are FlixCloud via Aniraku.)
   useEffect(() => {
     if (!embeddedUrl) {
       setBuiltEmbeddedUrl('');
@@ -3725,7 +3725,7 @@ export function Player({
       // Ownership notes (full table in the report): KeyT stays skipped —
       // theater belongs to useGlobalShortcuts' unmodified-t contract (a
       // player-side KeyT would double-toggle through Watch's single
-      // `miruro:shortcut` listener). KeyD/KeyS cycle the pools Watch hands
+      // `aniraku:shortcut` listener). KeyD/KeyS cycle the pools Watch hands
       // down via sourceCycleRef (ported from Aniraku Watch.jsx:1406-1438).
       // KeyK is our one addition — Aniraku has no K, but the app's own
       // ShortcutsPopup advertises "K / Space". Aniraku's handler contains
@@ -3979,7 +3979,7 @@ export function Player({
           // other bubble-phase owners (MediaSource dropdowns, trailer modal,
           // navbar search) keep their key whenever the player is in none of
           // those states. Theater-off rides Watch's single
-          // `miruro:shortcut` listener (case 'theater' toggles it off);
+          // `aniraku:shortcut` listener (case 'theater' toggles it off);
           // Escape is in neither useGlobalShortcuts' table nor overlayStack's
           // contract, so no double-fire. Known tiering edge: with theater on
           // AND an overlay open, the first Escape drops theater and the
@@ -4001,7 +4001,7 @@ export function Player({
           if (liveArt.fullscreenWeb) liveArt.fullscreenWeb = false;
           if (inTheater) {
             window.dispatchEvent(
-              new CustomEvent('miruro:shortcut', {
+              new CustomEvent('aniraku:shortcut', {
                 detail: { action: 'theater' },
               }),
             );
@@ -4122,7 +4122,7 @@ export function Player({
 
   // Shared control bar: Autoplay, Auto Skip, Auto Next, Lights (both modes)
   // plus embed-only Prev/Next — direct mode navigates through the ArtPlayer
-  // controls, and the Lights dispatcher feeds the single `miruro:shortcut`
+  // controls, and the Lights dispatcher feeds the single `aniraku:shortcut`
   // listener in Watch.
   const controlBar = (
     <div className='player-menu'>
@@ -4178,7 +4178,7 @@ export function Player({
       <Button
         onClick={() =>
           window.dispatchEvent(
-            new CustomEvent('miruro:shortcut', {
+            new CustomEvent('aniraku:shortcut', {
               detail: { action: 'lights' },
             }),
           )

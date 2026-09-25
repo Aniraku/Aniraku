@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async () => {
-    // miruro.to 1:1: no server-side CSRF roundtrip — the state token is
+    // the live site 1:1: no server-side CSRF roundtrip — the state token is
     // generated locally and the browser is redirected straight to AniList.
     // (The old flow called GET /get-csrf-token, an endpoint that exists
     // nowhere, which made every login attempt fail.)

@@ -16,10 +16,10 @@ import { infoPathFor } from '../../utils/animePaths';
 import { useBookmarks } from '../../hooks/useBookmarks';
 
 // Card corner bookmark control (Wave B) — Aniraku Card.jsx:37-45 toggle
-// semantics restyled onto Miruro's card chrome (live corpus has no bookmark
+// semantics restyled onto Aniraku's card chrome (live corpus has no bookmark
 // UI): mirrors `.editListButton`'s hover reveal + CSS vars, sits top-left.
 // Guest = LS-only toggle; signed-in = LS optimistic + server upsert/delete
-// via useBookmarks. (The miruro.to EditList control that used to sit
+// via useBookmarks. (the live site EditList control that used to sit
 // top-right is gone — AniList sign-in surface, no AniList auth here.)
 const CardBookmarkBtn = styled.button`
   position: absolute;

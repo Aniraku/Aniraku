@@ -18,17 +18,17 @@ const THEME_META_COLORS: Record<string, string> = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // ---------------------------------------------------------------------------
-// Storage parity with live miruro.to
+// Storage parity with live
 //
 // The theme lives in the unified record written by both this context and
 // SettingsProvider (merge-writes, so neither clobbers the other):
 //
-//   localStorage['miruro:settings'] = { schemaVersion, theme, settings }
+//   localStorage['aniraku:settings'] = { schemaVersion, theme, settings }
 //
 // Read chain (presence-based, mirroring the live pre-paint bootstrap and
 // runtime `Et` context):
-//   1. record field `theme`            (miruro:settings JSON)
-//   2. legacy live key                 (miruro:settings:theme, JSON-encoded)
+//   1. record field `theme`            (aniraku:settings JSON)
+//   2. legacy live key                 (aniraku:settings:theme, JSON-encoded)
 //   3. legacy local key                (themePreference, {"mode": ...})
 //   4. live default                    ('dark' — live `Ct`)
 //
@@ -39,8 +39,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 // values stays in index.html's bootstrap.
 // ---------------------------------------------------------------------------
 
-const SETTINGS_RECORD = 'miruro:settings';
-const LEGACY_LIVE_THEME_KEY = 'miruro:settings:theme';
+const SETTINGS_RECORD = 'aniraku:settings';
+const LEGACY_LIVE_THEME_KEY = 'aniraku:settings:theme';
 const LEGACY_LOCAL_THEME_KEY = 'themePreference';
 const DEFAULT_THEME: Theme = 'dark'; // live `Ct`
 const VALID_THEMES: string[] = [
@@ -102,7 +102,7 @@ function resolveStoredTheme(): Theme {
     : DEFAULT_THEME;
 }
 
-/** Merge-write `theme` into `miruro:settings`, preserving settings/schemaVersion. */
+/** Merge-write `theme` into `aniraku:settings`, preserving settings/schemaVersion. */
 function writeRecordTheme(theme: Theme) {
   try {
     let record: Record<string, unknown> = {};

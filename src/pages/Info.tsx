@@ -53,7 +53,7 @@ import { SITE_URL, useSeo } from '../utils/seo';
 import { infoPathFor } from '../utils/animePaths';
 
 // ---------------------------------------------------------------------------
-// Info page — miruro.to 1:1, hydrated tabbed rebuild.
+// Info page — the live site 1:1, hydrated tabbed rebuild.
 //
 // Structure follows the live InfoRoute `zt` layout:
 //   banner → infoDataWrapper (side column: poster + details `ht` rows |
@@ -63,8 +63,8 @@ import { infoPathFor } from '../utils/animePaths';
 // Tabs follow live `st = e => e === 'watch' ? ot : B` with
 // `ot = [Overview, Characters, Artwork, Episodes]` (accessMode defaults to
 // 'watch'). The active section is persisted per media id in the
-// `miruro:navigation` record under `infoSection` (live INFO_SECTION key
-// `miruro:navigation:info-section`, legacy standalone key migrated).
+// `aniraku:navigation` record under `infoSection` (live INFO_SECTION key
+// `aniraku:navigation:info-section`, legacy standalone key migrated).
 //
 // Overview = the trailer box only (double-details fix: the details block
 // that used to sit below it is gone — ONE details copy per breakpoint: the
@@ -257,9 +257,9 @@ type InfoTab = 'Overview' | 'Characters' | 'Artwork' | 'Episodes';
 const INFO_TABS: InfoTab[] = ['Overview', 'Characters', 'Artwork', 'Episodes'];
 
 // live `c.INFO_SECTION` = `${c.NAVIGATION}:info-section`, stored through the
-// record map as `localStorage['miruro:navigation'].infoSection[mediaId]`.
-const NAVIGATION_KEY = 'miruro:navigation';
-const LEGACY_INFO_SECTION_KEY = 'miruro:navigation:info-section';
+// record map as `localStorage['aniraku:navigation'].infoSection[mediaId]`.
+const NAVIGATION_KEY = 'aniraku:navigation';
+const LEGACY_INFO_SECTION_KEY = 'aniraku:navigation:info-section';
 
 const isInfoTab = (value: unknown): value is InfoTab =>
   typeof value === 'string' && (INFO_TABS as string[]).includes(value);
@@ -312,7 +312,7 @@ const writeInfoSection = (mediaId: string, section: InfoTab): void => {
 // on this page — read the persisted record like Comments does).
 const readLangTitle = (): string => {
   try {
-    const raw = localStorage.getItem('miruro:settings');
+    const raw = localStorage.getItem('aniraku:settings');
     if (!raw) return 'English';
     const value = JSON.parse(raw)?.settings?.langTitle;
     return typeof value === 'string' && value ? value : 'English';
@@ -881,7 +881,7 @@ const WatchNow = styled(Link)`
 `;
 
 // Wave B — sidebar bookmark toggle (Aniraku AnimeDetail.jsx:167-185 +
-// 981-983 BookmarkBtn, restyled onto Miruro's watchNow chrome / CSS vars).
+// 981-983 BookmarkBtn, restyled onto Aniraku's watchNow chrome / CSS vars).
 // Guest = LS-only; signed-in = LS optimistic + server upsert/delete.
 const BookmarkToggle = styled.button<{ $active?: boolean }>`
   ${watchNowCss}
@@ -2793,7 +2793,7 @@ const Info: React.FC = () => {
   const relatedScrollRef = useRef<HTMLUListElement>(null);
   const recsScrollRef = useRef<HTMLUListElement>(null);
 
-  // Tab state — effective localStorage record `miruro:navigation`
+  // Tab state — effective localStorage record `aniraku:navigation`
   // `.infoSection[mediaId]` (live `INFO_SECTION`), defaulting to Overview.
   // No query-param read: the stored section (or Overview) is the entry tab.
   const [activeSection, setActiveSection] = useState<InfoTab>('Overview');
@@ -2806,11 +2806,11 @@ const Info: React.FC = () => {
   const [artFilter, setArtFilter] = useState('all');
   const [artIndex, setArtIndex] = useState<number | null>(null);
   const [characterLanguage, setCharacterLanguage] = useState('Japanese');
-  // Episodes toolbar — spoiler toggle persists in the live `miruro:settings`
+  // Episodes toolbar — spoiler toggle persists in the live `aniraku:settings`
   // record (our useSettings subset has no hideSpoiler), default false.
   const [hideSpoiler, setHideSpoiler] = useState<boolean>(() => {
     try {
-      const raw = localStorage.getItem('miruro:settings');
+      const raw = localStorage.getItem('aniraku:settings');
       const record = raw ? JSON.parse(raw) : null;
       return !!record?.settings?.hideSpoiler;
     } catch {
@@ -2824,14 +2824,14 @@ const Info: React.FC = () => {
   ]);
 
   // live `qt` spoiler toggle: flips `settings.hideSpoiler` in the unified
-  // `miruro:settings` record with a merge-write preserving theme and
+  // `aniraku:settings` record with a merge-write preserving theme and
   // schemaVersion (our useSettings subset doesn't expose hideSpoiler —
   // pattern copied from SettingsProvider's record writer).
   const toggleSpoilers = () => {
     const next = !hideSpoiler;
     setHideSpoiler(next);
     try {
-      const raw = localStorage.getItem('miruro:settings');
+      const raw = localStorage.getItem('aniraku:settings');
       const record: Record<string, unknown> = raw ? JSON.parse(raw) : {};
       const base =
         record && typeof record === 'object' ? (record as Record<string, unknown>) : {};
@@ -2840,7 +2840,7 @@ const Info: React.FC = () => {
           ? { ...(base.settings as Record<string, unknown>) }
           : {};
       localStorage.setItem(
-        'miruro:settings',
+        'aniraku:settings',
         JSON.stringify({
           ...base,
           settings: { ...settings, hideSpoiler: next },

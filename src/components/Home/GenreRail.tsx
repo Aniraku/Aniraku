@@ -5,7 +5,7 @@ import { TbCircleChevronLeft } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
 // ---------------------------------------------------------------------------
-// GenreRail (miruro.to 1:1) — horizontally scrollable genre chips below hero.
+// GenreRail (the live site 1:1) — horizontally scrollable genre chips below hero.
 // Dynamic edge mask + fade-in scroll buttons, centered on mount, 200px steps.
 // ---------------------------------------------------------------------------
 

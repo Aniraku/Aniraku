@@ -13,21 +13,21 @@ import {
 
 // ---------------------------------------------------------------------------
 // Data-sync layer — TS port of the Supabase-touching halves of Aniraku's
-// `src/lib/sync.js` / `useNsfw`-style shared state, re-based onto Miruro:
+// `src/lib/sync.js` / `useNsfw`-style shared state, based on the live reference:
 //
 //  - Session bridge via `supabase.auth` ONLY (no auth hook import — Wave A
 //    owns those files; this module keeps its own user state).
-//  - bookmarks          → table `bookmarks`,    LS `miruro:bookmarks`
+//  - bookmarks          → table `bookmarks`,    LS `aniraku:bookmarks`
 //                         (+ legacy `aniraku-bookmarks` merged on login)
 //  - watch_history      → throttled 10s diff-upsert engine + merge-on-login
 //  - notifications      → backend API `${API_BASE}/api/v1/notifications`
 //                         (Aniraku NavBar.jsx:32-69 mechanism: Bearer fetch,
 //                         30s session poll, PUT `/notifications/{id}/read`;
 //                         server `read` column = authority — the LS key
-//                         `miruro:notifications-read` is retired as
+//                         `aniraku:notifications-read` is retired as
 //                         authority and no longer read/written here), plus
 //                         the new-episode insert loop with LS tracker
-//                         `miruro:episode-track`
+//                         `aniraku:episode-track`
 //  - provider sync      → MAL/AniList grant endpoints (`/api/v1/sync*`,
 //                         `/api/v1/import|export/{provider}`) — UNFILTERED
 //                         payloads (no NSFW/rating filter anywhere, per
@@ -115,7 +115,7 @@ export function subscribeToSession(listener: SessionListener): () => void {
 // AnimeDetail.jsx:663-693)
 // ---------------------------------------------------------------------------
 
-export const BOOKMARKS_KEY = 'miruro:bookmarks';
+export const BOOKMARKS_KEY = 'aniraku:bookmarks';
 export const ANIRAKU_BOOKMARKS_KEY = 'aniraku-bookmarks';
 
 export interface BookmarkEntry {
@@ -156,7 +156,7 @@ const toBookmark = (raw: unknown): BookmarkEntry | null => {
   };
 };
 
-/** Union of `miruro:bookmarks` and legacy `aniraku-bookmarks` (Miruro wins). */
+/** Union of `aniraku:bookmarks` and legacy `aniraku-bookmarks` (aniraku: key takes precedence). */
 export function readLocalBookmarks(): BookmarkEntry[] {
   const byId = new Map<number, BookmarkEntry>();
   for (const raw of readArray<unknown>(ANIRAKU_BOOKMARKS_KEY)) {
@@ -197,7 +197,7 @@ const mergedBookmarksUsers = new Set<string>();
 
 /**
  * Merge-on-login (AnimeDetail.jsx:663-693 pattern): read cloud, upsert the
- * local-only rows (from `miruro:bookmarks` AND `aniraku-bookmarks`), then
+ * local-only rows (from `aniraku:bookmarks` AND `aniraku-bookmarks`), then
  * store the union locally. Runs once per user per session.
  */
 export async function mergeBookmarksOnLogin(
@@ -354,7 +354,7 @@ export async function upsertHistoryRows(
 
 /**
  * MERGE-ON-LOGIN (history):
- *  1. local = readLocalHistoryRows()  (`miruro:watching`-native + `aniraku-watch-history`)
+ *  1. local = readLocalHistoryRows()  (`aniraku:watching`-native + `aniraku-watch-history`)
  *  2. server = fetchServerHistoryRows(userId)
  *  3. union by `anime_id:episode_number` → max(progress), tie → newest timestamp
  *  4. upload every row the server lacks or loses (local winner only)
@@ -488,13 +488,13 @@ async function authHeaders(
 //   PUT  ${API_BASE}/api/v1/notifications/{id}/read (Bearer, on click)
 // Payload = array; server `read` column is the authority. Module-level store
 // + session-driven shared poller; `useNotifications()` (Notifications.tsx)
-// subscribes here. The LS key `miruro:notifications-read` is retired as
+// subscribes here. The LS key `aniraku:notifications-read` is retired as
 // authority (no reads/writes below) — `readNotificationReadIds()` now derives
 // from the server rows so Wave A's Navbar badge shim stays correct.
 // ---------------------------------------------------------------------------
 
-export const NOTIFICATIONS_READ_KEY = 'miruro:notifications-read'; // legacy key — AuthProvider still clears it on sign-out; no longer read/written
-export const EPISODE_TRACK_KEY = 'miruro:episode-track';
+export const NOTIFICATIONS_READ_KEY = 'aniraku:notifications-read'; // legacy key — AuthProvider still clears it on sign-out; no longer read/written
+export const EPISODE_TRACK_KEY = 'aniraku:episode-track';
 
 export interface NotificationItem {
   id: string;
@@ -784,9 +784,9 @@ let episodeCheckInFlight = false;
 
 /**
  * NEW-EPISODE NOTIFICATION LOOP — port of Aniraku Home.jsx:589-614
- * (logged-in only; mounted from Miruro `pages/Home.tsx`):
+ * (logged-in only; mounted from the Home page `pages/Home.tsx`):
  *  bookmarks (LS union, server rows override) → 6h-cooled tracker
- *  `miruro:episode-track` → AniList batch (RELEASING only, last aired ep)
+ *  `aniraku:episode-track` → AniList batch (RELEASING only, last aired ep)
  *  → episode-availability check → dedupe lookup on
  *  (user_id, type='new_episode', anime_id, message) → insert
  *  `{user_id, type, message, anime_id}` (unique-violation 23505 ignored).

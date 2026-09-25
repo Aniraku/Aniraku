@@ -411,7 +411,7 @@ export const EpisodeCard: React.FC = () => {
       }
     }
 
-    // Miruro keeps ONE card per anime (native invariant) — collapse to the
+    // Keep ONE card per anime (native invariant) — collapse to the
     // newest candidate, then sort timestamp desc and take the top `limit`
     // (12 default per Aniraku).
     const byAnime = new Map<string, ContinueCard>();

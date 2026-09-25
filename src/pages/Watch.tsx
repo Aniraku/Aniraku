@@ -36,6 +36,14 @@ import {
   PROVIDER_LABELS,
 } from '../lib/sync';
 import { showToast } from '../components/Toaster';
+// Unreleased-title/episode fallback copy (old Aniraku voice).
+import {
+  UNRELEASED_ANIME_MESSAGE,
+  UNRELEASED_MOVIE_MESSAGE,
+  UPCOMING_EPISODE_MESSAGE,
+  isMovieFormat,
+  isUnreleasedStatus,
+} from '../lib/upcomingMessages';
 // Item 2 (episode ratings) — transport trio + LS key from Wave C's
 // lib/episodeRatings (verbatim Aniraku sync.js ports) — import-only.
 import {
@@ -51,13 +59,13 @@ import { SITE_URL, useSeo } from '../utils/seo';
 
 // ---------------------------------------------------------------------------
 // Live local-storage keys (per-anime prefs moved from the legacy
-// `source-[id]` / `subOrDub-[id]` names to `miruro:anime:source:{id}` /
-// `miruro:anime:language:{id}`; legacy keys stay readable/writable).
+// `source-[id]` / `subOrDub-[id]` names to `aniraku:anime:source:{id}` /
+// `aniraku:anime:language:{id}`; legacy keys stay readable/writable).
 // ---------------------------------------------------------------------------
 const getSourceTypeKey = (animeId: string | undefined) =>
-  `miruro:anime:source:${animeId}`;
+  `aniraku:anime:source:${animeId}`;
 const getLanguageKey = (animeId: string | undefined) =>
-  `miruro:anime:language:${animeId}`;
+  `aniraku:anime:language:${animeId}`;
 const legacySourceTypeKey = (animeId: string | undefined) =>
   `source-[${animeId}]`;
 const legacyLanguageKey = (animeId: string | undefined) =>
@@ -66,11 +74,11 @@ const legacyLanguageKey = (animeId: string | undefined) =>
 const readStoredPref = (key: string, legacyKey: string): string | null =>
   localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
 
-// Live theater prefs: `miruro:ui:theater` (legacy) + `miruro:ui` record
+// Live theater prefs: `aniraku:ui:theater` (legacy) + `aniraku:ui` record
 // field `theaterMode`. Both are kept in sync.
 const readUiRecord = (): Record<string, unknown> => {
   try {
-    const raw = localStorage.getItem('miruro:ui');
+    const raw = localStorage.getItem('aniraku:ui');
     const parsed = raw ? JSON.parse(raw) : null;
     if (parsed && typeof parsed === 'object') {
       return parsed as Record<string, unknown>;
@@ -83,7 +91,7 @@ const readUiRecord = (): Record<string, unknown> => {
 
 const readTheaterPref = (): boolean => {
   try {
-    const legacy = localStorage.getItem('miruro:ui:theater');
+    const legacy = localStorage.getItem('aniraku:ui:theater');
     if (legacy !== null) {
       const parsed = JSON.parse(legacy);
       if (typeof parsed === 'boolean') return parsed;
@@ -91,7 +99,7 @@ const readTheaterPref = (): boolean => {
       if (typeof parsed === 'number') return parsed === 1;
     }
   } catch {
-    const legacy = localStorage.getItem('miruro:ui:theater');
+    const legacy = localStorage.getItem('aniraku:ui:theater');
     if (legacy === 'true') return true;
   }
   return readUiRecord().theaterMode === true;
@@ -286,7 +294,7 @@ const SourceAndData = styled.div<{ $videoPlayerWidth: string }>`
 `;
 
 // Zenime RalationsTable (verbatim rules) + column gap so the SEASONS stack
-// sits above RELATED / RECOMMENDATIONS (Miruro feature parity).
+// sits above RELATED / RECOMMENDATIONS (Aniraku feature parity).
 const RalationsTable = styled.div`
   display: flex;
   flex-direction: column;
@@ -343,6 +351,13 @@ const NoEpsFoundDiv = styled.div`
     margin-top: 2.5rem;
     margin-bottom: 6rem;
   }
+`;
+
+const NoEpsMessage = styled.p`
+  color: var(--global-text-muted);
+  max-width: 34rem;
+  margin: 0 auto 1.5rem;
+  line-height: 1.6;
 `;
 
 const NoEpsImage = styled.div`
@@ -483,19 +498,19 @@ const LOCAL_STORAGE_KEYS = {
 
 // Live local-history gate: while the user paused history recording, skip
 // persisting watched-episodes. The pref is written by useWatchHistory's
-// writePref as either the `historyPaused` field of the `miruro:watching`
+// writePref as either the `historyPaused` field of the `aniraku:watching`
 // record or (legacy) as a JSON boolean under
-// `miruro:watching:history-paused`.
+// `aniraku:watching:history-paused`.
 const isHistoryPaused = (): boolean => {
   try {
-    const record = localStorage.getItem('miruro:watching');
+    const record = localStorage.getItem('aniraku:watching');
     if (record) {
       const parsed = JSON.parse(record);
       if (parsed && typeof parsed.historyPaused === 'boolean') {
         return parsed.historyPaused;
       }
     }
-    const legacy = localStorage.getItem('miruro:watching:history-paused');
+    const legacy = localStorage.getItem('aniraku:watching:history-paused');
     if (legacy !== null) return JSON.parse(legacy) === true;
   } catch {
     // Malformed record — treat as not paused.
@@ -676,7 +691,7 @@ const WatchInner: React.FC = () => {
   );
   const [downloadLink, setDownloadLink] = useState('');
   // Live theater + lights state (toggled ONLY through the single
-  // `miruro:shortcut` listener below, plus the player menu Lights button
+  // `aniraku:shortcut` listener below, plus the player menu Lights button
   // which dispatches the same contract event).
   const [theaterMode, setTheaterMode] = useState<boolean>(readTheaterPref);
   const [lightsOn, setLightsOn] = useState(false);
@@ -688,6 +703,27 @@ const WatchInner: React.FC = () => {
       : null;
   const nextEpisodenumber = animeInfo?.nextAiringEpisode?.episode;
   const countdown = useCountdown(nextEpisodeAiringTime);
+  // Unreleased fallback routing (old Aniraku voice): explicit status only.
+  // Title-level (movie vs series) wins; otherwise an explicit future `?ep=N`
+  // request at/after the next airing number gets the episode line. A
+  // merely-missing list keeps the generic empty copy below.
+  const requestedEpNumber = (() => {
+    try {
+      const parsed = parseRequestedEpisode(window.location.search);
+      return typeof parsed === 'number' ? parsed : null;
+    } catch {
+      return null;
+    }
+  })();
+  const titleUnreleased = isUnreleasedStatus(animeInfo?.status);
+  const movieUnreleased =
+    titleUnreleased && isMovieFormat(animeInfo?.type);
+  const futureEpisodeRequested =
+    !titleUnreleased &&
+    requestedEpNumber !== null &&
+    nextEpisodenumber !== null &&
+    nextEpisodenumber !== undefined &&
+    requestedEpNumber >= nextEpisodenumber;
   const currentEpisodeIndex = episodes.findIndex(
     (ep) => ep.id === currentEpisode.id,
   );
@@ -1050,7 +1086,7 @@ const WatchInner: React.FC = () => {
     handleEpisodeSelect(episodes[nextEpisodeIndex]);
   };
 
-  // Episode nav — driven by the single `miruro:shortcut` listener below
+  // Episode nav — driven by the single `aniraku:shortcut` listener below
   // (another agent dispatches Shift+P/B/N as CustomEvents; the legacy
   // Shift+N/P document keydown handler was removed to avoid double-firing).
   const onPrevEpisode = () => {
@@ -1072,7 +1108,7 @@ const WatchInner: React.FC = () => {
   const toggleLights = useCallback(() => setLightsOn((value) => !value), []);
 
   //----------------------------------------------USEFFECTS----------------------------------------------
-  // THE one `miruro:shortcut` listener (contract: detail.action ∈
+  // THE one `aniraku:shortcut` listener (contract: detail.action ∈
   // prev-ep | next-ep | theater | lights). Registered on mount, cleaned on
   // unmount; latest handlers are read through a ref so the listener never
   // goes stale and never fires twice.
@@ -1111,8 +1147,8 @@ const WatchInner: React.FC = () => {
           break;
       }
     };
-    window.addEventListener('miruro:shortcut', onShortcut);
-    return () => window.removeEventListener('miruro:shortcut', onShortcut);
+    window.addEventListener('aniraku:shortcut', onShortcut);
+    return () => window.removeEventListener('aniraku:shortcut', onShortcut);
   }, []);
 
   // Own episode ratings (Aniraku Watch.jsx:2088-2109): authed → backend
@@ -1150,14 +1186,14 @@ const WatchInner: React.FC = () => {
     };
   }, [animeId]);
 
-  // Theater persistence: `miruro:ui:theater` (legacy) + `miruro:ui`
+  // Theater persistence: `aniraku:ui:theater` (legacy) + `aniraku:ui`
   // record `theaterMode` — both written, both read.
   useEffect(() => {
-    localStorage.setItem('miruro:ui:theater', JSON.stringify(theaterMode));
+    localStorage.setItem('aniraku:ui:theater', JSON.stringify(theaterMode));
     try {
       const record = readUiRecord();
       record.theaterMode = theaterMode;
-      localStorage.setItem('miruro:ui', JSON.stringify(record));
+      localStorage.setItem('aniraku:ui', JSON.stringify(record));
     } catch {
       // Storage full/blocked — theater still works for this session.
     }
@@ -1885,7 +1921,28 @@ const WatchInner: React.FC = () => {
         </div>
       ) : showNoEpisodesMessage ? (
         <NoEpsFoundDiv>
-          <h2>No episodes found {':('}</h2>
+          <h2>
+            {movieUnreleased
+              ? 'This movie has not premiered yet'
+              : titleUnreleased
+                ? 'This anime has not started airing yet'
+                : futureEpisodeRequested
+                  ? 'That episode is not out yet'
+                  : (
+                    <>
+                      No episodes found {':('}
+                    </>
+                  )}
+          </h2>
+          {(movieUnreleased || titleUnreleased || futureEpisodeRequested) && (
+            <NoEpsMessage>
+              {movieUnreleased
+                ? UNRELEASED_MOVIE_MESSAGE
+                : titleUnreleased
+                  ? UNRELEASED_ANIME_MESSAGE
+                  : UPCOMING_EPISODE_MESSAGE}
+            </NoEpsMessage>
+          )}
           <NoEpsImage>
             <img src={Image404URL} alt='404 Error'></img>
           </NoEpsImage>

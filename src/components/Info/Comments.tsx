@@ -92,11 +92,11 @@ const buildScheme = (): ColorScheme => {
 };
 
 // live reads the comments flag straight from the settings record
-// (`localStorage['miruro:settings'].settings.comments ?? true`) — the public
+// (`localStorage['aniraku:settings'].settings.comments ?? true`) — the public
 // `useSettings()` shape doesn't expose it, so read it the same way live does.
 const readCommentsSetting = (): boolean => {
   try {
-    const raw = localStorage.getItem('miruro:settings');
+    const raw = localStorage.getItem('aniraku:settings');
     if (!raw) return true;
     const value = JSON.parse(raw)?.settings?.comments;
     if (typeof value === 'boolean') return value;
