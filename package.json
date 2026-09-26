@@ -6,12 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "NODE_OPTIONS=--experimental-global-webcrypto vite build",
+    "build": "npm run sitemap:fast && NODE_OPTIONS=--experimental-global-webcrypto vite build",
     "preview": "vite preview",
     "start": "NODE_OPTIONS=--experimental-global-webcrypto vite build && bun run ./server/server.ts",
     "lint": "eslint . --ext js,jsx,ts,tsx --report-unused-disable-directives",
     "format": "prettier --write .",
-    "sitemap": "node scripts/generate-sitemap.mjs"
+    "sitemap": "node scripts/generate-sitemap.mjs",
+    "sitemap:fast": "node scripts/generate-sitemap.mjs --fast"
   },
   "dependencies": {
     "@apollo/client": "^3.10.1",

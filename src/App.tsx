@@ -61,6 +61,11 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Dmca = lazy(() => import('./pages/Dmca'));
 const License = lazy(() => import('./pages/License'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
+// SEO/GEO static routes — entity + Q/A surfaces answer engines cite. Both
+// were previously missing (/about used to 404), so they are new indexable
+// URLs and are lazy like the rest of the static pages.
+const About = lazy(() => import('./pages/About'));
+const Faq = lazy(() => import('./pages/Faq'));
 // Wave C — MAL/AniList OAuth landing page (Aniraku `SyncCallback.jsx` port;
 // providers redirect to /sync/callback with ?code=&state=).
 const SyncCallback = lazy(() => import('./pages/SyncCallback'));
@@ -183,7 +188,6 @@ function App() {
                     path='/settings'
                     element={<Navigate to='/profile?settings=1' replace />}
                   />
-                  {/* the live site 1:1: /about and /pptos do not exist — they 404 */}
                   {/* Wave C — Library Sync OAuth return (Aniraku
                       /sync/callback, App.jsx:187) */}
                   <Route path='/sync/callback' element={<SyncCallback />} />
@@ -204,6 +208,9 @@ function App() {
                     path='/community-guidelines'
                     element={<CommunityGuidelines />}
                   />
+                  {/* SEO/GEO static routes (About + FAQ) */}
+                  <Route path='/about' element={<About />} />
+                  <Route path='/faq' element={<Faq />} />
                   {/* Catch-all — the historically "frozen" single `*` route
                       (previously the minimal Page404): the user-ordered
                       Aniraku Error.jsx port replaces its element in place,
