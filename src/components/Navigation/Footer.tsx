@@ -162,6 +162,11 @@ const Footer = () => {
               aria-label='Legal links'
               style={{ padding: 0 }}
             >
+              {/* SEO/GEO: About + FAQ lead the row — they are the entity and
+                  Q/A pages, so they get internal link equity from every page.
+                  Kept in this single wrapped row per the footer mandate. */}
+              <Link to='/about'>About</Link>
+              <Link to='/faq'>FAQ</Link>
               <Link to='/privacy'>Privacy</Link>
               <Link to='/terms'>Terms</Link>
               <Link to='/dmca'>DMCA</Link>

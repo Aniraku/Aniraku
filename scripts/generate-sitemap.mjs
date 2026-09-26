@@ -40,6 +40,15 @@
 // atomically after EVERY completed page (job index + page + accumulated items),
 // so an interrupted run resumes exactly where it stopped — never from scratch,
 // never re-emitting rows. Deleted automatically after a fully successful run.
+//
+// Usage:
+//   node scripts/generate-sitemap.mjs          full refresh — AniList crawl
+//                                               (~20-40 min, rate-limited, resumable)
+//   node scripts/generate-sitemap.mjs --fast   build-time restamp ONLY (see fastMain):
+//                                               0 API requests, ~1s, rewrites pages.xml
+//                                               from STATIC_URLS + stamps today's lastmod
+//                                               on the committed anime shards/index.
+//                                               Used by `npm run build` on Vercel.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -81,6 +90,10 @@ const STATIC_URLS = [
   { loc: '/trending', freq: 'daily', priority: '0.8' },
   { loc: '/schedule', freq: 'weekly', priority: '0.7' },
   { loc: '/search', freq: 'daily', priority: '0.7' },
+  // SEO/GEO entity + Q/A surfaces (routed in App.tsx; added so crawlers can
+  // discover the two pages answer engines are most likely to cite).
+  { loc: '/about', freq: 'monthly', priority: '0.5' },
+  { loc: '/faq', freq: 'monthly', priority: '0.5' },
   { loc: '/privacy', freq: 'monthly', priority: '0.3' },
   { loc: '/terms', freq: 'monthly', priority: '0.3' },
   { loc: '/dmca', freq: 'monthly', priority: '0.3' },
@@ -579,6 +592,67 @@ async function verifyNoMisses(jobs, items, seen) {
 }
 
 // ---------------------------------------------------------------------------
+// Fast mode (Vercel build step) — zero AniList requests
+// ---------------------------------------------------------------------------
+async function fastMain() {
+  console.log('Fast sitemap mode (--fast): restamping lastmod only, 0 AniList requests.')
+
+  // 1) static shard from the curated route list (always reflects current routes)
+  const staticUrls = STATIC_URLS.map(u => urlEntry(u.loc, today, u.freq, u.priority))
+  const staticSize = writeSitemap(path.join(OUT_DIR, 'sitemaps', 'pages.xml'), staticUrls)
+  console.log(`  sitemaps/pages.xml — ${staticUrls.length} URLs, ${staticSize} bytes`)
+
+  // 2) restamp lastmod on every committed shard — URL lists stay untouched
+  const sitemapsDir = path.join(OUT_DIR, 'sitemaps')
+  const files = fs.existsSync(sitemapsDir)
+    ? fs.readdirSync(sitemapsDir).filter(f => f.endsWith('.xml')).sort()
+    : []
+  const indexChildren = []
+  for (const name of files) {
+    const filePath = path.join(sitemapsDir, name)
+    if (name === 'pages.xml') {
+      indexChildren.push({ loc: '/sitemaps/pages.xml', lastmod: today })
+      continue
+    }
+    let content = null
+    try {
+      content = fs.readFileSync(filePath, 'utf-8')
+    } catch (e) {
+      console.warn(`  WARNING: sitemaps/${name} unreadable — kept as-is (${e.message})`)
+    }
+    if (content !== null) {
+      const locs = [...content.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1])
+      if (locs.length === 0) {
+        console.warn(`  WARNING: sitemaps/${name} has no <loc> entries — kept as-is`)
+      } else {
+        const entries = locs.map(full => {
+          const loc = full.startsWith(SITE) ? full.slice(SITE.length) : full
+          return urlEntry(loc, today, 'monthly', '0.6')
+        })
+        const size = writeSitemap(filePath, entries)
+        console.log(`  sitemaps/${name} — ${entries.length} URLs restamped, ${size} bytes`)
+      }
+    }
+    indexChildren.push({ loc: `/sitemaps/${name}`, lastmod: today })
+  }
+  // pages.xml first, exactly once (full mode's index shape)
+  const rest = indexChildren.filter(c => c.loc !== '/sitemaps/pages.xml')
+  indexChildren.length = 0
+  indexChildren.push({ loc: '/sitemaps/pages.xml', lastmod: today }, ...rest)
+
+  // 3) sitemap index (pages.xml first, same shape as full mode)
+  const children = indexChildren.map(
+    c => `  <sitemap>
+    <loc>${SITE}${escapeXml(c.loc)}</loc>
+    <lastmod>${c.lastmod}</lastmod>
+  </sitemap>`,
+  )
+  writeSitemapIndex(path.join(OUT_DIR, 'sitemap.xml'), children)
+  console.log(`  sitemap.xml (index) — ${indexChildren.length} children`)
+  console.log('Fast mode done. Catalog content unchanged — run `npm run sitemap` for a full AniList refresh.')
+}
+
+// ---------------------------------------------------------------------------
 // Write phase
 // ---------------------------------------------------------------------------
 async function main() {
@@ -686,4 +760,8 @@ process.on('SIGTERM', () => {
   process.exit(143)
 })
 
-await main()
+if (process.argv.includes('--fast')) {
+  await fastMain()
+} else {
+  await main()
+}

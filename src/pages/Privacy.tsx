@@ -32,7 +32,7 @@ const Privacy = () => {
       sections={sections}
     >
       <h2 id='summary'>1. At a glance</h2>
-      <p>Aniraku is designed to minimize personal data. You can browse metadata and use many discovery features without signing in. An account is needed for cloud-backed history, bookmarks, ratings, comments, profiles, and some sync features. We do not sell personal information or use watch history as an advertising profile.</p>
+      <p>Aniraku is designed to minimize personal data. You can browse metadata and use many discovery features without signing in. An account is needed for cloud-backed history, bookmarks, ratings, comments, profiles, and some sync features. We do not share or sell your personal information with anyone for marketing, advertising, or data-broker purposes. Aniraku is funded by voluntary community support rather than advertising, and we do not use watch history to target or profile users.</p>
 
       <h2 id='data'>2. Data we handle</h2>
       <p>Depending on how you use the product, we may handle:</p>
@@ -48,7 +48,7 @@ const Privacy = () => {
 
       <h2 id='use'>3. How we use information</h2>
       <p>We use information to authenticate you, synchronize the features you ask us to synchronize, display your community contributions, prevent abuse, respond to reports, improve reliability, and maintain the security of the service. We use local browser data to make guest playback and browsing convenient; local data does not automatically become cloud data until a feature syncs it.</p>
-      <p>We do not sell your personal information. We do not intentionally use your watch history to infer sensitive traits or build an advertising audience. We may disclose information when necessary to provide a requested service through a provider, protect the service and users, investigate abuse, comply with law, or respond to a valid legal process.</p>
+      <p>We do not share or sell your personal information with anyone for marketing, advertising, or data-broker purposes. Aniraku is funded by voluntary community support rather than advertising, and we do not intentionally use your watch history to infer sensitive traits. We may disclose information when necessary to provide a requested service through a provider, protect the service and users, investigate abuse, comply with law, or respond to a valid legal process.</p>
 
       <h2 id='storage'>4. Storage and third-party providers</h2>
       <p>Authentication and application data are handled through Supabase services configured by the project. Anime metadata is fetched directly from AniList in the browser and may include the network data described above. Episode availability and selected episode metadata may be requested from Aniraku’s configured API, while TMDB may be used by that service for episode enrichment. Playback providers, external library integrations, hosting, analytics, GIF reactions, and issue-reporting platforms have their own terms and privacy practices. A provider may receive the request data needed to answer a request, but Aniraku should not send your password to an anime metadata, playback, or GIF provider.</p>
