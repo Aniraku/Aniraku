@@ -47,7 +47,7 @@ import path from 'node:path'
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const ANILIST_ENDPOINT = 'https://graphql.anilist.co'
+const ANILIST_ENDPOINT = 'https://graphql.aniraku.tech'
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
 const CHECKPOINT_FILE = path.resolve('.sitemap-checkpoint.json')

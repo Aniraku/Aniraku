@@ -754,7 +754,7 @@ async function anilistBatchDetail(
     .map((_, index) => `$id${index}: Int!`)
     .join(', ')}) { ${fields.join('\n')} }`;
   try {
-    const response = await fetch('https://graphql.anilist.co', {
+    const response = await fetch('https://graphql.aniraku.tech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, variables }),
