@@ -3,6 +3,7 @@ import { fetchAnimeEpisodes } from '../hooks/useApi';
 import { API_BASE } from './apiBase';
 import {
   type HistoryRow,
+  healUnifiedHistory,
   historyRowKey,
   historyRowEquals,
   readLocalHistoryRows,
@@ -115,6 +116,16 @@ export function subscribeToSession(listener: SessionListener): () => void {
 // AnimeDetail.jsx:663-693)
 // ---------------------------------------------------------------------------
 
+import {
+  normalizeListStatus,
+  statusForNewBookmark,
+  LIST_STATUSES,
+  LIST_STATUS_LABELS,
+  type ListStatus,
+} from './listStatus';
+
+export type { ListStatus } from './listStatus';
+
 export const BOOKMARKS_KEY = 'aniraku:bookmarks';
 export const ANIRAKU_BOOKMARKS_KEY = 'aniraku-bookmarks';
 
@@ -123,6 +134,14 @@ export interface BookmarkEntry {
   title: string;
   image: string;
   added_at?: number;
+  /**
+   * List status (hidden bookmark mechanism). Null when the row predates
+   * the status column / import-saved statuses — call sites fall back to
+   * the legacy watching/completed derivation.
+   */
+  status?: ListStatus | null;
+  /** Known episode total, when seen (drives auto-COMPLETED). */
+  total_episodes?: number | null;
 }
 
 function readArray<T>(key: string): T[] {
@@ -147,12 +166,19 @@ const toBookmark = (raw: unknown): BookmarkEntry | null => {
   const item = raw as Record<string, unknown>;
   const id = Number(item.id ?? item.anime_id);
   if (!Number.isFinite(id) || id <= 0) return null;
+  const total =
+    item.total_episodes ?? item.totalEpisodes ?? item.episodes ?? null;
   return {
     id,
     title: String(item.title ?? ''),
     image: String(item.image ?? ''),
     added_at:
       typeof item.added_at === 'number' ? item.added_at : undefined,
+    status: normalizeListStatus(item.status),
+    total_episodes:
+      total === null || total === undefined || Number.isNaN(Number(total))
+        ? null
+        : Math.max(0, Math.floor(Number(total))),
   };
 };
 
@@ -178,19 +204,33 @@ export function writeLocalBookmarks(list: BookmarkEntry[]): void {
 export async function fetchServerBookmarks(
   userId: string,
 ): Promise<BookmarkEntry[]> {
+  // `status` / `total_episodes` columns postdate older projects: select
+  // them optimistically and retry without them when the schema lacks them.
+  const withStatus = 'anime_id,title,image,added_at,status,total_episodes';
+  const legacy = 'anime_id,title,image,added_at';
   try {
-    const { data, error } = await supabase
-      .from('bookmarks')
-      .select('anime_id,title,image,added_at')
-      .eq('user_id', userId)
-      .limit(2000);
+    const attempt = async (columns: string) =>
+      supabase.from('bookmarks').select(columns).eq('user_id', userId).limit(2000);
+    let { data, error } = await attempt(withStatus);
+    if (error && isMissingColumnError(error)) {
+      ({ data, error } = await attempt(legacy));
+    }
     if (error || !data) return [];
-    return data
-      .map((row) => toBookmark({ ...row, id: row.anime_id }))
+    const rows = data as unknown as Array<Record<string, unknown>>;
+    return rows
+      .map((row) => toBookmark({ ...row, id: row['anime_id'] }))
       .filter((row): row is BookmarkEntry => row !== null);
   } catch {
     return [];
   }
+}
+
+/** PostgREST "column does not exist" shape (schema predates a column). */
+function isMissingColumnError(error: unknown): boolean {
+  const code = (error as { code?: unknown })?.code;
+  if (code === '42703') return true;
+  const message = String((error as { message?: unknown })?.message ?? '');
+  return /column .* does not exist/i.test(message);
 }
 
 const mergedBookmarksUsers = new Set<string>();
@@ -217,6 +257,11 @@ export async function mergeBookmarksOnLogin(
           title: entry.title || '',
           image: entry.image || '',
           added_at: entry.added_at ?? Date.now(),
+          // New local rows land as PLANNING unless a status is known;
+          // the column may not exist yet — a missing-column failure must
+          // not break the merge (union still lands locally below).
+          status: entry.status ?? statusForNewBookmark(),
+          total_episodes: entry.total_episodes ?? null,
         })),
         { onConflict: 'user_id,anime_id' },
       );
@@ -244,19 +289,66 @@ export async function upsertBookmarkRow(
   userId: string,
   entry: BookmarkEntry,
 ): Promise<void> {
+  const payload: Record<string, unknown> = {
+    user_id: userId,
+    anime_id: entry.id,
+    title: entry.title || '',
+    image: entry.image || '',
+    added_at: entry.added_at ?? Date.now(),
+  };
+  // Status columns postdate older projects: try with them, fall back to
+  // the legacy shape when the schema lacks them.
+  const withStatus = {
+    ...payload,
+    status: entry.status ?? statusForNewBookmark(),
+    total_episodes: entry.total_episodes ?? null,
+  };
   try {
-    await supabase.from('bookmarks').upsert(
-      {
-        user_id: userId,
-        anime_id: entry.id,
-        title: entry.title || '',
-        image: entry.image || '',
-        added_at: entry.added_at ?? Date.now(),
-      },
-      { onConflict: 'user_id,anime_id' },
-    );
+    const first = await supabase
+      .from('bookmarks')
+      .upsert(withStatus, { onConflict: 'user_id,anime_id' });
+    if (first.error && isMissingColumnError(first.error)) {
+      await supabase
+        .from('bookmarks')
+        .upsert(payload, { onConflict: 'user_id,anime_id' });
+    }
   } catch {
     // keep the local mirror usable when the cloud request is unavailable
+  }
+}
+
+/**
+ * Persist a list-status transition (watch-event auto-advance or explicit
+ * user action). Updates the local union optimistically, then the server
+ * row (title/image/total preserved). No-op for guests (LS is the truth).
+ */
+export async function setBookmarkStatus(
+  userId: string | null,
+  animeId: number,
+  status: ListStatus,
+  totalEpisodes?: number | null,
+): Promise<void> {
+  if (!Number.isFinite(animeId) || animeId <= 0) return;
+  const local = readLocalBookmarks();
+  const existing = local.find((entry) => entry.id === animeId);
+  if (!existing) return; // only bookmarked titles carry a status
+  if (existing.status === status) return;
+  const next = local.map((entry) =>
+    entry.id === animeId
+      ? {
+          ...entry,
+          status,
+          total_episodes:
+            totalEpisodes ?? entry.total_episodes ?? null,
+        }
+      : entry,
+  );
+  writeLocalBookmarks(next);
+  if (!userId) return;
+  try {
+    await upsertBookmarkRow(userId, next.find((entry) => entry.id === animeId)!);
+  } catch {
+    // local status already applied; cloud sync retries on next merge
   }
 }
 
@@ -362,6 +454,9 @@ export async function upsertHistoryRows(
  * Runs once per user per session.
  */
 export async function mergeHistoryOnLogin(userId: string): Promise<void> {
+  // Heal first: suffixed-only watches must join the union before the
+  // server diff, or they'd upload as local-only rows AND stay invisible.
+  healUnifiedHistory();
   const localRows = readLocalHistoryRows();
   const serverRows = await fetchServerHistoryRows(userId);
 
@@ -754,7 +849,7 @@ async function anilistBatchDetail(
     .map((_, index) => `$id${index}: Int!`)
     .join(', ')}) { ${fields.join('\n')} }`;
   try {
-    const response = await fetch('https://graphql.anilist.co', {
+    const response = await fetch('https://graphql.aniraku.tech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, variables }),
@@ -1014,6 +1109,10 @@ export interface ImportResult {
   scores?: number;
   unmapped?: number;
   limited?: boolean;
+  /** Per-status title counts, when the backend reports them. */
+  statuses?: Record<string, number>;
+  /** Existing rows whose list status the import refreshed. */
+  statuses_updated?: number;
 }
 
 export interface ExportResult {
@@ -1023,6 +1122,8 @@ export interface ExportResult {
   skipped?: number;
   failed?: number;
   limited?: boolean;
+  /** Per-status title counts, when the backend reports them. */
+  statuses?: Record<string, number>;
 }
 
 export async function importProviderList(
@@ -1107,6 +1208,10 @@ export function describeImport(r: ImportResult | null | undefined): string {
   if ((r.episodes ?? 0) > 0) parts.push(`${r.episodes} episodes of progress`);
   if ((r.scores ?? 0) > 0) parts.push(`${r.scores} scores`);
   if ((r.unmapped ?? 0) > 0) parts.push(`${r.unmapped} had no Aniraku match`);
+  const statusLine = describeStatusBreakdown(r.statuses);
+  if (statusLine) parts.push(statusLine);
+  if ((r.statuses_updated ?? 0) > 0)
+    parts.push(`${r.statuses_updated} statuses refreshed`);
   if (r.limited) parts.push('more episodes remain — import again to continue');
   return parts.join(' · ') || 'Nothing new to import';
 }
@@ -1117,10 +1222,27 @@ export function describeExport(r: ExportResult | null | undefined): string {
   const parts: string[] = [];
   if ((r.exported ?? 0) > 0) parts.push(`${r.exported} titles updated`);
   if ((r.scores ?? 0) > 0) parts.push(`${r.scores} scores`);
-  if ((r.skipped ?? 0) > 0) parts.push(`${r.skipped} already completed`);
+  // Skipped = provider already matched our status + progress (not merely
+  // "completed") — see the backend diff-then-write.
+  if ((r.skipped ?? 0) > 0) parts.push(`${r.skipped} already up to date`);
   if ((r.failed ?? 0) > 0) parts.push(`${r.failed} failed`);
+  const statusLine = describeStatusBreakdown(r.statuses);
+  if (statusLine) parts.push(statusLine);
   if (r.limited) parts.push('more titles remain — export again to continue');
   return parts.join(' · ') || 'Nothing to export';
+}
+
+/** "3 Watching · 2 Plan to Watch" style breakdown for import/export. */
+function describeStatusBreakdown(
+  statuses: Record<string, number> | null | undefined,
+): string {
+  if (!statuses || typeof statuses !== 'object') return '';
+  const parts: string[] = [];
+  for (const status of LIST_STATUSES) {
+    const count = Math.floor(Number(statuses[status] ?? 0)) || 0;
+    if (count > 0) parts.push(`${count} ${LIST_STATUS_LABELS[status]}`);
+  }
+  return parts.join(' · ');
 }
 
 // ── Background export runner (rate-limited, Supabase-notified) ──

@@ -53,6 +53,7 @@ import {
   updateSyncScore,
 } from '../lib/episodeRatings';
 import { resolveDisplayTitle } from '../lib/displayLanguage';
+import { recordWatchEvent } from '../lib/watchEvents';
 // Item 1 (NSFW gate) — Aniraku Watch.jsx:1520/:5578.
 import { isNsfw, useNsfw } from '../hooks/useNsfw';
 // Runtime SEO (SEO layer) — old setWatchSEO (seo.js:190-260) via shared helper.
@@ -1043,42 +1044,16 @@ const WatchInner: React.FC = () => {
   );
 
   // TODO SAVE TO LOCAL STORAGE NAVIGATED/CLICKED EPISODES
-  // Skipped entirely while history recording is paused — resume keys
-  // (last-watched-*) stay ungated so playback position still resumes.
+  // Single unified writer (lib/watchEvents): writes the suffixed AND the
+  // unified `watched-episodes` stores together, stamps the per-episode
+  // watch time, and advances the bookmark status. Returns false while
+  // history recording is paused (freeze-everything semantics) — resume
+  // keys (last-watched-*) stay ungated so playback position still resumes.
   const updateWatchedEpisodes = (episode: Episode) => {
-    if (isHistoryPaused()) return;
-    const watchedEpisodesJson = localStorage.getItem(
-      LOCAL_STORAGE_KEYS.WATCHED_EPISODES + animeId,
-    );
-    const watchedEpisodes: Episode[] = watchedEpisodesJson
-      ? JSON.parse(watchedEpisodesJson)
-      : [];
-    if (!watchedEpisodes.some((ep) => ep.id === episode.id)) {
-      watchedEpisodes.push(episode);
-      localStorage.setItem(
-        LOCAL_STORAGE_KEYS.WATCHED_EPISODES + animeId,
-        JSON.stringify(watchedEpisodes),
-      );
-      // Mirror into the UNIFIED `watched-episodes` record (EpisodeList's
-      // dual-write shape). The history row builder + the watch_history
-      // upload engine only see anime present in THAT store — without this
-      // key the playback position saved by the player never reaches
-      // Supabase, so server-first resume stays stale on other devices.
-      try {
-        const idKey = String(animeId); // mirrors the suffixed-key coercion
-        const record = JSON.parse(
-          localStorage.getItem('watched-episodes') || '{}',
-        );
-        const list = Array.isArray(record[idKey]) ? record[idKey] : [];
-        if (!list.some((ep: Episode) => ep.id === episode.id)) {
-          list.push(episode);
-          record[idKey] = list;
-          localStorage.setItem('watched-episodes', JSON.stringify(record));
-        }
-      } catch {
-        // Unified record unreadable — the suffixed store is already written.
-      }
-    }
+    if (!animeId) return;
+    recordWatchEvent(animeId, episode, {
+      totalEpisodes: episodes.length > 0 ? episodes.length : null,
+    });
   };
 
   // GAP 4 (Item 1) — record the CURRENT episode on first GENUINE playback.
@@ -1451,7 +1426,11 @@ const WatchInner: React.FC = () => {
     };
 
     // TODO Last visited cache to order continue watching
+    // Frozen while history recording is paused (freeze-everything
+    // semantics): a paused visit must not reorder History / Continue
+    // Watching or revive timestamps.
     const updateLastVisited = () => {
+      if (isHistoryPaused()) return;
       if (!animeInfo || !animeId) return; // TODO Ensure both animeInfo and animeId are available
 
       const lastVisited = localStorage.getItem(

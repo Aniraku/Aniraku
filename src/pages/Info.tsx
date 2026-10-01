@@ -623,7 +623,7 @@ const fetchSupplementary = async (
   id: string,
 ): Promise<SupplementaryInfo | null> => {
   try {
-    const res = await fetch('https://graphql.anilist.co', {
+    const res = await fetch('https://graphql.aniraku.tech', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

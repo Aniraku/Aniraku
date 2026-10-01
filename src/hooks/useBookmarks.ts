@@ -11,6 +11,7 @@ import {
   upsertBookmarkRow,
   writeLocalBookmarks,
 } from '../lib/sync';
+import { statusForNewBookmark } from '../lib/listStatus';
 
 // ---------------------------------------------------------------------------
 // useBookmarks — local-first bookmark store with merge-on-login Supabase
@@ -142,6 +143,9 @@ export function useBookmarks(): UseBookmarksResult {
               title: entry.title ?? '',
               image: entry.image ?? '',
               added_at: Date.now(),
+              // Brand-new bookmarks start as Plan to Watch; the first
+              // watch event advances them to Watching (hidden mechanism).
+              status: statusForNewBookmark(),
             },
           ];
 
@@ -161,6 +165,7 @@ export function useBookmarks(): UseBookmarksResult {
             title: entry.title ?? '',
             image: entry.image ?? '',
             added_at: Date.now(),
+            status: statusForNewBookmark(),
           });
         }
       } catch {

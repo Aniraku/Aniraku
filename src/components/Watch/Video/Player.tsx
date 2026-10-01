@@ -2183,6 +2183,8 @@ export function Player({
 
     const saveIframeProgress = (time: number, duration: number) => {
       if (!episodeKey || duration <= 0) return;
+      // Frozen while history recording is paused (see HLS saver above).
+      if (isHistoryPaused()) return;
       const playbackPercentage = (time / duration) * 100;
       iframeProgressRef.current = {
         ...iframeProgressRef.current,
@@ -3688,6 +3690,9 @@ export function Player({
         }
         if (now - lastSave < 10_000) return;
         lastSave = now;
+        // Frozen while history recording is paused (freeze-everything
+        // semantics): position still renders in-session, nothing persists.
+        if (isHistoryPaused()) return;
         const allPlaybackInfo = JSON.parse(
           localStorage.getItem('all_episode_times') || '{}',
         );
