@@ -1111,6 +1111,8 @@ export interface ImportResult {
   limited?: boolean;
   /** Per-status title counts, when the backend reports them. */
   statuses?: Record<string, number>;
+  /** Existing rows whose list status the import refreshed. */
+  statuses_updated?: number;
 }
 
 export interface ExportResult {
@@ -1208,6 +1210,8 @@ export function describeImport(r: ImportResult | null | undefined): string {
   if ((r.unmapped ?? 0) > 0) parts.push(`${r.unmapped} had no Aniraku match`);
   const statusLine = describeStatusBreakdown(r.statuses);
   if (statusLine) parts.push(statusLine);
+  if ((r.statuses_updated ?? 0) > 0)
+    parts.push(`${r.statuses_updated} statuses refreshed`);
   if (r.limited) parts.push('more episodes remain — import again to continue');
   return parts.join(' · ') || 'Nothing new to import';
 }
