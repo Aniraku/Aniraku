@@ -13,6 +13,10 @@ import {
   subscribeToWatchHistory,
 } from '../../lib/watchHistory';
 import {
+  episodeWatchTime,
+  mostRecentEpisode,
+} from '../../lib/episodeWatchTimes';
+import {
   ensureDataSync,
   fetchServerHistoryRows,
   forgetSyncedAnime,
@@ -334,13 +338,29 @@ export const EpisodeCard: React.FC = () => {
         };
 
         for (const [animeId, episodes] of Object.entries(allEpisodes)) {
-          const lastEpisode = episodes[episodes.length - 1];
+          // Most-recently-watched by per-episode timestamp (rewatches move
+          // the card), NOT array tail — tail order breaks on rewatch and
+          // on merge-order. Falls back to array tail when no stamp exists.
+          const numbers = episodes
+            .map((ep) => Math.floor(Number(ep?.number)) || 0)
+            .filter((n) => n > 0);
+          const recentNumber = mostRecentEpisode(animeId, numbers);
+          const lastEpisode =
+            (recentNumber !== null
+              ? episodes.find(
+                  (ep) => Math.floor(Number(ep?.number)) === recentNumber,
+                )
+              : undefined) ?? episodes[episodes.length - 1];
           if (!lastEpisode) continue;
 
           const visit = lastVisitedData[animeId] ?? {};
           const animeTitle = visit.titleEnglish || visit.titleRomaji || '';
+          const episodeId =
+            typeof lastEpisode.id === 'string' && lastEpisode.id
+              ? lastEpisode.id
+              : `${animeId}-episode-${Math.floor(Number(lastEpisode.number)) || 0}`;
           const playbackPercentage =
-            playbackInfo[lastEpisode.id]?.playbackPercentage ||
+            playbackInfo[episodeId]?.playbackPercentage ||
             playbackInfo[`${animeId}-episode-${lastEpisode.number}`]
               ?.playbackPercentage ||
             0;
@@ -353,7 +373,11 @@ export const EpisodeCard: React.FC = () => {
             animeTitle,
             episodeTitle: lastEpisode.title ? ` - ${lastEpisode.title}` : '',
             percentage: playbackPercentage,
-            timestamp: Number(visit.timestamp) || 0,
+            timestamp:
+              Math.max(
+                episodeWatchTime(animeId, lastEpisode.number),
+                Number(visit.timestamp) || 0,
+              ),
             local: true,
             watchPath: watchPathFor(
               {

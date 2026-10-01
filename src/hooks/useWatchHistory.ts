@@ -13,6 +13,10 @@ import {
   removeAnimeFromServer,
   subscribeToWatchHistory,
 } from '../lib/watchHistory';
+import {
+  episodeWatchTime,
+  mostRecentEpisode,
+} from '../lib/episodeWatchTimes';
 
 /**
  * Local watch-history aggregation for the /history page.
@@ -153,10 +157,32 @@ function buildEntries(
 
   for (const [animeId, episodes] of Object.entries(watched)) {
     if (!Array.isArray(episodes) || episodes.length === 0) continue;
-    // Episodes are appended as they are watched, so the last one is the
-    // most recently watched (same rule EpisodeCard uses for Continue Watching).
-    const episode = episodes[episodes.length - 1] as Episode | undefined;
-    if (!episode || typeof episode !== 'object' || typeof episode.id !== 'string') continue;
+    // Most-recently-watched by per-episode timestamp (rewatches move the
+    // card), NOT array tail — tail order breaks on rewatch and on
+    // merge-order. Falls back to array tail only when no stamp exists
+    // (pre-timestamp installs healed without times).
+    const numbers = episodes
+      .map((ep) =>
+        ep && typeof ep === 'object' ? Math.floor(Number(ep.number)) || 0 : 0,
+      )
+      .filter((n) => n > 0);
+    const recentNumber = mostRecentEpisode(animeId, numbers);
+    const episode =
+      (recentNumber !== null
+        ? episodes.find(
+            (ep) =>
+              ep &&
+              typeof ep === 'object' &&
+              Math.floor(Number(ep.number)) === recentNumber,
+          )
+        : undefined) ??
+      episodes[episodes.length - 1] as Episode | undefined;
+    if (!episode || typeof episode !== 'object') continue;
+    const episodeId =
+      typeof episode.id === 'string' && episode.id
+        ? episode.id
+        : `${animeId}-episode-${Math.floor(Number(episode.number)) || 0}`;
+    if (!episodeId) continue;
 
     const visit = lastVisited[animeId] ?? {};
     const titleEnglish = typeof visit.titleEnglish === 'string' ? visit.titleEnglish : '';
@@ -165,7 +191,7 @@ function buildEntries(
     const episodeNumber = typeof episode.number === 'number' ? episode.number : 0;
 
     const playbackEntry =
-      playback[episode.id] ?? playback[`${animeId}-episode-${episodeNumber}`] ?? null;
+      playback[episodeId] ?? playback[`${animeId}-episode-${episodeNumber}`] ?? null;
     const rawPercentage = Number(playbackEntry?.playbackPercentage ?? 0);
     const percentage =
       Number.isFinite(rawPercentage) && rawPercentage > 0 ? rawPercentage : 0;
@@ -175,19 +201,22 @@ function buildEntries(
         : null;
 
     entries.push({
-      id: `local:${animeId}:${episode.id || 'unknown-ep'}`,
+      id: `local:${animeId}:${episodeId || 'unknown-ep'}`,
       mergeKey: `${animeId}:${episodeNumber}`,
       animeId,
-      episodeId: episode.id,
-      episode,
+      episodeId,
+      episode: { ...episode, id: episodeId },
       displayTitle,
       titleEnglish,
       titleRomaji,
       poster: episode.image ?? '',
       lastWatched:
-        typeof visit.timestamp === 'number' && Number.isFinite(visit.timestamp)
-          ? visit.timestamp
-          : 0,
+        Math.max(
+          episodeWatchTime(animeId, episodeNumber),
+          typeof visit.timestamp === 'number' && Number.isFinite(visit.timestamp)
+            ? visit.timestamp
+            : 0,
+        ),
       airTime: parseAirTime(episode.airDate),
       playback: { percentage, currentTime },
       watchPath: buildWatchPath(animeId, episodeNumber, visit),
