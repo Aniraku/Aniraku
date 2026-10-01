@@ -35,7 +35,7 @@ export function proxiedMediaUrl(
   return `${ANIRAKU_BASE}api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
 }
 
-const ANILIST_GRAPHQL = 'https://graphql.aniraku.tech';
+const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
 // Module-level AniList availability signal for the global outage banner.
 function reportAnilistStatus(unavailable: boolean): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }));
