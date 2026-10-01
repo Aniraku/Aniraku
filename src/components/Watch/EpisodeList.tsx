@@ -17,6 +17,7 @@ import {
   faEyeSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import { Episode } from '../../index';
+import { recordWatchEvent } from '../../lib/watchEvents';
 
 // Live `hideSpoiler` pref ("Hide Spoilers" — blocks episode images behind a
 // HIDDEN SPOILER overlay). StoredSettings keeps it internal to the settings
@@ -53,27 +54,9 @@ function writeHideSpoilerPref(value: boolean): void {
   }
 }
 
-// Live local-history gate: when the user paused history recording, skip
-// persisting watched-episodes (checkmark state still updates in-session).
-// Pref is written by useWatchHistory's writePref as either the
-// `historyPaused` field of the `aniraku:watching` record or (legacy) as a
-// JSON boolean under `aniraku:watching:history-paused`.
-const isHistoryPaused = (): boolean => {
-  try {
-    const record = localStorage.getItem('aniraku:watching');
-    if (record) {
-      const parsed = JSON.parse(record);
-      if (parsed && typeof parsed.historyPaused === 'boolean') {
-        return parsed.historyPaused;
-      }
-    }
-    const legacy = localStorage.getItem('aniraku:watching:history-paused');
-    if (legacy !== null) return JSON.parse(legacy) === true;
-  } catch {
-    // Malformed record — treat as not paused.
-  }
-  return false;
-};
+// Pause contract: the unified writer (lib/watchEvents) owns the
+// history-paused check — checkmark state still updates in-session while
+// paused, storage never does.
 
 interface Props {
   animeId: string | undefined;
@@ -345,16 +328,9 @@ export const EpisodeList: React.FC<Props> = ({
 
   const [selectionInitiatedByUser, setSelectionInitiatedByUser] =
     useState(false);
-  // Update local storage when watched episodes change (skipped while the
-  // user's history recording is paused).
-  useEffect(() => {
-    if (animeId && watchedEpisodes.length > 0 && !isHistoryPaused()) {
-      localStorage.setItem(
-        `watched-episodes-${animeId}`,
-        JSON.stringify(watchedEpisodes),
-      );
-    }
-  }, [animeId, watchedEpisodes]);
+  // The unified writer (recordWatchEvent, called from markEpisodeAsWatched)
+  // persists BOTH the suffixed and unified stores, so no persistence
+  // effect is needed here — state is checkmark truth only.
   // Load watched episodes from local storage when animeId changes
   useEffect(() => {
     if (animeId) {
@@ -371,7 +347,10 @@ export const EpisodeList: React.FC<Props> = ({
   }, [animeId]);
 
   // Function to handle episode selection
-  // Function to mark an episode as watched
+  // Function to mark an episode as watched — state drives the checkmarks;
+  // persistence flows through the unified writer (both stores + timestamp
+  // + bookmark status). The writer is pause-gated, so a paused click only
+  // flips the in-session checkmark, never storage.
   const markEpisodeAsWatched = useCallback(
     (id: string) => {
       if (animeId) {
@@ -386,19 +365,9 @@ export const EpisodeList: React.FC<Props> = ({
             );
             if (selectedEpisode) {
               updatedWatchedEpisodes.push(selectedEpisode);
-              // Update the watched episodes object in local storage
-              // (skipped while history recording is paused).
-              if (!isHistoryPaused()) {
-                localStorage.setItem(
-                  'watched-episodes',
-                  JSON.stringify({
-                    ...JSON.parse(
-                      localStorage.getItem('watched-episodes') || '{}',
-                    ),
-                    [animeId]: updatedWatchedEpisodes,
-                  }),
-                );
-              }
+              recordWatchEvent(animeId, selectedEpisode, {
+                totalEpisodes: episodes.length > 0 ? episodes.length : null,
+              });
               return updatedWatchedEpisodes;
             }
           }

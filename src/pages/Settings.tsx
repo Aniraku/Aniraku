@@ -43,6 +43,7 @@ import {
   type BookmarkEntry,
   type SyncStatus,
 } from '../lib/sync';
+import { EPISODE_WATCH_TIMES_KEY } from '../lib/episodeWatchTimes';
 
 // ---------------------------------------------------------------------------
 // Settings — page module (mirrors the visual language of the settings modal
@@ -776,12 +777,30 @@ export const Settings: React.FC = () => {
     setClearing('history');
     try {
       // Snapshot the native stores (raw strings so restore is byte-exact)
-      // plus the normalized rows for the server-side reinsert.
+      // plus the normalized rows for the server-side reinsert. Suffixed
+      // per-anime keys and the per-episode timestamp map are included so
+      // Undo restores History exactly (clearWatchHistory drops them too).
       const snapshotKeys: string[] = [
         ...Object.values(LOCAL_HISTORY_KEYS),
         EPISODE_TRACK_KEY,
         'aniraku-episode-track',
+        EPISODE_WATCH_TIMES_KEY,
       ];
+      try {
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            key.startsWith(`${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-`) &&
+            key !== LOCAL_HISTORY_KEYS.WATCHED_EPISODES &&
+            !snapshotKeys.includes(key)
+          ) {
+            snapshotKeys.push(key);
+          }
+        }
+      } catch {
+        // storage unavailable — static keys still snapshot below
+      }
       const raw: Record<string, string | null> = {};
       for (const key of snapshotKeys) {
         try {
@@ -873,6 +892,8 @@ export const Settings: React.FC = () => {
               title: entry.title || '',
               image: entry.image || '',
               added_at: entry.added_at ?? Date.now(),
+              status: entry.status ?? 'PLANNING',
+              total_episodes: entry.total_episodes ?? null,
             })),
             { onConflict: 'user_id,anime_id' },
           );
