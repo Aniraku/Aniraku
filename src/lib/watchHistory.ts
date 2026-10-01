@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { stampEpisodeWatch, clearEpisodeWatches } from './episodeWatchTimes';
 
 // ---------------------------------------------------------------------------
 // Local watch-history shape + merge helpers — TS port of Aniraku
@@ -255,6 +256,93 @@ function readLegacyRows(): HistoryRow[] {
  * All local history rows (native + legacy), deduped by `animeId:episode`
  * with the shared merge precedence.
  */
+/**
+ * Heal the unified `watched-episodes` record from the suffixed
+ * `watched-episodes-{animeId}` keys.
+ *
+ * History / Continue Watching / the sync engine read ONLY the unified
+ * record, while Info checkmarks and older write paths also maintained
+ * per-anime suffixed keys — any episode present in a suffixed key but
+ * missing from the unified record made its anime vanish from History.
+ * This unions every suffixed key into the unified record (dedupe by
+ * episode id, then number), so pre-heal watches reappear. Runs once at
+ * boot (main.tsx) and at the start of merge-on-login. Returns the
+ * number of episodes healed.
+ */
+export function healUnifiedHistory(): number {
+  let healed = 0;
+  try {
+    const unified = readJSON<Record<string, NativeEpisode[]>>(
+      LOCAL_HISTORY_KEYS.WATCHED_EPISODES,
+      {},
+    );
+    let dirty = false;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (
+        key &&
+        key.startsWith(`${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-`) &&
+        key !== LOCAL_HISTORY_KEYS.WATCHED_EPISODES
+      ) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      const animeId = key.slice(LOCAL_HISTORY_KEYS.WATCHED_EPISODES.length + 1);
+      if (!animeId) continue;
+      let suffixed: unknown;
+      try {
+        suffixed = JSON.parse(localStorage.getItem(key) || '[]');
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(suffixed) || suffixed.length === 0) continue;
+      const list = Array.isArray(unified[animeId]) ? unified[animeId] : [];
+      const seenIds = new Set(
+        list
+          .map((e) => String(e?.id ?? ''))
+          .filter((id) => id.length > 0),
+      );
+      const seenNumbers = new Set(
+        list
+          .map((e) => Math.floor(Number(e?.number)) || 0)
+          .filter((n) => n > 0),
+      );
+      for (const raw of suffixed) {
+        if (!raw || typeof raw !== 'object') continue;
+        const entry = raw as Record<string, unknown>;
+        const number = Math.floor(Number(entry.number));
+        if (!Number.isFinite(number) || number <= 0) continue;
+        const id = String(entry.id ?? '').trim() || `${animeId}-episode-${number}`;
+        if (seenIds.has(id) || seenNumbers.has(number)) continue;
+        seenIds.add(id);
+        seenNumbers.add(number);
+        list.push({
+          id,
+          title: String(entry.title ?? ''),
+          description:
+            typeof entry.description === 'string' ? entry.description : null,
+          number,
+          image: String(entry.image ?? ''),
+          imageHash: String(entry.imageHash ?? ''),
+          airDate: typeof entry.airDate === 'string' ? entry.airDate : null,
+        });
+        healed += 1;
+        dirty = true;
+      }
+      if (Array.isArray(unified[animeId]) === false && list.length > 0) {
+        unified[animeId] = list;
+        dirty = true;
+      }
+    }
+    if (dirty) writeJSON(LOCAL_HISTORY_KEYS.WATCHED_EPISODES, unified);
+  } catch {
+    // storage unavailable — nothing to heal
+  }
+  return healed;
+}
+
 export function readLocalHistoryRows(): HistoryRow[] {
   const byKey = new Map<string, HistoryRow>();
   const add = (row: HistoryRow) => {
@@ -343,6 +431,14 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
         eps.push(synth);
       }
       watchedDirty = true;
+    }
+
+    // --- per-episode watch time (History / Continue Watching "latest") --
+    // Server rows carry per-episode timestamps: fold them in so the
+    // most-recently-watched pick works cross-device. Never lowers a
+    // newer local stamp (stampEpisodeWatch is max-only).
+    if (row.timestamp > 0) {
+      stampEpisodeWatch(animeId, row.episode_number, row.timestamp);
     }
 
     // --- last visit -------------------------------------------------------
@@ -608,6 +704,21 @@ export async function clearWatchHistory(
     localStorage.removeItem(LOCAL_HISTORY_KEYS.WATCHED_EPISODES);
     localStorage.removeItem(LOCAL_HISTORY_KEYS.LAST_ANIME_VISITED);
     localStorage.removeItem(LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK);
+    // Suffixed per-anime keys (Info checkmarks) + per-episode timestamps:
+    // leaving them would resurrect History cards on the next heal/read.
+    const suffixed: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (
+        key &&
+        key.startsWith(`${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-`) &&
+        key !== LOCAL_HISTORY_KEYS.WATCHED_EPISODES
+      ) {
+        suffixed.push(key);
+      }
+    }
+    for (const key of suffixed) localStorage.removeItem(key);
+    clearEpisodeWatches();
   } catch {
     // storage unavailable
   }

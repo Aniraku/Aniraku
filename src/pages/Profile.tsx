@@ -43,6 +43,7 @@ import {
   type ExportJobStatus,
   type SyncStatus,
 } from '../lib/sync';
+import { normalizeListStatus, LIST_STATUSES, LIST_STATUS_LABELS, type ListStatus } from '../lib/listStatus';
 import ProviderIcon from '../components/ProviderIcon';
 import { showToast } from '../components/Toaster';
 import { infoPathFor } from '../utils/animePaths';
@@ -556,6 +557,7 @@ const BookmarkGrid = styled.div`
 `;
 
 const BookmarkCard = styled(Link)`
+  position: relative;
   overflow: hidden;
   background: var(--global-div-tr);
   border: 1px solid var(--global-border-color);
@@ -583,6 +585,43 @@ const BookmarkCard = styled(Link)`
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+`;
+
+// List-status filter chips + card badge (hidden bookmark mechanism,
+// surfaced read-only — status changes come from watch events/import).
+const StatusChipRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 14px;
+`;
+
+const StatusChip = styled.button<{ $active?: boolean }>`
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: ${({ $active }) => ($active ? '#fff' : 'var(--global-text)')};
+  cursor: pointer;
+  background: ${({ $active }) =>
+    $active ? 'var(--primary-accent)' : 'var(--global-div-tr)'};
+  border: 1px solid
+    ${({ $active }) => ($active ? 'var(--primary-accent)' : 'var(--global-border-color)')};
+  border-radius: 999px;
+`;
+
+const BookmarkStatusBadge = styled.span`
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid var(--global-border-color);
+  border-radius: 999px;
 `;
 
 const GuestPrompt = styled.div`
@@ -792,6 +831,8 @@ interface BookmarkEntry {
   id: number | string;
   title: string | null;
   image: string | null;
+  status?: ListStatus | null;
+  total_episodes?: number | null;
 }
 
 // Wave C — tab set (Aniraku Profile.jsx:354-360; History + Badges stay out
@@ -825,6 +866,9 @@ export const Profile: React.FC = () => {
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<'ok' | 'error'>('ok');
   const [bookmarks, setBookmarks] = useState<BookmarkEntry[]>([]);
+  // Hidden-mechanism statuses, surfaced as filter chips (null = pre-status
+  // rows, shown under All and counted as Watching).
+  const [bookmarkFilter, setBookmarkFilter] = useState<ListStatus | 'ALL'>('ALL');
   const [avatars, setAvatars] = useState<Avatar[]>(AVATAR_LIST);
 
   // Wave C — section tabs (Aniraku Profile.jsx:33 activeTab) + Library
@@ -903,15 +947,43 @@ export const Profile: React.FC = () => {
     }
     supabase
       .from('bookmarks')
-      .select('anime_id,title,image')
+      // `status` / `total_episodes` postdate older projects: the shared
+      // toBookmark normalizes their absence to null, and the select
+      // falls back below when the schema lacks the columns.
+      .select('anime_id,title,image,status,total_episodes')
       .eq('user_id', user.id)
       .then(
-        ({ data }) => {
-          const mapped: BookmarkEntry[] = (data || []).map(
-            (b: { anime_id: number; title: string; image: string }) => ({
-              id: b.anime_id,
-              title: b.title,
-              image: b.image,
+        ({ data, error }) => {
+          if (error && /column .* does not exist/i.test(error.message ?? '')) {
+            supabase
+              .from('bookmarks')
+              .select('anime_id,title,image')
+              .eq('user_id', user.id)
+              .then(
+                (fallback) => {
+                  const mapped: BookmarkEntry[] = ((fallback.data || []) as Array<Record<string, unknown>>).map(
+                    (b) => ({
+                      id: Number(b['anime_id']),
+                      title: String(b['title'] ?? ''),
+                      image: String(b['image'] ?? ''),
+                    }),
+                  );
+                  setBookmarks(mapped);
+                },
+                (err: unknown) => console.error('bookmarks fetch error:', err),
+              );
+            return;
+          }
+          const mapped: BookmarkEntry[] = ((data || []) as Array<Record<string, unknown>>).map(
+            (b: Record<string, unknown>) => ({
+              id: Number(b['anime_id']),
+              title: String(b['title'] ?? ''),
+              image: String(b['image'] ?? ''),
+              status: normalizeListStatus(b['status']),
+              total_episodes:
+                b['total_episodes'] === null || b['total_episodes'] === undefined
+                  ? null
+                  : Math.max(0, Math.floor(Number(b['total_episodes']))),
             }),
           );
           setBookmarks(mapped);
@@ -1305,23 +1377,56 @@ export const Profile: React.FC = () => {
                 <Link to='/'>Browse Anime</Link>
               </EmptyState>
             ) : (
-              <BookmarkGrid>
-                {bookmarks.map((b) => {
-                  const bookmarkTitle = b.title || `Anime ${b.id ?? ''}`.trim();
-                  return (
-                    <BookmarkCard
-                      key={String(b.id)}
-                      to={infoPathFor({
-                        id: b.id,
-                        title: { romaji: b.title || undefined },
-                      })}
-                    >
-                      {b.image && <img src={b.image} alt={bookmarkTitle} />}
-                      <p>{bookmarkTitle}</p>
-                    </BookmarkCard>
-                  );
-                })}
-              </BookmarkGrid>
+              <>
+                <StatusChipRow role='group' aria-label='Filter bookmarks by list status'>
+                  {(['ALL', ...LIST_STATUSES] as const).map((status) => {
+                    const count =
+                      status === 'ALL'
+                        ? bookmarks.length
+                        : bookmarks.filter(
+                            (b) => (b.status ?? 'CURRENT') === status,
+                          ).length;
+                    if (status !== 'ALL' && count === 0) return null;
+                    return (
+                      <StatusChip
+                        key={status}
+                        type='button'
+                        $active={bookmarkFilter === status}
+                        onClick={() => setBookmarkFilter(status)}
+                        aria-pressed={bookmarkFilter === status}
+                      >
+                        {status === 'ALL' ? 'All' : LIST_STATUS_LABELS[status]} · {count}
+                      </StatusChip>
+                    );
+                  })}
+                </StatusChipRow>
+                <BookmarkGrid>
+                  {bookmarks
+                    .filter(
+                      (b) =>
+                        bookmarkFilter === 'ALL' ||
+                        (b.status ?? 'CURRENT') === bookmarkFilter,
+                    )
+                    .map((b) => {
+                      const bookmarkTitle = b.title || `Anime ${b.id ?? ''}`.trim();
+                      return (
+                        <BookmarkCard
+                          key={String(b.id)}
+                          to={infoPathFor({
+                            id: b.id,
+                            title: { romaji: b.title || undefined },
+                          })}
+                        >
+                          {b.image && <img src={b.image} alt={bookmarkTitle} />}
+                          <BookmarkStatusBadge>
+                            {LIST_STATUS_LABELS[(b.status ?? 'CURRENT') as ListStatus]}
+                          </BookmarkStatusBadge>
+                          <p>{bookmarkTitle}</p>
+                        </BookmarkCard>
+                      );
+                    })}
+                </BookmarkGrid>
+              </>
             )}
           </ListSection>
         )}
@@ -1403,10 +1508,12 @@ export const Profile: React.FC = () => {
               <h3>Library</h3>
               <p style={libraryDescStyle}>
                 Move your list between Aniraku and your streaming accounts.
-                Import pulls a provider's library into Aniraku — favorites,
-                episode progress and scores (progress only advances, existing
-                ratings are kept). Export writes each title's current Aniraku
-                watch progress, completed status and average score there. Both
+                Import pulls a provider's library into Aniraku — favorites
+                with their list statuses (Watching, Plan to Watch,
+                Completed, …), episode progress and scores (progress only
+                advances, existing ratings are kept). Export writes each
+                title's current status, watch progress and average score
+                there, skipping titles that already match. Both
                 use the connection from{' '}
                 <Link
                   to='/profile/settings'
@@ -1504,9 +1611,9 @@ export const Profile: React.FC = () => {
                       <ConfirmBox>
                         <p>
                           Add your Aniraku favorites to your{' '}
-                          {PROVIDER_LABELS[provider]} library, preserving watch
-                          progress, completed status and scores?
-                          Already-completed titles are skipped.
+                          {PROVIDER_LABELS[provider]} library, preserving list
+                          status, watch progress and scores?
+                          Titles that already match are skipped.
                         </p>
                         <BtnRow>
                           <SmallBtn
