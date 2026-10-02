@@ -45,12 +45,6 @@ Aniraku keeps discovery, playback, watch history, ratings, bookmarks, comments, 
 The main flow is:
 
 `discover` → `watch` → `remember`
-
-> [!IMPORTANT]
-> This branch uses a **publicly hosted Anilist offline database** for metadata with **no rate limits**.
->
-> - **Anilist Mirror Graphql With Same Anilist Endpoint:** [Mirror](https://graphql.aniraku.tech)
-> - **GitHub Repository:** [Shoislam0311/anilist-offline-db](https://github.com/Shoislam0311/anilist-offline-db)
 ## Open the project
 
 <a href="https://www.aniraku.tech/"><img src="https://img.shields.io/badge/OPEN%20ANIRAKU-Visit%20the%20live%20site-3B82F6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open Aniraku live site" /></a>
