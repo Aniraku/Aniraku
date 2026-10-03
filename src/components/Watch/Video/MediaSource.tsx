@@ -47,6 +47,20 @@ interface MediaSourceProps {
   episodeFiller?: boolean;
   /** AniList id — required by the report modal (live disables without it). */
   anilistId?: string | number | null;
+  /**
+   * True once the server pools settled for THIS episode. Until then both
+   * language options render (today's behaviour) so the menu never looks
+   * empty mid-load; after that, absent languages are hidden, not greyed.
+   */
+  serversReady?: boolean;
+  /**
+   * Actually-playing server key (fallback tracking, display-only): the
+   * picker highlights this instead of the manual selection while set.
+   * Null = follow the selection.
+   */
+  activeServerKey?: string | null;
+  /** True when playback arrived via automatic fallback — shows AUTO. */
+  autoPlaying?: boolean;
 }
 
 // lyfa9_1 — container: flex row, gap 1rem, centered; column under 1000px.
@@ -525,6 +539,21 @@ const ItemCheck = styled.span`
   color: var(--primary-accent);
 `;
 
+// Fallback-tracking badge: shown beside the server picker while playback
+// arrived via automatic fallback (silent by user choice — badge only).
+const AutoTag = styled.span`
+  align-self: center;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-transform: uppercase;
+  color: var(--primary-accent);
+  border: 1px solid var(--primary-accent);
+  border-radius: 999px;
+  white-space: nowrap;
+`;
+
 const isEmbedServer = (s: any) =>
   (s?.sources ?? []).some((src: any) => src?.type === 'embed');
 
@@ -670,6 +699,9 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
   totalEpisodes = 0,
   episodeFiller = false,
   anilistId,
+  serversReady = true,
+  activeServerKey = null,
+  autoPlaying = false,
 }) => {
   const [copyState, setCopyState] = useState<
     'idle' | 'copying' | 'copied' | 'error'
@@ -715,7 +747,10 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     return badges;
   };
 
-  // Language options (Sub/Dub) — disabled when this episode has no servers.
+  // Language options (Sub/Dub) — once the pools settle for this episode,
+  // absent languages are hidden outright (sub-only shows Sub, dub-only
+  // shows Dub). While loading, or when neither side has servers, both
+  // render (disabled as needed) so the trigger never goes empty.
   const languageOptions: SelectOption[] = [
     {
       value: 'sub',
@@ -730,6 +765,11 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
       disabled: !langAvailable.dub,
     },
   ];
+  const visibleLanguageOptions = (() => {
+    if (!serversReady) return languageOptions;
+    const shown = languageOptions.filter((o) => langAvailable[o.value]);
+    return shown.length > 0 ? shown : languageOptions;
+  })();
 
   // Server options for the CURRENT language (direct first, embed after),
   // values keyed `${lang}:${name}` so selection can never flip pools.
@@ -739,6 +779,15 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     icon: <FaServer />,
     tags: badgesFor(s),
   }));
+
+  // Picker display truth: the manual selection, unless fallback tracking
+  // reports something actually playing. The check mark + trigger both read
+  // this key, so an auto-switched server visibly takes over the list.
+  const fallbackServerKey =
+    selectedServer && selectedServer.startsWith(`${currentLang}:`)
+      ? selectedServer
+      : serverKey(currentLang, langServers[0]?.name ?? '');
+  const displayServerKey = activeServerKey ?? fallbackServerKey;
 
   const handleLanguageChange = (value: string) => {
     const next = value === 'dub' ? 'dub' : 'sub';
@@ -822,23 +871,29 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
                 <DropdownGroup>
                   <SelectDropdown
                     value={currentLang}
-                    options={languageOptions}
+                    options={visibleLanguageOptions}
                     onChange={handleLanguageChange}
                     ariaLabel='Language'
                     menuAlign='left'
                   />
                   <RowDivider />
                   <SelectDropdown
-                    value={
-                      selectedServer &&
-                      selectedServer.startsWith(`${currentLang}:`)
-                        ? selectedServer
-                        : serverKey(currentLang, langServers[0]?.name ?? '')
-                    }
+                    value={displayServerKey}
                     options={serverOptions}
                     onChange={handleServerChange}
                     ariaLabel='Server'
                   />
+                  {autoPlaying && (
+                    <AutoTag
+                      title={
+                        activeServerKey
+                          ? 'Playing via automatic fallback'
+                          : 'Playing via automatic fallback (source not listed)'
+                      }
+                    >
+                      AUTO
+                    </AutoTag>
+                  )}
                 </DropdownGroup>
               </ServerColumn>
             </TitleRow>

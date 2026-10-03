@@ -737,6 +737,12 @@ const WatchInner: React.FC = () => {
   const [serversSub, setServersSub] = useState<any[]>([]);
   const [serversDub, setServersDub] = useState<any[]>([]);
   const [selectedServer, setSelectedServer] = useState('');
+  // Actually-playing server display (fallback tracking): the picker
+  // highlights this key when set, falling back to selectedServer when
+  // null. Display-only — selection state is never rewritten, so no
+  // re-resolve loop is possible. autoPlaying badges unmatchable streams.
+  const [activeServerKey, setActiveServerKey] = useState<string | null>(null);
+  const [autoPlaying, setAutoPlaying] = useState(false);
   // Episode stamp for the pools above: `poolEpKey` is written only when a
   // fetch SETTLES, so the player gate can never boot off another episode's
   // stale server list (the reported wrong-source/restart race).
@@ -748,6 +754,12 @@ const WatchInner: React.FC = () => {
       readStoredPref(getLanguageKey(animeId), legacyLanguageKey(animeId)) ||
       'sub',
   );
+  // Auto language fallback: when pools settle for an episode and the
+  // current language has zero playable servers while the other one does,
+  // playback flips to the available language. The ref marks the flip so
+  // the persist effect below skips it — a sub-only episode must not
+  // overwrite the user's saved Dub preference (and vice versa).
+  const autoLangFallbackRef = useRef(false);
   const [downloadLink, setDownloadLink] = useState('');
   // Live theater + lights state (toggled ONLY through the single
   // `aniraku:shortcut` listener below, plus the player menu Lights button
@@ -985,6 +997,23 @@ const WatchInner: React.FC = () => {
     }
   }, [serversSub, serversDub, language, selectedServer, sourceType]);
 
+  // Language availability rule: once the pools settle for THIS episode, a
+  // language with zero playable servers is not a real choice. If the
+  // current language is empty but the other one isn't, flip playback to
+  // it (marked via autoLangFallbackRef so the saved preference survives).
+  // Both empty → stay put; the player owns the no-source state.
+  useEffect(() => {
+    if (poolEpKey !== serverEpKey || !serversSettled) return;
+    const currentEmpty =
+      language === 'dub' ? serversDub.length === 0 : serversSub.length === 0;
+    const otherFull =
+      language === 'dub' ? serversSub.length > 0 : serversDub.length > 0;
+    if (currentEmpty && otherFull) {
+      autoLangFallbackRef.current = true;
+      setLanguage(language === 'dub' ? 'sub' : 'dub');
+    }
+  }, [poolEpKey, serverEpKey, serversSettled, serversSub, serversDub, language]);
+
   // Keep the iframe URL in sync whenever the embed path is active.
   useEffect(() => {
     if (
@@ -1028,6 +1057,9 @@ const WatchInner: React.FC = () => {
       const name = idx > 0 ? key.slice(idx + 1) : key;
       if (!name) return;
       setSelectedServer(key);
+      // Manual pick is ground truth again — clear fallback display.
+      setActiveServerKey(null);
+      setAutoPlaying(false);
       setLanguage(serverLang);
       const pool = serverLang === 'dub' ? serversDub : serversSub;
       const srv = pool.find((s: any) => s?.name === name);
@@ -1042,6 +1074,23 @@ const WatchInner: React.FC = () => {
     },
     [serversSub, serversDub],
   );
+
+  // Player playing-source report → picker display truth. Silent by user
+  // choice (no toast). Null key = stream matched no listed server.
+  const handlePlayingSource = useCallback(
+    (info: { key: string | null; lang: 'sub' | 'dub'; auto: boolean }) => {
+      setActiveServerKey(info.key);
+      setAutoPlaying(info.auto);
+    },
+    [],
+  );
+
+  // New episode → drop stale fallback display; the fresh discovery
+  // re-reports the instant its first candidate applies.
+  useEffect(() => {
+    setActiveServerKey(null);
+    setAutoPlaying(false);
+  }, [animeId, currentEpisode.number]);
 
   // TODO SAVE TO LOCAL STORAGE NAVIGATED/CLICKED EPISODES
   // Single unified writer (lib/watchEvents): writes the suffixed AND the
@@ -1271,8 +1320,14 @@ const WatchInner: React.FC = () => {
     );
   }, [animeId]);
 
-  // TODO SAVES LANGUAGE PREFERENCE TO LOCAL STORAGE (live + legacy keys)
+  // TODO SAVES LANGUAGE PREFERENCE TO LOCAL STORAGE (live + legacy keys).
+  // Skipped once after an automatic fallback flip (see above) so a
+  // single-language episode never rewrites the saved preference.
   useEffect(() => {
+    if (autoLangFallbackRef.current) {
+      autoLangFallbackRef.current = false;
+      return;
+    }
     localStorage.setItem(getLanguageKey(animeId), language);
     localStorage.setItem(legacyLanguageKey(animeId), language);
   }, [language, animeId]);
@@ -1778,6 +1833,9 @@ const WatchInner: React.FC = () => {
         totalEpisodes={episodes.length}
         episodeFiller={(currentEpisode as any)?.filler === true}
         anilistId={animeInfo?.id}
+        serversReady={poolEpKey === serverEpKey && serversSettled}
+        activeServerKey={activeServerKey}
+        autoPlaying={autoPlaying}
       />
     ) : null;
 
@@ -1949,6 +2007,7 @@ const WatchInner: React.FC = () => {
           serversDub={serversDub}
           selectedServer={selectedServer}
           onSelectServer={handleSelectServer}
+          onPlayingSource={handlePlayingSource}
         />
       )}
     </VideoPlayerContainer>

@@ -214,6 +214,19 @@ type PlayerProps = {
   serversDub?: any[];
   selectedServer?: string;
   onSelectServer?: (key: string, serverLang: 'sub' | 'dub') => void;
+  /**
+   * Playing-source identity report (Watch#fallback display): fired whenever
+   * applyCandidate swaps the playing URL — initial picks, error fallbacks
+   * and the /stream-after-dead-override path. `key` is the matched
+   * `${lang}:${name}` pool entry (null when the stream matches no listed
+   * server); `auto` is true only for genuine error fallbacks, so Watch can
+   * badge those without crying wolf on every fresh load.
+   */
+  onPlayingSource?: (info: {
+    key: string | null;
+    lang: 'sub' | 'dub';
+    auto: boolean;
+  }) => void;
 };
 
 type SkipTime = {
@@ -1205,6 +1218,7 @@ export function Player({
   serversDub = [],
   selectedServer = '',
   onSelectServer,
+  onPlayingSource,
 }: PlayerProps) {
   // ── Zenime bridge state (ported): embedded-iframe progress/ended machine
   // + single-transition lock so double-ended events can't stack auto-next.
@@ -1525,6 +1539,26 @@ export function Player({
     onSelectServer,
   };
 
+  // Playing-identity mirror for reportPlayingSource: applyCandidate runs
+  // from stale art-handler closures and async fetch continuations, so the
+  // pools / lang / callback it reads must be render-fresh. Same house
+  // style as sourceCycleRef above.
+  const playingIdRef = useRef({
+    serversSub,
+    serversDub,
+    lang: 'sub' as 'sub' | 'dub',
+    onPlayingSource: undefined as PlayerProps['onPlayingSource'],
+  });
+  playingIdRef.current = {
+    serversSub,
+    serversDub,
+    lang: lang === 'dub' ? 'dub' : 'sub',
+    onPlayingSource,
+  };
+  // Dedupe stamp for the report above — reset on every fresh discovery
+  // (episode/lang/override switch) so the new episode always re-reports.
+  const lastPlayReportRef = useRef('');
+
   // Subtitle preference setter (ref-only state): persists, then restyles the
   // live captions immediately — no React re-render needed for styling.
   const setSubtitlePreference = useCallback((key: string, value: string) => {
@@ -1800,7 +1834,8 @@ export function Player({
     const nextIndex = candidateIndexRef.current + 1;
     if (nextIndex < candidates.length) {
       candidateIndexRef.current = nextIndex;
-      applyCandidate(candidates[nextIndex]);
+      // Genuine error fallback — Watch badges this as auto.
+      applyCandidate(candidates[nextIndex], true);
       return;
     }
     if (srcOverride && !overrideFailedRef.current) {
@@ -1878,22 +1913,68 @@ export function Player({
   }
 
   // Apply one source candidate (URL + subtitle tracks + proxy headers).
-  function applyCandidate(c: {
-    url: string;
-    type?: string;
-    subs: { url: string; lang: string; label: string }[];
-    headers: Record<string, string>;
-  }) {
+  function applyCandidate(
+    c: {
+      url: string;
+      type?: string;
+      subs: { url: string; lang: string; label: string }[];
+      headers: Record<string, string>;
+    },
+    auto = false,
+  ) {
     setSrc(c.url);
     setSrcType(detectHls(c.url, c.type) ? 'hls' : 'mp4');
     setSubTracks(dedupeSubtitles(Array.isArray(c.subs) ? c.subs : []));
     // Headers MUST survive every path — the subtitle proxy answers
     // 502 CDN_BLOCKED without them.
     setStreamHeaders(c.headers ?? {});
+    reportPlayingSource(c.url, auto);
+  }
+
+  // Playing-server identity (Watch#fallback display): exact-match the
+  // applied URL against this episode's pool sources and report the
+  // `${lang}:${name}` key (or null when nothing matches). Display-only —
+  // Watch never reloads off this, so no select/re-resolve loop is
+  // possible. Deduped: identical repeats don't re-notify.
+  function resolvePoolKey(url: string): {
+    key: string;
+    lang: 'sub' | 'dub';
+  } | null {
+    const { serversSub, serversDub } = playingIdRef.current;
+    const pools = [
+      { list: serversSub, lang: 'sub' },
+      { list: serversDub, lang: 'dub' },
+    ] as const;
+    for (const { list, lang } of pools) {
+      const hit = (list ?? []).find(
+        (s: any) =>
+          s?.name &&
+          (s?.sources ?? []).some((x: any) => x?.url === url),
+      );
+      if (hit) return { key: `${lang}:${hit.name}`, lang };
+    }
+    return null;
+  }
+
+  function reportPlayingSource(url: string, auto: boolean) {
+    const { lang, onPlayingSource } = playingIdRef.current;
+    if (!onPlayingSource) return;
+    const resolved = resolvePoolKey(url);
+    const stamp = `${resolved?.key ?? 'auto'}:${auto ? '1' : '0'}`;
+    if (lastPlayReportRef.current === stamp) return;
+    lastPlayReportRef.current = stamp;
+    onPlayingSource({
+      key: resolved?.key ?? null,
+      lang: resolved?.lang ?? lang,
+      auto,
+    });
   }
 
   async function fetchAndSetAnimeSource() {
     setSourceFailed(false);
+    // Fresh discovery (episode/lang/override switch) — the next apply
+    // always re-reports, even if the URL matches the previous stamp.
+    lastPlayReportRef.current = '';
     try {
       // Server-picker override: play the selected server's HLS directly
       // (unless that override already errored — then fall through to /stream).
@@ -1935,7 +2016,9 @@ export function Player({
       candidateIndexRef.current = candidatesRef.current.length > 0 ? 0 : -1;
       const chosen = candidatesRef.current[0] ?? sources.find((s: any) => s?.url);
       if (chosen?.url) {
-        applyCandidate(chosen);
+        // Auto when this fetch exists because the override died
+        // (overrideFailedRef set by advanceOnError just above).
+        applyCandidate(chosen, overrideFailedRef.current);
         // Provider-wins merge: /stream's verified windows overwrite the
         // AniSkip/cache values when present; null slots keep what's there.
         setAnirakuSkip((prev) => ({
