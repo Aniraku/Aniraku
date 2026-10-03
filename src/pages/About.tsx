@@ -55,8 +55,8 @@ const sections = [
       <Paragraph>
         Yes. We started this site to improve UX and are committed to keeping our
         users safe. We encourage all our users to notify us if anything looks
-        suspicious. Please understand that we do have to run advertisements to
-        maintain the site.
+        suspicious. Aniraku serves no pop-up / redirect ads — playback embeds
+        run sandboxed with popup blocking.
       </Paragraph>
     ),
   },
