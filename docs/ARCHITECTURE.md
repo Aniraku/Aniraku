@@ -181,8 +181,26 @@ Watch), `COMPLETED`, `PAUSED`, `DROPPED`, `REPEATING` (Rewatching).
   backend requests for unreleased titles. `src/lib/upcomingMessages.ts`
   holds the verbatim fallback copy.
 
-## 7. Gates & workflow
+## 7. Backend AniList endpoint rule (the export-502 lesson)
 
+The offline mirror is **read-only**: it rejects mutations and carries no
+user data. Any authenticated or mutating backend call sent there fails —
+this once broke all AniList exports with `502 … Unsupported root field
+in offline anime mirror: SaveMediaListEntry`.
+
+- **Official API always** (`https://graphql.anilist.co`):
+  `anilistAuthed` in `importexport.go` (every authed import/export call:
+  mutations, collection reads, viewer ID, list-state diffing) plus
+  `fetchAniListUsername`, `updateAniListProgress`, `updateAniListScore`
+  in `sync.go`.
+- **Mirror stays** (`https://graphql.aniraku.tech`): the public cached
+  client (`anilist_client.go`) and streaming-provider metadata lookups —
+  anonymous reads, which is what the mirror exists for.
+
+If you add a new backend call, ask one question: does it carry a user
+token or mutate anything? Yes → official. Pure anonymous read → mirror.
+
+## 8. Gates & workflow
 ```bash
 npm run dev      # localhost:3000 (keep alive: nohup npx vite --host)
 npx tsc --noEmit # must be 0
