@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { fetchAnimeEpisodes } from '../hooks/useApi';
+import { fetchAnimeEpisodes, ANILIST_GRAPHQL } from '../hooks/useApi';
 import { API_BASE } from './apiBase';
 import {
   type HistoryRow,
@@ -377,9 +377,12 @@ const UPsert_CHUNK = 100;
 const mergedHistoryUsers = new Set<string>();
 let historySyncTimer: ReturnType<typeof setInterval> | null = null;
 let historySyncUser: string | null = null;
-const syncedFingerprint = new Map<string, string>();
+// Last synced row per key — compared with tolerant `historyRowEquals`
+// (duration ±2s) so reconstructed durations don't cause an upload loop.
+const syncedRows = new Map<string, HistoryRow>();
 
-const rowFingerprint = (row: HistoryRow): string =>
+/** Debug fingerprint (progress|duration|timestamp|title|image). */
+export const rowFingerprint = (row: HistoryRow): string =>
   `${row.progress}|${row.duration}|${row.timestamp}|${row.anime_title}|${row.anime_image}`;
 
 /** Full server history for the user (single page — table is per-account). */
@@ -478,23 +481,30 @@ export async function mergeHistoryOnLogin(userId: string): Promise<void> {
 
   reconcileLocalHistory([...merged.values()]);
   for (const row of merged.values()) {
-    syncedFingerprint.set(historyRowKey(row), rowFingerprint(row));
+    syncedRows.set(historyRowKey(row), { ...row });
   }
   mergedHistoryUsers.add(userId);
   publishWatchHistory({ type: 'sync', keys: [...merged.keys()] });
 }
 
-/** Diff-flush the local rows against the last synced snapshot (throttled). */
+/** Diff-flush the local rows against the last synced snapshot (throttled).
+ * Uses tolerant `historyRowEquals` (duration ±2s, empty-title guard in merge)
+ * so rounding-error reconstructions and visit-only changes don't loop. */
 async function flushHistorySync(userId: string): Promise<void> {
   const rows = readLocalHistoryRows();
+  // Skip empty-title locals when the server already has a titled row —
+  // prevents `anime_title: ''` clobber on first login merge.
   const changed = rows.filter((row) => {
     const key = historyRowKey(row);
-    return syncedFingerprint.get(key) !== rowFingerprint(row);
+    const prev = syncedRows.get(key);
+    if (!prev) return true;
+    if (!row.anime_title && prev.anime_title) return false;
+    return !historyRowEquals(prev, row);
   });
   if (!changed.length) return;
   await upsertHistoryRows(userId, changed);
   for (const row of changed) {
-    syncedFingerprint.set(historyRowKey(row), rowFingerprint(row));
+    syncedRows.set(historyRowKey(row), { ...row });
   }
   publishWatchHistory({ type: 'upsert', keys: changed.map(historyRowKey) });
 }
@@ -519,9 +529,17 @@ export async function publishHistoryNow(
  *  throttled engine cannot re-upload rows the user just deleted. */
 export function forgetSyncedAnime(animeId: string | number): void {
   const prefix = `${String(animeId)}:`;
-  for (const key of [...syncedFingerprint.keys()]) {
-    if (key.startsWith(prefix)) syncedFingerprint.delete(key);
+  for (const key of [...syncedRows.keys()]) {
+    if (key.startsWith(prefix)) syncedRows.delete(key);
   }
+}
+
+/** Drop a single episode's synced snapshot (per-episode removal path). */
+export function forgetSyncedEpisode(
+  animeId: string | number,
+  episodeNumber: number,
+): void {
+  syncedRows.delete(`${String(animeId)}:${Math.floor(Number(episodeNumber))}`);
 }
 
 function stopHistorySync(): void {
@@ -530,7 +548,7 @@ function stopHistorySync(): void {
     historySyncTimer = null;
   }
   historySyncUser = null;
-  syncedFingerprint.clear();
+  syncedRows.clear();
 }
 
 /**
@@ -821,7 +839,11 @@ subscribeToSession((userId) => {
   }, NOTIFICATION_POLL_MS);
 });
 
-/** Direct AniList request (port of Aniraku `anilistBatchDetail`, ≤50 ids). */
+/** AniList metadata batch read via the shared `ANILIST_GRAPHQL` endpoint
+ * (port of Aniraku `anilistBatchDetail`, ≤50 ids per batch).
+ * Preview points it at the unlimited Aniraku mirror, main at the official
+ * API — either way there is no client-side limiter here; provider write
+ * pacing lives in the backend. */
 async function anilistBatchDetail(
   ids: number[],
 ): Promise<
@@ -849,11 +871,12 @@ async function anilistBatchDetail(
     .map((_, index) => `$id${index}: Int!`)
     .join(', ')}) { ${fields.join('\n')} }`;
   try {
-    const response = await fetch('https://graphql-mirror.redacted.invalid', {
+    const response = await fetch(ANILIST_GRAPHQL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, variables }),
     });
+    if (!response.ok) return {};
     const json = await response.json();
     const result: Record<
       string,
@@ -864,11 +887,9 @@ async function anilistBatchDetail(
       }
     > = {};
     safeIds.forEach((id, index) => {
-      result[id] = (json?.data?.[`m${index}`] ?? null) as never;
+      const node = json?.data?.[`m${index}`] ?? null;
+      if (node) result[id] = node;
     });
-    for (const key of Object.keys(result)) {
-      if (!result[key]) delete result[key];
-    }
     return result;
   } catch {
     return {};
@@ -1003,20 +1024,22 @@ export async function runNewEpisodeNotifications(
 }
 
 // ---------------------------------------------------------------------------
-// MAL / AniList watch-progress sync — verbatim TS port of Aniraku
+// MAL / AniList watch-progress sync — TS port of Aniraku
 // `src/lib/sync.js` (authHeaders :8-15, getSyncStatus :17-28,
 // syncAuthorize :33-44, completeSyncCallback :46-60, syncDisconnect :62-72,
-// PROVIDER_LABELS :148-151, PROVIDER_LOGO :153-156, importProviderList
-// :162-175, exportProviderList :177-195, describeImport :198-209,
-// describeExport :211-221). Bearer via authHeaders above; base = API_BASE.
+// updateSyncProgress :74-95, updateSyncScore :98-113 (score lives in
+// lib/episodeRatings, re-exported here), PROVIDER_LABELS :148-151,
+// PROVIDER_LOGO :153-156, importProviderList :162-175, exportProviderList
+// :177-195, describeImport :198-209, describeExport :211-221). Bearer via
+// authHeaders above; base = API_BASE.
 // UNFILTERED: no NSFW/rating filter exists anywhere in this chain (sync =
 // unfiltered, per user decision — Aniraku's sync.js has none either).
-// `updateSyncProgress`/`updateSyncScore`/ratings are Watch-scope and not
-// part of this mission's port list.
 // ---------------------------------------------------------------------------
 
 export interface SyncProviderStatus {
   connected?: boolean;
+  /** Backend reports whether the OAuth grant is configured (Watch predicate). */
+  configured?: boolean;
   username?: string;
   reason?: string;
   expires_at?: number;
@@ -1083,6 +1106,40 @@ export async function syncDisconnect(provider: string): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Push watch progress to one provider (restored Aniraku `updateSyncProgress`
+ * sync.js:74-95 — `POST /api/v1/sync/update {provider, animeId, episode,
+ * progress, status}`). Called on video ended (`completed`) and at the 60%
+ * threshold (`watching`); fire-and-forget from Watch/Player with toast
+ * aggregation at the call site.
+ */
+export async function updateSyncProgress({
+  provider,
+  animeId,
+  episode,
+  progress,
+  status,
+}: {
+  provider: string;
+  animeId: number;
+  episode: number;
+  progress: number;
+  status: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/sync/update`, {
+      method: 'POST',
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ provider, animeId, episode, progress, status }),
+    });
+    if (res.ok) return { ok: true };
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: data?.error || `HTTP ${res.status}` };
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message || 'network error' };
   }
 }
 
@@ -1292,7 +1349,7 @@ const EXPORT_ENTRIES_PER_MINUTE = 30;
 const EXPORT_RATE_WAIT_MS = 65000;
 const EXPORT_RATE_RETRIES = 8;
 
-let exportJobInFlight = false;
+const exportJobsInFlight = new Set<string>();
 let exportJobs: ExportJobs = {};
 const exportJobListeners = new Set<(jobs: ExportJobs) => void>();
 
@@ -1414,7 +1471,9 @@ async function notifyExportFinished(
  */
 export async function runExportJob(provider: string): Promise<ExportJobState> {
   const current = exportJobs[provider];
-  if (exportJobInFlight || current?.status === 'running') {
+  // Per-provider mutex (MAL and AniList export in parallel; same provider
+  // never runs twice).
+  if (exportJobsInFlight.has(provider) || current?.status === 'running') {
     return (
       current ?? {
         provider,
@@ -1429,7 +1488,7 @@ export async function runExportJob(provider: string): Promise<ExportJobState> {
       }
     );
   }
-  exportJobInFlight = true;
+  exportJobsInFlight.add(provider);
   const startedAt = Date.now();
   const totals = { exported: 0, scores: 0, skipped: 0, failed: 0 };
   let chunks = 0;
@@ -1497,7 +1556,7 @@ export async function runExportJob(provider: string): Promise<ExportJobState> {
       );
     }
   } finally {
-    exportJobInFlight = false;
+    exportJobsInFlight.delete(provider);
   }
 }
 
@@ -1516,6 +1575,240 @@ export function startExportJob(provider: string): ExportJobState {
       scores: 0,
       skipped: 0,
       failed: 0,
+    }
+  );
+}
+
+// ── Background import runner (auto-loop on `limited`, Supabase-notified) ──
+// Mirrors the export runner: the backend answers `limited: true` while
+// provider pages remain. Loops chunk POSTs with the same 6s floor pacing,
+// aggregates imported/already/episodes/scores/unmapped + status breakdown,
+// notifies via Supabase `notifications` (import_complete / import_failed),
+// persists per-provider job state (reload → `interrupted`).
+
+export type ImportJobStatus = 'running' | 'done' | 'error' | 'interrupted';
+
+export interface ImportJobState {
+  provider: string;
+  status: ImportJobStatus;
+  startedAt: number;
+  updatedAt: number;
+  chunks: number;
+  imported: number;
+  already: number;
+  episodes: number;
+  scores: number;
+  unmapped: number;
+  statuses_updated: number;
+  message?: string;
+  note?: string;
+}
+
+export type ImportJobs = Record<string, ImportJobState>;
+
+const IMPORT_JOB_KEY = 'aniraku:import-job';
+
+const importJobsInFlight = new Set<string>();
+let importJobs: ImportJobs = {};
+const importJobListeners = new Set<(jobs: ImportJobs) => void>();
+
+function readImportJobs(): void {
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(IMPORT_JOB_KEY);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, ImportJobState>;
+    for (const [provider, job] of Object.entries(parsed)) {
+      if (!job || typeof job !== 'object') continue;
+      importJobs[provider] = {
+        ...job,
+        provider,
+        status: job.status === 'running' ? 'interrupted' : job.status,
+        updatedAt: Date.now(),
+      };
+    }
+  } catch {
+    // corrupt payload — start clean
+  }
+}
+
+readImportJobs();
+
+function persistImportJobs(): void {
+  try {
+    window.localStorage.setItem(IMPORT_JOB_KEY, JSON.stringify(importJobs));
+  } catch {
+    // storage unavailable — memory-only
+  }
+}
+
+function setImportJob(next: ImportJobState): void {
+  importJobs = { ...importJobs, [next.provider]: next };
+  persistImportJobs();
+  importJobListeners.forEach((listener) => {
+    try {
+      listener(importJobs);
+    } catch {
+      // a broken listener must not break the store
+    }
+  });
+}
+
+export function getImportJobs(): ImportJobs {
+  return importJobs;
+}
+
+export function subscribeImportJobs(
+  listener: (jobs: ImportJobs) => void,
+): () => void {
+  importJobListeners.add(listener);
+  try {
+    listener(importJobs);
+  } catch {
+    // ignore listener errors
+  }
+  return () => {
+    importJobListeners.delete(listener);
+  };
+}
+
+async function notifyImportFinished(
+  provider: string,
+  totals: {
+    imported: number;
+    already: number;
+    episodes: number;
+    scores: number;
+    unmapped: number;
+    statuses_updated: number;
+  },
+  error?: string,
+): Promise<string> {
+  const label = PROVIDER_LABELS[provider] ?? provider;
+  const message = error
+    ? `Import from ${label} stopped after ${totals.imported} titles: ${error} — run import again to continue`
+    : `Import from ${label} finished: ${describeImport({ ...totals, limited: false })}`;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user.id;
+    if (uid) {
+      await supabase.from('notifications').insert({
+        user_id: uid,
+        type: error ? 'import_failed' : 'import_complete',
+        message,
+        anime_id: null,
+      });
+    }
+  } catch {
+    // best-effort
+  }
+  try {
+    await fetchNotifications();
+  } catch {
+    // store keeps last-known rows
+  }
+  return message;
+}
+
+export async function runImportJob(provider: string): Promise<ImportJobState> {
+  const current = importJobs[provider];
+  if (importJobsInFlight.has(provider) || current?.status === 'running') {
+    return (
+      current ?? {
+        provider,
+        status: 'running',
+        startedAt: Date.now(),
+        updatedAt: Date.now(),
+        chunks: 0,
+        imported: 0,
+        already: 0,
+        episodes: 0,
+        scores: 0,
+        unmapped: 0,
+        statuses_updated: 0,
+      }
+    );
+  }
+  importJobsInFlight.add(provider);
+  const startedAt = Date.now();
+  const totals = {
+    imported: 0,
+    already: 0,
+    episodes: 0,
+    scores: 0,
+    unmapped: 0,
+    statuses_updated: 0,
+  };
+  let chunks = 0;
+  const progress = (note?: string): ImportJobState => ({
+    provider,
+    status: 'running',
+    startedAt,
+    updatedAt: Date.now(),
+    chunks,
+    ...totals,
+    ...(note ? { note } : {}),
+  });
+  setImportJob(progress());
+  try {
+    for (;;) {
+      const chunk = await importProviderList(provider);
+      chunks += 1;
+      if (chunk.error) {
+        if (isRateLimitError(chunk.error)) {
+          setImportJob(
+            progress(
+              `Rate limited by ${PROVIDER_LABELS[provider] ?? provider} — waiting before retrying…`,
+            ),
+          );
+          await sleepMs(EXPORT_RATE_WAIT_MS);
+          continue;
+        }
+        const message = await notifyImportFinished(provider, totals, chunk.error);
+        const terminal: ImportJobState = { ...progress(), status: 'error', message };
+        setImportJob(terminal);
+        return terminal;
+      }
+      totals.imported += chunk.imported ?? 0;
+      totals.already += chunk.already ?? 0;
+      totals.episodes += chunk.episodes ?? 0;
+      totals.scores += chunk.scores ?? 0;
+      totals.unmapped += chunk.unmapped ?? 0;
+      totals.statuses_updated += chunk.statuses_updated ?? 0;
+      if (!chunk.limited) {
+        const message = await notifyImportFinished(provider, totals);
+        const terminal: ImportJobState = { ...progress(), status: 'done', message };
+        setImportJob(terminal);
+        return terminal;
+      }
+      setImportJob(progress());
+      await sleepMs(exportPaceDelayMs(chunk.imported ?? EXPORT_ENTRIES_PER_MINUTE));
+    }
+  } finally {
+    importJobsInFlight.delete(provider);
+  }
+}
+
+export function startImportJob(provider: string): ImportJobState {
+  void runImportJob(provider);
+  const snapshot = getImportJobs()[provider];
+  return (
+    snapshot ?? {
+      provider,
+      status: 'running',
+      startedAt: Date.now(),
+      updatedAt: Date.now(),
+      chunks: 0,
+      imported: 0,
+      already: 0,
+      episodes: 0,
+      scores: 0,
+      unmapped: 0,
+      statuses_updated: 0,
     }
   );
 }

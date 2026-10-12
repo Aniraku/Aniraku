@@ -32,7 +32,6 @@ import { Comments } from '../components/Watch/Comments';
 import {
   publishHistoryNow,
   getSessionUserId,
-  getSyncStatus,
   PROVIDER_LABELS,
 } from '../lib/sync';
 import { showToast } from '../components/Toaster';
@@ -44,14 +43,17 @@ import {
   isMovieFormat,
   isUnreleasedStatus,
 } from '../lib/upcomingMessages';
-// Item 2 (episode ratings) — transport trio + LS key from Wave C's
-// lib/episodeRatings (verbatim Aniraku sync.js ports) — import-only.
+// Item 2 (episode ratings) — transport + averaged provider-score push.
 import {
-  EPISODE_RATINGS_LS_KEY,
+  averageRating,
   fetchEpisodeRatings,
+  mergeGuestRatingsOnLogin,
+  normalizeScore,
+  readGuestRatings,
   saveEpisodeRating,
-  updateSyncScore,
+  writeGuestRatings,
 } from '../lib/episodeRatings';
+import { syncAverageScore } from '../lib/providerSync';
 import { resolveDisplayTitle } from '../lib/displayLanguage';
 import { recordWatchEvent } from '../lib/watchEvents';
 // Item 1 (NSFW gate) — Aniraku Watch.jsx:1520/:5578.
@@ -825,9 +827,6 @@ const WatchInner: React.FC = () => {
   const [epRatingSaving, setEpRatingSaving] = useState(false);
   const [epRatingSaved, setEpRatingSaved] = useState(false);
   const epRatingSaveTimerRef = useRef<number | null>(null);
-  // null = sync status not fetched yet this page session
-  // (Aniraku Watch.jsx:1899).
-  const syncConnectedRef = useRef<string[] | null>(null);
 
   //----------------------------------------------MORE VARIABLES----------------------------------------------
   const GoToHomePageButton = () => {
@@ -1249,8 +1248,9 @@ const WatchInner: React.FC = () => {
     return () => window.removeEventListener('aniraku:shortcut', onShortcut);
   }, []);
 
-  // Own episode ratings (Aniraku Watch.jsx:2088-2109): authed → backend
-  // (`GET /api/v1/anime/{id}/ratings`), guest → LS
+  // Own episode ratings (Aniraku Watch.jsx:2088-2109, upgraded):
+  // authed → backend (`GET /api/v1/anime/{id}/ratings`) with guest-merge on
+  // login (server wins per-episode, guest-only uploads); guest → LS
   // `aniraku-episode-ratings-{animeId}`. Session identity resolves through
   // lib/sync's bridge (Info.tsx pattern) — no auth-hook import.
   useEffect(() => {
@@ -1261,19 +1261,18 @@ const WatchInner: React.FC = () => {
       .then((userId) => {
         if (cancelled) return;
         if (userId) {
-          fetchEpisodeRatings(animeId).then((ratings) => {
-            if (!cancelled) setEpRatings(ratings || {});
-          });
+          // Merge any pre-login guest ratings, then show the union.
+          mergeGuestRatingsOnLogin(animeId)
+            .then((ratings) => {
+              if (!cancelled) setEpRatings(ratings || {});
+            })
+            .catch(() => {
+              fetchEpisodeRatings(animeId).then((ratings) => {
+                if (!cancelled) setEpRatings(ratings || {});
+              });
+            });
         } else {
-          try {
-            const stored = JSON.parse(
-              localStorage.getItem(`${EPISODE_RATINGS_LS_KEY}-${animeId}`) ||
-                '{}',
-            );
-            if (!cancelled) setEpRatings(stored || {});
-          } catch {
-            if (!cancelled) setEpRatings({});
-          }
+          if (!cancelled) setEpRatings(readGuestRatings(animeId));
         }
       })
       .catch(() => {
@@ -1692,18 +1691,16 @@ const WatchInner: React.FC = () => {
     }
   }, [loading, episodes]);
 
-  // ── saveRating — Aniraku Watch.jsx:2111-2177 (verbatim flow) ──
-  // authed → saveEpisodeRating (server); guest → LS `…-{animeId}` (the
-  // reference's unauthenticated behavior — local persistence, still fully
-  // interactive). On success, push the score to every CONNECTED provider
-  // (GET /sync cached in syncConnectedRef, then PUT /sync/score each) and
-  // toast with the reference's dynamic provider-label construction.
+  // ── saveRating — Aniraku Watch.jsx:2111-2177 (upgraded flow) ──
+  // authed → saveEpisodeRating (server); guest → LS `…-{animeId}`.
+  // On success, push the AVERAGE of all episode ratings as the provider
+  // anime score (providers only support anime-level scores) via the shared
+  // providerSync helper (connected+configured predicate + status cache).
   const saveRating = useCallback(
     async (score: number) => {
       if (epRatingSaving || !animeId || !currentEpisode.number) return;
-      const selectedScore = Math.round(Number(score));
-      if (!Number.isInteger(selectedScore) || selectedScore < 1 || selectedScore > 10)
-        return;
+      const selectedScore = normalizeScore(score);
+      if (selectedScore === null) return;
       const epNumber = Number(currentEpisode.number);
       setEpRatingSaving(true);
       setEpRatingSaved(false);
@@ -1715,51 +1712,20 @@ const WatchInner: React.FC = () => {
         ok = await saveEpisodeRating(animeId, epNumber, selectedScore);
       } else {
         try {
-          localStorage.setItem(
-            `${EPISODE_RATINGS_LS_KEY}-${animeId}`,
-            JSON.stringify(next),
-          );
+          writeGuestRatings(animeId, next);
           ok = true;
         } catch {
           // storage unavailable
         }
       }
       if (ok) {
-        if (syncConnectedRef.current === null) {
-          const data = await getSyncStatus();
-          if (data) {
-            syncConnectedRef.current = ['mal', 'anilist'].filter((p) => {
-              // Reference predicate `configured && connected`
-              // (Watch.jsx:2137-2139); `configured` ships from the backend
-              // (api/v1/sync.go:154) but isn't on SyncProviderStatus — read
-              // it through a local shape (lib/sync.ts is read-only here).
-              const status = data[p] as
-                | { configured?: boolean; connected?: boolean }
-                | undefined;
-              return status?.configured && status?.connected;
-            });
-          }
-        }
-        const providers = syncConnectedRef.current || [];
-        if (providers.length > 0) {
-          Promise.allSettled(
-            providers.map((p) =>
-              updateSyncScore({
-                provider: p,
-                animeId: parseInt(animeId, 10),
-                score: selectedScore,
-              }),
-            ),
-          ).then((results) => {
-            // Aniraku counts truthy fulfilled values; our port resolves
-            // `{ ok }`, so a fulfilled-but-failed PUT must not count.
-            const done = results.filter(
-              (r) => r.status === 'fulfilled' && r.value?.ok,
-            ).length;
-            if (done > 0) {
+        const avg = averageRating(next);
+        if (avg !== null) {
+          void syncAverageScore(animeId, next).then(({ synced }) => {
+            if (synced.length > 0) {
               showToast(
-                `Score ${selectedScore}/10 synced to ${providers
-                  .map((p) => PROVIDER_LABELS[p])
+                `Score ${avg}/10 synced to ${synced
+                  .map((p) => PROVIDER_LABELS[p] ?? p)
                   .join(' & ')}`,
                 { type: 'success' },
               );

@@ -4,11 +4,23 @@ import { v4 as uuidv4 } from 'uuid'; // Ensure uuid is installed via npm or yarn
 import { UserData, MediaListStatus } from '../index'; // Assuming this is the correct path
 import { useQuery, gql } from '@apollo/client';
 
-// Constants for AniList OAuth, ideally should be loaded from environment variables
+// Constants for AniList OAuth — backend-owned flow.
+// Library sync OAuth is owned by the Aniraku Backend
+// (`GET /api/v1/sync/{provider}/authorize` → provider → `POST
+// /api/v1/sync/callback`). The browser NEVER holds the client secret and
+// never POSTs to anilist.co/oauth/token directly. VITE_CLIENT_ID /
+// VITE_REDIRECT_URI below are only for building the legacy direct URL
+// (deprecated — prefer lib/sync `syncAuthorize`).
 const clientId = import.meta.env.VITE_CLIENT_ID || 'default_client_id';
-const clientSecret =
-  import.meta.env.VITE_CLIENT_SECRET || 'default_client_secret';
 const redirectUri = import.meta.env.VITE_REDIRECT_URI || 'default_redirect_uri';
+
+// Aniraku GraphQL mirror: public AniList metadata only, unlimited (no
+// 30/min cap). Public metadata reads (search, lists, anime info, batch
+// detail) go to the mirror — see hooks/useApi + lib/sync `anilistBatchDetail`.
+// AUTHENTICATED reads (Viewer with Bearer) stay on the official API on both
+// branches per docs/ARCHITECTURE §1-2: the offline mirror is read-only,
+// rejects mutations and carries no user data.
+const ANILIST_OFFICIAL = 'https://graphql.anilist.co';
 
 /**
  * Generates a new CSRF token for each session
@@ -37,35 +49,22 @@ export const buildAuthUrl = (csrfToken: string): string => {
  * Requests an access token from AniList using the authorization code
  * @param {string} code The authorization code received from AniList after user consent
  * @returns {Promise<string>} A promise that resolves to the access token
+ * @deprecated Backend-owned flow — use `syncAuthorize` /
+ * `completeSyncCallback` in lib/sync.ts. The client secret must never ship
+ * to the browser; this stub throws instead of POSTing with a secret.
  */
-export const getAccessToken = async (code: string): Promise<string> => {
-  const url = 'https://anilist.co/api/v2/oauth/token';
-  const payload = {
-    client_id: clientId,
-    client_secret: clientSecret,
-    code,
-    grant_type: 'authorization_code',
-    redirect_uri: redirectUri,
-  };
-
-  try {
-    const response = await axios.post(url, payload);
-    if (response.data.access_token) {
-      return response.data.access_token;
-    } else {
-      throw new Error('Access token not found in the response');
-    }
-  } catch (error) {
-    console.error('Error obtaining access token:', error);
-    throw new Error('Failed to obtain access token');
-  }
+export const getAccessToken = async (_code: string): Promise<string> => {
+  throw new Error(
+    'Direct AniList token exchange is disabled — library sync uses the backend OAuth flow (syncAuthorize / completeSyncCallback).',
+  );
 };
 
-// src/services/authService.js
+// src/services/authService.js — authenticated Viewer read stays on the
+// OFFICIAL API (mirror carries no user data). Bearer from the caller.
 export const fetchUserData = async (accessToken: string): Promise<UserData> => {
   try {
     const response = await axios.post(
-      'https://graphql.anilist.co',
+      ANILIST_OFFICIAL,
       {
         query: `
           query {

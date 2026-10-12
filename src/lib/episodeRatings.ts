@@ -9,7 +9,7 @@
 //   - POST ${API_BASE}/api/v1/anime/{id}/episode/{ep}/rating  {score}
 //   - PUT  ${API_BASE}/api/v1/sync/score  {provider, animeId, score}
 //     (both MAL and AniList only support an anime-level score, so the
-//     episode rating becomes the score pushed to connected providers).
+//     AVERAGE of the user's episode ratings becomes the pushed score).
 // Guests keep ratings in localStorage under Aniraku's
 // `aniraku-episode-ratings-{animeId}` key (AnimeDetail.jsx:414, Watch.jsx:91).
 // ---------------------------------------------------------------------------
@@ -17,6 +17,82 @@ import { supabase } from './supabase';
 import { API_BASE } from './apiBase';
 
 export const EPISODE_RATINGS_LS_KEY = 'aniraku-episode-ratings';
+
+export function episodeRatingsKey(animeId: string | number): string {
+  return `${EPISODE_RATINGS_LS_KEY}-${String(animeId)}`;
+}
+
+/** Clamp to a valid 1-10 integer score, or null when invalid. */
+export function normalizeScore(score: unknown): number | null {
+  const n = Math.round(Number(score));
+  if (!Number.isInteger(n) || n < 1 || n > 10) return null;
+  return n;
+}
+
+/** Mean of a ratings map, rounded to the nearest integer (provider score). */
+export function averageRating(ratings: Record<number | string, number>): number | null {
+  const scores = Object.values(ratings)
+    .map((s) => Math.round(Number(s)))
+    .filter((s) => Number.isInteger(s) && s >= 1 && s <= 10);
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
+
+export function readGuestRatings(
+  animeId: string | number,
+): Record<number, number> {
+  try {
+    const raw = localStorage.getItem(episodeRatingsKey(animeId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    const out: Record<number, number> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      const ep = Math.floor(Number(k));
+      const score = normalizeScore(v);
+      if (Number.isFinite(ep) && ep > 0 && score !== null) out[ep] = score;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function writeGuestRatings(
+  animeId: string | number,
+  ratings: Record<number, number>,
+): void {
+  try {
+    localStorage.setItem(episodeRatingsKey(animeId), JSON.stringify(ratings));
+  } catch {
+    // storage unavailable
+  }
+}
+
+/**
+ * Merge guest ratings into the server on login: server wins per-episode,
+ * guest-only episodes upload. Returns the merged map.
+ */
+export async function mergeGuestRatingsOnLogin(
+  animeId: string | number,
+): Promise<Record<number, number>> {
+  const guest = readGuestRatings(animeId);
+  const server = await fetchEpisodeRatings(animeId);
+  if (!server) return guest;
+  const merged: Record<number, number> = { ...guest, ...server };
+  const guestOnly = Object.entries(guest).filter(([ep]) => !(ep in server));
+  for (const [ep, score] of guestOnly) {
+    await saveEpisodeRating(animeId, Number(ep), score);
+  }
+  if (guestOnly.length) {
+    try {
+      localStorage.removeItem(episodeRatingsKey(animeId));
+    } catch {
+      // storage unavailable
+    }
+  }
+  return merged;
+}
 
 async function authHeaders(
   extra: Record<string, string> = {},
@@ -78,8 +154,8 @@ export async function saveEpisodeRating(
 
 /**
  * Push a 1-10 anime score to a connected provider (Aniraku sync.js:97-113).
- * Both MAL and AniList only support an anime-level score, so the rating the
- * user just set becomes that score.
+ * Both MAL and AniList only support an anime-level score — callers pass the
+ * AVERAGE of the user's episode ratings (see `averageRating`).
  */
 export async function updateSyncScore({
   provider,

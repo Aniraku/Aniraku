@@ -25,14 +25,15 @@ import {
 // layer): Wave B's sync engine owns the `watch_history` server reads, the
 // watchHistory lib owns the documented local stores.
 import {
-  fetchServerHistoryRows,
-  getSessionUserId,
   publishHistoryNow,
 } from '../../../lib/sync';
 import {
   LOCAL_HISTORY_KEYS,
+  getEpisodeProgress,
   readLocalHistoryRows,
 } from '../../../lib/watchHistory';
+import { syncWatchProgress } from '../../../lib/providerSync';
+import { PROVIDER_LABELS } from '../../../lib/sync';
 import styled from 'styled-components';
 import {
   fetchSkipTimes,
@@ -1230,12 +1231,39 @@ export function Player({
     duration: 0,
     hasTriggeredEnd: false,
   });
-  // AniList progress sync: There is no auth bridge (no syncWatchProgress /
-  // getAniListIdFromMalId in this build) — stays null so every guarded call
-  // is a structural no-op (reported gap).
-  const saveAniListProgressRef = useRef<
-    ((episodeNumber: number) => Promise<void>) | null
-  >(null);
+  // Provider progress sync bridge (restored Aniraku syncWatchProgress):
+  // video ended → `completed`, 60% threshold → `watching`. Fire-and-forget
+  // with aggregated toasts; history-paused freezes provider pushes too.
+  // (`watching` pushes throttle at 60s/episode inside lib/providerSync.)
+  const pushProviderProgress = useCallback(
+    (
+      mode: 'completed' | 'watching',
+      positionSeconds: number,
+      durationSeconds: number,
+    ) => {
+      if (isHistoryPaused()) return;
+      if (!animeId || !episode) return;
+      const dur = Math.floor(Number(durationSeconds) || 0);
+      if (dur <= 0) return;
+      void syncWatchProgress({
+        animeId,
+        episode: Number(episode),
+        progress: Math.floor(Number(positionSeconds) || 0),
+        duration: dur,
+        mode,
+      })
+        .then(({ synced }) => {
+          if (synced.length > 0 && mode === 'completed') {
+            showToast(
+              `Progress synced to ${synced.map((p) => PROVIDER_LABELS[p] ?? p).join(' & ')}`,
+              { type: 'success' },
+            );
+          }
+        })
+        .catch(() => {});
+    },
+    [animeId, episode],
+  );
   const { isLoggedIn } = useAuth();
   const [src, setSrc] = useState<string>('');
   const [srcType, setSrcType] = useState<'hls' | 'mp4'>('hls');
@@ -1768,10 +1796,29 @@ export function Player({
       const playback = JSON.parse(
         localStorage.getItem(LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK) || '{}',
       );
-      const entry = playback[`${animeId}-episode-${episode}`];
-      const t = Number(entry?.currentTime);
-      if (Number.isFinite(t) && t > localSeconds) {
-        localSeconds = Math.floor(t);
+      // Canonical key first, then provider-id-keyed entries (native episode
+      // id lookup via the unified record) — a provider-id entry must not be
+      // invisible to resume.
+      const candidates = [`${animeId}-episode-${episode}`];
+      try {
+        const watched = JSON.parse(
+          localStorage.getItem(LOCAL_HISTORY_KEYS.WATCHED_EPISODES) || '{}',
+        );
+        const native = watched?.[String(animeId)]?.find(
+          (e: { number?: unknown }) =>
+            Math.floor(Number(e?.number)) === Math.floor(Number(episode)),
+        );
+        if (native?.id && typeof native.id === 'string') {
+          candidates.unshift(native.id);
+        }
+      } catch {
+        // unified record unreadable — canonical key still applies
+      }
+      for (const key of candidates) {
+        const t = Number(playback?.[key]?.currentTime);
+        if (Number.isFinite(t) && Math.floor(t) > localSeconds) {
+          localSeconds = Math.floor(t);
+        }
       }
     } catch {
       // Corrupt playback store — the merged-row read below still applies.
@@ -1793,26 +1840,20 @@ export function Player({
       applySeed(localSeconds);
       return stopCountdown;
     }
-    // Server-first for signed-in users (mission rule), then max(server,
-    // local) so a fresher local session never rewinds. Errors fall back to
-    // the local value captured above.
+    // Server-first for signed-in users via the shared resume helper
+    // (max(progress), tie → newest timestamp — same rule as mergeHistoryRow).
+    // Errors fall back to the local value captured above.
     void (async () => {
-      let serverSeconds = 0;
       try {
-        const userId = await getSessionUserId();
-        if (userId) {
-          const rows = await fetchServerHistoryRows(userId);
-          const row = rows.find(
-            (r) =>
-              r.anime_id === Number(animeId) &&
-              r.episode_number === Number(episode),
-          );
-          if (row) serverSeconds = Math.floor(Number(row.progress) || 0);
+        const winner = await getEpisodeProgress(animeId, Number(episode));
+        if (winner && winner.currentTime > 0) {
+          applySeed(Math.max(winner.currentTime, localSeconds));
+          return;
         }
       } catch {
         // Offline / unconfigured client — local fallback below.
       }
-      applySeed(Math.max(serverSeconds, localSeconds));
+      applySeed(localSeconds);
     })();
     return stopCountdown;
   }, [animeId, episode, embedded, isLoggedIn]);
@@ -2229,9 +2270,9 @@ export function Player({
   }, [builtEmbeddedUrl]);
 
   // ─── Zenime iframe postMessage bridge (ported) ────────────────────────────
-  // Progress → all_episode_times; ended (ArtPlayer/FlixCloud/MegaCloud/
-  // watching-log/generic) → transition-locked auto-next. AniList sync stays
-  // structurally present but gated on the missing auth bridge.
+  // Progress → all_episode_times (timestamped); ended (ArtPlayer/FlixCloud/
+  // MegaCloud/watching-log/generic) → transition-locked auto-next.
+  // Provider sync: 60% → `watching`, end → `completed` (restored auto-sync).
   useEffect(() => {
     if (!isEmbedded) return;
 
@@ -2268,17 +2309,23 @@ export function Player({
       if (!episodeKey || duration <= 0) return;
       // Frozen while history recording is paused (see HLS saver above).
       if (isHistoryPaused()) return;
-      const playbackPercentage = (time / duration) * 100;
+      const flooredTime = Math.floor(Number(time) || 0);
+      const flooredDuration = Math.floor(Number(duration) || 0);
+      const playbackPercentage = (flooredTime / flooredDuration) * 100;
       iframeProgressRef.current = {
         ...iframeProgressRef.current,
-        currentTime: time,
-        duration,
+        currentTime: flooredTime,
+        duration: flooredDuration,
       };
       try {
         const all = JSON.parse(
           localStorage.getItem('all_episode_times') || '{}',
         );
-        all[episodeKey] = { currentTime: time, playbackPercentage };
+        all[episodeKey] = {
+          currentTime: flooredTime,
+          playbackPercentage,
+          timestamp: Date.now(),
+        };
         localStorage.setItem('all_episode_times', JSON.stringify(all));
       } catch {
         // localStorage unavailable — ignore
@@ -2294,8 +2341,17 @@ export function Player({
         onPlaybackStartRef.current?.();
       }
       if ((settings as any).aniListSync && isLoggedIn) {
-        // GAP: no auth progress bridge in this build — call no-ops.
-        void saveAniListProgressRef.current?.(episode);
+        try {
+          const dur = Math.floor(Number(iframeProgressRef.current.duration) || 0);
+          const pos = Math.floor(Number(time) || 0);
+          // 60% threshold → `watching` (HLS + OLD embed parity) — the lib
+          // throttles repeat pushes at 60s/episode.
+          if (dur > 0 && pos >= dur * 0.6) {
+            pushProviderProgress('watching', pos, dur);
+          }
+        } catch {
+          // provider push is best-effort
+        }
       }
       // FlixCloud time-based ended detection (Zenime parity).
       if (isFlixcloudEmbed) {
@@ -2484,8 +2540,20 @@ export function Player({
     playbackTransitionRef.current = true;
     playbackTransitionLockUntilRef.current = Date.now() + 2_000;
     try {
-      // Structural AniList slot — no-op until the auth bridge exists.
-      void saveAniListProgressRef.current?.(episode);
+      // Provider completion push (restored auto-sync): ended always counts
+      // as completed; the history save below stays idempotent.
+      try {
+        const dur = Math.floor(
+          Number(
+            artInstanceRef.current?.video?.duration ??
+              iframeProgressRef.current.duration ??
+              0,
+          ) || 0,
+        );
+        if (dur > 0) pushProviderProgress('completed', dur, dur);
+      } catch {
+        // provider push is best-effort
+      }
       if (!autoNextRef.current || !hasNext) {
         // Auto-next off (or final episode): show the "ended" overlay instead
         // of a black screen so the user knows to press Next or Replay.
@@ -2542,11 +2610,17 @@ export function Player({
       ) {
         return; // already recorded complete — don't double-write
       }
-      all[episodeKey] = { currentTime: duration, playbackPercentage: 100 };
+      // Timestamped write (Delta 2b): recency tiebreaks need epoch ms.
+      all[episodeKey] = {
+        currentTime: duration,
+        playbackPercentage: 100,
+        timestamp: Date.now(),
+      };
       localStorage.setItem('all_episode_times', JSON.stringify(all));
     } catch {
       // localStorage unavailable — nothing to record into.
     }
+    pushProviderProgress('completed', duration, duration);
     void publishHistoryNow().catch(() => {});
   };
 
@@ -3776,18 +3850,27 @@ export function Player({
         // Frozen while history recording is paused (freeze-everything
         // semantics): position still renders in-session, nothing persists.
         if (isHistoryPaused()) return;
+        const savedPosition = Math.floor(Number(art.video?.currentTime) || 0);
+        const savedDuration = Math.floor(Number(art.video?.duration) || 0);
         const allPlaybackInfo = JSON.parse(
           localStorage.getItem('all_episode_times') || '{}',
         );
         allPlaybackInfo[episodeKey] = {
-          currentTime: Math.floor(position),
+          currentTime: savedPosition,
           playbackPercentage:
-            (position / (Number(art.video?.duration) || 1)) * 100,
+            (savedPosition / (savedDuration || 1)) * 100,
+          // Timestamped write so mergeHistoryRow's newest-timestamp tiebreak
+          // has data (previously clobbered reconcile's stamps).
+          timestamp: now,
         };
         localStorage.setItem(
           'all_episode_times',
           JSON.stringify(allPlaybackInfo),
         );
+        // 60% threshold → `watching` provider push (Aniraku embed parity).
+        if (savedDuration > 0 && savedPosition >= savedDuration * 0.6) {
+          pushProviderProgress('watching', savedPosition, savedDuration);
+        }
       });
 
       artInstanceRef.current = art;
