@@ -28,19 +28,25 @@ import {
   listAvatars,
   type Avatar,
 } from '../lib/avatars';
-// Library tab (Wave C) — Aniraku Profile.jsx:8-15 sync import/export + the
-// provider row/status copy (:554-672). Transport lives in lib/sync.ts.
+// Library tab (Wave C, upgraded) — Aniraku Profile.jsx:8-15 sync
+// import/export + the provider row/status copy (:554-672). Transports live
+// in lib/sync.ts; import AND export run as background jobs (auto-loop on
+// `limited`, per-provider mutex, bell notifications).
 import {
   describeExport,
   describeImport,
   getExportJobs,
+  getImportJobs,
   getSyncStatus,
-  importProviderList,
-  PROVIDER_LABELS,
   startExportJob,
+  startImportJob,
   subscribeExportJobs,
+  subscribeImportJobs,
+  PROVIDER_LABELS,
   type ExportJobs,
   type ExportJobStatus,
+  type ImportJobs,
+  type ImportJobStatus,
   type SyncStatus,
 } from '../lib/sync';
 import { normalizeListStatus, LIST_STATUSES, LIST_STATUS_LABELS, type ListStatus } from '../lib/listStatus';
@@ -876,17 +882,19 @@ export const Profile: React.FC = () => {
   // (Profile.jsx:43).
   const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncBusy, setSyncBusy] = useState(''); // 'mal-import' | 'mal-export' | ...
   const [syncResult, setSyncResult] = useState<
     Record<string, { type: 'ok' | 'error'; text: string } | null>
   >({});
   const [confirmExport, setConfirmExport] = useState(''); // provider being confirmed
   const [avatarLibraryReady, setAvatarLibraryReady] = useState(false);
-  // Background export jobs (lib/sync.ts runner): progress renders below,
-  // terminal transitions toast + fill the result slot. Seen-statuses ref
-  // keeps toasts to genuine running→done/error edges (no stale toasts).
+  // Background jobs (lib/sync.ts runners): import + export progress render
+  // below, terminal transitions toast + fill the result slot. Seen-status
+  // refs keep toasts to genuine running→done/error edges (no stale toasts).
+  // Per-provider mutexes allow MAL + AniList in parallel.
   const [exportJobs, setExportJobs] = useState<ExportJobs>(() => getExportJobs());
   const exportSeenRef = useRef<Record<string, ExportJobStatus>>({});
+  const [importJobs, setImportJobs] = useState<ImportJobs>(() => getImportJobs());
+  const importSeenRef = useRef<Record<string, ImportJobStatus>>({});
 
   useEffect(
     () =>
@@ -915,6 +923,40 @@ export const Profile: React.FC = () => {
           }
         }
       }),
+    [],
+  );
+
+  useEffect(
+    () =>
+      subscribeImportJobs((jobs) => {
+        setImportJobs({ ...jobs });
+        for (const [provider, job] of Object.entries(jobs)) {
+          const prev = importSeenRef.current[provider];
+          importSeenRef.current[provider] = job.status;
+          if (prev !== 'running') continue;
+          if (job.status === 'done') {
+            const text =
+              job.message ??
+              describeImport({
+                imported: job.imported,
+                already: job.already,
+                episodes: job.episodes,
+                scores: job.scores,
+                unmapped: job.unmapped,
+                limited: false,
+              });
+            setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text } }));
+            showToast(text, { type: 'success' });
+            refreshSyncStatus();
+            loadBookmarks();
+          } else if (job.status === 'error') {
+            const text = job.message ?? 'Import failed';
+            setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text } }));
+            showToast(text, { type: 'error' });
+          }
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -1112,9 +1154,10 @@ export const Profile: React.FC = () => {
     }
   };
 
-  // ── Library import / export (Aniraku Profile.jsx:267-315) ──────────────
-  // Requires the provider connected in Settings; results render through
-  // describeImport/describeExport AND toast (Wave C — Aniraku copy).
+  // ── Library import / export (Aniraku Profile.jsx:267-315, upgraded) ───
+  // Both run as background jobs (auto-loop on `limited`, per-provider
+  // mutex): Import pulls provider library → bookmarks + statuses +
+  // progress + scores; Export writes status + progress + average score.
   const refreshSyncStatus = useCallback(() => {
     if (!user) return;
     getSyncStatus().then((data) => {
@@ -1132,30 +1175,22 @@ export const Profile: React.FC = () => {
   const providerUsername = (provider: string): string =>
     syncStatus?.[provider]?.username || '';
 
-  const runImport = async (provider: string) => {
-    const key = `${provider}-import`;
-    if (syncBusy) return;
-    setSyncBusy(key);
-    setSyncResult((r) => ({ ...r, [provider]: null }));
-    const data = await importProviderList(provider);
-    setSyncBusy('');
-    if (data.error) {
-      const text = data.error;
-      setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text } }));
-      showToast(text, { type: 'error' });
+  const runImport = (provider: string) => {
+    const job = getImportJobs()[provider];
+    if (job?.status === 'running') {
+      showToast(
+        `Import from ${PROVIDER_LABELS[provider]} is already running in the background`,
+        { type: 'warning' },
+      );
       return;
     }
-    const text = describeImport(data);
-    setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text } }));
-    showToast(text, { type: 'success' });
-    refreshSyncStatus();
-    loadBookmarks();
+    setSyncResult((r) => ({ ...r, [provider]: null }));
+    startImportJob(provider);
   };
 
   // Background export: fire-and-forget paced chunk loop (lib/sync.ts runner,
-  // ~30 entries/min). Progress renders below; completion lands in the bell.
+  // per-provider mutex). Progress renders below; completion lands in the bell.
   const runExport = (provider: string) => {
-    if (syncBusy) return;
     setConfirmExport('');
     const job = getExportJobs()[provider];
     if (job?.status === 'running') {
@@ -1527,12 +1562,11 @@ export const Profile: React.FC = () => {
               {['mal', 'anilist'].map((provider) => {
                 const connected = providerConnected(provider);
                 const result = syncResult[provider];
-                const job = exportJobs[provider];
-                const jobRunning = job?.status === 'running';
-                const busy =
-                  syncBusy === `${provider}-import` ||
-                  syncBusy === `${provider}-export` ||
-                  jobRunning;
+                const exportJob = exportJobs[provider];
+                const importJob = importJobs[provider];
+                const exportRunning = exportJob?.status === 'running';
+                const importRunning = importJob?.status === 'running';
+                const busy = exportRunning || importRunning;
                 const confirming = confirmExport === provider;
                 return (
                   <LibraryRow key={provider}>
@@ -1565,9 +1599,7 @@ export const Profile: React.FC = () => {
                             disabled={busy}
                             onClick={() => void runImport(provider)}
                           >
-                            {syncBusy === `${provider}-import`
-                              ? 'Importing…'
-                              : 'Import list'}
+                            {importRunning ? 'Importing…' : 'Import list'}
                           </SmallBtn>
                           <SmallBtn
                             $primary={false}
@@ -1575,7 +1607,7 @@ export const Profile: React.FC = () => {
                             disabled={busy}
                             onClick={() => setConfirmExport(provider)}
                           >
-                            {jobRunning ? 'Exporting…' : 'Export'}
+                            {exportRunning ? 'Exporting…' : 'Export'}
                           </SmallBtn>
                         </BtnRow>
                       ) : (
@@ -1592,16 +1624,31 @@ export const Profile: React.FC = () => {
                       </ResultBox>
                     )}
 
-                    {jobRunning && (
+                    {importRunning && (
                       <ResultBox $tone='ok' role='status'>
-                        Exporting to {PROVIDER_LABELS[provider]} in the
-                        background… {job.exported} titles so far (chunk{' '}
-                        {job.chunks}) — you can leave this page, the bell will
-                        notify you when it finishes.
-                        {job.note ? (
+                        Importing from {PROVIDER_LABELS[provider]} in the
+                        background… {importJob.imported} titles so far (chunk{' '}
+                        {importJob.chunks}) — you can leave this page, the bell
+                        will notify you when it finishes.
+                        {importJob.note ? (
                           <>
                             <br />
-                            {job.note}
+                            {importJob.note}
+                          </>
+                        ) : null}
+                      </ResultBox>
+                    )}
+
+                    {exportRunning && (
+                      <ResultBox $tone='ok' role='status'>
+                        Exporting to {PROVIDER_LABELS[provider]} in the
+                        background… {exportJob.exported} titles so far (chunk{' '}
+                        {exportJob.chunks}) — you can leave this page, the bell
+                        will notify you when it finishes.
+                        {exportJob.note ? (
+                          <>
+                            <br />
+                            {exportJob.note}
                           </>
                         ) : null}
                       </ResultBox>
@@ -1622,7 +1669,7 @@ export const Profile: React.FC = () => {
                             disabled={busy}
                             onClick={() => void runExport(provider)}
                           >
-                            {jobRunning ? 'Exporting…' : 'Yes, export'}
+                            {exportRunning ? 'Exporting…' : 'Yes, export'}
                           </SmallBtn>
                           <SmallBtn
                             $primary={false}

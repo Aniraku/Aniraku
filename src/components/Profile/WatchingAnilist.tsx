@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { useAuth, useUserAnimeList, MediaListStatus } from '../../index';
+import { useUserAnimeList } from '../../client/authService';
+import { MediaListStatus } from '../../client/userInfoTypes';
+import { useAuth as useSupabaseAuth } from '../../hooks/useAuth';
+import { getSyncStatus } from '../../lib/sync';
 import CardGrid from '../Cards/CardGrid';
 
 const Container = styled.div`
@@ -98,13 +101,41 @@ const apiStatusToUserFriendly = {
 };
 
 export const WatchingAnilist = () => {
-  const { isLoggedIn, userData } = useAuth();
+  // Supabase session is the real auth (the legacy client/useAuth
+  // `accessToken` flow is retired — nothing writes it). The AniList
+  // username comes from the backend sync status (OAuth-owned), not from a
+  // direct Viewer query.
+  const supabaseAuth = useSupabaseAuth();
+  const isLoggedIn = Boolean(supabaseAuth?.user);
+  const [anilistUsername, setAnilistUsername] = useState<string>('');
+  const [usernameLoaded, setUsernameLoaded] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>(
     localStorage.getItem('selectedStatus') || 'CURRENT',
   );
 
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setUsernameLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    getSyncStatus()
+      .then((data) => {
+        if (cancelled) return;
+        const username = String(data?.anilist?.username ?? '');
+        setAnilistUsername(username);
+        setUsernameLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setUsernameLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
   const { animeList, loading, error } = useUserAnimeList(
-    userData?.name ?? '',
+    anilistUsername,
     selectedStatus as MediaListStatus,
   );
 
@@ -157,7 +188,17 @@ export const WatchingAnilist = () => {
     return (
       <LoginPromptBox>
         <LoginPromptText>
-          Log in to view your <b>AniList</b> or <b>MyAnimeList</b> :)
+          Log in to view your <b>AniList</b> list :)
+        </LoginPromptText>
+      </LoginPromptBox>
+    );
+
+  if (usernameLoaded && !anilistUsername)
+    return (
+      <LoginPromptBox>
+        <LoginPromptText>
+          Connect <b>AniList</b> in Settings → Library Sync to see your list
+          here. MyAnimeList browsing lives in Settings import/export.
         </LoginPromptText>
       </LoginPromptBox>
     );
@@ -173,7 +214,7 @@ export const WatchingAnilist = () => {
           onChange={handleStatusChange}
           aria-label='List status'
         >
-          {Object.values(MediaListStatus).map((status) => (
+          {Object.values(MediaListStatus).map((status: string) => (
             <option key={status} value={status}>
               {statusLabels[status] || status}
             </option>

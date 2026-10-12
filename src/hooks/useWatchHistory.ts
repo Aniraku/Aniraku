@@ -5,12 +5,16 @@ import {
   ensureDataSync,
   fetchServerHistoryRows,
   forgetSyncedAnime,
+  forgetSyncedEpisode,
   getSessionUserId,
   subscribeToSession,
 } from '../lib/sync';
 import {
   reconcileLocalHistory,
   removeAnimeFromServer,
+  removeAnimeLocal,
+  removeEpisodeFromServer,
+  removeEpisodeLocal,
   subscribeToWatchHistory,
 } from '../lib/watchHistory';
 import {
@@ -228,10 +232,14 @@ function buildEntries(
 
 export interface UseWatchHistoryResult {
   entries: WatchHistoryEntry[];
+  /** All watched episodes per anime (for per-episode expansion/removal). */
+  episodesByAnime: Record<string, Episode[]>;
   /** Re-read localStorage (also called automatically on cross-tab `storage` events). */
   refresh: () => void;
   /** Removes the anime's whole history entry (same behavior as Continue Watching). */
   removeEntry: (animeId: string) => void;
+  /** Removes a single episode; drops the card when the anime empties. */
+  removeEpisode: (animeId: string, episodeNumber: number) => void;
   /** Persisted like live: `aniraku:watching:history-paused`. */
   historyPaused: boolean;
   setHistoryPaused: (paused: boolean) => void;
@@ -328,21 +336,19 @@ export function useWatchHistory(): UseWatchHistoryResult {
     return buildEntries(watched, lastVisited, playback);
   }, [revision]);
 
+  const episodesByAnime = useMemo(() => {
+    void revision;
+    return readJSON<Record<string, Episode[]>>(
+      LOCAL_STORAGE_KEYS.WATCHED_EPISODES,
+      {},
+    );
+  }, [revision]);
+
   const removeEntry = useCallback(
     (animeId: string) => {
-      const watched = readJSON<Record<string, Episode[]>>(
-        LOCAL_STORAGE_KEYS.WATCHED_EPISODES,
-        {},
-      );
-      delete watched[animeId];
-      try {
-        localStorage.setItem(
-          LOCAL_STORAGE_KEYS.WATCHED_EPISODES,
-          JSON.stringify(watched),
-        );
-      } catch {
-        // ignore quota / availability errors
-      }
+      // Full local cleanup (unified + suffixed + playback + stamps + visit)
+      // via the shared lib so History and Continue Watching stay in sync.
+      removeAnimeLocal(animeId);
       refresh();
 
       // Server mirror (Aniraku removeWatchHistoryEntries): drop the anime's
@@ -352,6 +358,25 @@ export function useWatchHistory(): UseWatchHistoryResult {
       getSessionUserId()
         .then((userId) => {
           if (userId) return removeAnimeFromServer(userId, animeId);
+          return undefined;
+        })
+        .catch(() => {
+          // offline / unconfigured client — local removal already applied
+        });
+    },
+    [refresh],
+  );
+
+  const removeEpisode = useCallback(
+    (animeId: string, episodeNumber: number) => {
+      const ep = Math.floor(Number(episodeNumber));
+      if (!animeId || !Number.isFinite(ep) || ep <= 0) return;
+      removeEpisodeLocal(animeId, ep);
+      refresh();
+      forgetSyncedEpisode(animeId, ep);
+      getSessionUserId()
+        .then((userId) => {
+          if (userId) return removeEpisodeFromServer(userId, animeId, ep);
           return undefined;
         })
         .catch(() => {
@@ -383,8 +408,10 @@ export function useWatchHistory(): UseWatchHistoryResult {
 
   return {
     entries,
+    episodesByAnime,
     refresh,
     removeEntry,
+    removeEpisode,
     historyPaused,
     setHistoryPaused,
     order,
