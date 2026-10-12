@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
-import { stampEpisodeWatch, clearEpisodeWatches } from './episodeWatchTimes';
+import {
+  stampEpisodeWatch,
+  clearEpisodeWatches,
+  forgetEpisodeWatches,
+  episodeWatchTime,
+} from './episodeWatchTimes';
 
 // ---------------------------------------------------------------------------
 // Local watch-history shape + merge helpers — TS port of Aniraku
@@ -117,19 +122,46 @@ export const historyEntryKey = (entry: {
     entry?.episode ?? entry?.episode_number ?? 0,
   )}`;
 
-/** Prefer max(progress); on a tie the newest timestamp wins. */
+/** Prefer max(progress); on a tie the newest timestamp wins.
+ * Empty titles/images never clobber good ones — the winner keeps the
+ * loser's non-empty title/image when its own is blank. */
 export const mergeHistoryRow = (a: HistoryRow, b: HistoryRow): HistoryRow => {
-  if (a.progress !== b.progress) return a.progress > b.progress ? a : b;
-  return a.timestamp >= b.timestamp ? a : b;
+  const winner =
+    a.progress !== b.progress
+      ? a.progress > b.progress
+        ? a
+        : b
+      : a.timestamp >= b.timestamp
+        ? a
+        : b;
+  const loser = winner === a ? b : a;
+  const anime_title = winner.anime_title || loser.anime_title || '';
+  const anime_image = winner.anime_image || loser.anime_image || '';
+  if (anime_title === winner.anime_title && anime_image === winner.anime_image)
+    return winner;
+  return { ...winner, anime_title, anime_image };
 };
 
-/** Field-level equality used to decide whether an upload is needed. */
-export const historyRowEquals = (a: HistoryRow, b: HistoryRow): boolean =>
-  a.anime_title === b.anime_title &&
-  a.anime_image === b.anime_image &&
-  a.progress === b.progress &&
-  a.duration === b.duration &&
-  a.timestamp === b.timestamp;
+/** Episode counts as completed: >=90% or within 5s of the end. */
+export function isEpisodeCompleted(progress: number, duration: number): boolean {
+  const p = Math.floor(Number(progress) || 0);
+  const d = Math.floor(Number(duration) || 0);
+  if (p <= 0 || d <= 0) return p > 0 && d <= 0 ? false : false;
+  if (p >= d) return true;
+  return p >= Math.max(d - 5, Math.floor(d * 0.9));
+}
+
+/** Field-level equality used to decide whether an upload is needed.
+ * Duration allows ±2s tolerance: native rows reconstruct duration from
+ * current/(pct/100) with rounding error vs the server's exact value. */
+export const historyRowEquals = (a: HistoryRow, b: HistoryRow): boolean => {
+  if (a.anime_title !== b.anime_title) return false;
+  if (a.anime_image !== b.anime_image) return false;
+  if (a.progress !== b.progress) return false;
+  if (Math.abs((a.duration || 0) - (b.duration || 0)) > 2) return false;
+  if (a.timestamp !== b.timestamp) return false;
+  return true;
+};
 
 // ---------------------------------------------------------------------------
 // Row builders
@@ -187,7 +219,6 @@ function readNativeRows(): HistoryRow[] {
 
     const visit = lastVisited[animeId] ?? {};
     const title = visit.titleEnglish || visit.titleRomaji || '';
-    const timestamp = toCount(visit.timestamp);
 
     for (const episode of episodes) {
       if (!episode || typeof episode !== 'object') continue;
@@ -203,6 +234,13 @@ function readNativeRows(): HistoryRow[] {
       // when both values are known, else 0 (row still records the visit).
       const duration =
         current > 0 && pct > 0 ? Math.round(current / (pct / 100)) : 0;
+      // Row timestamp = per-EPISODE watch time (genuine watch event), NOT
+      // the per-anime visit time. The visit time only seeds rows that were
+      // never stamped (pre-timestamp installs). This stops every page visit
+      // from changing the fingerprint and triggering an upload loop.
+      const episodeStamp = episodeWatchTime(animeId, number);
+      const timestamp =
+        episodeStamp > 0 ? episodeStamp : toCount(visit.timestamp);
       rows.push({
         anime_id: numericId,
         anime_title: title,
@@ -442,17 +480,23 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
     }
 
     // --- last visit -------------------------------------------------------
+    // Per-anime guard (not the loop-global flag): each row decides its own
+    // visit write so a future per-row condition can't mis-fire siblings.
     const visit = lastVisited[animeId] ?? {};
     const nextVisit: LastVisitedEntry = { ...visit };
+    let visitChanged = false;
     if (toCount(visit.timestamp) < row.timestamp) {
       nextVisit.timestamp = row.timestamp;
-      visitedDirty = true;
+      visitChanged = true;
     }
     if (!nextVisit.titleEnglish && !nextVisit.titleRomaji && row.anime_title) {
       nextVisit.titleEnglish = row.anime_title;
+      visitChanged = true;
+    }
+    if (visitChanged) {
+      lastVisited[animeId] = nextVisit;
       visitedDirty = true;
     }
-    if (visitedDirty) lastVisited[animeId] = nextVisit;
 
     // --- playback / resume ------------------------------------------------
     const pb =
@@ -662,22 +706,146 @@ export function subscribeToWatchHistory(
 // Server row deletes (Aniraku removeWatchHistoryEntries / clearWatchHistory)
 // ---------------------------------------------------------------------------
 
-/** Remove one anime's rows locally (whole-anime removal, History semantics). */
+/** Remove one anime's rows locally (whole-anime removal, History semantics).
+ * Full cleanup: unified + suffixed episode lists, visit record, per-episode
+ * playback entries (canonical + provider-id keys), per-episode watch-time
+ * stamps. Publishes per-episode keys so exact-key subscribers also fire. */
 export function removeAnimeLocal(animeId: string | number): void {
+  const key = String(animeId);
   const watched = readJSON<Record<string, NativeEpisode[]>>(
     LOCAL_HISTORY_KEYS.WATCHED_EPISODES,
     {},
   );
-  delete watched[String(animeId)];
+  const episodes = Array.isArray(watched[key]) ? watched[key] : [];
+  const numbers = episodes
+    .map((e) => Math.floor(Number(e?.number)) || 0)
+    .filter((n) => n > 0);
+  const ids = episodes.map((e) => String(e?.id ?? '')).filter(Boolean);
+  delete watched[key];
   writeJSON(LOCAL_HISTORY_KEYS.WATCHED_EPISODES, watched);
+
+  try {
+    localStorage.removeItem(`${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-${key}`);
+  } catch {
+    // storage unavailable
+  }
 
   const lastVisited = readJSON<Record<string, LastVisitedEntry>>(
     LOCAL_HISTORY_KEYS.LAST_ANIME_VISITED,
     {},
   );
-  delete lastVisited[String(animeId)];
+  delete lastVisited[key];
   writeJSON(LOCAL_HISTORY_KEYS.LAST_ANIME_VISITED, lastVisited);
-  publishWatchHistory({ type: 'remove', keys: [`${animeId}`] });
+
+  try {
+    const playback = readJSON<Record<string, PlaybackEntry>>(
+      LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK,
+      {},
+    );
+    let dirty = false;
+    for (const n of numbers) {
+      for (const k of [`${key}-episode-${n}`]) {
+        if (k in playback) {
+          delete playback[k];
+          dirty = true;
+        }
+      }
+    }
+    for (const id of ids) {
+      if (id in playback) {
+        delete playback[id];
+        dirty = true;
+      }
+    }
+    if (dirty) writeJSON(LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK, playback);
+  } catch {
+    // storage unavailable
+  }
+  forgetEpisodeWatches(key);
+
+  const keys = numbers.map((n) => `${key}:${n}`);
+  publishWatchHistory({ type: 'remove', keys: keys.length ? keys : [key] });
+}
+
+/** Remove a single episode locally (per-episode removal, upgraded History).
+ * Drops the episode from unified + suffixed lists, its playback entries and
+ * its watch-time stamp. When the anime has no episodes left the visit record
+ * is also dropped so the card vanishes. */
+export function removeEpisodeLocal(
+  animeId: string | number,
+  episodeNumber: number,
+): void {
+  const key = String(animeId);
+  const ep = Math.floor(Number(episodeNumber));
+  if (!key || !Number.isFinite(ep) || ep <= 0) return;
+  const watched = readJSON<Record<string, NativeEpisode[]>>(
+    LOCAL_HISTORY_KEYS.WATCHED_EPISODES,
+    {},
+  );
+  const list = Array.isArray(watched[key]) ? watched[key] : [];
+  const target = list.find((e) => Math.floor(Number(e?.number)) === ep);
+  const targetId = target ? String(target.id ?? '') : '';
+  const next = list.filter((e) => Math.floor(Number(e?.number)) !== ep);
+  if (next.length) watched[key] = next;
+  else delete watched[key];
+  writeJSON(LOCAL_HISTORY_KEYS.WATCHED_EPISODES, watched);
+
+  try {
+    const suffixedKey = `${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-${key}`;
+    const parsed = JSON.parse(localStorage.getItem(suffixedKey) || '[]');
+    if (Array.isArray(parsed)) {
+      const filtered = parsed.filter(
+        (e) =>
+          e &&
+          typeof e === 'object' &&
+          Math.floor(Number((e as Record<string, unknown>).number)) !== ep,
+      );
+      if (filtered.length) localStorage.setItem(suffixedKey, JSON.stringify(filtered));
+      else localStorage.removeItem(suffixedKey);
+    }
+  } catch {
+    // storage unavailable
+  }
+
+  try {
+    const playback = readJSON<Record<string, PlaybackEntry>>(
+      LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK,
+      {},
+    );
+    let dirty = false;
+    for (const k of [`${key}-episode-${ep}`, targetId]) {
+      if (k && k in playback) {
+        delete playback[k];
+        dirty = true;
+      }
+    }
+    if (dirty) writeJSON(LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK, playback);
+  } catch {
+    // storage unavailable
+  }
+
+  try {
+    const map = JSON.parse(
+      localStorage.getItem('aniraku:episode-watch-times') || '{}',
+    );
+    const stampKey = `${key}-episode-${ep}`;
+    if (map && typeof map === 'object' && stampKey in map) {
+      delete map[stampKey];
+      localStorage.setItem('aniraku:episode-watch-times', JSON.stringify(map));
+    }
+  } catch {
+    // storage unavailable
+  }
+
+  if (!next.length) {
+    const lastVisited = readJSON<Record<string, LastVisitedEntry>>(
+      LOCAL_HISTORY_KEYS.LAST_ANIME_VISITED,
+      {},
+    );
+    delete lastVisited[key];
+    writeJSON(LOCAL_HISTORY_KEYS.LAST_ANIME_VISITED, lastVisited);
+  }
+  publishWatchHistory({ type: 'remove', keys: [`${key}:${ep}`] });
 }
 
 /** Best-effort server delete scoped to `user_id` (RLS enforces ownership). */
@@ -691,6 +859,26 @@ export async function removeAnimeFromServer(
       .delete()
       .eq('user_id', userId)
       .eq('anime_id', Number(animeId));
+  } catch {
+    // offline / unconfigured client — local removal already happened
+  }
+}
+
+/** Best-effort single-episode server delete (per-episode removal path). */
+export async function removeEpisodeFromServer(
+  userId: string,
+  animeId: string | number,
+  episodeNumber: number,
+): Promise<void> {
+  const ep = Math.floor(Number(episodeNumber));
+  if (!Number.isFinite(ep) || ep <= 0) return;
+  try {
+    await supabase
+      .from('watch_history')
+      .delete()
+      .eq('user_id', userId)
+      .eq('anime_id', Number(animeId))
+      .eq('episode_number', ep);
   } catch {
     // offline / unconfigured client — local removal already happened
   }

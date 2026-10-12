@@ -4,6 +4,11 @@ import { year, getCurrentSeason, getNextSeason } from '../index';
 // ---------------------------------------------------------------------------
 // Aniraku data layer — post-Consumet wiring
 // - Metadata (search, lists, anime info): AniList GraphQL DIRECT from browser
+//   (official public API `https://graphql.anilist.co` on main — 30 req/min
+//   cap applies; backend provider writes pace themselves).
+//   Library writes (progress / scores / import / export) go through the
+//   Aniraku Backend (`/api/v1/sync*`, `/api/v1/import|export/*`) which owns
+//   the OAuth tokens and applies its own provider pacing.
 // - Episodes metadata: Aniraku Backend (AniZip + TMDB merge)
 // - Streaming: Aniraku Backend (POST /api/v1/stream, GET /api/v1/servers)
 // ---------------------------------------------------------------------------
@@ -35,8 +40,10 @@ export function proxiedMediaUrl(
   return `${ANIRAKU_BASE}api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
 }
 
-const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
+export const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
 // Module-level AniList availability signal for the global outage banner.
+// Only TRUE outages (network failure, 5xx, 429) flip the banner — ordinary
+// GraphQL errors (validation, not-found) and 4xx must not flap it.
 function reportAnilistStatus(unavailable: boolean): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }));
 }
@@ -240,6 +247,9 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
       { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
     );
     if ((data as any)?.errors?.length) {
+      // GraphQL-level error (bad id, validation, not-found) is NOT an
+      // outage — the endpoint is up. Only network/5xx/429 flips the banner.
+      reportAnilistStatus(false);
       throw new Error(
         `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
       );
@@ -247,7 +257,13 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
     reportAnilistStatus(false);
     return (data as any)?.data;
   } catch (err) {
-    reportAnilistStatus(true);
+    // Banner only on real transport outage (network failure, 5xx, 429) —
+    // ordinary GraphQL/4xx errors must not flap it. Provider write pacing
+    // lives in the backend, not here.
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    const isOutage =
+      status === undefined || status === 429 || (status >= 500 && status <= 599);
+    reportAnilistStatus(isOutage);
     throw err;
   }
 }
