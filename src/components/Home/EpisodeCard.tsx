@@ -10,6 +10,7 @@ import { watchPathFor } from '../../utils/animePaths';
 import {
   type HistoryRow,
   removeAnimeFromServer,
+  removeAnimeLocal,
   subscribeToWatchHistory,
 } from '../../lib/watchHistory';
 import {
@@ -451,17 +452,14 @@ export const EpisodeCard: React.FC = () => {
       .slice(0, limit);
   }, [watchedEpisodesData, lastVisitedData, serverRows, limit]);
 
-  // Close = drop the anime from Continue Watching: native local removal
-  // (unchanged) + the anime's server rows (state + `watch_history`) so the
-  // merged card cannot resurrect on the next fetch.
+  // Close = drop the anime from Continue Watching via the shared full
+  // cleanup (unified + suffixed + playback + stamps + visit) so History and
+  // Continue Watching stay in sync, plus the anime's server rows.
   const handleRemoveCard = (card: ContinueCard) => {
-    if (card.local && watchedEpisodesData) {
+    if (card.local) {
       try {
-        const updatedEpisodes = JSON.parse(watchedEpisodesData || '{}');
-        delete updatedEpisodes[card.animeId];
-        const newWatchedEpisodesData = JSON.stringify(updatedEpisodes);
-        localStorage.setItem('watched-episodes', newWatchedEpisodesData);
-        setWatchedEpisodesData(newWatchedEpisodesData);
+        removeAnimeLocal(card.animeId);
+        setWatchedEpisodesData(localStorage.getItem('watched-episodes'));
       } catch {
         // stale storage is non-fatal
       }

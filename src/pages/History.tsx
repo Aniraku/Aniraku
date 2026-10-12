@@ -956,7 +956,9 @@ const UndoButton = styled.button`
 
 interface HistoryCardProps {
   entry: WatchHistoryEntry;
+  episodes: Episode[];
   onRemove: (animeId: string) => void;
+  onRemoveEpisode: (animeId: string, episodeNumber: number) => void;
   /** Bulk-selection state (Aniraku Profile history rows — always-on). */
   selected: boolean;
   onToggleSelect: (animeId: string) => void;
@@ -964,19 +966,30 @@ interface HistoryCardProps {
 
 const HistoryCard = ({
   entry,
+  episodes,
   onRemove,
+  onRemoveEpisode,
   selected,
   onToggleSelect,
 }: HistoryCardProps) => {
+  const [expanded, setExpanded] = useState(false);
   const handleRemove = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     onRemove(entry.animeId);
   };
+  const toggleExpanded = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setExpanded((v) => !v);
+  };
 
   const episodeNumber = entry.episode.number ?? 0;
   const lastWatchedLabel = relativeLastWatched(entry.lastWatched);
   const progressWidth = `min(100%, max(${Math.max(entry.playback.percentage, 5)}%, 3%))`;
+  const sortedEpisodes = [...(episodes ?? [])].sort(
+    (a, b) => (Number(a?.number) || 0) - (Number(b?.number) || 0),
+  );
 
   return (
     <VerticalCardShell $selected={selected}>
@@ -993,8 +1006,8 @@ const HistoryCard = ({
           <CardRemoveButton
             type='button'
             onClick={handleRemove}
-            title='Remove from history'
-            aria-label='Remove from history'
+            title='Remove anime from history'
+            aria-label='Remove anime from history'
           >
             <CardRemoveIcon aria-hidden={true} />
           </CardRemoveButton>
@@ -1012,7 +1025,74 @@ const HistoryCard = ({
       />
       <CardTitleBelow>
         <CardTitleText>{entry.displayTitle}</CardTitleText>
+        {sortedEpisodes.length > 1 && (
+          <button
+            type='button'
+            onClick={toggleExpanded}
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Hide episodes' : `Show all ${sortedEpisodes.length} episodes`}
+            style={{
+              marginTop: 4,
+              fontSize: 12,
+              color: 'var(--global-text-muted)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            {expanded ? 'Hide episodes' : `${sortedEpisodes.length} episodes ▾`}
+          </button>
+        )}
       </CardTitleBelow>
+      {expanded && sortedEpisodes.length > 1 && (
+        <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {sortedEpisodes.map((ep) => {
+            const n = Math.floor(Number(ep?.number) || 0);
+            if (!n) return null;
+            return (
+              <div
+                key={`${entry.animeId}:${n}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12,
+                  color: 'var(--global-text-muted)',
+                }}
+              >
+                <Link
+                  to={entry.watchPath.replace(/ep=\d+/, `ep=${n}`)}
+                  style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={String(ep?.title ?? `Episode ${n}`)}
+                >
+                  EP {n} — {String(ep?.title ?? `Episode ${n}`)}
+                </Link>
+                <button
+                  type='button'
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveEpisode(entry.animeId, n);
+                  }}
+                  title={`Remove episode ${n}`}
+                  aria-label={`Remove episode ${n} of ${entry.displayTitle}`}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--global-text-muted)',
+                    padding: 2,
+                    display: 'inline-flex',
+                  }}
+                >
+                  <IoClose size={14} aria-hidden={true} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </VerticalCardShell>
   );
 };
@@ -1024,7 +1104,9 @@ const HistoryCard = ({
 const History = () => {
   const {
     entries,
+    episodesByAnime,
     removeEntry,
+    removeEpisode,
     refresh,
     historyPaused,
     setHistoryPaused,
@@ -1190,6 +1272,17 @@ const History = () => {
       removeEntry(animeId);
     },
     [removeEntry],
+  );
+
+  const handleRemoveEpisode = useCallback(
+    (animeId: string, episodeNumber: number) => {
+      removeEpisode(animeId, episodeNumber);
+      setToast({
+        id: Date.now(),
+        message: `Removed episode ${episodeNumber}`,
+      });
+    },
+    [removeEpisode],
   );
 
   // --- Bulk operations --------------------------------------------------
@@ -1507,7 +1600,9 @@ const History = () => {
                         <HistoryCard
                           key={entry.id}
                           entry={entry}
+                          episodes={episodesByAnime[entry.animeId] ?? []}
                           onRemove={handleRemove}
+                          onRemoveEpisode={handleRemoveEpisode}
                           selected={selectedIds.has(entry.animeId)}
                           onToggleSelect={handleToggleSelect}
                         />
@@ -1522,7 +1617,9 @@ const History = () => {
                   <HistoryCard
                     key={entry.id}
                     entry={entry}
+                    episodes={episodesByAnime[entry.animeId] ?? []}
                     onRemove={handleRemove}
+                    onRemoveEpisode={handleRemoveEpisode}
                     selected={selectedIds.has(entry.animeId)}
                     onToggleSelect={handleToggleSelect}
                   />

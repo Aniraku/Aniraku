@@ -8,8 +8,7 @@ import {
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
-import axios from 'axios';
-import { buildAuthUrl, fetchUserData, UserData } from '../index';
+import { buildAuthUrl, fetchUserData, generateCsrfToken, UserData } from '../index';
 import { ReactNode, useEffect } from 'react';
 
 // Reactive variables for user authentication state
@@ -17,7 +16,10 @@ const isLoggedInVar = makeVar<boolean>(false);
 const userDataVar = makeVar<UserData | null>(null);
 
 const httpLink = createHttpLink({
-  uri: 'https://graphql.anilist.co', // Update to your GraphQL server URL
+  // Authenticated AniList traffic stays on the official API on both branches
+  // (docs/ARCHITECTURE §1): the mirror is metadata-only and carries no user
+  // data. Public metadata reads use the mirror via hooks/useApi instead.
+  uri: 'https://graphql.anilist.co',
 });
 
 const authLink = setContext((_, { headers }) => {
@@ -47,18 +49,17 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-// Functions for handling authentication
+// Functions for handling authentication (legacy direct-AniList flow,
+// retired — library sync uses the backend OAuth in lib/sync `syncAuthorize`).
+// `login` keeps the local CSRF redirect for source parity but no longer
+// calls the non-existent GET /get-csrf-token (which made every login fail).
 function login() {
-  axios
-    .get('/get-csrf-token')
-    .then((response) => {
-      const csrfToken = response.data.csrfToken;
-      const authUrl = buildAuthUrl(csrfToken);
-      window.location.href = authUrl;
-    })
-    .catch((error) => {
-      console.error('Error fetching CSRF token or building auth URL:', error);
-    });
+  try {
+    const csrfToken = generateCsrfToken();
+    window.location.href = buildAuthUrl(csrfToken);
+  } catch (error) {
+    console.error('Error building auth URL:', error);
+  }
 }
 
 function logout() {
