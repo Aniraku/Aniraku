@@ -64,6 +64,13 @@ interface Props {
   selectedEpisodeId: string;
   onEpisodeSelect: (id: string) => void;
   maxListHeight: string;
+  /**
+   * Authoritative SERIES total (AniList `episodes`), null when unknown.
+   * Drives bookmark COMPLETED derivation — never pass the loaded-list
+   * length: a truncated/ongoing list derives false COMPLETED statuses
+   * that export to every provider as completed series.
+   */
+  seriesTotalEpisodes?: number | null;
 }
 
 // Styled components for the episode list
@@ -289,6 +296,7 @@ export const EpisodeList: React.FC<Props> = ({
   selectedEpisodeId,
   onEpisodeSelect,
   maxListHeight,
+  seriesTotalEpisodes = null,
 }) => {
   // State for interval, layout, user layout preference, search term, and watched episodes
   const episodeGridRef = useRef<HTMLDivElement>(null);
@@ -366,7 +374,10 @@ export const EpisodeList: React.FC<Props> = ({
             if (selectedEpisode) {
               updatedWatchedEpisodes.push(selectedEpisode);
               recordWatchEvent(animeId, selectedEpisode, {
-                totalEpisodes: episodes.length > 0 ? episodes.length : null,
+                totalEpisodes:
+                  Number(seriesTotalEpisodes) > 0
+                    ? Math.floor(Number(seriesTotalEpisodes))
+                    : null,
               });
               return updatedWatchedEpisodes;
             }
@@ -375,7 +386,7 @@ export const EpisodeList: React.FC<Props> = ({
         });
       }
     },
-    [episodes, animeId],
+    [episodes, animeId, seriesTotalEpisodes],
   );
   const handleEpisodeSelect = useCallback(
     (id: string) => {

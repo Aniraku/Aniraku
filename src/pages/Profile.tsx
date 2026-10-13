@@ -38,6 +38,7 @@ import {
   getExportJobs,
   getImportJobs,
   getSyncStatus,
+  healBookmarkStatuses,
   startExportJob,
   startImportJob,
   subscribeExportJobs,
@@ -1165,9 +1166,24 @@ export const Profile: React.FC = () => {
     });
   }, [user]);
 
-  // Refresh the provider status when the Library tab opens (Aniraku :275-278).
+  // Refresh the provider status when the Library tab opens (Aniraku :275-278),
+  // plus re-verify COMPLETED bookmark rows against authoritative series
+  // totals (repairs false-COMPLETED derived from truncated episode lists).
+  // Runs once per session inside the lib; reloads when it fixed anything.
   useEffect(() => {
     if (activeTab === 'library' && user) refreshSyncStatus();
+    if (activeTab === 'library') {
+      void healBookmarkStatuses()
+        .then((result) => {
+          if (result.fixed > 0) {
+            loadBookmarks();
+            refreshSyncStatus();
+          }
+        })
+        .catch(() => {
+          // best-effort — library renders from current state
+        });
+    }
   }, [activeTab, user, refreshSyncStatus]);
 
   const providerConnected = (provider: string): boolean =>

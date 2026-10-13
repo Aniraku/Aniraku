@@ -10,6 +10,7 @@ import {
   mergeHistoryRow,
   reconcileLocalHistory,
   publishWatchHistory,
+  LOCAL_HISTORY_KEYS,
 } from './watchHistory';
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,7 @@ export function subscribeToSession(listener: SessionListener): () => void {
 
 import {
   normalizeListStatus,
+  deriveStatusAfterWatch,
   statusForNewBookmark,
   LIST_STATUSES,
   LIST_STATUS_LABELS,
@@ -365,6 +367,128 @@ export async function deleteBookmarkRow(
   } catch {
     // ditto
   }
+}
+
+const bookmarkHealRanFor = new Set<string>();
+
+/**
+ * Repair false-COMPLETED bookmarks (once per session scope).
+ *
+ * Root cause fixed alongside this: watch events used to derive the series
+ * total from the LOADED episode-list length, so 6 aired of 12 derived
+ * COMPLETED at 6 watched and persisted `total_episodes: 6` — which export
+ * then pushed to every provider as a completed series. This pass
+ * re-verifies every COMPLETED row against the authoritative AniList total
+ * (bulked ≤50 ids/request via `anilistBatchDetail`) and local watch
+ * evidence, demoting only the corrupt signature:
+ *   local watched > 0 AND watched < authoritative AND stored ≤ watched.
+ * Provider-imported COMPLETED rows (no/low local watches, sane stored
+ * total) are never touched. Stored totals below the authoritative value
+ * are repaired monotonically. Best-effort; guests heal LS-only.
+ */
+export async function healBookmarkStatuses(
+  force = false,
+): Promise<{ checked: number; fixed: number }> {
+  const summary = { checked: 0, fixed: 0 };
+  let uid: string | null = null;
+  try {
+    uid = await getSessionUserId();
+  } catch {
+    uid = null;
+  }
+  const scope = uid ?? 'guest';
+  if (!force && bookmarkHealRanFor.has(scope)) return summary;
+  bookmarkHealRanFor.add(scope);
+
+  try {
+    const bookmarks = readLocalBookmarks();
+    const candidates = bookmarks.filter((b) => b.status === 'COMPLETED');
+    if (!candidates.length) return summary;
+    summary.checked = candidates.length;
+
+    let watched: Record<string, Array<{ number?: unknown }>> = {};
+    try {
+      watched =
+        JSON.parse(
+          localStorage.getItem(LOCAL_HISTORY_KEYS.WATCHED_EPISODES) || '{}',
+        ) || {};
+    } catch {
+      watched = {};
+    }
+
+    const changed: BookmarkEntry[] = [];
+    for (let i = 0; i < candidates.length; i += 50) {
+      const chunk = candidates.slice(i, i + 50);
+      if (i > 0) await sleepMs(2500); // gentle on the official API (main)
+      let detail: Record<string, { episodes: number | null } | null> = {};
+      try {
+        detail = await anilistBatchDetail(chunk.map((b) => b.id));
+      } catch {
+        continue;
+      }
+      for (const entry of chunk) {
+        const media = detail[entry.id];
+        const authoritative =
+          media && Number.isFinite(Number(media.episodes))
+            ? Math.floor(Number(media.episodes))
+            : 0;
+        if (!(authoritative > 0)) continue; // unknown total — unverifiable
+        const list = Array.isArray(watched[String(entry.id)])
+          ? watched[String(entry.id)]
+          : [];
+        const seen = new Set<number>();
+        for (const ep of list) {
+          const n = Math.floor(Number((ep as { number?: unknown })?.number));
+          if (Number.isFinite(n) && n > 0) seen.add(n);
+        }
+        const watchedCount = seen.size;
+        const stored = Math.max(
+          0,
+          Math.floor(Number(entry.total_episodes ?? 0)) || 0,
+        );
+        let dirty = false;
+        if (authoritative > stored) {
+          entry.total_episodes = authoritative;
+          dirty = true;
+        }
+        // Corrupt signature: locally watched some but fewer than the real
+        // total, while the stored total was at/below what was watched
+        // (i.e. derived from a truncated list) → back to Watching.
+        if (
+          watchedCount > 0 &&
+          watchedCount < authoritative &&
+          stored <= watchedCount
+        ) {
+          entry.status = deriveStatusAfterWatch({
+            previous: null,
+            watchedCount,
+            total: authoritative,
+          });
+          dirty = true;
+        }
+        if (dirty) {
+          changed.push({ ...entry });
+          summary.fixed += 1;
+        }
+      }
+    }
+
+    if (changed.length) {
+      writeLocalBookmarks(bookmarks);
+      if (uid) {
+        for (const entry of changed) {
+          try {
+            await upsertBookmarkRow(uid, entry);
+          } catch {
+            // local repair already applied; cloud retries on next merge
+          }
+        }
+      }
+    }
+  } catch {
+    // best-effort — bookmarks stay as they were
+  }
+  return summary;
 }
 
 // ---------------------------------------------------------------------------

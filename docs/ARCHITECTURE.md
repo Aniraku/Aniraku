@@ -143,6 +143,10 @@ Watch), `COMPLETED`, `PAUSED`, `DROPPED`, `REPEATING` (Rewatching).
   `PLANNING → CURRENT → COMPLETED` (needs a known total — never
   guessed), any post-completion watch → `REPEATING`. `DROPPED`/`PAUSED`
   are explicit user actions only, never derived.
+- The series total is authoritative (AniList `episodes`) — never the
+  loaded-list length. Stored totals only ever grow (monotonic max), and
+  Library open re-verifies COMPLETED rows in bulk
+  (`healBookmarkStatuses`), demoting only the truncated-list signature.
 - Surfaced read-only as filter chips + badges on Profile → Bookmarks.
 - Import persists the provider's status per title and backfills
   status-less existing rows (never clobbering real local watch state);

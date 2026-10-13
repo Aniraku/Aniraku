@@ -21,7 +21,7 @@ import {
 import {
   getSessionUserId,
   readLocalBookmarks,
-  setBookmarkStatus,
+  upsertBookmarkRow,
   writeLocalBookmarks,
 } from './sync';
 
@@ -145,6 +145,13 @@ export function recordWatchEvent(
   stampEpisodeWatch(idKey, number, now);
 
   // --- bookmark status advance (hidden mechanism) -----------------------
+  // `total` MUST be the authoritative SERIES total (AniList `episodes`),
+  // never a loaded-list length: a truncated/ongoing list (6 aired of 12)
+  // would otherwise derive COMPLETED at 6 watched and export it to every
+  // provider. Unknown totals stay null → CURRENT at most, never COMPLETED.
+  // Stored totals are monotonic: a smaller observed total never clobbers a
+  // larger stored one, and derivation uses max(observed, stored) so old
+  // truncated rows self-heal the moment a correct total is seen.
   try {
     const bookmarks = readLocalBookmarks();
     const bookmark = bookmarks.find((entry) => String(entry.id) === idKey);
@@ -161,38 +168,38 @@ export function recordWatchEvent(
       } catch {
         watchedNumbers.add(number);
       }
-      const total = Math.max(
+      const observed = Math.max(
         0,
-        Math.floor(
-          Number(
-            options.totalEpisodes ??
-              bookmark.total_episodes ??
-              0,
-          ),
-        ) || 0,
+        Math.floor(Number(options.totalEpisodes ?? 0)) || 0,
       );
+      const stored = Math.max(
+        0,
+        Math.floor(Number(bookmark.total_episodes ?? 0)) || 0,
+      );
+      const total = Math.max(observed, stored);
       const previous: ListStatus | null = bookmark.status ?? null;
       const next = deriveStatusAfterWatch({
         previous,
         watchedCount: watchedNumbers.size,
         total,
       });
-      const totalChanged =
-        total > 0 && (bookmark.total_episodes ?? 0) !== total;
+      const totalChanged = total > stored;
       if (next !== previous || totalChanged) {
+        const updatedEntry = {
+          ...bookmark,
+          status: next,
+          total_episodes: total > 0 ? total : (bookmark.total_episodes ?? null),
+        };
         const updated = bookmarks.map((entry) =>
-          String(entry.id) === idKey
-            ? {
-                ...entry,
-                status: next,
-                total_episodes: total > 0 ? total : (entry.total_episodes ?? null),
-              }
-            : entry,
+          String(entry.id) === idKey ? updatedEntry : entry,
         );
         writeLocalBookmarks(updated);
+        // upsertBookmarkRow (not setBookmarkStatus): total-only changes
+        // must also reach the server — setBookmarkStatus early-returns
+        // when the status is unchanged.
         void getSessionUserId()
           .then((userId) => {
-            if (userId) return setBookmarkStatus(userId, Number(idKey), next, total > 0 ? total : null);
+            if (userId) return upsertBookmarkRow(userId, updatedEntry);
             return undefined;
           })
           .catch(() => {
