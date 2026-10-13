@@ -133,6 +133,37 @@ export type { ListStatus } from './listStatus';
 export const BOOKMARKS_KEY = 'aniraku:bookmarks';
 export const ANIRAKU_BOOKMARKS_KEY = 'aniraku-bookmarks';
 
+/** Window event broadcast on local bookmark writes. */
+export const BOOKMARKS_EVENT = 'aniraku:bookmarks-changed';
+
+export function publishBookmarks(detail?: { type?: string }): void {
+  try {
+    window.dispatchEvent(new CustomEvent(BOOKMARKS_EVENT, { detail }));
+  } catch {
+    // window unavailable (SSR/test) — nothing to notify
+  }
+}
+
+/** Local (same-tab CustomEvent) + cross-tab `storage` subscription. */
+export function subscribeToBookmarks(listener: () => void): () => void {
+  const handleChange = () => listener();
+  const handleStorage = (event: StorageEvent) => {
+    if (
+      event.key === null ||
+      event.key === BOOKMARKS_KEY ||
+      event.key === ANIRAKU_BOOKMARKS_KEY
+    ) {
+      listener();
+    }
+  };
+  window.addEventListener(BOOKMARKS_EVENT, handleChange);
+  window.addEventListener('storage', handleStorage);
+  return () => {
+    window.removeEventListener(BOOKMARKS_EVENT, handleChange);
+    window.removeEventListener('storage', handleStorage);
+  };
+}
+
 export interface BookmarkEntry {
   id: number;
   title: string;
@@ -163,6 +194,7 @@ function writeBookmarksLocal(list: BookmarkEntry[]): void {
   } catch {
     // storage unavailable
   }
+  publishBookmarks();
 }
 
 const toBookmark = (raw: unknown): BookmarkEntry | null => {
@@ -286,6 +318,42 @@ export async function ensureBookmarksMerged(
 ): Promise<BookmarkEntry[]> {
   if (mergedBookmarksUsers.has(userId)) return readLocalBookmarks();
   return mergeBookmarksOnLogin(userId);
+}
+
+/**
+ * Adopt the server bookmark truth into the local mirror — statuses,
+ * totals and titles as import just wrote them — so later watch
+ * derivations and exports build on import state instead of clobbering
+ * it with stale pre-import values. Local-only rows (never uploaded,
+ * e.g. toggled offline) are preserved and pushed up. Always publishes,
+ * so live bookmark UI refreshes. No-op for guests (LS is the truth).
+ */
+export async function refreshLocalBookmarks(
+  userId?: string | null,
+): Promise<BookmarkEntry[]> {
+  const uid = userId ?? (await getSessionUserId().catch(() => null));
+  if (!uid) {
+    publishBookmarks({ type: 'refresh' });
+    return readLocalBookmarks();
+  }
+  try {
+    const cloud = await fetchServerBookmarks(uid);
+    const cloudIds = new Set(cloud.map((entry) => entry.id));
+    const local = readLocalBookmarks();
+    const localOnly = local.filter((entry) => !cloudIds.has(entry.id));
+    if (localOnly.length) {
+      await Promise.allSettled(
+        localOnly.map((entry) => upsertBookmarkRow(uid, entry)),
+      );
+    }
+    const union = [...cloud, ...localOnly];
+    writeLocalBookmarks(union);
+    mergedBookmarksUsers.add(uid);
+    return union;
+  } catch {
+    publishBookmarks({ type: 'refresh' });
+    return readLocalBookmarks();
+  }
 }
 
 /** Authed add — LS optimistic write happens in the hook; this is the passthrough. */
@@ -1927,10 +1995,14 @@ export async function runImportJob(provider: string): Promise<ImportJobState> {
       totals.unmapped += chunk.unmapped ?? 0;
       totals.statuses_updated += chunk.statuses_updated ?? 0;
       if (!chunk.limited) {
-        // Imported episode progress lands in the SERVER `watch_history`
-        // table — pull it into the native stores now so History, Continue
-        // Watching and resume show it immediately (previously invisible
-        // until the next login). The publish wakes every subscriber.
+        // Adopt the import as local truth so later watches/exports build
+        // on it instead of clobbering it with stale pre-import values:
+        //  - episode progress: pull SERVER `watch_history` into the native
+        //    stores (History, Continue Watching, resume show it at once —
+        //    previously invisible until the next login);
+        //  - list state: adopt server bookmarks (imported statuses/totals)
+        //    into the LS mirror + live bookmark UI.
+        // Both publish, waking every subscriber.
         try {
           const uid = await getSessionUserId();
           if (uid) {
@@ -1940,6 +2012,7 @@ export async function runImportJob(provider: string): Promise<ImportJobState> {
               syncedRows.set(historyRowKey(row), { ...row });
             }
             publishWatchHistory({ type: 'sync', keys: rows.map(historyRowKey) });
+            await refreshLocalBookmarks(uid);
           }
         } catch {
           // offline — merge-on-login picks the rows up next session
