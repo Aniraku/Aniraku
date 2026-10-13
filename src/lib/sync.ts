@@ -1503,6 +1503,10 @@ export async function runExportJob(provider: string): Promise<ExportJobState> {
     ...(note ? { note } : {}),
   });
   setExportJob(progress());
+  // The backend exports from the SERVER tables, so flush pending local
+  // history first — otherwise progress watched in the last seconds (after
+  // the 10s engine tick) is silently missing from the provider.
+  await publishHistoryNow().catch(() => {});
   try {
     for (;;) {
       const chunk = await exportProviderList(provider);
@@ -1780,6 +1784,23 @@ export async function runImportJob(provider: string): Promise<ImportJobState> {
       totals.unmapped += chunk.unmapped ?? 0;
       totals.statuses_updated += chunk.statuses_updated ?? 0;
       if (!chunk.limited) {
+        // Imported episode progress lands in the SERVER `watch_history`
+        // table — pull it into the native stores now so History, Continue
+        // Watching and resume show it immediately (previously invisible
+        // until the next login). The publish wakes every subscriber.
+        try {
+          const uid = await getSessionUserId();
+          if (uid) {
+            const rows = await fetchServerHistoryRows(uid);
+            if (rows.length) reconcileLocalHistory(rows);
+            for (const row of rows) {
+              syncedRows.set(historyRowKey(row), { ...row });
+            }
+            publishWatchHistory({ type: 'sync', keys: rows.map(historyRowKey) });
+          }
+        } catch {
+          // offline — merge-on-login picks the rows up next session
+        }
         const message = await notifyImportFinished(provider, totals);
         const terminal: ImportJobState = { ...progress(), status: 'done', message };
         setImportJob(terminal);
