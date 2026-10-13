@@ -884,6 +884,110 @@ export async function removeEpisodeFromServer(
   }
 }
 
+export interface PurgedEpisode {
+  animeId: string;
+  episode: number;
+}
+
+/**
+ * Purge "selected but never played" episodes from the local stores.
+ *
+ * Older builds recorded a watch event on mere episode SELECT/navigation,
+ * so browsing inflated watch counts — and the server rows uploaded from
+ * them (progress 0) made bulk export report full progress for half-watched
+ * series. Selection no longer records; this removes the leftovers: unified
+ * entries with NO `all_episode_times` playback record (genuine playback —
+ * HLS ticks, completions, embed progress — always leaves one, even at 0s).
+ * Also drops their suffixed-list copies and watch-time stamps, and (via
+ * the sync engine) their 0-progress server rows. Returns what was purged.
+ */
+export function purgeUnplayedSelectionsLocal(): PurgedEpisode[] {
+  const purged: PurgedEpisode[] = [];
+  try {
+    const watched = readJSON<Record<string, NativeEpisode[]>>(
+      LOCAL_HISTORY_KEYS.WATCHED_EPISODES,
+      {},
+    );
+    const playback = readJSON<Record<string, PlaybackEntry>>(
+      LOCAL_HISTORY_KEYS.EPISODE_PLAYBACK,
+      {},
+    );
+    let dirty = false;
+    for (const [animeId, eps] of Object.entries(watched)) {
+      if (!Array.isArray(eps) || eps.length === 0) continue;
+      const kept = eps.filter((entry) => {
+        const n = Math.floor(Number(entry?.number)) || 0;
+        if (!(n > 0)) {
+          dirty = true;
+          return false;
+        }
+        const id = String(entry?.id ?? '');
+        if (
+          (id && id in playback) ||
+          `${animeId}-episode-${n}` in playback
+        ) {
+          return true;
+        }
+        purged.push({ animeId, episode: n });
+        dirty = true;
+        return false;
+      });
+      if (kept.length) watched[animeId] = kept;
+      else delete watched[animeId];
+    }
+    if (!dirty) return purged;
+    writeJSON(LOCAL_HISTORY_KEYS.WATCHED_EPISODES, watched);
+    try {
+      for (const { animeId, episode } of purged) {
+        const key = `${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-${animeId}`;
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed)) continue;
+        const filtered = parsed.filter(
+          (entry) =>
+            !entry ||
+            typeof entry !== 'object' ||
+            Math.floor(
+              Number((entry as Record<string, unknown>).number),
+            ) !== episode,
+        );
+        if (filtered.length) localStorage.setItem(key, JSON.stringify(filtered));
+        else localStorage.removeItem(key);
+      }
+    } catch {
+      // storage unavailable — suffixed copies simply remain
+    }
+    try {
+      const mapKey = 'aniraku:episode-watch-times';
+      const map: unknown = JSON.parse(
+        localStorage.getItem(mapKey) || '{}',
+      );
+      if (map && typeof map === 'object' && !Array.isArray(map)) {
+        const record = map as Record<string, unknown>;
+        let stampDirty = false;
+        for (const { animeId, episode } of purged) {
+          const stampKey = `${animeId}-episode-${episode}`;
+          if (stampKey in record) {
+            delete record[stampKey];
+            stampDirty = true;
+          }
+        }
+        if (stampDirty) localStorage.setItem(mapKey, JSON.stringify(record));
+      }
+    } catch {
+      // storage unavailable — stamps simply remain
+    }
+    publishWatchHistory({
+      type: 'remove',
+      keys: purged.map((p) => `${p.animeId}:${p.episode}`),
+    });
+  } catch {
+    // storage unavailable — nothing purged
+  }
+  return purged;
+}
+
 /** Clear local history and (optionally) every server row for the user. */
 export async function clearWatchHistory(
   { userId }: { userId?: string | null } = {},
