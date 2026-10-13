@@ -10,6 +10,8 @@ import {
   mergeHistoryRow,
   reconcileLocalHistory,
   publishWatchHistory,
+  purgeUnplayedSelectionsLocal,
+  removeEpisodeFromServer,
   LOCAL_HISTORY_KEYS,
 } from './watchHistory';
 
@@ -609,6 +611,23 @@ export async function mergeHistoryOnLogin(userId: string): Promise<void> {
   }
   mergedHistoryUsers.add(userId);
   publishWatchHistory({ type: 'sync', keys: [...merged.keys()] });
+
+  // Purge "selected but never played" leftovers (older builds recorded on
+  // select/navigation): drop their local entries AND their 0-progress
+  // server rows so bulk export counts only genuinely played episodes.
+  // Runs after reconcile so server-only 0-rows (synthesized locally above)
+  // are caught too.
+  try {
+    const purged = purgeUnplayedSelectionsLocal();
+    if (purged.length) {
+      for (const p of purged) forgetSyncedEpisode(p.animeId, p.episode);
+      await Promise.allSettled(
+        purged.map((p) => removeEpisodeFromServer(userId, p.animeId, p.episode)),
+      );
+    }
+  } catch {
+    // best-effort — merge already landed
+  }
 }
 
 /** Diff-flush the local rows against the last synced snapshot (throttled).

@@ -1157,7 +1157,10 @@ const WatchInner: React.FC = () => {
           number: selectedEpisode.number,
         }),
       );
-      updateWatchedEpisodes(selectedEpisode);
+      // Selecting/navigating never marks watched — only genuine playback
+      // does (handlePlaybackStarted on first timeupdate). Otherwise merely
+      // browsing episodes inflates watch counts and exports full progress
+      // for half-watched series.
 
       // Live episode write: `/watch/{id}/{slug}?ep={N}` with REPLACE (live's
       // `history.replaceState` + `setSearchParams({replace:true})` — never a

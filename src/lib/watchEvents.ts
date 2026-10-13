@@ -12,7 +12,7 @@
 //
 // Returns false when nothing was written (paused, invalid input).
 
-import { LOCAL_HISTORY_KEYS } from './watchHistory';
+import { LOCAL_HISTORY_KEYS, publishWatchHistory } from './watchHistory';
 import { episodeTimeKey, stampEpisodeWatch } from './episodeWatchTimes';
 import {
   deriveStatusAfterWatch,
@@ -210,6 +210,11 @@ export function recordWatchEvent(
   } catch {
     // status advance is best-effort; the watch itself is recorded
   }
+
+  // Wake same-tab subscribers (History, Continue Watching, checkmarks) —
+  // previously only cross-tab `storage` events did, so guests saw stale UI
+  // until remount.
+  publishWatchHistory({ type: 'upsert', keys: [`${idKey}:${number}`] });
 
   return true;
 }
