@@ -53,14 +53,6 @@ import {
 import { normalizeListStatus, LIST_STATUSES, LIST_STATUS_LABELS, type ListStatus } from '../lib/listStatus';
 import ProviderIcon from '../components/ProviderIcon';
 import { showToast } from '../components/Toaster';
-import {
-  computeForcePlan,
-  getForceJobs,
-  startForceJob,
-  subscribeForceJobs,
-  type ForceJobs,
-  type ForceJobStatus,
-} from '../lib/providerSync';
 import { infoPathFor } from '../utils/animePaths';
 
 // Same as the live .vh helper (visually hidden heading)
@@ -904,9 +896,6 @@ export const Profile: React.FC = () => {
   const exportSeenRef = useRef<Record<string, ExportJobStatus>>({});
   const [importJobs, setImportJobs] = useState<ImportJobs>(() => getImportJobs());
   const importSeenRef = useRef<Record<string, ImportJobStatus>>({});
-  const [forceJobs, setForceJobs] = useState<ForceJobs>(() => getForceJobs());
-  const forceSeenRef = useRef<Record<string, ForceJobStatus>>({});
-  const [confirmForce, setConfirmForce] = useState(''); // provider being force-confirmed
 
   useEffect(
     () =>
@@ -969,28 +958,6 @@ export const Profile: React.FC = () => {
         }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  useEffect(
-    () =>
-      subscribeForceJobs((jobs) => {
-        setForceJobs({ ...jobs });
-        for (const [provider, job] of Object.entries(jobs)) {
-          const prev = forceSeenRef.current[provider];
-          forceSeenRef.current[provider] = job.status;
-          if (prev !== 'running') continue;
-          if (job.status === 'done') {
-            const text = job.message ?? 'Force overwrite finished';
-            setSyncResult((r) => ({ ...r, [provider]: { type: 'ok', text } }));
-            showToast(text, { type: 'success' });
-          } else if (job.status === 'error') {
-            const text = job.message ?? 'Force overwrite failed';
-            setSyncResult((r) => ({ ...r, [provider]: { type: 'error', text } }));
-            showToast(text, { type: 'error' });
-          }
-        }
-      }),
     [],
   );
 
@@ -1251,23 +1218,6 @@ export const Profile: React.FC = () => {
     }
     setSyncResult((r) => ({ ...r, [provider]: null }));
     startExportJob(provider);
-  };
-
-  // Force overwrite: pushes Aniraku's finished counts straight through the
-  // per-episode update endpoint, bypassing bulk export's never-regress
-  // guard — the correction path for provider values stuck too high.
-  const runForce = (provider: string) => {
-    setConfirmForce('');
-    const job = getForceJobs()[provider];
-    if (job?.status === 'running') {
-      showToast(
-        `Force overwrite on ${PROVIDER_LABELS[provider]} is already running in the background`,
-        { type: 'warning' },
-      );
-      return;
-    }
-    setSyncResult((r) => ({ ...r, [provider]: null }));
-    startForceJob(provider);
   };
 
   const handleSignOut = async () => {
@@ -1614,10 +1564,7 @@ export const Profile: React.FC = () => {
                 Completed, …), episode progress and scores (progress only
                 advances, existing ratings are kept). Export writes each
                 title's current status, watch progress and average score
-                there, skipping titles that already match. Export never
-                lowers a number the provider has higher — if a
-                provider value is stuck too high, Force overwrites it
-                with Aniraku&apos;s finished counts. Both
+                there, skipping titles that already match. Both
                 use the connection from{' '}
                 <Link
                   to='/profile/settings'
@@ -1633,13 +1580,10 @@ export const Profile: React.FC = () => {
                 const result = syncResult[provider];
                 const exportJob = exportJobs[provider];
                 const importJob = importJobs[provider];
-                const forceJob = forceJobs[provider];
                 const exportRunning = exportJob?.status === 'running';
                 const importRunning = importJob?.status === 'running';
-                const forceRunning = forceJob?.status === 'running';
-                const busy = exportRunning || importRunning || forceRunning;
+                const busy = exportRunning || importRunning;
                 const confirming = confirmExport === provider;
-                const confirmingForce = confirmForce === provider;
                 return (
                   <LibraryRow key={provider}>
                     <LibraryRowHead>
@@ -1680,14 +1624,6 @@ export const Profile: React.FC = () => {
                             onClick={() => setConfirmExport(provider)}
                           >
                             {exportRunning ? 'Exporting…' : 'Export'}
-                          </SmallBtn>
-                          <SmallBtn
-                            $primary={false}
-                            type='button'
-                            disabled={busy}
-                            onClick={() => setConfirmForce(provider)}
-                          >
-                            {forceRunning ? 'Forcing…' : 'Force'}
                           </SmallBtn>
                         </BtnRow>
                       ) : (
@@ -1734,22 +1670,6 @@ export const Profile: React.FC = () => {
                       </ResultBox>
                     )}
 
-                    {forceRunning && (
-                      <ResultBox $tone='ok' role='status'>
-                        Overwriting {PROVIDER_LABELS[provider]} with
-                        Aniraku&apos;s numbers in the background…{' '}
-                        {forceJob.pushed}/{forceJob.total} titles — you can
-                        leave this page, the bell will notify you when it
-                        finishes.
-                        {forceJob.note ? (
-                          <>
-                            <br />
-                            {forceJob.note}
-                          </>
-                        ) : null}
-                      </ResultBox>
-                    )}
-
                     {confirming && (
                       <ConfirmBox>
                         <p>
@@ -1778,65 +1698,6 @@ export const Profile: React.FC = () => {
                         </BtnRow>
                       </ConfirmBox>
                     )}
-
-                    {confirmingForce &&
-                      (() => {
-                        const plan = computeForcePlan();
-                        return (
-                          <ConfirmBox>
-                            <p>
-                              Overwrite your {PROVIDER_LABELS[provider]}{' '}
-                              numbers with Aniraku&apos;s finished counts?
-                              Unlike Export, this lowers values the provider
-                              has too high. {plan.targets.length} title
-                              {plan.targets.length === 1 ? '' : 's'} will be
-                              overwritten
-                              {plan.skippedNoEvidence.length > 0
-                                ? `, ${plan.skippedNoEvidence.length} skipped (no finished episodes locally — clear those on the provider manually)`
-                                : ''}
-                              . Run Export afterwards to sync statuses and
-                              remaining scores.
-                            </p>
-                            {plan.targets.length > 0 && (
-                              <ul
-                                style={{
-                                  margin: '8px 0',
-                                  paddingLeft: 18,
-                                  fontSize: 12,
-                                  maxHeight: 160,
-                                  overflowY: 'auto',
-                                }}
-                              >
-                                {plan.targets.map((t) => (
-                                  <li key={t.animeId}>
-                                    {t.title} → EP {t.episode}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                            <BtnRow>
-                              <SmallBtn
-                                $primary
-                                type='button'
-                                disabled={busy || plan.targets.length === 0}
-                                onClick={() => void runForce(provider)}
-                              >
-                                {forceRunning
-                                  ? 'Overwriting…'
-                                  : 'Yes, overwrite'}
-                              </SmallBtn>
-                              <SmallBtn
-                                $primary={false}
-                                type='button'
-                                disabled={busy}
-                                onClick={() => setConfirmForce('')}
-                              >
-                                Cancel
-                              </SmallBtn>
-                            </BtnRow>
-                          </ConfirmBox>
-                        );
-                      })()}
                   </LibraryRow>
                 );
               })}

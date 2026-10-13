@@ -7,6 +7,7 @@ import {
   ensureBookmarksMerged,
   ensureDataSync,
   readLocalBookmarks,
+  subscribeToBookmarks,
   subscribeToSession,
   upsertBookmarkRow,
   writeLocalBookmarks,
@@ -90,6 +91,10 @@ function startStore(): void {
         refreshLocal();
       }
     });
+    // Same-tab bookmark writes (toggles, merge-on-login, import adoption,
+    // status advances) — e.g. an import finishing on Profile refreshes
+    // bookmark icons on a mounted Info page without remount.
+    subscribeToBookmarks(() => refreshLocal());
   }
 }
 
