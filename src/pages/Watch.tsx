@@ -1097,10 +1097,17 @@ const WatchInner: React.FC = () => {
   // watch time, and advances the bookmark status. Returns false while
   // history recording is paused (freeze-everything semantics) — resume
   // keys (last-watched-*) stay ungated so playback position still resumes.
+  // Series total is authoritative (AniList `episodes`, 0/unknown → null):
+  // NEVER the loaded-list length — a truncated/ongoing list would derive
+  // a false COMPLETED and export it to every provider.
   const updateWatchedEpisodes = (episode: Episode) => {
     if (!animeId) return;
+    const seriesTotal =
+      animeInfo && Number(animeInfo.totalEpisodes) > 0
+        ? Math.floor(Number(animeInfo.totalEpisodes))
+        : null;
     recordWatchEvent(animeId, episode, {
-      totalEpisodes: episodes.length > 0 ? episodes.length : null,
+      totalEpisodes: seriesTotal,
     });
   };
 
@@ -1884,6 +1891,11 @@ const WatchInner: React.FC = () => {
           animeId={animeId}
           episodes={episodes}
           selectedEpisodeId={currentEpisode.id}
+          seriesTotalEpisodes={
+            animeInfo && Number(animeInfo.totalEpisodes) > 0
+              ? Math.floor(Number(animeInfo.totalEpisodes))
+              : null
+          }
           onEpisodeSelect={(episodeId: string) => {
             const episode = episodes.find((e) => e.id === episodeId);
             if (episode) {
