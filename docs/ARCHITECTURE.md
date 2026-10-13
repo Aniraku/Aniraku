@@ -180,6 +180,14 @@ Watch), `COMPLETED`, `PAUSED`, `DROPPED`, `REPEATING` (Rewatching).
   honoring `Retry-After`, completion/failure → Supabase `notifications`
   row + bell refresh. Job state in `aniraku:export-job` (reload marks
   mid-flight jobs `interrupted`; chunks are server-idempotent).
+- **Force overwrite** (`src/lib/providerSync.ts`): bulk export never
+  lowers a provider number it finds higher (never-regress guard), so
+  past-inflated values are permanent through Export. Force pushes each
+  bookmarked title's highest finished local episode straight through
+  `POST /api/v1/sync/update` (no lead guard there) + average score, one
+  title per 5s, with confirm screen, progress, and bell receipt. Titles
+  with no finished local episode are skipped (the endpoint rejects
+  unwatched pushes).
 - **Upcoming/unreleased panel**: conservative triggers only (explicit
   status / future episode), exact old-Aniraku stage styling, and no
   backend requests for unreleased titles. `src/lib/upcomingMessages.ts`
