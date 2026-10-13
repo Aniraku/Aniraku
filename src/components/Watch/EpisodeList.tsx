@@ -17,7 +17,7 @@ import {
   faEyeSlash,
 } from '@fortawesome/free-solid-svg-icons';
 import { Episode } from '../../index';
-import { recordWatchEvent } from '../../lib/watchEvents';
+import { subscribeToWatchHistory } from '../../lib/watchHistory';
 
 // Live `hideSpoiler` pref ("Hide Spoilers" — blocks episode images behind a
 // HIDDEN SPOILER overlay). StoredSettings keeps it internal to the settings
@@ -296,7 +296,6 @@ export const EpisodeList: React.FC<Props> = ({
   selectedEpisodeId,
   onEpisodeSelect,
   maxListHeight,
-  seriesTotalEpisodes = null,
 }) => {
   // State for interval, layout, user layout preference, search term, and watched episodes
   const episodeGridRef = useRef<HTMLDivElement>(null);
@@ -336,73 +335,46 @@ export const EpisodeList: React.FC<Props> = ({
 
   const [selectionInitiatedByUser, setSelectionInitiatedByUser] =
     useState(false);
-  // The unified writer (recordWatchEvent, called from markEpisodeAsWatched)
-  // persists BOTH the suffixed and unified stores, so no persistence
-  // effect is needed here — state is checkmark truth only.
-  // Load watched episodes from local storage when animeId changes
+  // Checkmarks reflect STORED watch truth (unified `watched-episodes`
+  // record) — selecting/navigating an episode never marks it watched.
+  // Only genuine playback records (Watch `handlePlaybackStarted` → the
+  // unified writer) create entries. This effect re-reads on anime change
+  // AND on every same-tab/cross-tab history write so checkmarks follow
+  // playback without a click ever writing storage.
   useEffect(() => {
-    if (animeId) {
-      localStorage.setItem(`listLayout-[${animeId}]`, displayMode);
-      const watched = localStorage.getItem('watched-episodes');
-      if (watched) {
-        const watchedEpisodesObject = JSON.parse(watched);
-        const watchedEpisodesForAnime = watchedEpisodesObject[animeId];
-        if (watchedEpisodesForAnime) {
-          setWatchedEpisodes(watchedEpisodesForAnime);
+    if (!animeId) return;
+    localStorage.setItem(`listLayout-[${animeId}]`, displayMode);
+    const readStored = () => {
+      try {
+        const watched = localStorage.getItem('watched-episodes');
+        if (watched) {
+          const watchedEpisodesObject = JSON.parse(watched);
+          const watchedEpisodesForAnime = watchedEpisodesObject[animeId];
+          setWatchedEpisodes(
+            Array.isArray(watchedEpisodesForAnime)
+              ? watchedEpisodesForAnime
+              : [],
+          );
+          return;
         }
+      } catch {
+        // corrupt store — checkmarks simply clear
       }
-    }
+      setWatchedEpisodes([]);
+    };
+    readStored();
+    return subscribeToWatchHistory(() => readStored());
   }, [animeId]);
 
-  // Function to handle episode selection
-  // Function to mark an episode as watched — state drives the checkmarks;
-  // persistence flows through the unified writer (both stores + timestamp
-  // + bookmark status). The writer is pause-gated, so a paused click only
-  // flips the in-session checkmark, never storage.
-  const markEpisodeAsWatched = useCallback(
-    (id: string) => {
-      if (animeId) {
-        setWatchedEpisodes((prevWatchedEpisodes) => {
-          const updatedWatchedEpisodes = [...prevWatchedEpisodes];
-          const selectedEpisodeIndex = updatedWatchedEpisodes.findIndex(
-            (episode) => episode.id === id,
-          );
-          if (selectedEpisodeIndex === -1) {
-            const selectedEpisode = episodes.find(
-              (episode) => episode.id === id,
-            );
-            if (selectedEpisode) {
-              updatedWatchedEpisodes.push(selectedEpisode);
-              recordWatchEvent(animeId, selectedEpisode, {
-                totalEpisodes:
-                  Number(seriesTotalEpisodes) > 0
-                    ? Math.floor(Number(seriesTotalEpisodes))
-                    : null,
-              });
-              return updatedWatchedEpisodes;
-            }
-          }
-          return prevWatchedEpisodes;
-        });
-      }
-    },
-    [episodes, animeId, seriesTotalEpisodes],
-  );
+  // Selecting an episode only navigates — watching is recorded by genuine
+  // playback (Watch `handlePlaybackStarted`), never by clicks/navigation.
   const handleEpisodeSelect = useCallback(
     (id: string) => {
       setSelectionInitiatedByUser(true);
-      markEpisodeAsWatched(id); // Mark the episode as watched
       onEpisodeSelect(id);
     },
-    [onEpisodeSelect, markEpisodeAsWatched],
+    [onEpisodeSelect],
   );
-
-  // Update watched episodes when a new episode is selected or visited
-  useEffect(() => {
-    if (selectedEpisodeId && !selectionInitiatedByUser) {
-      markEpisodeAsWatched(selectedEpisodeId);
-    }
-  }, [selectedEpisodeId, selectionInitiatedByUser, markEpisodeAsWatched]);
 
   // Generate interval options
   const intervalOptions = useMemo(() => {
