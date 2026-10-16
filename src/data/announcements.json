@@ -1,0 +1,11 @@
+[
+  {
+    "id": "backend-limit-donate-1",
+    "title": "Keep Aniraku Alive",
+    "message": "Our backend is running out of limits soon — streaming servers, metadata and sync all run on paid infrastructure. If you want Aniraku to stay alive, please consider donating. Every contribution keeps the episodes playing.",
+    "link": "/about",
+    "linkLabel": "How to donate",
+    "start": "2026-10-16T00:00:00Z",
+    "end": "2026-11-30T00:00:00Z"
+  }
+]

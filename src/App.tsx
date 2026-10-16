@@ -30,6 +30,7 @@ import BottomNav from './components/Navigation/BottomNav';
 // Aniraku parity: support modal behind the navbar heart (event-driven via
 // `aniraku:open-support`; also auto-prompts after 30 min active time).
 import SupportPrompt from './components/SupportPrompt';
+import AnnouncementModal from './components/AnnouncementModal';
 import './components/global-chrome.css';
 // Task wave — global crash boundary (wraps everything below the nav so a
 // caught crash still leaves the navbar alive for the resetKey route change),
@@ -137,6 +138,7 @@ function App() {
               <GlobalShortcutsBridge />
               <ShortcutsPopup />
               <SupportPrompt />
+              <AnnouncementModal />
               <ScrollToTop />
               <TrackPageViews />
               <div style={{ minHeight: '35rem' }}>

@@ -7,6 +7,9 @@ export const SUPPORT_FUNDING_COPY =
 
 export const BINANCE_PAY_UID = '1098400042';
 export const BINANCE_PAY_LABEL = 'Binance Pay';
+export const BINANCE_PAY_USERNAME = 'SHO_WAIB21';
+/** Public QR card (`public/binance-pay-qr.webp`) — scanned in Binance Pay. */
+export const BINANCE_QR_SRC = '/binance-pay-qr.webp';
 
 export const SUPPORT_PROMPT_ACTIVE_MS = 30 * 60 * 1000;
 export const SUPPORT_PROMPT_DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
