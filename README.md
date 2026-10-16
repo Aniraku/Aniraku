@@ -28,13 +28,14 @@ Aniraku is open source. Voluntary support helps fund **hosting, releases, and op
 
 ## Binance Pay
 
-Send directly via Binance Pay to UID:
+Send directly via Binance Pay — scan the QR on the site (About page or the
+support popup) or send to username `SHO_WAIB21` / UID:
 
 ```
 1098400042
 ```
 
-Open Binance > Pay > Enter UID > Send. No network fees.
+Open Binance > Pay > scan or Enter UID > Send. No network fees.
 
 Read the full [Support Guide](./SUPPORT.md).
 
