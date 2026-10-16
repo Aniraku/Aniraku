@@ -5,7 +5,8 @@
 //     "link": "/profile", "linkLabel": "Open profile",
 //     "start": "2026-10-20T00:00:00Z", "end": "2026-10-27T00:00:00Z" }
 // `link`/`linkLabel`/`start`/`end` are optional; no `end` = runs forever.
-// Each id shows once (dismissal persisted) — bump the id to re-show.
+// Dismissal is session-scoped: closing hides it until the next visit, when
+// every active announcement shows again.
 import raw from '../data/announcements.json';
 
 export interface Announcement {
@@ -20,7 +21,22 @@ export interface Announcement {
   end?: string;
 }
 
-const DISMISSED_KEY = 'aniraku:announcements:dismissed';
+const DISMISSED_KEY = 'aniraku:announcements:dismissed-session';
+
+// In-memory fallback when sessionStorage is unavailable (private mode);
+// still session-scoped — a reload re-shows, same as closing rules below.
+const memoryDismissed = new Set<string>();
+
+function sessionStore(): Pick<Storage, 'getItem' | 'setItem'> | null {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      return window.sessionStorage;
+    }
+  } catch {
+    // storage blocked — fall through to memory
+  }
+  return null;
+}
 
 function asAnnouncement(item: unknown): Announcement | null {
   if (!item || typeof item !== 'object') return null;
@@ -67,23 +83,28 @@ export function getActiveAnnouncements(now: number = Date.now()): Announcement[]
 }
 
 export function readDismissedIds(): Set<string> {
+  const store = sessionStore();
+  if (!store) return new Set(memoryDismissed);
   try {
-    const parsed = JSON.parse(
-      localStorage.getItem(DISMISSED_KEY) || '[]',
+    const parsed = JSON.parse(store.getItem(DISMISSED_KEY) || '[]');
+    return new Set(
+      Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : [],
     );
-    return new Set(Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []);
   } catch {
-    return new Set();
+    return new Set(memoryDismissed);
   }
 }
 
 export function dismissAnnouncement(id: string): void {
+  memoryDismissed.add(id);
+  const store = sessionStore();
+  if (!store) return;
   try {
     const next = readDismissedIds();
     next.add(id);
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next]));
+    store.setItem(DISMISSED_KEY, JSON.stringify([...next]));
   } catch {
-    // storage unavailable — shows again next visit
+    // storage blocked — memory set above still covers this session
   }
 }
 
