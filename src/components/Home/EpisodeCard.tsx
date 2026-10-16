@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { FaPlay } from 'react-icons/fa';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/swiper-bundle.css';
-import { Episode } from '../../index';
+import type { Episode } from '../../hooks/animeInterface';
 import { IoIosCloseCircleOutline } from 'react-icons/io';
 import { watchPathFor } from '../../utils/animePaths';
 import {

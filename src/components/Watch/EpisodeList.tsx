@@ -16,7 +16,7 @@ import {
   faEye,
   faEyeSlash,
 } from '@fortawesome/free-solid-svg-icons';
-import { Episode } from '../../index';
+import type { Episode } from '../../hooks/animeInterface';
 import { subscribeToWatchHistory } from '../../lib/watchHistory';
 
 // Live `hideSpoiler` pref ("Hide Spoilers" — blocks episode images behind a

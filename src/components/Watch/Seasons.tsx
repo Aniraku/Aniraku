@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
-import { Relation } from '../../index';
+import type { Relation } from '../../hooks/animeInterface';
 import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { FaFilm } from 'react-icons/fa';

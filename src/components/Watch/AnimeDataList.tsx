@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { TbCards } from 'react-icons/tb';
 import { FaStar } from 'react-icons/fa';
-import { Anime, StatusIndicator } from '../../index';
+import type { Anime } from '../../hooks/animeInterface';
+import StatusIndicator from '../shared/StatusIndicator';
 import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 

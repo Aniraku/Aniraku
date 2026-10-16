@@ -1,7 +1,7 @@
 // src/services/authService.ts
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid'; // Ensure uuid is installed via npm or yarn
-import { UserData, MediaListStatus } from '../index'; // Assuming this is the correct path
+import type { UserData, MediaListStatus } from './userInfoTypes'; // Adjust the path as necessary
 import { useQuery, gql } from '@apollo/client';
 
 // Constants for AniList OAuth — backend-owned flow.

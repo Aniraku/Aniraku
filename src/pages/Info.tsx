@@ -19,10 +19,6 @@ import {
 } from 'react-icons/fa';
 import { SiAnilist, SiMyanimelist } from 'react-icons/si';
 import {
-  SkeletonPlayer,
-  SkeletonCard,
-  StyledCardGrid,
-  CardItem,
   fetchAnimeData,
   fetchAnimeEpisodes,
   Episode,
@@ -31,6 +27,9 @@ import {
   Tag,
   ExternalLink,
 } from '../index';
+import { SkeletonPlayer, SkeletonCard } from '../components/Skeletons/Skeletons';
+import { StyledCardGrid } from '../components/Cards/CardGrid';
+import CardItem from '../components/Cards/CardItem';
 import InfoComments from '../components/Info/Comments';
 import { showToast } from '../components/Toaster';
 import { useBookmarks } from '../hooks/useBookmarks';
