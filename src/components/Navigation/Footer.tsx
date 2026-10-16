@@ -162,6 +162,8 @@ const Footer = () => {
               aria-label='Legal links'
               style={{ padding: 0 }}
             >
+              <Link to='/about'>About</Link>
+              <Link to='/faq'>FAQ</Link>
               <Link to='/privacy'>Privacy</Link>
               <Link to='/terms'>Terms</Link>
               <Link to='/dmca'>DMCA</Link>
