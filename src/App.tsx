@@ -6,7 +6,8 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { lazy, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
+import { lazyRetry as lazy } from './utils/lazyRetry';
 import {
   Navbar,
   ThemeProvider,
