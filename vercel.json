@@ -93,6 +93,7 @@
   ],
   "env": {
     "VITE_API_URL": "https://api-host.redacted.invalid",
+    "VITE_BACKEND_URL": "https://api-host.redacted.invalid",
     "VITE_PROXY_URL": ""
   }
 }
