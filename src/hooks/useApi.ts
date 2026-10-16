@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { year, getCurrentSeason, getNextSeason } from '../index';
+import { year, getCurrentSeason, getNextSeason } from './useTIme';
 
 // ---------------------------------------------------------------------------
 // Aniraku data layer — post-Consumet wiring

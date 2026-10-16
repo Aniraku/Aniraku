@@ -17,7 +17,7 @@ import { IoClose, IoLogOutOutline } from 'react-icons/io5';
 import { CgProfile } from 'react-icons/cg';
 import { FiSettings } from 'react-icons/fi';
 import { FaLock } from 'react-icons/fa';
-import { Settings } from '../index';
+import { Settings } from './Settings';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import {

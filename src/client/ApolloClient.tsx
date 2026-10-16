@@ -8,7 +8,12 @@ import {
 } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
-import { buildAuthUrl, fetchUserData, generateCsrfToken, UserData } from '../index';
+import {
+  buildAuthUrl,
+  fetchUserData,
+  generateCsrfToken,
+} from './authService';
+import type { UserData } from './userInfoTypes';
 import { ReactNode, useEffect } from 'react';
 
 // Reactive variables for user authentication state

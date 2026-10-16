@@ -5,7 +5,8 @@ import { IoChevronForward, IoChevronDown } from 'react-icons/io5';
 import { TbCards } from 'react-icons/tb';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { FaStar, FaCalendarAlt } from 'react-icons/fa';
-import { Anime, StatusIndicator } from '../../index';
+import type { Anime } from '../../hooks/animeInterface';
+import StatusIndicator from '../shared/StatusIndicator';
 import { infoPathFor } from '../../utils/animePaths';
 
 // ---------------------------------------------------------------------------

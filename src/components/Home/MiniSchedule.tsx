@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
-import { fetchAiringDay, type AiringEntry } from '../../index';
+import { fetchAiringDay } from '../../hooks/useApi';
+import type { AiringEntry } from '../../hooks/useApi';
 import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
