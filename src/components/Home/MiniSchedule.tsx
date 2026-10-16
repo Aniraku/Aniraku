@@ -401,7 +401,12 @@ export const MiniSchedule: React.FC = () => {
                     <RowEpisode>EP {e.episode}</RowEpisode>
                     {hovered === i && (
                       <HoverCard
-                        src={e.anime.image || e.anime.coverImage?.large || ''}
+                        src={
+                          e.anime.thumbnail ||
+                          e.anime.image ||
+                          e.anime.coverImage?.large ||
+                          ''
+                        }
                         alt=''
                       />
                     )}

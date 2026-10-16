@@ -313,7 +313,12 @@ export const SidePanel: React.FC<{
                       </BannerWrap>
                     )}
                     <CardImage>
-                      <img src={anime.image} alt={name} loading='lazy' />
+                      <img
+                        src={anime.thumbnail || anime.image}
+                        alt={name}
+                        loading='lazy'
+                        decoding='async'
+                      />
                     </CardImage>
                     <CardContent>
                       <TitleRow>

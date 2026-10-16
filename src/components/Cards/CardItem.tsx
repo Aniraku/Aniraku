@@ -119,7 +119,7 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
           style={{ '--img-ratio': '184 / 133' } as React.CSSProperties}
         >
           <img
-            src={anime.image}
+            src={anime.thumbnail || anime.image}
             alt={`Play ${displayTitle}`}
             loading="lazy"
             decoding="async"
@@ -167,7 +167,7 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
           void toggleBookmark({
             id: anime.id,
             title: displayTitle,
-            image: anime.image,
+            image: anime.thumbnail || anime.image,
           });
         }}
       >

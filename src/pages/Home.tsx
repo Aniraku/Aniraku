@@ -183,6 +183,37 @@ const TAB_FETCHERS: Record<
 const TAB_KEYS = ['newest', 'popular', 'topRated'];
 const TAB_TTL = 900000; // live tab cache window: 15 minutes
 
+// Below-fold rails + background loops never block first paint: idle
+// first, 2.5s fallback (devices without rIC), cancelled on unmount.
+// Mount fan-out drops from ~8 request chains to hero + tab grid.
+function deferNonCritical(work: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const ric = (
+    window as unknown as {
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout: number },
+      ) => number;
+    }
+  ).requestIdleCallback;
+  if (ric) {
+    const id = ric(work, { timeout: 2500 });
+    return () => {
+      try {
+        (
+          window as unknown as {
+            clearIdleCallback?: (id: number) => void;
+          }
+        ).clearIdleCallback?.(id);
+      } catch {
+        // scheduler unavailable — nothing to cancel
+      }
+    };
+  }
+  const id = window.setTimeout(work, 600);
+  return () => window.clearTimeout(id);
+}
+
 const Home = () => {
   const perPage = window.innerWidth > 1604 ? 18 : 12;
 
@@ -281,68 +312,79 @@ const Home = () => {
     };
   }, []);
 
-  // UPCOMING.
+  // UPCOMING (below the fold — deferred).
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchUpcomingSeasons(1, 12);
-        if (!cancelled) setUpcoming(data.results);
-      } catch {
-        if (!cancelled) setUpcomingError(true);
-      } finally {
-        if (!cancelled) setUpcomingLoading(false);
-      }
-    })();
+    const cancelDeferred = deferNonCritical(() => {
+      (async () => {
+        try {
+          const data = await fetchUpcomingSeasons(1, 12);
+          if (!cancelled) setUpcoming(data.results);
+        } catch {
+          if (!cancelled) setUpcomingError(true);
+        } finally {
+          if (!cancelled) setUpcomingLoading(false);
+        }
+      })();
+    });
     return () => {
       cancelled = true;
+      cancelDeferred();
     };
   }, []);
 
-  // TOP MOVIES (format=MOVIE, sort=SCORE_DESC — live `A(...)`).
+  // TOP MOVIES (below the fold — deferred; format=MOVIE, sort=SCORE_DESC).
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchAdvancedSearch('', 1, 12, {
-          format: 'MOVIE',
-          sort: ['SCORE_DESC'],
-        });
-        if (!cancelled) setTopMovies(data.results);
-      } catch {
-        if (!cancelled) setTopMoviesError(true);
-      } finally {
-        if (!cancelled) setTopMoviesLoading(false);
-      }
-    })();
+    const cancelDeferred = deferNonCritical(() => {
+      (async () => {
+        try {
+          const data = await fetchAdvancedSearch('', 1, 12, {
+            format: 'MOVIE',
+            sort: ['SCORE_DESC'],
+          });
+          if (!cancelled) setTopMovies(data.results);
+        } catch {
+          if (!cancelled) setTopMoviesError(true);
+        } finally {
+          if (!cancelled) setTopMoviesLoading(false);
+        }
+      })();
+    });
     return () => {
       cancelled = true;
+      cancelDeferred();
     };
   }, []);
 
-  // JUST FINISHED — popular shows from the season that just ended (local
-  // season/year query vs live endDate_greater; reported as a difference).
+  // JUST FINISHED (below the fold — deferred) — popular shows from the
+  // season that just ended (local season/year query vs live endDate_greater;
+  // reported as a difference).
   // The listPath carries the same season/year (see justFinishedSeason above)
-  // so "view all" shows just-finished titles, not every old FINISHED title.
+  // so "view all" shows the same just-finished season — not every old
+  // FINISHED title.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchAdvancedSearch('', 1, 12, {
-          season: justFinishedSeason.season,
-          year: justFinishedSeason.year,
-          status: 'FINISHED',
-          sort: ['POPULARITY_DESC'],
-        });
-        if (!cancelled) setJustFinished(data.results);
-      } catch {
-        if (!cancelled) setFinishedError(true);
-      } finally {
-        if (!cancelled) setFinishedLoading(false);
-      }
-    })();
+    const cancelDeferred = deferNonCritical(() => {
+      (async () => {
+        try {
+          const data = await fetchAdvancedSearch('', 1, 12, {
+            season: justFinishedSeason.season,
+            year: justFinishedSeason.year,
+            status: 'FINISHED',
+            sort: ['POPULARITY_DESC'],
+          });
+          if (!cancelled) setJustFinished(data.results);
+        } catch {
+          if (!cancelled) setFinishedError(true);
+        } finally {
+          if (!cancelled) setFinishedLoading(false);
+        }
+      })();
+    });
     return () => {
       cancelled = true;
+      cancelDeferred();
     };
   }, [justFinishedSeason]);
 
@@ -400,15 +442,19 @@ const Home = () => {
   // (supabase.auth directly — no auth-hook import).
   useEffect(() => {
     let cancelled = false;
-    const unsubscribe = subscribeToSession((userId) => {
-      if (!userId || cancelled) return;
-      runNewEpisodeNotifications(userId).catch(() => {
-        // best-effort: AniList/Supabase unreachable → no notifications
+    // Background loop — deferred past first paint like the rails.
+    const cancelDeferred = deferNonCritical(() => {
+      const unsubscribe = subscribeToSession((userId) => {
+        if (!userId || cancelled) return;
+        runNewEpisodeNotifications(userId).catch(() => {
+          // best-effort: AniList/Supabase unreachable → no notifications
+        });
       });
+      if (cancelled) unsubscribe();
     });
     return () => {
       cancelled = true;
-      unsubscribe();
+      cancelDeferred();
     };
   }, []);
 

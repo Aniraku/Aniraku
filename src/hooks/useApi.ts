@@ -91,12 +91,17 @@ function mapAnilistStatus(s?: string | null): string {
 function pickImage(coverImage: any, bannerImage?: string) {
   const img =
     coverImage?.extraLarge || coverImage?.large || coverImage?.medium || '';
+  // Grid thumbnail: large-first. extraLarge decodes to multi-MB bitmaps
+  // that dominate tab RAM when grids hold dozens of cards; large (~230px)
+  // is plenty at card size. Detail/hero/SEO keep full `img`.
+  const thumbnail =
+    coverImage?.large || coverImage?.medium || coverImage?.extraLarge || '';
   const cover = bannerImage || img || '';
-  return { img, cover };
+  return { img, thumbnail, cover };
 }
 
 export function mapAnilistMediaToAnime(m: any) {
-  const { img, cover } = pickImage(m?.coverImage, m?.bannerImage);
+  const { img, thumbnail, cover } = pickImage(m?.coverImage, m?.bannerImage);
   const nextAiring = m?.nextAiringEpisode
     ? {
         episode: m.nextAiringEpisode.episode,
@@ -120,6 +125,7 @@ export function mapAnilistMediaToAnime(m: any) {
     isAdult: !!m?.isAdult,
     countryOfOrigin: m?.countryOfOrigin ?? '',
     image: img,
+    thumbnail,
     imageHash: '',
     cover,
     coverHash: '',
@@ -156,7 +162,7 @@ export function mapAnilistMediaToAnime(m: any) {
               media?.id && media?.type !== 'MANGA' && media?.format !== 'MANGA' && media?.format !== 'NOVEL',
           )
           .map((media: any) => {
-            const { img: rImg, cover: rCover } = pickImage(
+            const { img: rImg, thumbnail: rThumb, cover: rCover } = pickImage(
               media?.coverImage,
               media?.bannerImage,
             );
@@ -172,6 +178,7 @@ export function mapAnilistMediaToAnime(m: any) {
               status: mapAnilistStatus(media?.status),
               episodes: media?.episodes ?? 0,
               image: rImg,
+              thumbnail: rThumb,
               imageHash: '',
               cover: rCover,
               coverHash: '',
@@ -200,7 +207,7 @@ export function mapAnilistMediaToAnime(m: any) {
           )
           .map((e: any) => {
           const node = e?.node ?? {};
-          const { img: relImg, cover: relCover } = pickImage(
+          const { img: relImg, thumbnail: relThumb, cover: relCover } = pickImage(
             node?.coverImage,
             node?.bannerImage,
           );
@@ -217,6 +224,7 @@ export function mapAnilistMediaToAnime(m: any) {
             status: mapAnilistStatus(node?.status),
             episodes: node?.episodes ?? 0,
             image: relImg,
+            thumbnail: relThumb,
             imageHash: '',
             cover: relCover,
             coverHash: '',
@@ -244,32 +252,45 @@ export function mapAnilistMediaToAnime(m: any) {
 }
 
 async function anilistQuery(query: string, variables: Record<string, any>) {
-  try {
-    const { data } = await directAxios.post(
-      ANILIST_GRAPHQL,
-      { query, variables },
-      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
-    );
-    if ((data as any)?.errors?.length) {
-      // GraphQL-level error (bad id, validation, not-found) is NOT an
-      // outage — the mirror is up. Only network/5xx/429 flips the banner.
-      reportAnilistStatus(false);
-      throw new Error(
-        `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
+  // In-flight dedup: mount fan-out (hero + rails + tabs) and remounts often
+  // fire the identical POST twice — share one request.
+  const key = `${query.length}:${JSON.stringify(variables)}`;
+  const inflight = anilistInflight.get(key);
+  if (inflight) return inflight;
+  const task = (async () => {
+    try {
+      const { data } = await directAxios.post(
+        ANILIST_GRAPHQL,
+        { query, variables },
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
       );
+      if ((data as any)?.errors?.length) {
+        // GraphQL-level error (bad id, validation, not-found) is NOT an
+        // outage — the mirror is up. Only network/5xx/429 flips the banner.
+        reportAnilistStatus(false);
+        throw new Error(
+          `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
+        );
+      }
+      reportAnilistStatus(false);
+      return (data as any)?.data;
+    } catch (err) {
+      // Mirror is unlimited metadata-only: throttle signals come from the
+      // backend provider APIs, not here. Banner only on real transport outage.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const isOutage =
+        status === undefined || status === 429 || (status >= 500 && status <= 599);
+      reportAnilistStatus(isOutage);
+      throw err;
+    } finally {
+      anilistInflight.delete(key);
     }
-    reportAnilistStatus(false);
-    return (data as any)?.data;
-  } catch (err) {
-    // Mirror is unlimited metadata-only: throttle signals come from the
-    // backend provider APIs, not here. Banner only on real transport outage.
-    const status = (err as { response?: { status?: number } })?.response?.status;
-    const isOutage =
-      status === undefined || status === 429 || (status >= 500 && status <= 599);
-    reportAnilistStatus(isOutage);
-    throw err;
-  }
+  })();
+  anilistInflight.set(key, task);
+  return task;
 }
+
+const anilistInflight = new Map<string, Promise<unknown>>();
 
 // ---------------------------------------------------------------------------
 // Session-storage cache (unchanged behaviour)

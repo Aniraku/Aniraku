@@ -111,6 +111,8 @@ export interface Anime {
   isAdult: boolean;
   countryOfOrigin: string;
   image: string;
+  /** Grid-size poster (large-first) — use in cards/rails, not heroes. */
+  thumbnail?: string;
   imageHash: string;
   cover: string;
   coverHash: string;
