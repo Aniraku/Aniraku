@@ -173,9 +173,10 @@ const DropSearch = ({
                   }}
                 >
                   <img
-                    src={anime.image}
+                    src={anime.thumbnail || anime.image}
                     alt={`Search Result for ${resolveDisplayTitle(anime.title)}`}
                     loading="lazy"
+                    decoding="async"
                   />
                   <div className="searchDetails">
                     <div className="searchTitleContainer">
