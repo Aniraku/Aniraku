@@ -8,11 +8,10 @@ import {
   type SearchFilterValues,
 } from '../components/Navigation/SearchFilters';
 import {
-  CardGrid,
-  StyledCardGrid,
   fetchAdvancedSearch,
-  SkeletonCard,
 } from '../index';
+import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
+import { SkeletonCard } from '../components/Skeletons/Skeletons';
 import { Paging } from '../index';
 import { Anime } from '../index';
 // NSFW gate (Wave C) — Aniraku Catalog.jsx:966-974: browse results run

@@ -2,11 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { FaBullhorn } from 'react-icons/fa';
 import {
-  HomeCarousel,
-  CardGrid,
-  StyledCardGrid,
-  SkeletonSlide,
-  SkeletonCard,
   fetchTrendingAnime,
   fetchPopularAnime,
   fetchTopAnime,
@@ -17,15 +12,21 @@ import {
   getCurrentSeason,
   getNextSeason,
   year,
-  EpisodeCard,
-  GenreRail,
-  HomeBanner,
-  HomeTabs,
-  MiniSchedule,
-  SidePanel,
   type Anime,
   type Paging,
 } from '../index';
+import { HomeCarousel } from '../components/Home/HomeCarousel';
+import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
+import {
+  SkeletonSlide,
+  SkeletonCard,
+} from '../components/Skeletons/Skeletons';
+import { EpisodeCard } from '../components/Home/EpisodeCard';
+import { GenreRail } from '../components/Home/GenreRail';
+import { HomeBanner } from '../components/Home/HomeBanner';
+import { HomeTabs } from '../components/Home/HomeTabs';
+import { MiniSchedule } from '../components/Home/MiniSchedule';
+import { SidePanel } from '../components/Home/SidePanels';
 import { runNewEpisodeNotifications, subscribeToSession } from '../lib/sync';
 import { useSeo } from '../utils/seo';
 // NSFW gate (Wave C) — Aniraku Home.jsx:544-550 / Hero.jsx:33: every browse

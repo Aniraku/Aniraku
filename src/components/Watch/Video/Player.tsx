@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import HomemadeAppleUrl from './fonts/Homemade-Apple.ttf';
-import ButterflyKidsUrl from './fonts/Butterfly-Kids.ttf';
+import HomemadeAppleUrl from './fonts/Homemade-Apple.woff2';
+import ButterflyKidsUrl from './fonts/Butterfly-Kids.woff2';
 import './PlayerStyles.css';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../client/useAuth';
@@ -40,8 +40,8 @@ import {
   fetchAnirakuStream,
   proxiedMediaUrl,
   pickHighestDownload,
-  useSettings,
-} from '../../../index';
+} from '../../../hooks/useApi';
+import { useSettings } from '../../../components/Profile/SettingsProvider';
 import { TbPlayerTrackPrev, TbPlayerTrackNext } from 'react-icons/tb';
 import { FaCheck } from 'react-icons/fa6';
 import { RiCheckboxBlankFill } from 'react-icons/ri';
@@ -1371,14 +1371,14 @@ export function Player({
         font-style: normal;
         font-weight: 400;
         font-display: swap;
-        src: url('${HomemadeAppleUrl}') format('truetype');
+        src: url('${HomemadeAppleUrl}') format('woff2');
       }
       @font-face {
         font-family: 'Butterfly Kids';
         font-style: normal;
         font-weight: 400;
         font-display: swap;
-        src: url('${ButterflyKidsUrl}') format('truetype');
+        src: url('${ButterflyKidsUrl}') format('woff2');
       }
     `;
     document.head.appendChild(style);

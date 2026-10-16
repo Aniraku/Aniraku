@@ -1,4 +1,4 @@
-import { year as currentYear } from '../index';
+import { year as currentYear } from './useTIme';
 
 export interface Option {
   value: string;

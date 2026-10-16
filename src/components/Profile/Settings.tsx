@@ -17,7 +17,8 @@ import {
   FaSync,
   FaUnlink,
 } from 'react-icons/fa';
-import { useAuth, useSettings, useTheme } from '../../index';
+import { useSettings, useTheme } from '../../index';
+import { useAuth } from '../../client/useAuth';
 import { supabase } from '../../lib/supabase';
 import { showToast } from '../Toaster';
 import { useNsfw } from '../../hooks/useNsfw';

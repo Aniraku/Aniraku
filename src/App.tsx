@@ -8,24 +8,14 @@ import {
 } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
 import {
-  Profile,
   Navbar,
   ThemeProvider,
   Footer,
-  Home,
-  Watch,
-  Info,
-  Trending,
-  Schedule,
-  Search,
-  History,
   ShortcutsPopup,
   ScrollToTop,
   usePreserveScrollOnReload,
-  ApolloClientProvider,
   SettingsProvider,
 } from './index';
-import { register } from 'swiper/element/bundle';
 import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './client/useAuth';
 // Wave A (Supabase auth layer) — mounted at the top of the router tree, wrapping
@@ -50,7 +40,22 @@ import { AppErrorBoundary } from './components/ErrorBoundary';
 import { AniListStatusBanner } from './components/AniListStatusBanner';
 import NotFound from './pages/NotFound';
 
-register();
+// Heavy routes split out of the initial bundle: each page (and its
+// page-only dependency subtrees — Watch's player, Info's sections,
+// Profile's library) loads on first navigation instead of upfront.
+// Direct page-module imports (NOT the index barrel) keep the barrel's
+// re-export graph from collapsing the splits back into one chunk.
+const Home = lazy(() => import('./pages/Home'));
+const Search = lazy(() => import('./pages/Search'));
+const Trending = lazy(() => import('./pages/Trending'));
+const Schedule = lazy(() => import('./pages/Schedule'));
+const History = lazy(() => import('./pages/History'));
+const Info = lazy(() => import('./pages/Info'));
+const Watch = lazy(() => import('./pages/Watch'));
+const ProfilePage = lazy(() => import('./pages/Profile'));
+
+// NOTE: no swiper custom-element register() — nothing renders
+// <swiper-container>; carousels use swiper/react (code-split with Home).
 
 // Wave A routes are lazy so the auth/legal chunks stay out of the initial
 // bundle (no prior lazy/Suspense pattern in this repo — see report deviations).
@@ -112,7 +117,7 @@ function App() {
   }, [measurementId]);
 
   return (
-    <ApolloClientProvider>
+    <>
       <Router>
         <SupabaseAuthProvider>
         <AuthProvider>
@@ -173,7 +178,7 @@ function App() {
                     path='/watch/:animeId/:animeTitle/:episodeNumber/*'
                     element={<Navigate to='..' replace />}
                   />
-                  <Route path='/profile' element={<Profile />} />
+                  <Route path='/profile' element={<ProfilePage />} />
                   {/* the live site 1:1: settings is a modal inside Profile (?settings=1) */}
                   <Route
                     path='/profile/settings'
@@ -222,7 +227,7 @@ function App() {
         </SupabaseAuthProvider>
       </Router>
       <Analytics />
-    </ApolloClientProvider>
+    </>
   );
 }
 
