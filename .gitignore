@@ -33,11 +33,11 @@ build/Release/
 ehthumbs.db
 Thumbs.db
 
-# Package manager lock files
-package-lock.json
+# Package manager lock files (npm is canonical — Cloudflare Pages builds
+# with npm; bun.lock v2 is unreadable by its bun 1.2.15)
 yarn.lock
 pnpm-lock.yaml
-bun.lockb
+bun.lock
 
 # dotenv environment variables files
 .env

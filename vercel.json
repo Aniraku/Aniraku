@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "bun install --frozen-lockfile",
+  "installCommand": "npm ci",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
