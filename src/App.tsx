@@ -16,7 +16,6 @@ import {
   usePreserveScrollOnReload,
   SettingsProvider,
 } from './index';
-import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './client/useAuth';
 // Wave A (Supabase auth layer) — mounted at the top of the router tree, wrapping
 // the existing AniList AuthProvider (src/client/* hosts that one and is off-limits).
@@ -226,7 +225,6 @@ function App() {
         </AuthProvider>
         </SupabaseAuthProvider>
       </Router>
-      <Analytics />
     </>
   );
 }
