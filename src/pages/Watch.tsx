@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FaBell, FaSpinner, FaStar } from 'react-icons/fa';
 import styled, { createGlobalStyle, keyframes } from 'styled-components';
-import Image404URL from '/src/assets/404.webp';
+// 404 art loads ONLY on the no-episodes error branch (dynamic import keeps
+// ~170KB of animated webp out of the Watch chunk for normal playback).
 import {
   chooseBrowserPlayableEmbed,
   getSourcePlaybackType,
@@ -10,20 +11,20 @@ import {
   isBrowserPlayableEmbedSource,
 } from '../components/Watch/lib/watchEmbedFallback';
 import {
-  EpisodeList,
-  Player,
-  WatchAnimeData as AnimeData,
-  AnimeDataList,
-  MediaSource,
-  Seasons,
   fetchAnirakuServers,
   fetchAnimeEpisodes,
   fetchAnimeData,
   fetchAnimeInfo,
   pickHighestDownload,
-  SkeletonPlayer,
   useCountdown,
 } from '../index';
+import { EpisodeList } from '../components/Watch/EpisodeList';
+import { Player } from '../components/Watch/Video/Player';
+import { WatchAnimeData as AnimeData } from '../components/Watch/WatchAnimeData';
+import { AnimeDataList } from '../components/Watch/AnimeDataList';
+import { MediaSource } from '../components/Watch/Video/MediaSource';
+import { Seasons } from '../components/Watch/Seasons';
+import { SkeletonPlayer } from '../components/Skeletons/Skeletons';
 import { Episode } from '../index';
 import { Comments } from '../components/Watch/Comments';
 // Item 1 (GAP 4) — immediate history upload after the first-playback
@@ -723,6 +724,17 @@ const WatchInner: React.FC = () => {
   const [infoResolved, setInfoResolved] = useState(false);
   const [isEpisodeChanging, setIsEpisodeChanging] = useState(false);
   const [showNoEpisodesMessage, setShowNoEpisodesMessage] = useState(false);
+  const [noEpsArt, setNoEpsArt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!showNoEpisodesMessage || noEpsArt) return;
+    let live = true;
+    void import('/src/assets/404.webp').then((mod) => {
+      if (live) setNoEpsArt(mod.default);
+    });
+    return () => {
+      live = false;
+    };
+  }, [showNoEpisodesMessage, noEpsArt]);
   const [sourceType, setSourceType] = useState(
     () =>
       readStoredPref(
@@ -2053,7 +2065,7 @@ const WatchInner: React.FC = () => {
             </NoEpsMessage>
           )}
           <NoEpsImage>
-            <img src={Image404URL} alt='404 Error'></img>
+            {noEpsArt && <img src={noEpsArt} alt='404 Error'></img>}
           </NoEpsImage>
           <GoToHomePageButton />
         </NoEpsFoundDiv>

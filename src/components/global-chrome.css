@@ -11,15 +11,15 @@
  * Masks the element with the logo asset and tints it with the theme text
  * color. LOGO SWAP DONE (CSS side): the url() below is a RELATIVE bundled
  * import of the user's custom logo (source of truth =
- * src/assets/aniraku_logo.png, also imported by BRAND_LOGO in
+ * src/assets/aniraku_logo.webp, also imported by BRAND_LOGO in
  * src/lib/brand.ts) so Vite rewrites it to the hashed asset URL at build
  * time — never hardcode a hashed /assets/*.png filename here (stale builds
  * 404). The portrait png carries true
  * alpha (rounded-square corners), so it masks cleanly and tints correctly. */
 .app-icon {
   background-color: var(--global-text);
-  -webkit-mask-image: url('../assets/aniraku_logo.png');
-  mask-image: url('../assets/aniraku_logo.png');
+  -webkit-mask-image: url('../assets/aniraku_logo.webp');
+  mask-image: url('../assets/aniraku_logo.webp');
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;

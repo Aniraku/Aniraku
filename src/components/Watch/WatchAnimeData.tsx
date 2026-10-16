@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
-import { Anime } from '../../index';
+import type { Anime } from '../../hooks/animeInterface';
 import { SiMyanimelist, SiAnilist } from 'react-icons/si';
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 

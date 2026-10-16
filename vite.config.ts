@@ -70,7 +70,6 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
       rollupOptions: {
         output: {
           manualChunks: {
-            lodash: ['lodash'], // Manually define chunk for lodash
             vendor: ['react', 'react-dom'], // Manually define chunk for React and ReactDOM
           },
         },

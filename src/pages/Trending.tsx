@@ -2,11 +2,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import {
-  CardGrid,
-  StyledCardGrid,
-  SkeletonCard,
   fetchAdvancedSearch,
 } from '../index';
+import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
+import { SkeletonCard } from '../components/Skeletons/Skeletons';
 import { Anime } from '../index';
 // NSFW gate (Wave C) — Aniraku Catalog.jsx:970-974 shelf filtering: browse
 // results run through filterAdult (Hentai-genre rule, default OFF → hidden).

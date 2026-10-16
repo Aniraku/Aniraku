@@ -9,7 +9,7 @@ import { Swiper, SwiperSlide, useSwiperSlide } from 'swiper/react';
 import type { Swiper as SwiperClass } from 'swiper';
 import { Autoplay, EffectFade, Keyboard } from 'swiper/modules';
 import 'swiper/swiper-bundle.css';
-import { Anime } from '../../index';
+import type { Anime } from '../../hooks/animeInterface';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { infoPathFor, watchPathFor } from '../../utils/animePaths';
 
