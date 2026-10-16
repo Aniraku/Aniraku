@@ -9,6 +9,8 @@ import { FaCopy, FaExternalLinkAlt, FaHeart, FaTimes } from 'react-icons/fa';
 import {
   BINANCE_PAY_LABEL,
   BINANCE_PAY_UID,
+  BINANCE_PAY_USERNAME,
+  BINANCE_QR_SRC,
   PATREON_URL,
   SUPPORT_FUNDING_COPY,
   SUPPORT_PROMPT_DISMISS_KEY,
@@ -36,6 +38,7 @@ const SupportPrompt = () => {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [qrOk, setQrOk] = useState(true);
   const activeMsRef = useRef(0);
   const activeStartedAtRef = useRef(Date.now());
   const dismissedUntilRef = useRef(0);
@@ -106,7 +109,20 @@ const SupportPrompt = () => {
       <PrimaryLink href={PATREON_URL} target="_blank" rel="noreferrer" onClick={dismiss}><span><FaHeart /> SUPPORT ON PATREON</span><FaExternalLinkAlt /></PrimaryLink>
       <BinancePanel>
         <BinanceHeading><span>{BINANCE_PAY_LABEL} · UID</span><b>OPTIONAL</b></BinanceHeading>
-        <BinanceBody><div><strong>Send via {BINANCE_PAY_LABEL}</strong><code>{BINANCE_PAY_UID}</code><button type="button" onClick={() => void handleCopy()}><FaCopy /> {copied ? 'UID COPIED' : 'COPY UID'}</button></div></BinanceBody>
+        <BinanceBody>
+          {qrOk && (
+            <QrWrap>
+              <img
+                src={BINANCE_QR_SRC}
+                alt='Binance Pay QR — SHO_WAIB21'
+                loading='lazy'
+                decoding='async'
+                onError={() => setQrOk(false)}
+              />
+            </QrWrap>
+          )}
+          <div><strong>Send via {BINANCE_PAY_LABEL} · {BINANCE_PAY_USERNAME}</strong><code>{BINANCE_PAY_UID}</code><button type="button" onClick={() => void handleCopy()}><FaCopy /> {copied ? 'UID COPIED' : 'COPY UID'}</button></div>
+        </BinanceBody>
         <BinanceNote>OPEN BINANCE &gt; PAY &gt; ENTER UID &gt; SEND. NO NETWORK FEES.</BinanceNote>
       </BinancePanel>
       <LaterButton type="button" onClick={dismiss}>NOT NOW · ASK AGAIN IN 7 DAYS</LaterButton>
@@ -172,6 +188,11 @@ const BinanceBody = styled.div`
   strong { color: var(--global-text); font-size: .72rem; }
   code { overflow-wrap: anywhere; color: var(--global-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .68rem; line-height: 1.45; letter-spacing: .06em; }
   button { display: inline-flex; width: fit-content; align-items: center; gap: 6px; padding: 0; color: var(--global-text); background: transparent; border: none; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .58rem; letter-spacing: .04em; } button:hover { color: var(--primary-accent); }
+`
+
+const QrWrap = styled.div`
+  justify-self: center; width: 150px; overflow: hidden; border: 1px solid var(--global-border-color); border-radius: var(--global-border-radius); background: #fff;
+  img { display: block; width: 100%; height: auto; }
 `
 
 const BinanceNote = styled.p`

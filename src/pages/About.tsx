@@ -1,6 +1,13 @@
 import styled from 'styled-components';
-import { useEffect } from 'react';
-import { FaCheckCircle } from 'react-icons/fa';
+import { useEffect, useState } from 'react';
+import { FaCheckCircle, FaCopy } from 'react-icons/fa';
+import {
+  BINANCE_PAY_LABEL,
+  BINANCE_PAY_UID,
+  BINANCE_PAY_USERNAME,
+  BINANCE_QR_SRC,
+  PATREON_URL,
+} from '../lib/support';
 const SplashContainer = styled.div`
   margin-top: -2rem;
 `;
@@ -36,6 +43,71 @@ const MainContent = styled.div`
   font-size: 1rem;
   line-height: 1.6;
 `;
+
+const DonateCard = styled.div`
+  display: grid; gap: 12px; justify-items: center; margin: 1rem 0; padding: 1.25rem;
+  text-align: center; background: var(--global-div); border: 1px solid var(--global-border-color);
+  border-radius: var(--global-border-radius);
+`;
+
+const DonateQr = styled.div`
+  width: min(100%, 220px); overflow: hidden; border-radius: var(--global-border-radius); background: #fff;
+  img { display: block; width: 100%; height: auto; }
+`;
+
+const DonateUid = styled.div`
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .8rem;
+  code { color: var(--global-text-muted); letter-spacing: .05em; }
+  button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; color: var(--global-text); background: var(--global-secondary-bg); border: 1px solid var(--global-border-color); border-radius: var(--global-border-radius); cursor: pointer; font-size: .72rem; }
+  button:hover { border-color: var(--primary-accent); color: var(--primary-accent); }
+`;
+
+const DonateLink = styled.a`
+  color: var(--primary-accent); font-weight: 700;
+`;
+
+function DonateBlock() {
+  const [copied, setCopied] = useState(false);
+  const [qrOk, setQrOk] = useState(true);
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(BINANCE_PAY_UID);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <DonateCard>
+      {qrOk && (
+        <DonateQr>
+          <img
+            src={BINANCE_QR_SRC}
+            alt='Binance Pay QR — SHO_WAIB21'
+            loading='lazy'
+            decoding='async'
+            onError={() => setQrOk(false)}
+          />
+        </DonateQr>
+      )}
+      <Paragraph style={{ marginBottom: 0 }}>
+        <strong>{BINANCE_PAY_LABEL} · {BINANCE_PAY_USERNAME}</strong>
+      </Paragraph>
+      <DonateUid>
+        <code>UID {BINANCE_PAY_UID}</code>
+        <button type='button' onClick={() => void copy()}>
+          <FaCopy /> {copied ? 'UID COPIED' : 'COPY UID'}
+        </button>
+      </DonateUid>
+      <Paragraph style={{ marginBottom: 0 }}>
+        Open Binance &gt; Pay &gt; scan the QR or enter the UID. Prefer
+        Patreon? <DonateLink href={PATREON_URL} target='_blank' rel='noreferrer'>Support us there</DonateLink>.
+      </Paragraph>
+    </DonateCard>
+  );
+}
 
 const sections = [
   {
@@ -111,6 +183,20 @@ const sections = [
           </strong>{' '}
           Join our active <Keyword>community of anime lovers</Keyword>.
         </Paragraph>
+      </>
+    ),
+  },
+  {
+    title2: 'Support Us',
+    content: (
+      <>
+        <Paragraph>
+          Hosting, streaming servers and sync all run on paid infrastructure
+          with monthly limits — and we are running out soon. If you want
+          Aniraku to stay alive, please consider donating. Every
+          contribution keeps the episodes playing.
+        </Paragraph>
+        <DonateBlock />
       </>
     ),
   },
