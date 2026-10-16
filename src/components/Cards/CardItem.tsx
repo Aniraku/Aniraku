@@ -122,6 +122,7 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
             src={anime.image}
             alt={`Play ${displayTitle}`}
             loading="lazy"
+            decoding="async"
             className="cardImg"
           />
           <div className="playIcon" aria-label="Play">

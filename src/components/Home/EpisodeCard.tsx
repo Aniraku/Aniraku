@@ -484,7 +484,12 @@ export const EpisodeCard: React.FC = () => {
           style={{ textDecoration: 'none' }}
           title={`Continue Watching ${displayTitle}`}
         >
-          <img src={card.image} alt={`Cover for ${card.animeTitle}`} />
+          <img
+            src={card.image}
+            alt={`Cover for ${card.animeTitle}`}
+            loading="lazy"
+            decoding="async"
+          />
           <PlayIcon aria-label='Play Episode'>
             <FaPlay />
           </PlayIcon>
