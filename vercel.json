@@ -93,6 +93,7 @@
   ],
   "env": {
     "VITE_API_URL": "https://api.aniraku.tech",
+    "VITE_BACKEND_URL": "https://api.aniraku.tech",
     "VITE_PROXY_URL": ""
   }
 }
