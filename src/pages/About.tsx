@@ -105,6 +105,11 @@ function DonateBlock() {
         Open Binance &gt; Pay &gt; scan the QR or enter the UID. Prefer
         Patreon? <DonateLink href={PATREON_URL} target='_blank' rel='noreferrer'>Support us there</DonateLink>.
       </Paragraph>
+      <Paragraph style={{ marginBottom: 0 }}>
+        Want an anime added to the library? Mail us at{' '}
+        <DonateLink href='mailto:sho.islam0311@proton.me'>sho.islam0311@proton.me</DonateLink>{' '}
+        and we will add it.
+      </Paragraph>
     </DonateCard>
   );
 }
