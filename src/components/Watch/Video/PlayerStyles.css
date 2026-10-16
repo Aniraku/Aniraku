@@ -1,6 +1,7 @@
-@import '@vidstack/react/player/styles/default/theme.css';
-@import '@vidstack/react/player/styles/default/layouts/audio.css';
-@import '@vidstack/react/player/styles/default/layouts/video.css';
+/* NOTE: vidstack is fully retired (ArtPlayer renders playback) — its
+   theme @imports were removed with the dependency. The .player CSS vars
+   below are self-defined; leftover .vds-* selectors below match nothing
+   and are inert until that dead layer is cleaned. */
 
 .player {
   --brand-color: #f5f5f5;
@@ -208,8 +209,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    ArtPlayer layer (ported): player typography, settings panel, quality menu,
    custom transport/cast controls, mobile control sizing, fullscreen scroll
-   lock and intro/outro timeline markers. The vidstack @imports above are
-   retained (license headers) even though no vidstack component mounts.
+   lock and intro/outro timeline markers.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Fullscreen scroll lock (also iOS native fullscreen) */
