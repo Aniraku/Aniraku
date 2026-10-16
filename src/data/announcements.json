@@ -1,11 +1,11 @@
 [
   {
     "id": "backend-limit-donate-1",
-    "title": "Keep Aniraku Alive",
-    "message": "Our backend is running out of limits soon — streaming servers, metadata and sync all run on paid infrastructure. If you want Aniraku to stay alive, please consider donating. Every contribution keeps the episodes playing.",
+    "title": "Aniraku May Go Dark Before Oct 20",
+    "message": "Our backend credits are almost finished — once they run out, streaming stops and Aniraku goes offline. We run a huge anime library that keeps growing on your demand: want an anime added? Mail us at sho.islam0311@proton.me and we will add it. I come from a middle-class family and cannot pay for the servers from my own pocket — if you want Aniraku to stay available, please donate. Every contribution keeps the episodes playing.",
     "link": "/about",
-    "linkLabel": "How to donate",
+    "linkLabel": "Donate to keep us alive",
     "start": "2026-10-16T00:00:00Z",
-    "end": "2026-11-30T00:00:00Z"
+    "end": "2026-10-31T00:00:00Z"
   }
 ]
