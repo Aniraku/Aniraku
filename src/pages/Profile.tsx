@@ -881,7 +881,16 @@ export const Profile: React.FC = () => {
   // Wave C — section tabs (Aniraku Profile.jsx:33 activeTab) + Library
   // import/export state (Profile.jsx:38-41) + avatar-library readiness
   // (Profile.jsx:43).
-  const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
+  // Deep-link: `/profile?tab=bookmarks` (Info split button's "Open List
+  // Editor"). Any `?tab=` matching a tab id seeds the initial tab; the guard
+  // effect below clamps authed-only tabs for real guests (auth is async, so
+  // we can't trust the null-user-during-loading state here).
+  const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    return TABS.some((tab) => tab.id === requested)
+      ? (requested as ProfileTab)
+      : 'profile';
+  });
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncResult, setSyncResult] = useState<
     Record<string, { type: 'ok' | 'error'; text: string } | null>
@@ -962,6 +971,16 @@ export const Profile: React.FC = () => {
   );
 
   const guest = !user;
+
+  // Deep-link guard: a real guest landing on `/profile?tab=bookmarks` (or
+  // `avatars`) gets bounced to Profile once auth has settled (`!loading`),
+  // since those tabs are authed-only and would render nothing. Runs after
+  // load so a signed-in user mid-session-load isn't clamped early.
+  useEffect(() => {
+    if (loading || !guest) return;
+    const tab = TABS.find((t) => t.id === activeTab);
+    if (tab?.authedOnly) setActiveTab('profile');
+  }, [loading, guest, activeTab]);
 
   const resolvedUsername = profile?.username || username || '';
   const resolvedDisplayName = profile?.display_name || profile?.username || 'User';
