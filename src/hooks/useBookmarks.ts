@@ -12,7 +12,7 @@ import {
   upsertBookmarkRow,
   writeLocalBookmarks,
 } from '../lib/sync';
-import { statusForNewBookmark } from '../lib/listStatus';
+import { statusForNewBookmark, type ListStatus } from '../lib/listStatus';
 
 // ---------------------------------------------------------------------------
 // useBookmarks — local-first bookmark store with merge-on-login Supabase
@@ -115,6 +115,16 @@ export interface UseBookmarksResult {
    * upsert (add) / delete (remove) — Aniraku Card.jsx:37-45 semantics.
    */
   toggleBookmark: (entry: ToggleableBookmark) => Promise<void>;
+  /**
+   * Explicit list-status action: adds the entry with that status when it
+   * isn't bookmarked yet, otherwise transitions the existing status.
+   * Same optimistic-LS + server-upsert path as toggleBookmark.
+   */
+  setListStatus: (
+    entry: ToggleableBookmark,
+    status: ListStatus,
+    totalEpisodes?: number | null,
+  ) => Promise<void>;
 }
 
 export function useBookmarks(): UseBookmarksResult {
@@ -180,7 +190,70 @@ export function useBookmarks(): UseBookmarksResult {
     [],
   );
 
-  return { bookmarks, userId, isBookmarked, toggleBookmark };
+  /**
+   * Explicit list-status action (Info page "Add to List" split button).
+   * Adds the entry with that status when it isn't bookmarked yet, or
+   * transitions the status of an existing one. Same write path as
+   * toggleBookmark: LS optimistic first, then the server row when signed
+   * in. Guests are LS-only. Provider (MAL/AniList) receives the status on
+   * the next export run — `POST /sync/update` needs episode progress, so
+   * there is no status-only push endpoint.
+   *
+   * Never lowers a stored `total_episodes` (monotonic totals invariant);
+   * `totalEpisodes` only fills rows that don't have one yet.
+   */
+  const setListStatus = useCallback(
+    async (
+      entry: ToggleableBookmark,
+      status: ListStatus,
+      totalEpisodes?: number | null,
+    ): Promise<void> => {
+      startStore();
+      const numericId = Number(entry.id);
+      if (!Number.isFinite(numericId) || numericId <= 0) return;
+
+      const existing = storeBookmarks.find((row) => row.id === numericId);
+      const next: BookmarkEntry[] = existing
+        ? storeBookmarks.map((row) =>
+            row.id === numericId
+              ? {
+                  ...row,
+                  status,
+                  total_episodes:
+                    row.total_episodes ?? totalEpisodes ?? null,
+                }
+              : row,
+          )
+        : [
+            ...storeBookmarks,
+            {
+              id: numericId,
+              title: entry.title ?? '',
+              image: entry.image ?? '',
+              added_at: Date.now(),
+              status,
+              total_episodes: totalEpisodes ?? null,
+            },
+          ];
+
+      storeBookmarks = next;
+      writeLocalBookmarks(next);
+      publish();
+
+      const userIdAtClick = storeUserId;
+      if (!userIdAtClick) return; // guest — LS is the whole truth
+      const row = next.find((r) => r.id === numericId);
+      if (!row) return;
+      try {
+        await upsertBookmarkRow(userIdAtClick, row);
+      } catch {
+        // local mirror stays usable when the cloud request fails
+      }
+    },
+    [],
+  );
+
+  return { bookmarks, userId, isBookmarked, toggleBookmark, setListStatus };
 }
 
 export default useBookmarks;

@@ -1,5 +1,11 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useMemo,
+} from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import styled, { css } from 'styled-components';
 import {
   FaPlay,
@@ -15,6 +21,7 @@ import {
   FaMicrophone,
   FaBookmark,
   FaRegBookmark,
+  FaCheck,
   FaStar,
 } from 'react-icons/fa';
 import { SiAnilist, SiMyanimelist } from 'react-icons/si';
@@ -33,6 +40,15 @@ import CardItem from '../components/Cards/CardItem';
 import InfoComments from '../components/Info/Comments';
 import { showToast } from '../components/Toaster';
 import { useBookmarks } from '../hooks/useBookmarks';
+// List-status vocabulary for the sidebar "Add to List" split button —
+// the six AniList statuses live on the bookmark row (hidden mechanism).
+import {
+  LIST_STATUSES,
+  LIST_STATUS_LABELS,
+  type ListStatus,
+} from '../lib/listStatus';
+// Escape closes only the top-most overlay (menu over page overlays).
+import { registerOverlayHandler } from '../components/overlayStack';
 // NSFW gate (Wave C) — Aniraku AnimeDetail.jsx:632/658/878: Hentai titles
 // gate the page when OFF (default) and recommendations run through
 // filterAdult. Sync payloads stay unfiltered (user decision).
@@ -879,23 +895,179 @@ const WatchNow = styled(Link)`
   ${watchNowCss}
 `;
 
-// Wave B — sidebar bookmark toggle (Aniraku AnimeDetail.jsx:167-185 +
-// 981-983 BookmarkBtn, restyled onto Aniraku's watchNow chrome / CSS vars).
-// Guest = LS-only; signed-in = LS optimistic + server upsert/delete.
-const BookmarkToggle = styled.button<{ $active?: boolean }>`
-  ${watchNowCss}
+// Wave B → split "Add to List" (AniList detail-page pattern, our chrome):
+// main action + caret that opens the list-status menu. In Aniraku the
+// bookmark IS the library entry (it carries Watching/Plan to Watch/...),
+// so one split button covers add / change status / remove — no separate
+// favourite. Guest = LS-only; signed-in = LS optimistic + server upsert.
+const ListSplit = styled.div`
+  position: relative;
+  display: flex;
+  width: 100%;
+  /* Lift the whole split button (and its absolutely-positioned menu) into a
+     stacking context above the poster/hero siblings so the dropdown never
+     gets painted over by the image section below it. */
+  z-index: 30;
+`;
+
+// _watchNowButton_4yc5g_32 chrome, split across main + caret so the pair
+// reads as one button (shared radius, divider between the halves).
+const listHalfCss = css`
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--global-text);
+  cursor: pointer;
+  background-color: var(--global-div);
+  border: none;
+  outline: 1px solid var(--global-border-color);
+
+  &:active {
+    transform: scale(0.97);
+  }
+  @media (max-width: 500px) {
+    font-size: 0.8rem;
+  }
+`;
+
+const ListMain = styled.button<{ $active?: boolean }>`
+  ${listHalfCss}
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: var(--global-border-radius) 0 0 var(--global-border-radius);
   color: ${({ $active }) =>
     $active ? 'var(--primary-accent)' : 'var(--global-text)'};
 
   svg {
+    flex-shrink: 0;
     color: ${({ $active }) =>
       $active ? 'var(--primary-accent)' : 'inherit'};
   }
 
   &:hover {
-    color: ${({ $active }) =>
-      $active ? 'var(--primary-accent)' : 'var(--primary-accent)'};
+    color: var(--primary-accent);
+    background-color: var(--primary-accent-tr);
+    outline: 1px solid var(--primary-accent);
   }
+`;
+
+const ListCaret = styled.button`
+  ${listHalfCss}
+  flex: 0 0 auto;
+  width: 1.9rem;
+  padding: 0.45rem 0;
+  border-left: 1px solid var(--global-border-color);
+  border-radius: 0 var(--global-border-radius) var(--global-border-radius) 0;
+
+  svg {
+    font-size: 0.6rem;
+    transition: transform 0.15s ease;
+  }
+  &[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+
+  &:hover {
+    color: var(--primary-accent);
+    background-color: var(--primary-accent-tr);
+    outline: 1px solid var(--primary-accent);
+  }
+`;
+
+// Dropdown below the split button — status rows (check + label), then the
+// list-editor link and Remove. Poster column has no overflow clipping, so
+// the absolute panel paints over the stats row cleanly. `listMenuUp` flips it
+// above the button when there isn't enough room below; `max-height` + scroll
+// guarantee it never exceeds the viewport either way.
+const ListMenu = styled.div<{ $up?: boolean }>`
+  position: absolute;
+  ${({ $up }) =>
+    $up
+      ? 'bottom: calc(100% + 4px);'
+      : 'top: calc(100% + 4px);'}
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  background-color: var(--global-div);
+  border: none;
+  border-radius: var(--global-border-radius);
+  outline: 1px solid var(--global-border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  max-height: min(60vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+`;
+
+const listMenuItemCss = css`
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: left;
+  color: var(--global-text);
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  border-radius: calc(var(--global-border-radius) / 2);
+  text-decoration: none;
+
+  svg {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+  }
+
+  &:hover {
+    color: var(--primary-accent);
+    background-color: var(--primary-accent-tr);
+  }
+`;
+
+const ListMenuItem = styled.button<{
+  $current?: boolean;
+  $danger?: boolean;
+}>`
+  ${listMenuItemCss}
+  color: ${({ $current, $danger }) =>
+    $danger
+      ? 'var(--cancelled)'
+      : $current
+        ? 'var(--primary-accent)'
+        : 'var(--global-text)'};
+
+  svg {
+    opacity: ${({ $current, $danger }) => ($current || $danger ? 1 : 0)};
+  }
+
+  &:hover {
+    color: ${({ $danger }) =>
+      $danger ? 'var(--cancelled)' : 'var(--primary-accent)'};
+    background-color: ${({ $danger }) =>
+      $danger ? 'rgba(255, 0, 0, 0.1)' : 'var(--primary-accent-tr)'};
+  }
+`;
+
+const ListMenuLink = styled(Link)`
+  ${listMenuItemCss}
+`;
+
+const ListMenuDivider = styled.div`
+  height: 1px;
+  margin: 3px 2px;
+  background-color: var(--global-border-color);
 `;
 
 const SearchTrailerBtn = styled.a`
@@ -2752,13 +2924,65 @@ const Info: React.FC = () => {
   // Wave B — bookmark store (module singleton; supabase session bridge, no
   // auth-hook import). Declared with the other hooks, above every early
   // return, so the hook order stays stable.
-  const { isBookmarked, toggleBookmark } = useBookmarks();
+  const { bookmarks, userId, isBookmarked, toggleBookmark, setListStatus } =
+    useBookmarks();
+  const navigate = useNavigate();
   // NSFW (Aniraku AnimeDetail.jsx:632) + own episode ratings (AnimeDetail
   // :641) — both hooks sit above every early return.
   const { nsfwEnabled } = useNsfw();
   const [episodeRatings, setEpisodeRatings] = useState<Record<number, number>>(
     {},
   );
+  // AniList-style "Add to List" split-button dropdown (Info poster column
+  // only). Above every early return with the other hooks. Closes on outside
+  // click and on Escape (shared overlay stack, so a drawer stacked above
+  // still wins) — registered only while the menu is open.
+  const [listMenuOpen, setListMenuOpen] = useState(false);
+  const listMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!listMenuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (
+        listMenuRef.current &&
+        !listMenuRef.current.contains(event.target as Node)
+      ) {
+        setListMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    const unregister = registerOverlayHandler(() => setListMenuOpen(false));
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      unregister();
+    };
+  }, [listMenuOpen]);
+  // Flip the dropdown upward when there isn't enough room below the split
+  // button (poster column is short; a downward menu would overflow the
+  // viewport / bleed over the hero). Measured once per open via layout effect
+  // so it lands in the right spot on the first paint.
+  const [listMenuUp, setListMenuUp] = useState(false);
+  const listMenuPanelRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!listMenuOpen) return;
+    const anchor = listMenuRef.current;
+    const panel = listMenuPanelRef.current;
+    if (!anchor || !panel) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const panelHeight = panel.offsetHeight;
+    const spaceBelow = window.innerHeight - anchorRect.bottom;
+    const spaceAbove = anchorRect.top;
+    setListMenuUp(
+      spaceBelow < panelHeight + 8 && spaceAbove > spaceBelow,
+    );
+  }, [listMenuOpen]);
+  // Bookmarking requires an account: guests are bounced to /login instead of
+  // writing a local-only row (library is a synced, per-user concept now).
+  const requireLogin = (): boolean => {
+    if (userId) return true;
+    showToast('Log in to add anime to your library', { type: 'warning' });
+    navigate('/login');
+    return false;
+  };
   const [animeInfo, setAnimeInfo] = useState<Anime | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3185,6 +3409,11 @@ const Info: React.FC = () => {
   const bookmarkId = Number(animeInfo.id || animeInfo.malId);
   const hasBookmarkId = Number.isFinite(bookmarkId) && bookmarkId > 0;
   const bookmarked = hasBookmarkId && isBookmarked(bookmarkId);
+  // Current list status on the bookmark row (null = pre-status/legacy row);
+  // drives the split button's check marks.
+  const currentListStatus: ListStatus | null = hasBookmarkId
+    ? (bookmarks.find((row) => row.id === bookmarkId)?.status ?? null)
+    : null;
   const accentColor = animeInfo.color || 'grey';
   const score = animeInfo.rating ? Math.round(animeInfo.rating * 10) : 0;
   const statusParam = STATUS_PARAMS[animeInfo.status];
@@ -3486,36 +3715,123 @@ const Info: React.FC = () => {
                     <WatchLabelNarrow>WATCH</WatchLabelNarrow>
                   </WatchNow>
                   {hasBookmarkId && (
-                    <BookmarkToggle
-                      type='button'
-                      $active={bookmarked}
-                      aria-pressed={bookmarked}
-                      aria-label={
-                        bookmarked
-                          ? `Remove ${title} from bookmarks`
-                          : `Bookmark ${title}`
-                      }
-                      title={bookmarked ? 'Remove bookmark' : 'Bookmark'}
-                      onClick={() => {
-                        void toggleBookmark({
-                          id: bookmarkId,
-                          title,
-                          image: animeInfo.image || '',
-                        });
-                      }}
-                    >
-                      {bookmarked ? (
-                        <FaBookmark aria-hidden='true' />
-                      ) : (
-                        <FaRegBookmark aria-hidden='true' />
+                    <ListSplit ref={listMenuRef}>
+                      <ListMain
+                        type='button'
+                        $active={bookmarked}
+                        aria-pressed={bookmarked}
+                        aria-haspopup={bookmarked ? 'menu' : undefined}
+                        aria-expanded={bookmarked ? listMenuOpen : undefined}
+                        aria-label={
+                          bookmarked
+                            ? `Change list status for ${title}`
+                            : `Add ${title} to list`
+                        }
+                        title={
+                          bookmarked ? 'Change list status' : 'Add to List'
+                        }
+                        onClick={() => {
+                          if (!requireLogin()) return;
+                          if (bookmarked) {
+                            setListMenuOpen((open) => !open);
+                            return;
+                          }
+                          void toggleBookmark({
+                            id: bookmarkId,
+                            title,
+                            image: animeInfo.image || '',
+                          });
+                        }}
+                      >
+                        {bookmarked ? (
+                          <FaBookmark aria-hidden='true' />
+                        ) : (
+                          <FaRegBookmark aria-hidden='true' />
+                        )}
+                        <BookmarkLabelWide>
+                          {bookmarked ? 'IN LIBRARY' : 'ADD TO LIST'}
+                        </BookmarkLabelWide>
+                        <BookmarkLabelNarrow>
+                          {bookmarked ? 'LISTED' : 'ADD'}
+                        </BookmarkLabelNarrow>
+                      </ListMain>
+                      <ListCaret
+                        type='button'
+                        aria-label={
+                          bookmarked
+                            ? 'Open list status menu'
+                            : `Add ${title} with a status`
+                        }
+                        aria-haspopup='menu'
+                        aria-expanded={listMenuOpen}
+                        onClick={() => {
+                          if (!requireLogin()) return;
+                          setListMenuOpen((open) => !open);
+                        }}
+                      >
+                        <FaChevronDown aria-hidden='true' />
+                      </ListCaret>
+                      {listMenuOpen && (
+                        <ListMenu
+                          ref={listMenuPanelRef}
+                          $up={listMenuUp}
+                          role='menu'
+                          aria-label='List status'
+                        >
+                          {LIST_STATUSES.map((status) => (
+                            <ListMenuItem
+                              key={status}
+                              type='button'
+                              role='menuitemradio'
+                              aria-checked={currentListStatus === status}
+                              $current={currentListStatus === status}
+                              onClick={() => {
+                                void setListStatus(
+                                  {
+                                    id: bookmarkId,
+                                    title,
+                                    image: animeInfo.image || '',
+                                  },
+                                  status,
+                                  animeInfo.totalEpisodes || null,
+                                );
+                                setListMenuOpen(false);
+                              }}
+                            >
+                              <FaCheck aria-hidden='true' />
+                              Set as {LIST_STATUS_LABELS[status]}
+                            </ListMenuItem>
+                          ))}
+                          <ListMenuDivider />
+                          <ListMenuLink
+                            role='menuitem'
+                            to='/profile?tab=bookmarks'
+                            onClick={() => setListMenuOpen(false)}
+                          >
+                            <FaTh aria-hidden='true' />
+                            Open List Editor
+                          </ListMenuLink>
+                          {bookmarked && (
+                            <ListMenuItem
+                              type='button'
+                              role='menuitem'
+                              $danger
+                              onClick={() => {
+                                void toggleBookmark({
+                                  id: bookmarkId,
+                                  title,
+                                  image: animeInfo.image || '',
+                                });
+                                setListMenuOpen(false);
+                              }}
+                            >
+                              <FaRegBookmark aria-hidden='true' />
+                              Remove from Library
+                            </ListMenuItem>
+                          )}
+                        </ListMenu>
                       )}
-                      <BookmarkLabelWide>
-                        {bookmarked ? 'BOOKMARKED' : 'BOOKMARK'}
-                      </BookmarkLabelWide>
-                      <BookmarkLabelNarrow>
-                        {bookmarked ? 'SAVED' : 'SAVE'}
-                      </BookmarkLabelNarrow>
-                    </BookmarkToggle>
+                    </ListSplit>
                   )}
                 </PosterActions>
                 {(animeInfo.id || animeInfo.malId) && (
