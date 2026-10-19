@@ -422,6 +422,25 @@ const UpcomingEta = styled.div`
   color: var(--global-text);
 `;
 
+const RecheckButton = styled.button`
+  margin-top: 14px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--global-text);
+  cursor: pointer;
+  background-color: var(--global-div);
+  border: none;
+  outline: 1px solid var(--global-border-color);
+  border-radius: var(--global-border-radius);
+
+  &:hover {
+    color: var(--primary-accent);
+    background-color: var(--primary-accent-tr);
+    outline: 1px solid var(--primary-accent);
+  }
+`;
+
 const NoEpsImage = styled.div`
   margin-bottom: 3rem;
   max-width: 100%;
@@ -763,6 +782,10 @@ const WatchInner: React.FC = () => {
   const [poolEpKey, setPoolEpKey] = useState('');
   const [serversSettled, setServersSettled] = useState(false);
   const lastServerFetchKeyRef = useRef('');
+  // Manual re-check when a freshly-released episode's server pools settle
+  // EMPTY (backend hasn't scraped it yet). Bumping this re-runs the fetch
+  // effect below so the user can poll without a full reload.
+  const [serverRetry, setServerRetry] = useState(0);
   const [language, setLanguage] = useState(
     () =>
       readStoredPref(getLanguageKey(animeId), legacyLanguageKey(animeId)) ||
@@ -937,8 +960,10 @@ const WatchInner: React.FC = () => {
     };
     // `language` is a dep: flipping Sub/Dub re-fetches so the other pool is
     // always present too (the missing dep left stale empty pools).
+    // `serverRetry` re-runs the fetch on a manual re-check (empty pools for a
+    // fresh release) — the key guard above keeps the pools, it just refetches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animeId, currentEpisode.number, genreKey, language, infoResolved]);
+  }, [animeId, currentEpisode.number, genreKey, language, infoResolved, serverRetry]);
 
   const servers = language === 'dub' ? serversDub : serversSub;
   const allServers = [...serversSub, ...serversDub];
@@ -1933,6 +1958,16 @@ const WatchInner: React.FC = () => {
     poolEpKey === serverEpKey &&
     serversSettled &&
     (Boolean(selectedServerObj) || !gatePool.some((s: any) => s?.name));
+  // Freshly-released episode the backend hasn't scraped yet: pools settled
+  // for THIS episode and BOTH are empty. The old gate let the Player boot
+  // here (empty pool ⇒ `!some(...)` is true) and its own /stream fallback
+  // then served a WRONG episode the backend had lying around. Block the
+  // player and show a re-checkable "not available yet" panel instead.
+  const serversEmptyForEpisode =
+    poolEpKey === serverEpKey &&
+    serversSettled &&
+    serversSub.length === 0 &&
+    serversDub.length === 0;
 
   const playerEl = (
     <VideoPlayerContainer
@@ -1965,6 +2000,33 @@ const WatchInner: React.FC = () => {
             {countdown && countdown !== 'Airing now or aired' ? (
               <UpcomingEta>Next episode airs in {countdown}.</UpcomingEta>
             ) : null}
+          </UpcomingContent>
+        </UpcomingPanel>
+      ) : serversEmptyForEpisode ? (
+        // Released episode whose server pools settled empty — the backend
+        // hasn't scraped it yet. Never hand it to the Player (its /stream
+        // fallback would play a wrong episode); show a re-checkable panel.
+        <UpcomingPanel role='status'>
+          {selectedBackgroundImage ? (
+            <UpcomingArt
+              src={selectedBackgroundImage}
+              alt=''
+              aria-hidden='true'
+            />
+          ) : null}
+          <UpcomingDim />
+          <UpcomingContent>
+            <img src='/no-source.svg' alt='' aria-hidden='true' />
+            <UpcomingMessage>
+              This episode isn't available yet. It may still be processing —
+              check again in a moment.
+            </UpcomingMessage>
+            <RecheckButton
+              type='button'
+              onClick={() => setServerRetry((n) => n + 1)}
+            >
+              Check again
+            </RecheckButton>
           </UpcomingContent>
         </UpcomingPanel>
       ) : (
