@@ -28,6 +28,8 @@ Open-source anime discovery and viewing for people who want to find something, w
   <sub>Binance Pay UID <code>1098400042</code> · full details in <a href="./SUPPORT.md">SUPPORT.md</a></sub>
 </p>
 
+Aniraku is open source. Voluntary support helps fund **hosting, releases, and open-source development** and never changes access to site features.
+
 ---
 
 ## What Aniraku is
