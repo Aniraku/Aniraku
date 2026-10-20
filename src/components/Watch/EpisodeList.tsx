@@ -18,6 +18,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { Episode } from '../../hooks/animeInterface';
 import { subscribeToWatchHistory } from '../../lib/watchHistory';
+import ThemedSelect from '../ThemedSelect';
 
 // Live `hideSpoiler` pref ("Hide Spoilers" — blocks episode images behind a
 // HIDDEN SPOILER overlay). StoredSettings keeps it internal to the settings
@@ -212,16 +213,6 @@ const ControlsContainer = styled.div`
   padding: 0.5rem;
 `;
 
-const SelectInterval = styled.select`
-  height: 2.25rem;
-  box-sizing: border-box;
-  padding: 0.35rem 0.5rem;
-  background-color: var(--global-secondary-bg);
-  color: var(--global-text);
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
-`;
-
 const LayoutToggle = styled.button`
   width: 2.25rem;
   height: 2.25rem;
@@ -392,13 +383,10 @@ export const EpisodeList: React.FC<Props> = ({
   }, [episodes]);
 
   // Handle interval change
-  const handleIntervalChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const [start, end] = e.target.value.split('-').map(Number);
-      setInterval([start, end]);
-    },
-    [],
-  );
+  const handleIntervalChange = useCallback((value: string) => {
+    const [start, end] = value.split('-').map(Number);
+    setInterval([start, end]);
+  }, []);
 
   // Live controls-bar spoiler toggle (`title="Toggle Spoilers"`): blocks
   // episode images behind the HIDDEN SPOILER overlay.
@@ -510,16 +498,15 @@ export const EpisodeList: React.FC<Props> = ({
   return (
     <ListContainer $maxHeight={maxListHeight}>
       <ControlsContainer>
-        <SelectInterval
+        <ThemedSelect
           onChange={handleIntervalChange}
           value={`${interval[0]}-${interval[1]}`}
-        >
-          {intervalOptions.map(({ start, end }, index) => (
-            <option key={index} value={`${start}-${end}`}>
-              {`${start + 1} - ${end + 1}`}
-            </option>
-          ))}
-        </SelectInterval>
+          ariaLabel='Episode range'
+          options={intervalOptions.map(({ start, end }) => ({
+            value: `${start}-${end}`,
+            label: `${start + 1} - ${end + 1}`,
+          }))}
+        />
 
         <SearchContainer>
           <Icon>

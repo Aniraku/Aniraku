@@ -5,6 +5,7 @@ import { MediaListStatus } from '../../client/userInfoTypes';
 import { useAuth as useSupabaseAuth } from '../../hooks/useAuth';
 import { getSyncStatus } from '../../lib/sync';
 import CardGrid from '../Cards/CardGrid';
+import ThemedSelect from '../ThemedSelect';
 
 const Container = styled.div`
   margin-top: 1rem;
@@ -64,22 +65,6 @@ const LoginPromptBox = styled.div`
 const LoginPromptText = styled.span`
   padding: 0.5rem;
   text-align: center;
-`;
-
-// Placed like the live view-toggle control in the heading row
-const StatusDropdown = styled.select`
-  padding: 0.5rem;
-  font-family: var(--app-font-family);
-  color: var(--global-text);
-  cursor: pointer;
-  background-color: var(--global-secondary-bg);
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
-  transition: background-color 0.15s, color 0.15s;
-
-  &:hover {
-    background-color: var(--global-button-hover-bg);
-  }
 `;
 
 // Live status labels (AniList list names used by the live site)
@@ -178,8 +163,7 @@ export const WatchingAnilist = () => {
       )
     : [];
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value;
+  const handleStatusChange = (newStatus: string) => {
     setSelectedStatus(newStatus);
     localStorage.setItem('selectedStatus', newStatus);
   };
@@ -209,17 +193,16 @@ export const WatchingAnilist = () => {
         <HeadingTitle>
           {animeData.length} {statusLabels[selectedStatus] || 'Watching'}
         </HeadingTitle>
-        <StatusDropdown
+        <ThemedSelect
           value={selectedStatus}
           onChange={handleStatusChange}
-          aria-label='List status'
-        >
-          {Object.values(MediaListStatus).map((status: string) => (
-            <option key={status} value={status}>
-              {statusLabels[status] || status}
-            </option>
-          ))}
-        </StatusDropdown>
+          ariaLabel='List status'
+          align='right'
+          options={Object.values(MediaListStatus).map((status: string) => ({
+            value: status,
+            label: statusLabels[status] || status,
+          }))}
+        />
       </HeadingRow>
       {loading ? (
         <StateMessage>Loading...</StateMessage>
