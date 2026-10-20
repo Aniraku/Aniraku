@@ -18,7 +18,7 @@ Open-source anime discovery and viewing for people who want to find something, w
 
 ---
 > [!CAUTION]
-> **Keep Aniraku online.** Our backend credit runs out around **October 19–20** — when it's gone, streaming stops (the app still opens, but playback goes dark until the servers are topped up). Aniraku is free, open-source, and has **no ads and no paid tier**. It's built and run by one person from a middle-class family — no company, no investors, and no personal money left to keep the servers on. **Donations are the only thing keeping Aniraku alive.** If it has saved you time, a small donation keeps it online past October 20. And the library keeps growing — **missing an anime?** Email [`sho.islam0311@proton.me`](mailto:sho.islam0311@proton.me) and it'll get added.
+>If it has saved you time, a small donation keeps it up. And the library keeps growing — **missing an anime?** Email [`sho.islam0311@proton.me`](mailto:sho.islam0311@proton.me) and it'll get added.
 
 <p align="center">
   <a href="https://patreon.com/ShoIslam"><img src="https://img.shields.io/badge/Support_on_Patreon-FF4D4D?style=for-the-badge&logo=patreon&logoColor=white" alt="Support on Patreon" /></a>
