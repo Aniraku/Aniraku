@@ -1693,13 +1693,62 @@ const EpAirDate = styled.div`
 
 // toolbar range select — live `qt` applies `Gt` inline:
 // {padding:.5rem, bg global-div, color global-text, border, radius, center}
-const EpInterval = styled.select`
-  padding: 0.5rem;
-  color: var(--global-text);
+// Episode-range pager — replaces the old native <select> chunk picker. The OS
+// picker looked out of place on mobile and the opaque "1 - 100" options gave no
+// sense of scale for long-running series; a prev/next pager with a live
+// "1–100 / 1122" readout is thumb-friendly (big touch targets) and shows exactly
+// where you are in the episode list.
+const EpRangeNav = styled.div`
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  overflow: hidden;
   background-color: var(--global-div);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
-  text-align: center;
+`;
+
+const EpRangeBtn = styled.button`
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  color: var(--global-text);
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    color: var(--primary-accent);
+    background-color: var(--global-button-hover-bg);
+  }
+  &:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+`;
+
+const EpRangeLabel = styled.span`
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: baseline;
+  justify-content: center;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--global-text);
+  border-right: 1px solid var(--global-border-color);
+  border-left: 1px solid var(--global-border-color);
+`;
+
+const EpRangeTotal = styled.span`
+  font-weight: 400;
+  color: var(--global-text-muted);
 `;
 
 // single-interval fallback: `{...Gt, alignContent: 'center'}`
@@ -2734,10 +2783,14 @@ const LightboxBtn = styled.button`
 `;
 
 // Episodes toolbar — _container_dlwq6_1 family (no radius/align on the bar;
-// ≤500 container/buttonBase get padding .5rem from live's media rule)
+// ≤500 container/buttonBase get padding .5rem from live's media rule).
+// flex-wrap lets the range pager + filter + 2 icon buttons reflow onto two rows
+// on narrow phones instead of squeezing the filter to nothing.
 const EpToolbar = styled.div`
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+  align-items: center;
   padding: 0.35rem 0.5rem;
   background-color: var(--global-div-tr);
   border-bottom: 1px solid var(--global-border-color);
@@ -3572,6 +3625,19 @@ const Info: React.FC = () => {
     },
     [],
   );
+  // Pager nav: step to the previous/next 100-episode chunk and jump the list
+  // back to the top (the old <select> did the same on change).
+  const stepEpisodeInterval = (delta: number) => {
+    const current = intervalOptions.findIndex(
+      (option) => option.start === episodeInterval[0],
+    );
+    const next = intervalOptions[current + delta];
+    if (!next) return;
+    setEpisodeInterval([next.start, next.end]);
+    document
+      .getElementById('episodes-list-container')
+      ?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   // live `ee`: a search shows every match; otherwise slice the selected
   // 100-page interval.
   const visibleEpisodes = episodeQuery
@@ -4490,28 +4556,30 @@ const Info: React.FC = () => {
                 <EpisodeListContainer>
                   <EpToolbar>
                     {intervalOptions.length > 1 ? (
-                      <EpInterval
-                        aria-label='Episode range'
-                        value={`${episodeInterval[0]}-${episodeInterval[1]}`}
-                        onChange={(event) => {
-                          const [start, end] = event.target.value
-                            .split('-')
-                            .map(Number);
-                          setEpisodeInterval([start, end]);
-                          document
-                            .getElementById('episodes-list-container')
-                            ?.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                      >
-                        {intervalOptions.map((option) => (
-                          <option
-                            key={`${option.start}-${option.end}`}
-                            value={`${option.start}-${option.end}`}
-                          >
-                            {`${option.start + 1} - ${option.end + 1}`}
-                          </option>
-                        ))}
-                      </EpInterval>
+                      <EpRangeNav>
+                        <EpRangeBtn
+                          type='button'
+                          aria-label='Previous episodes'
+                          disabled={episodeInterval[0] === 0}
+                          onClick={() => stepEpisodeInterval(-1)}
+                        >
+                          <FaChevronLeft aria-hidden='true' />
+                        </EpRangeBtn>
+                        <EpRangeLabel>
+                          {episodeInterval[0] + 1}–{episodeInterval[1] + 1}
+                          <EpRangeTotal>/{episodes.length}</EpRangeTotal>
+                        </EpRangeLabel>
+                        <EpRangeBtn
+                          type='button'
+                          aria-label='Next episodes'
+                          disabled={
+                            episodeInterval[1] >= episodes.length - 1
+                          }
+                          onClick={() => stepEpisodeInterval(1)}
+                        >
+                          <FaChevronRight aria-hidden='true' />
+                        </EpRangeBtn>
+                      </EpRangeNav>
                     ) : (
                       /* live `m` label — quirk kept: shows the raw interval
                          bounds (e.g. "1 - 100") even with fewer episodes */
