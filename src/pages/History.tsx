@@ -16,6 +16,7 @@ import {
   getSessionUserId,
   publishHistoryNow,
 } from '../lib/sync';
+import ThemedSelect from '../components/ThemedSelect';
 
 /* ------------------------------------------------------------------ *
  * Constants & helpers (ported from the live v1.14.x History route)   *
@@ -275,31 +276,6 @@ const FullRowControl = styled(CompactControl)`
 
 const SortRow = styled(FullRowControl)`
   gap: 0.5rem;
-`;
-
-const SortSelect = styled.select`
-  box-sizing: border-box;
-  flex: 1;
-  min-width: 0;
-  padding: 0.5rem 0.75rem;
-  font-family: inherit;
-  font-size: 0.8rem;
-  color: var(--global-text);
-  cursor: pointer;
-  background-color: var(--global-div-tr);
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
-
-  option {
-    background-color: var(--global-div);
-    color: var(--global-text);
-  }
-
-  &:hover,
-  &:focus {
-    border-color: var(--global-text);
-    outline: none;
-  }
 `;
 
 const DirectionButton = styled.button`
@@ -1640,19 +1616,13 @@ const History = () => {
           <SidePanel>
             <SidePanelSection>
               <SortRow>
-                <SortSelect
+                <ThemedSelect
+                  fullWidth
                   value={order}
-                  onChange={(event) => setOrder(event.target.value as SortValue)}
-                  aria-label='Sort'
-                >
-                  <optgroup label='Sort'>
-                    {SORT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                </SortSelect>
+                  onChange={(value) => setOrder(value as SortValue)}
+                  ariaLabel='Sort'
+                  options={SORT_OPTIONS}
+                />
                 <DirectionButton
                   type='button'
                   onClick={handleDirectionToggle}

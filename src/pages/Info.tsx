@@ -39,6 +39,7 @@ import { StyledCardGrid } from '../components/Cards/CardGrid';
 import CardItem from '../components/Cards/CardItem';
 import InfoComments from '../components/Info/Comments';
 import { showToast } from '../components/Toaster';
+import ThemedSelect from '../components/ThemedSelect';
 import { useBookmarks } from '../hooks/useBookmarks';
 // List-status vocabulary for the sidebar "Add to List" split button —
 // the six AniList statuses live on the bookmark row (hidden mechanism).
@@ -2314,16 +2315,6 @@ const SectionBarLabel = styled.span`
   }
 `;
 
-// _filterSelectBox_hsaph_39
-const BarSelect = styled.select`
-  padding: 0.5rem;
-  color: var(--global-text);
-  text-align: center;
-  background-color: var(--global-tertiary-bg);
-  border: none;
-  border-radius: var(--global-border-radius);
-`;
-
 // _scrollWrapper_hsaph_46 / _scrollWrapper_1lfbt_79 — position/overflow base;
 // live adds the same flex fill under both ≥951 and ≤950 → unconditional here.
 const SectionScroll = styled.div`
@@ -4380,23 +4371,19 @@ const Info: React.FC = () => {
                       Characters & Voice Actors
                     </SectionBarLabel>
                     {characterLanguages.length > 0 && (
-                      <BarSelect
+                      <ThemedSelect
                         value={
                           characterLanguages.includes(characterLanguage)
                             ? characterLanguage
                             : characterLanguages[0]
                         }
-                        aria-label='Voice actor language'
-                        onChange={(event) =>
-                          setCharacterLanguage(event.target.value)
-                        }
-                      >
-                        {characterLanguages.map((language) => (
-                          <option key={language} value={language}>
-                            {language}
-                          </option>
-                        ))}
-                      </BarSelect>
+                        ariaLabel='Voice actor language'
+                        onChange={(value) => setCharacterLanguage(value)}
+                        options={characterLanguages.map((language) => ({
+                          value: language,
+                          label: language,
+                        }))}
+                      />
                     )}
                   </SectionBar>
                   <SectionScroll>
@@ -4501,20 +4488,18 @@ const Info: React.FC = () => {
                       Artwork & Posters
                     </SectionBarLabel>
                     {artworkTypes.length > 0 && (
-                      <BarSelect
+                      <ThemedSelect
                         value={artFilter}
-                        aria-label='Artwork category'
-                        onChange={(event) => {
-                          setArtFilter(event.target.value);
+                        ariaLabel='Artwork category'
+                        onChange={(value) => {
+                          setArtFilter(value);
                           setArtIndex(null);
                         }}
-                      >
-                        {artworkTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {ARTWORK_LABELS[type] ?? type}
-                          </option>
-                        ))}
-                      </BarSelect>
+                        options={artworkTypes.map((type) => ({
+                          value: type,
+                          label: ARTWORK_LABELS[type] ?? type,
+                        }))}
+                      />
                     )}
                   </SectionBar>
                   <SectionScroll>
