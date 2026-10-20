@@ -17,6 +17,8 @@ Open-source anime discovery and viewing for people who want to find something, w
 </div>
 
 ---
+
+
 > [!CAUTION]
 >If it has saved you time, a small donation keeps it up. And the library keeps growing — **missing an anime?** Email [`sho.islam0311@proton.me`](mailto:sho.islam0311@proton.me) and it'll get added.
 
@@ -28,10 +30,6 @@ Open-source anime discovery and viewing for people who want to find something, w
   <sub>Binance Pay UID <code>1098400042</code> · full details in <a href="./SUPPORT.md">SUPPORT.md</a></sub>
 </p>
 
-Aniraku is open source. Voluntary support helps fund **hosting, releases, and open-source development** and never changes access to site features.
-
----
-
 ## What Aniraku is
 
 Aniraku keeps discovery, playback, watch history, ratings, bookmarks, comments, and recommendations close to the title you are watching. The goal is simple: spend less time moving between pages and more time watching.
@@ -39,6 +37,15 @@ Aniraku keeps discovery, playback, watch history, ratings, bookmarks, comments, 
 The main flow is:
 
 `discover` → `watch` → `remember`
+
+> [!IMPORTANT]
+> Metadata comes from AniList. The two deploy branches use different
+> endpoints with the same schema — keep each branch on its own:
+>
+> - **Preview** (`test.aniraku.tech`): a **publicly hosted Anilist offline database** with **no rate limits** — [Mirror](https://graphql.aniraku.tech) ([repo](https://github.com/Shoislam0311/anilist-offline-db)).
+> - **Main** (`www.aniraku.tech`): the **official AniList public API** (`https://graphql.anilist.co`).
+>
+> Authenticated AniList traffic stays on the official API on both branches.
 ## Open the project
 
 <a href="https://test.aniraku.tech/"><img src="https://img.shields.io/badge/OPEN%20ANIRAKU-Visit%20the%20live%20site-3B82F6?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Open Aniraku live site" /></a>

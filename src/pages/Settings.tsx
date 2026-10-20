@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa';
 import { useSettings } from '../components/Profile/SettingsProvider';
 import { useTheme } from '../components/ThemeContext';
+import ThemedSelect from '../components/ThemedSelect';
 import { useAuth } from '../hooks/useAuth';
 import { useNsfw } from '../hooks/useNsfw';
 import { supabase } from '../lib/supabase';
@@ -250,17 +251,6 @@ const StyledButton = styled.button<{ $danger?: boolean }>`
     opacity: 0.6;
     cursor: not-allowed;
   }
-`;
-
-const StyledSelect = styled.select`
-  background: var(--global-tertiary-bg);
-  color: var(--global-text);
-  padding: 0.35rem 0.5rem;
-  cursor: pointer;
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
-  font-family: var(--app-font-family);
-  transition: background-color 0.2s ease-in-out;
 `;
 
 const StyledInput = styled.input`
@@ -1074,18 +1064,13 @@ export const Settings: React.FC = () => {
           {row.options?.[0]?.label ?? 'Open'}
         </StyledButton>
       ) : (
-        <StyledSelect
+        <ThemedSelect
           value={preferences[row.key as keyof Preferences]}
-          onChange={(event) =>
-            handlePreferenceChange(row.key as keyof Preferences, event.target.value)
+          onChange={(value) =>
+            handlePreferenceChange(row.key as keyof Preferences, value)
           }
-        >
-          {row.options?.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </StyledSelect>
+          options={row.options ?? []}
+        />
       )}
     </Row>
   );
@@ -1106,20 +1091,13 @@ export const Settings: React.FC = () => {
             pages show a block screen. You can change this at any time.
           </RowDescription>
         </RowLabel>
-        <StyledSelect
+        <ThemedSelect
           value={nsfwEnabled ? 'Enabled' : 'Disabled'}
           disabled={nsfwSaving}
-          onChange={(event) =>
-            handleNsfwToggle(event.target.value === 'Enabled')
-          }
-          aria-label='NSFW content'
-        >
-          {YES_NO.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </StyledSelect>
+          onChange={(value) => handleNsfwToggle(value === 'Enabled')}
+          ariaLabel='NSFW content'
+          options={YES_NO}
+        />
       </Row>
       {nsfwSaving && (
         <Row>
