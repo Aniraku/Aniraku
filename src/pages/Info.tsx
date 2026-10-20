@@ -1075,49 +1075,35 @@ const SearchTrailerBtn = styled.a`
   width: auto;
 `;
 
-const WatchLabelWide = styled.span`
-  @media (max-width: 500px) {
-    display: none;
-  }
-`;
+const WatchLabelWide = styled.span``;
 
 const WatchLabelNarrow = styled.span`
   display: none;
-  @media (max-width: 500px) {
-    display: inline;
-  }
 `;
 
-const BookmarkLabelWide = styled.span`
-  @media (max-width: 500px) {
-    display: none;
-  }
-`;
+const BookmarkLabelWide = styled.span``;
 
 const BookmarkLabelNarrow = styled.span`
   display: none;
-  @media (max-width: 500px) {
-    display: inline;
-  }
 `;
 
-// Mobile (≤500px) action row: WATCH + BOOKMARK share one compact row instead
-// of stacking full-width (the stack made the poster column overflow-tall and
-// squeezed the synopsis). display:contents on larger screens keeps the
-// existing stacked full-width layout untouched.
+// Mobile (≤500px) action row: WATCH + the split "Add to List" button stack
+// full-width under the poster instead of being crammed side-by-side into the
+// narrow (10rem) poster column — the split button (main + caret) needs real
+// width for its icon + label, and the old even row crushed it to ~45px. The
+// full-width MobileSynopsis below now owns the description, so a slightly
+// taller poster column no longer squeezes it. display:contents on larger
+// screens keeps the existing stacked full-width layout untouched.
 const PosterActions = styled.div`
   display: contents;
 
   @media (max-width: 500px) {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 0.5rem;
 
     > * {
-      flex: 1 1 0;
-      min-width: 0;
-      width: auto;
-      white-space: nowrap;
+      width: 100%;
     }
   }
 `;
