@@ -90,7 +90,7 @@ const DayStripScroll = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   width: 100%;
   overflow: auto hidden;
@@ -107,7 +107,8 @@ const DayStripWrapper = styled.div`
   gap: 1rem;
   align-items: center;
   justify-content: center;
-  width: auto;
+  width: max-content;
+  min-width: 100%;
   margin: 0 auto;
   font-size: 2rem;
   font-weight: 700;
@@ -368,6 +369,7 @@ const SlotWrapper = styled.div`
   }
   @media (max-width: 800px) {
     width: 100%;
+    min-width: 0;
     max-width: unset;
   }
 `;
