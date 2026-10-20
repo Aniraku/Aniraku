@@ -13,7 +13,6 @@ import {
 } from 'react-icons/fa';
 import { FaFilm } from 'react-icons/fa6';
 import { ReportModal } from '../ReportModal';
-import { useMediaQuery } from '../useMediaQuery';
 
 // ---------------------------------------------------------------------------
 // MediaSource — live lyfa9 module (episode bar) + live 1uhbb dropdowns.
@@ -264,9 +263,10 @@ const ServerColumn = styled.div`
     width: 100%;
     box-sizing: border-box;
     margin: 0;
-    /* Equal halves so AUDIO/SERVER labels sit centered over their own
-       dropdown instead of a floating auto-width island. */
-    grid-template-columns: 1fr auto 1fr;
+    /* AUDIO column hugs "Sub/Dub"; the SERVER column takes everything else
+       so long provider names (FlixCloud, etc.) get room instead of being
+       truncated to nothing in an even split. */
+    grid-template-columns: minmax(4.5rem, auto) auto minmax(0, 1fr);
   }
 `;
 
@@ -274,11 +274,11 @@ const DropdownLabels = styled.div`
   display: contents;
   > :nth-child(1) {
     grid-area: 1 / 1;
-    justify-self: center;
+    justify-self: start;
   }
   > :nth-child(2) {
     grid-area: 1 / 3;
-    justify-self: center;
+    justify-self: start;
   }
 `;
 
@@ -363,27 +363,9 @@ const DropdownRoot = styled.div`
   align-items: center;
   height: 100%;
   @media (max-width: 500px) {
-    justify-content: center;
+    justify-content: flex-start;
     min-width: 0;
-  }
-`;
-
-const NativeSelect = styled.select`
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  font-family: inherit;
-  color: transparent;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  opacity: 0;
-  appearance: none;
-  &:focus-visible {
-    outline: none;
+    width: 100%;
   }
 `;
 
@@ -393,6 +375,7 @@ const Trigger = styled.button`
   gap: 0.25rem;
   align-items: center;
   height: 100%;
+  min-height: 2.4rem;
   padding: 0.6rem 0.6rem 0.6rem 0.1rem;
   font-size: 0.85rem;
   font-weight: 500;
@@ -401,6 +384,11 @@ const Trigger = styled.button`
   background: none;
   border: none;
   outline: none;
+  @media (max-width: 500px) {
+    width: 100%;
+    min-width: 0;
+    padding: 0.65rem 0.5rem;
+  }
 `;
 
 const TriggerIcon = styled.span`
@@ -408,15 +396,24 @@ const TriggerIcon = styled.span`
   align-items: center;
   margin-left: 0.5rem;
   font-size: 1.15rem;
+  @media (max-width: 500px) {
+    margin-left: 0;
+  }
 `;
 
 const TriggerName = styled.span`
   display: inline-block;
-  width: 2.5rem;
+  max-width: 9rem;
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+  @media (max-width: 500px) {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    text-align: left;
+  }
 `;
 
 const Caret = styled.span`
@@ -433,8 +430,11 @@ const Menu = styled.div<{ $open: boolean; $align: 'left' | 'right' }>`
   z-index: var(--z-index-dropdown);
   display: flex;
   flex-direction: column;
+  gap: 2px;
   padding: 0.25rem;
-  overflow: hidden;
+  max-height: min(60vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: ${({ $open }) => ($open ? 'auto' : 'none')};
   background-color: var(--global-primary-bg);
   border: 1px solid var(--global-border-color);
@@ -460,7 +460,8 @@ const MenuItem = styled.button`
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 0.45rem 0.55rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.6rem;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--global-text);
@@ -579,7 +580,6 @@ const SelectDropdown: React.FC<DropdownProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const isTouch = useMediaQuery('(pointer: coarse)');
   const selected = options.find((o) => o.value === value);
   const icon = triggerIcon ?? selected?.icon;
 
@@ -588,50 +588,26 @@ const SelectDropdown: React.FC<DropdownProps> = ({
     setOpen(false);
   }, [value]);
 
-  // Outside click + Escape close (live).
+  // Outside tap/click + Escape close. Uses `pointerdown` (not mousedown) so a
+  // touch outside the menu closes it too — the themed menu is now used on EVERY
+  // device. The old touch path swapped in a native <select> (OS picker) that
+  // dropped all icons/tags/checks and looked nothing like the site.
   useEffect(() => {
-    if (isTouch || !open) return;
-    const onMouseDown = (e: MouseEvent) => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node))
         setOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
-    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, isTouch]);
-
-  if (isTouch) {
-    return (
-      <DropdownRoot ref={rootRef}>
-        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', height: '100%' }}>
-          {icon && <TriggerIcon>{icon}</TriggerIcon>}
-          <TriggerName style={triggerWidth ? { width: triggerWidth } : undefined}>
-            {selected?.label ?? value.split(':')[0]}
-          </TriggerName>
-          <Caret>
-            <FaChevronDown />
-          </Caret>
-        </div>
-        <NativeSelect
-          aria-label={ariaLabel}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value} disabled={o.disabled}>
-              {o.label}
-            </option>
-          ))}
-        </NativeSelect>
-      </DropdownRoot>
-    );
-  }
+  }, [open]);
 
   return (
     <DropdownRoot ref={rootRef}>
