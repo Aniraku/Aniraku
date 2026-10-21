@@ -13,7 +13,6 @@ import { lazy, type ComponentType } from 'react';
 // of reload-looping.
 const RETRY_KEY = 'aniraku:chunk-retry';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function lazyRetry<T extends ComponentType<any>>(
   loader: () => Promise<{ default: T }>,
 ) {
