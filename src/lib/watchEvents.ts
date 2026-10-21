@@ -141,10 +141,10 @@ export function recordWatchEvent(
     return false; // storage unavailable — nothing recorded
   }
 
-  // --- per-episode timestamp (Continue Watching / History "latest") ----
+  // Per-episode timestamp (Continue Watching / History "latest")
   stampEpisodeWatch(idKey, number, now);
 
-  // --- bookmark status advance (hidden mechanism) -----------------------
+  // Bookmark status advance (hidden mechanism)
   // `total` MUST be the authoritative SERIES total (AniList `episodes`),
   // never a loaded-list length: a truncated/ongoing list (6 aired of 12)
   // would otherwise derive COMPLETED at 6 watched and export it to every

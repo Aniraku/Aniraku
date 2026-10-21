@@ -1,5 +1,4 @@
-// TS port of the src/pages/ — content copied with
-// every user-visible brand mention swapped to "Aniraku".
+// Terms of service content.
 import { Link } from 'react-router-dom';
 import LegalPage from '../components/LegalPage';
 import { useSeo, breadcrumbLd } from '../utils/seo';

@@ -2,16 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FaCheck, FaChevronDown } from 'react-icons/fa';
 
-// ThemedSelect — a reusable replacement for the native <select> everywhere it
-// would otherwise open the phone's OS picker on Android/touch. It renders the
-// SAME themed menu the Watch-page server/language dropdown already uses: a
-// button trigger + an absolutely-positioned listbox. Outside `pointerdown` and
-// Escape close it, so it behaves identically on desktop and mobile — no more
-// un-themed system popup.
+// A reusable replacement for the native <select>, which opens the phone's
+// OS picker on Android/touch. It renders the same themed menu used by the
+// Watch-page server/language dropdowns: a button trigger plus an absolutely
+// positioned listbox. Outside `pointerdown` and Escape close it, so it
+// behaves identically on desktop and mobile.
 //
-// Each call site controls layout (width / flex) by wrapping this component or
-// passing `className`; the trigger and menu styling are theme-aware via the
-// global CSS variables so it fits every context it's dropped into.
+// Call sites control layout (width / flex) by wrapping this component or
+// passing `className`; the trigger and menu use the global CSS variables,
+// so the styling fits every context.
 
 export type ThemedSelectOption = {
   value: string;
@@ -167,7 +166,7 @@ export const ThemedSelect: React.FC<ThemedSelectProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
 
-  // Live: menu closes whenever the value changes (parent re-render).
+  // Menu closes whenever the value changes (parent re-render).
   useEffect(() => {
     setOpen(false);
   }, [value]);

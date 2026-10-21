@@ -10,12 +10,10 @@ import {
 import { completeSyncCallback, PROVIDER_LABELS } from '../lib/sync';
 import ProviderIcon from '../components/ProviderIcon';
 
-// SyncCallback — TS port of Aniraku `src/pages/` (behavior +
-// copy; chrome restyled onto our CSS vars). Landing page for the
-// OAuth redirect from MAL / AniList. The providers append only
+// OAuth callback landing page for MAL / AniList. The providers append only
 // ?code=&state= to the registered redirect URI, so the provider is resolved
 // server-side from the pending OAuth state. The "Back to Settings" link
-// completes the loop (ours resolves to /profile?settings=1 via App).
+// completes the loop (/profile?settings=1 via App).
 
 const Page = styled.main`
   display: flex;

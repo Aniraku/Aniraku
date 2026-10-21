@@ -5,15 +5,14 @@ import { useTheme } from '../ThemeContext';
 import TacLoginNotice from '../TacLoginNotice';
 import type { Anime } from '../../hooks/animeInterface';
 
-// The Anime Community comments embed — .
+// The Anime Community comments embed.
 //
-// The Info page renders it as `<Ye media episodeNumber:0 forceInline:!0>`
-// inside a `_infoCommentsSection_aojp4_108` wrapper (InfoRoute-BPEGjnwd.js),
-// so only the INLINE variant is built here: `forceInline` forces the compact
-// bottom-sheet (`L(Be)`, breakpoint 768) off. Strings, DOM order and every
-// qywzu_* class are taken from the bundle + style.css.
+// The Info page renders it inline (`episodeNumber: 0`, `forceInline`), so
+// only the inline variant is built here; `forceInline` keeps the compact
+// bottom-sheet off. Strings and DOM order match the embed's markup, and
+// every class is prefixed qywzu_.
 //
-// Config keys / colorScheme probe / script loader mirror the live code:
+// Config keys / colorScheme probe / script loader:
 //   window.theAnimeCommunityConfig = { AniList_ID, episodeChapterNumber,
 //     mediaType, colorScheme, removeBorder, removePadding }
 //   https://theanimecommunity.com/embed.js  (id: anime-community-script)
@@ -36,7 +35,7 @@ interface ColorScheme {
   accentColor: string;
 }
 
-// (empty defaults) + `Ge` (keys) + `Ke` (key-by-key equality).
+// Empty defaults; keys and values are compared field by field.
 const EMPTY_SCHEME: ColorScheme = {
   primaryColor: '',
   backgroundColor: '',
@@ -89,9 +88,9 @@ const buildScheme = (): ColorScheme => {
   };
 };
 
-// live reads the comments flag straight from the settings record
-// (`localStorage['aniraku:settings'].settings.comments ?? true`) — the public
-// `useSettings()` shape doesn't expose it, so read it the same way live does.
+// The comments flag lives in the settings record
+// (`localStorage['aniraku:settings'].settings.comments ?? true`). The public
+// `useSettings()` shape doesn't expose it, so read it directly.
 const readCommentsSetting = (): boolean => {
   try {
     const raw = localStorage.getItem('aniraku:settings');
@@ -140,7 +139,7 @@ const ensureScript = (): Promise<void> => {
   return scriptPromise;
 };
 
-// Styles — classes text (qywzu_* + aojp4_108) as styled-components.
+// Styles, with the embed's class names applied through styled-components.
 
 const ButtonWrapper = styled.div`
   display: flex;
@@ -201,21 +200,18 @@ const TitleBar = styled.div`
   }
 `;
 
-// _titleWrapper_qywzu_87
 const TitleWrapper = styled.div`
   display: flex;
   gap: 0.5rem;
   align-items: center;
 `;
 
-// _label_qywzu_92
 const Label = styled.p`
   margin: 0;
   font-size: 0.95rem;
   color: var(--global-text);
 `;
 
-// _framePad_qywzu_97 (padding) + _hidden_qywzu_105 (display:none)
 const FrameWrap = styled.div<{ $hidden: boolean }>`
   padding: 1.25rem;
   @media (max-width: 500px) {
@@ -224,14 +220,12 @@ const FrameWrap = styled.div<{ $hidden: boolean }>`
   ${({ $hidden }) => ($hidden ? 'display: none;' : '')}
 `;
 
-// _frame_qywzu_97
 const Frame = styled.div`
   width: 100%;
   overflow: hidden;
   border-radius: var(--global-border-radius);
 `;
 
-// _commentSectionContainer_qywzu_61
 const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -242,7 +236,6 @@ const Container = styled.div`
   border-radius: var(--global-border-radius);
 `;
 
-// _infoCommentsSection_aojp4_108
 const Section = styled.div`
   display: flex;
   flex-direction: column;
@@ -254,9 +247,7 @@ const Section = styled.div`
   }
 `;
 
-// ---------------------------------------------------------------------------
 // Component
-// ---------------------------------------------------------------------------
 
 export interface InfoCommentsProps {
   media: Anime;
@@ -265,28 +256,28 @@ export interface InfoCommentsProps {
 
 const InfoComments: React.FC<InfoCommentsProps> = ({ media, loading = false }) => {
   const { theme } = useTheme();
-  // live `[f,p]` — initialized from the comments setting, toggled by the title.
+  // Initialized from the comments setting, toggled by the title.
   const [showFrame, setShowFrame] = useState<boolean>(() =>
     readCommentsSetting(),
   );
-  // live `[g,_]` — colorScheme, recomputed on theme change (deps [themeName, compact]).
+  // ColorScheme, recomputed on theme change (deps [themeName, compact]).
   const [scheme, setScheme] = useState<ColorScheme>(() => buildScheme());
 
-  // live `Ee(media)` — AniList id as a positive-integer string. Live's id is a
+  // AniList id as a positive-integer string. the app's id is a
   // number; the local Anime.id is a string, so normalize before the check.
   const numericId = Number(media?.id);
   const anilistId =
     media?.id != null && Number.isFinite(numericId) && numericId > 0
       ? String(numericId)
       : null;
-  // live `De({overall:true, ...})` — Info has episodeNumber 0 → '0' overall.
+  // Info has episodeNumber 0 → '0' overall.
   const chapter = '0';
-  // live `E` — the ANIME tab is always active here (no episode context).
+  // The ANIME tab is always active here (no episode context).
   const animeActive = true;
-  // live `D` — frame visible once loaded + id valid + not toggled off.
+  // Frame visible once loaded + id valid + not toggled off.
   const visible = !loading && anilistId !== null && showFrame;
 
-  // live recompute effect (rAF so the theme class has been applied first).
+  // Recompute the scheme after the theme class has been applied (rAF).
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       setScheme((prev) => {
@@ -297,7 +288,7 @@ const InfoComments: React.FC<InfoCommentsProps> = ({ media, loading = false }) =
     return () => cancelAnimationFrame(raf);
   }, [theme]);
 
-  // live config effect: publish config → load embed.js → reload().
+  // Publish config, load embed.js, then reload the embed.
   useEffect(() => {
     if (anilistId === null || chapter === null) return;
     const w = window as TacWindow;
@@ -322,7 +313,7 @@ const InfoComments: React.FC<InfoCommentsProps> = ({ media, loading = false }) =
     };
   }, [anilistId, chapter, scheme]);
 
-  // live timestamp bridge — re-dispatches TAC clicks for the Watch player.
+  // Timestamp bridge — re-dispatches TAC clicks for the Watch player.
   // Origin-checked: only the TAC embed frame may drive player seeks.
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {

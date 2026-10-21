@@ -24,14 +24,14 @@ const SeasonsHeading = styled.p`
   font-weight: 700;
 `;
 
-// 1vb3r — season card grid: auto-fill columns min 11rem, gap .5rem.
+// Season card grid: auto-fill columns min 11rem, gap .5rem.
 const SeasonCardContainer = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(11rem, 100%), 1fr));
   gap: 0.5rem;
 `;
 
-// 1vb3r — season card: 4.84rem tall, real cover image behind a #0000008c
+// Season card: 4.84rem tall, real cover image behind a #0000008c
 // overlay, title 1.15rem/700.
 const SeasonCard = styled(Link)`
   position: relative;
@@ -109,8 +109,8 @@ const SeasonName = styled.div`
 `;
 
 // Card label: OVA / SPECIAL relations render as `Specials`, everything
-// else falls back to the relation type (live uses TVDB `Season {n}` numbers —
-// unavailable locally, noted as a gap).
+// else falls back to the relation type. TVDB-style `Season {n}` numbering
+// is unavailable locally.
 const SEASON_LIKE = ['SEASON', 'PREQUEL', 'SEQUEL', 'OVA', 'SPECIAL'];
 
 const seasonLabel = (relation: Relation): string => {
@@ -124,7 +124,7 @@ export const Seasons: React.FC<{ relations: Relation[] }> = ({ relations }) => {
     SEASON_LIKE.includes(relation.relationType || ''),
   );
 
-  // Mirrors the live TVDB-gated render — no seasons, no section.
+  // No seasons, no section.
   if (seasonRelations.length === 0) return null;
 
   const sortedRelations = [...seasonRelations].sort((a, b) => {

@@ -211,12 +211,11 @@ const EmptyState = styled.div`
 `;
 
 /* ---------------------------------------------------------- slot card --- */
-/* Live `_cardWrapper/_watchNow/_cardContainer_1t2k2` schedule card port. */
+/* Schedule card. */
 
-// Slug/watch URL construction moved to the shared live helpers
-// (utils/animePaths — live `Q/$` = slugify/pickTitle, used by watchPathFor).
+// Slug/watch URL construction lives in the shared helpers.
 
-// Live `R()`: Sunday-based week start (midnight) containing `day`.
+// Sunday-based week start (midnight) containing `day`.
 const weekStartOf = (day: Date): Date => {
   const start = new Date(day);
   start.setDate(start.getDate() - start.getDay());
@@ -557,7 +556,7 @@ const ScheduleSkeletonCard = () => (
 
 /* ---------------------------------------------------------------- toast -- */
 
-// Inline error toast (live uses sonner: title + description).
+// Inline error toast (title + description).
 const ErrorToast = styled.div`
   position: fixed;
   right: 1.5rem;
@@ -641,7 +640,7 @@ const timeLabelToDate = (label: string, day: Date): Date => {
   return date;
 };
 
-// Live schedule renders 5 fake time slots while loading.
+// Schedule renders 5 fake time slots while loading.
 const generateFakeTimes = (count: number): string[] =>
   Array.from({ length: count }, () => {
     const hour = Math.floor(Math.random() * 12) + 1;
@@ -676,11 +675,10 @@ const Schedule = () => {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchActiveRef = useRef(false);
 
-  // NSFW gate (Aniraku Schedule.jsx:511): Hentai-genre titles are dropped
+  // NSFW gate: Hentai-genre titles are dropped
   // from the visible week while NSFW is off; flips live with the setting.
   const { nsfwEnabled } = useNsfw();
 
-  // SEO (ported from Aniraku's lib/seo.js setScheduleSEO).
   useSeo({
     title: 'Anime Schedule — Airing Calendar | Aniraku',
     description:
@@ -710,7 +708,7 @@ const Schedule = () => {
     persistState({ selectedDay: day.toISOString() });
   };
 
-  // Rewrite an invalid stored day on mount (live behavior).
+  // Rewrite an invalid stored day on mount.
   useEffect(() => {
     const stored = initialState?.selectedDay;
     if (typeof stored !== 'string') return;
@@ -741,14 +739,14 @@ const Schedule = () => {
     return () => window.clearTimeout(timer);
   }, [selectedDay]);
 
-  // Ticker for the current-time slot highlight (live updates every 60s).
+  // The ticker updates the current-time slot highlight every 60s.
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(interval);
   }, []);
 
   // Fetch the Sunday-based week containing the selected day — one week-range
-  // query with client-side day filtering, like live; AniList caps perPage at
+  // query with client-side day filtering, like the app; AniList caps perPage
   // 50, so paginate until the range is exhausted (guarded by fetchSeq).
   const weekKey = weekStartOf(selectedDay).toDateString();
   useEffect(() => {
@@ -787,7 +785,7 @@ const Schedule = () => {
   }, [weekKey, selectedDay, weekData]);
 
   // Hide the toast automatically, like a toast library would. The error
-  // itself stays so the skeleton/empty-state logic matches the live route.
+  // itself stays so the skeleton/empty-state logic matches the route.
   useEffect(() => {
     if (!toastVisible) return;
     const timeout = window.setTimeout(
@@ -797,8 +795,8 @@ const Schedule = () => {
     return () => window.clearTimeout(timeout);
   }, [toastVisible]);
 
-  // Entries of the selected day, filtered from the cached week (live `P`).
-  // NSFW gate (Aniraku Schedule.jsx:511): `filterAdult` runs over the week's
+  // Entries of the selected day, filtered from the cached week.
+  // NSFW gate: `filterAdult` runs over the week's
   // anime payloads first — Hentai titles vanish while the setting is off and
   // reappear the moment it flips — then the day filter picks from survivors.
   const weekReady = !!weekData && weekData.key === weekKey;
@@ -818,7 +816,7 @@ const Schedule = () => {
     );
   }, [weekReady, weekData, selectedDay, nsfwEnabled]);
 
-  // Live: loading/error only show the skeleton while the day has no entries.
+  // Loading/error only show the skeleton while the day has no entries.
   const showSkeleton = error
     ? dayEntries.length === 0
     : (!weekReady || loading) && dayEntries.length === 0;
@@ -861,7 +859,7 @@ const Schedule = () => {
     return time <= now ? 'var(--primary-accent)' : 'var(--global-text-muted)';
   };
 
-  // Quick-nav targets are computed relative to *today* (live behavior).
+  // Quick-nav targets are computed relative to *today*.
   const nav = useMemo(() => {
     const today = new Date();
     const yesterday = new Date(today);

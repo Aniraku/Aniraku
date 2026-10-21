@@ -1,8 +1,8 @@
-// Shared Random action — SINGLE SOURCE for the Navbar dice (Navbar.tsx:68-82
-// pre-extraction) and the mobile bottom-nav Random tab (BottomNav.tsx). Body
-// Moved so there is no logic drift between the two callers:
+// Shared Random action — single source for the navbar dice and the mobile
+// bottom-nav Random tab. Kept here so there is no logic drift between the
+// two callers:
 //   trending fetch → filterAdult NSFW pool → navigate(infoPathFor(pick)).
-// The explicit `filterAdult<Anime>` type arg is REQUIRED for TS.
+// The explicit `filterAdult<Anime>` type arg is required for TypeScript.
 
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';

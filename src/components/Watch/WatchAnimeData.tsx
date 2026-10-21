@@ -393,7 +393,7 @@ export const WatchAnimeData: React.FC<{ animeData: Anime }> = ({
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   }
 
-  // Live stats (Wn): Format, Status, Episodes, Rating/100, Duration, Season,
+  // Format, Status, Episodes, Rating/100, Duration, Season,
   // Release/Start Date, End Date, Country, Adult, Studios — missing → `—`.
   const startDate = animeData.startDate ?? null;
   const endDate = animeData.endDate ?? null;
@@ -458,9 +458,9 @@ export const WatchAnimeData: React.FC<{ animeData: Anime }> = ({
           : '—'}
       </strong>
     </p>,
-    // Live details card (Wn): `Official Site: <link>` — picks the
+    // Details card (Wn): `Official Site: <link>` — picks the
     // externalLinks entry whose site is exactly `Official Site`; missing →
-    // the row is omitted entirely (same as live).
+    // the row is omitted entirely.
     ...(() => {
       const links: { site?: string; url?: string }[] = Array.isArray(
         (animeData as any).externalLinks,

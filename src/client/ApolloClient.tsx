@@ -54,10 +54,9 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-// Functions for handling authentication (legacy direct-AniList flow,
-// retired — library sync uses the backend OAuth in lib/sync `syncAuthorize`).
-// `login` keeps the local CSRF redirect for source parity but no longer
-// calls the non-existent GET /get-csrf-token (which made every login fail).
+// Legacy direct-AniList auth helpers (retired — library sync uses the backend
+// OAuth in lib/sync `syncAuthorize`). `login` keeps the local CSRF redirect
+// but no longer calls the non-existent GET /get-csrf-token.
 function login() {
   try {
     const csrfToken = generateCsrfToken();

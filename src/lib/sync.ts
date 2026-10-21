@@ -15,26 +15,25 @@ import {
   LOCAL_HISTORY_KEYS,
 } from './watchHistory';
 
-// Data-sync layer — TS port of the Supabase-touching halves of the
-// `src/lib/sync.js` / `useNsfw`-style shared state, based on the live reference:
+// Data-sync layer: bookmarks, watch history, notifications, and
+// MAL/AniList provider sync.
 //
-//  - Session bridge via `supabase.auth` ONLY (no auth hook import —
-//    owns those files; this module keeps its own user state).
+//  - Session bridge via `supabase.auth` only (no auth hook import); this
+//    module keeps its own user state.
 //  - bookmarks          → table `bookmarks`,    LS `aniraku:bookmarks`
 //                         (+ legacy `aniraku-bookmarks` merged on login)
 //  - watch_history      → throttled 10s diff-upsert engine + merge-on-login
 //  - notifications      → backend API `${API_BASE}/api/v1/notifications`
-//                         (Aniraku mechanism: Bearer fetch,
-//                         30s session poll, PUT `/notifications/{id}/read`;
-//                         server `read` column = authority — the LS key
-//                         `aniraku:notifications-read` is retired as
-//                         authority and no longer read/written here), plus
-//                         the new-episode insert loop with LS tracker
+//                         (Bearer fetch, 30s session poll, PUT
+//                         `/notifications/{id}/read`; server `read` column
+//                         is the authority — the LS key
+//                         `aniraku:notifications-read` is retired and no
+//                         longer read/written here), plus the new-episode
+//                         insert loop with LS tracker
 //  - provider sync      → MAL/AniList grant endpoints (`/api/v1/sync*`,
-//                         `/api/v1/import|export/{provider}`) — UNFILTERED
-//                         payloads (no NSFW/rating filter anywhere, per
-//                         user decision; the nsfw_enabled toggle only gates
-//                         browse/display)
+//                         `/api/v1/import|export/{provider}`) — unfiltered
+//                         payloads (no NSFW or rating filter anywhere; the
+//                         nsfw_enabled toggle only gates browse/display)
 //
 // Every network call is best-effort: the client may be a placeholder when
 // VITE_SUPABASE_* is unset, so all paths swallow errors and local-first UX
@@ -109,7 +108,7 @@ export function subscribeToSession(listener: SessionListener): () => void {
   };
 }
 
-// Bookmarks — LS store + server passthrough (Aniraku
+// Bookmarks: local store plus server passthrough.
 
 import {
   normalizeListStatus,
@@ -264,9 +263,9 @@ function isMissingColumnError(error: unknown): boolean {
 const mergedBookmarksUsers = new Set<string>();
 
 /**
- * Merge-on-login (AnimeDetail.jsx:663-693 pattern): read cloud, upsert the
- * local-only rows (from `aniraku:bookmarks` AND `aniraku-bookmarks`), then
- * store the union locally. Runs once per user per session.
+ * Merge-on-login: read cloud, upsert the local-only rows (from
+ * `aniraku:bookmarks` and `aniraku-bookmarks`), then store the union
+ * locally. Runs once per user per session.
  */
 export async function mergeBookmarksOnLogin(
   userId: string,
@@ -318,7 +317,7 @@ export async function ensureBookmarksMerged(
  * derivations and exports build on import state instead of clobbering
  * it with stale pre-import values. Local-only rows (never uploaded,
  * e.g. toggled offline) are preserved and pushed up. Always publishes,
- * so live bookmark UI refreshes. No-op for guests (LS is the truth).
+ * so the bookmark UI refreshes. No-op for guests (LS is the truth).
  */
 export async function refreshLocalBookmarks(
   userId?: string | null,
@@ -776,10 +775,7 @@ export function ensureDataSync(userId: string | null): void {
 // for guests → the timer only starts once a session user exists.
 startBridge();
 
-// ---------------------------------------------------------------------------
 // Backend Bearer helper — every `/api/v1/*` call authenticates with the
-// Supabase JWT (Aniraku sync.js `authHeaders`, :8-15, verbatim semantics).
-// ---------------------------------------------------------------------------
 
 async function authHeaders(
   extra: Record<string, string> = {},
@@ -796,16 +792,14 @@ async function authHeaders(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Notifications — Aniraku's EXACT mechanism (NavBar.jsx:32-69 / :57-70):
+// Notifications — Aniraku's EXACT mechanism
 //   GET  ${API_BASE}/api/v1/notifications          (Bearer, poll every 30s)
 //   PUT  ${API_BASE}/api/v1/notifications/{id}/read (Bearer, on click)
 // Payload = array; server `read` column is the authority. Module-level store
 // + session-driven shared poller; `useNotifications()` (Notifications.tsx)
 // subscribes here. The LS key `aniraku:notifications-read` is retired as
 // authority (no reads/writes below) — `readNotificationReadIds()` now derives
-// from the server rows so Wave A's Navbar badge shim stays correct.
-// ---------------------------------------------------------------------------
+// from the server rows so the Navbar badge shim stays correct.
 
 export const NOTIFICATIONS_READ_KEY = 'aniraku:notifications-read'; // legacy key — AuthProvider still clears it on sign-out; no longer read/written
 export const EPISODE_TRACK_KEY = 'aniraku:episode-track';
@@ -875,15 +869,14 @@ const mapApiNotification = (row: unknown): NotificationItem | null => {
   };
 };
 
-const EPISODE_CHECK_COOLDOWN_MS = 21600000; // 6h (Aniraku Home.jsx:599)
+const EPISODE_CHECK_COOLDOWN_MS = 21600000; // 6h
 
 /**
- * FETCH (Aniraku NavBar fetchNotifs, :34-51): GET the notifications array
- * with the session Bearer; only an `res.ok` payload replaces the store
- * (failures keep the last-known rows — Aniraku only setState inside
- * `if (res.ok)`). Returns the rows the store now holds.
+ * FETCH: GET the notifications array with the session Bearer; only an
+ * `res.ok` payload replaces the store (failures keep the last-known rows).
+ * Returns the rows the store now holds.
  *
- * Export-compat shims (Wave A's Navbar badge depends on these names):
+ * Export-compat shims (the Navbar badge depends on these names):
  * the legacy `(userId, limit)` parameters are accepted but ignored — the
  * endpoint is session-scoped (Bearer), so callers stay source-compatible.
  */
@@ -979,10 +972,9 @@ async function putNotificationRead(id: string): Promise<void> {
 }
 
 /**
- * MARK READ (Aniraku NavBar markRead, :57-70): optimistic store flip, then
- * the PUT — only for a row that is currently unread (the drawer triggers it
- * on clicking an unread row, Aniraku :159). Export-compat: keeps the legacy
- * sync signature returning the updated read-id set.
+ * Mark read: optimistic store flip, then the PUT — only for a row that is
+ * currently unread (the drawer triggers it on clicking an unread row).
+ * Keeps the legacy sync signature returning the updated read-id set.
  */
 export function markNotificationRead(id: string): Set<string> {
   const target = notificationItems.find((item) => item.id === id);
@@ -1014,7 +1006,7 @@ export function markAllNotificationsRead(ids: string[]): Set<string> {
   return readNotificationReadIds();
 }
 
-const NOTIFICATION_POLL_MS = 30000; // Aniraku NavBar.jsx:53
+const NOTIFICATION_POLL_MS = 30000;
 let notificationPollTimer: ReturnType<typeof setInterval> | null = null;
 
 function stopNotificationPoll(): void {
@@ -1024,9 +1016,9 @@ function stopNotificationPoll(): void {
   }
 }
 
-// Session-driven poll (Aniraku NavBar effect, :32-55 — immediate fetch +
-// interval while the user exists, cleared on cleanup / user change):
-// the bridge fires on module load (via getSession), on sign-in/out and on
+// Session-driven poll: immediate fetch plus an interval while the user
+// exists, cleared on cleanup / user change. The bridge fires on module load
+// (via getSession), on sign-in/out and on
 // user switch, so the interval always tracks the live session.
 subscribeToSession((userId) => {
   stopNotificationPoll();
@@ -1041,10 +1033,10 @@ subscribeToSession((userId) => {
 });
 
 /** AniList metadata batch read via the shared `ANILIST_GRAPHQL` endpoint
- * (port of Aniraku `anilistBatchDetail`, ≤50 ids per batch).
- * Preview points it at the unlimited Aniraku mirror, main at the official
- * API — either way there is no client-side limiter here; provider write
- * pacing lives in the backend. */
+ * (at most 50 ids per batch).
+ * Preview points it at the mirror, main at the official API — either way
+ * there is no client-side limiter here; provider write pacing lives in the
+ * backend. */
 async function anilistBatchDetail(
   ids: number[],
 ): Promise<
@@ -1100,8 +1092,8 @@ async function anilistBatchDetail(
 let episodeCheckInFlight = false;
 
 /**
- * NEW-EPISODE NOTIFICATION LOOP — port of Aniraku Home.jsx:589-614
- * (logged-in only; mounted from the Home page `pages/Home.tsx`):
+ * NEW-EPISODE NOTIFICATION LOOP (logged-in only; mounted from the Home page
+ * `pages/Home.tsx`):
  *  bookmarks (LS union, server rows override) → 6h-cooled tracker
  *  `aniraku:episode-track` → AniList batch (RELEASING only, last aired ep)
  *  → episode-availability check → dedupe lookup on
@@ -1224,18 +1216,10 @@ export async function runNewEpisodeNotifications(
   return summary;
 }
 
-// ---------------------------------------------------------------------------
-// MAL / AniList watch-progress sync — TS port of Aniraku
-// `src/lib/sync.js` (authHeaders :8-15, getSyncStatus :17-28,
-// syncAuthorize :33-44, completeSyncCallback :46-60, syncDisconnect :62-72,
-// updateSyncProgress :74-95, updateSyncScore :98-113 (score lives in
-// lib/episodeRatings, re-exported here), PROVIDER_LABELS :148-151,
-// PROVIDER_LOGO :153-156, importProviderList :162-175, exportProviderList
-// :177-195, describeImport :198-209, describeExport :211-221). Bearer via
-// authHeaders above; base = API_BASE.
-// UNFILTERED: no NSFW/rating filter exists anywhere in this chain (sync =
-// unfiltered, per user decision — Aniraku's sync.js has none either).
-// ---------------------------------------------------------------------------
+// MAL / AniList watch-progress sync: provider status, OAuth connect/disconnect,
+// import/export, and progress/score updates. Requests use authHeaders and
+// API_BASE.
+// Unfiltered: no NSFW or rating filter applies anywhere in this chain.
 
 export interface SyncProviderStatus {
   connected?: boolean;
@@ -1311,11 +1295,10 @@ export async function syncDisconnect(provider: string): Promise<boolean> {
 }
 
 /**
- * Push watch progress to one provider (restored Aniraku `updateSyncProgress`
- * sync.js:74-95 — `POST /api/v1/sync/update {provider, animeId, episode,
- * progress, status}`). Called on video ended (`completed`) and at the 60%
- * threshold (`watching`); fire-and-forget from Watch/Player with toast
- * aggregation at the call site.
+ * Push watch progress to one provider via
+ * `POST /api/v1/sync/update {provider, animeId, episode, progress, status}`.
+ * Called on video ended (`completed`) and at the 60% threshold (`watching`),
+ * fire-and-forget from Watch/Player with toast aggregation at the call site.
  */
 export async function updateSyncProgress({
   provider,
@@ -1354,7 +1337,7 @@ export const PROVIDER_LOGO: Record<string, string> = {
   anilist: 'A',
 };
 
-// ── Import / Export (provider library ↔ Aniraku favorites) ──
+// Import / Export (provider library ↔ Aniraku favorites)
 // These reuse the OAuth tokens stored by the sync feature, so the
 // provider must be connected in Settings first. UNFILTERED — the full
 // library pushes/pulls with no rating filter (per user decision).
@@ -1503,7 +1486,7 @@ function describeStatusBreakdown(
   return parts.join(' · ');
 }
 
-// ── Background export runner (rate-limited, Supabase-notified) ──
+// Background export runner (rate-limited, Supabase-notified)
 // The provider mutations themselves run inside the backend
 // (`POST /api/v1/export/{provider}`), which processes one chunk per call and
 // answers `limited: true` while titles remain. This runner loops those chunk
@@ -1784,7 +1767,7 @@ export function startExportJob(provider: string): ExportJobState {
   );
 }
 
-// ── Background import runner (auto-loop on `limited`, Supabase-notified) ──
+// Background import runner (auto-loop on `limited`, Supabase-notified)
 // Mirrors the export runner: the backend answers `limited: true` while
 // provider pages remain. Loops chunk POSTs with the same 6s floor pacing,
 // aggregates imported/already/episodes/scores/unmapped + status breakdown,
@@ -1991,7 +1974,7 @@ export async function runImportJob(provider: string): Promise<ImportJobState> {
         //    stores (History, Continue Watching, resume show it at once —
         //    previously invisible until the next login);
         //  - list state: adopt server bookmarks (imported statuses/totals)
-        //    into the LS mirror + live bookmark UI.
+        //    into the LS mirror and bookmark UI.
         // Both publish, waking every subscriber.
         try {
           const uid = await getSessionUserId();

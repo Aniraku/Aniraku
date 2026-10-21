@@ -1,9 +1,8 @@
-// Shared Escape-key overlay stack — port of the app's `yh`/`Ch`/`Sh` handlers
-// around the `_h` handler array: Escape closes ONLY the top-most registered
-// overlay (so a notifications drawer stacked over the shortcuts popup closes
-// the drawer first, like live). Handlers register while their overlay is open
-// and unregister on close; the document listener exists only while the stack
-// is non-empty.
+// Shared Escape-key overlay stack: Escape closes only the top-most
+// registered overlay (so a notifications drawer stacked over the shortcuts
+// popup closes the drawer first). Handlers register while their overlay is
+// open and unregister on close; the document listener exists only while the
+// stack is non-empty.
 
 type OverlayHandler = () => void;
 
@@ -16,7 +15,7 @@ const handleKeydown = (e: KeyboardEvent): void => {
   try {
     top();
   } catch {
-    // live swallows handler errors so one broken overlay cannot strand the stack
+    // Swallow handler errors so one broken overlay cannot strand the stack.
   }
 };
 

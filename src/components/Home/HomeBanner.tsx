@@ -3,8 +3,8 @@ import styled from 'styled-components';
 
 // HomeBanner — community notice at the top of the tabs block.
 // One random avatar, "Love the Site?" + rotating submessages (absolutely
-// positioned, slide + fade every 4s). Social strip (Reddit/Discord/X) removed
-// per Aniraku rebrand (Wave: global social strip).
+// positioned, slide + fade every 4s). The social strip (Reddit/Discord/X)
+// was removed in the rebrand.
 
 const NoticeSection = styled.section`
   display: flex;

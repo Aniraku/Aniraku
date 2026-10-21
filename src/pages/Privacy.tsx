@@ -1,5 +1,4 @@
-// TS port of the src/pages/ — content kept in the
-// source's own wording (final brand: Aniraku); GitHub issue link restored.
+// Privacy policy content.
 import { useSeo, breadcrumbLd } from '../utils/seo';
 import LegalPage from '../components/LegalPage';
 
