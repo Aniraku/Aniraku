@@ -18,7 +18,7 @@ import {
   SettingsProvider,
 } from './index';
 import { AuthProvider } from './client/useAuth';
-// Wave A (Supabase auth layer) — mounted at the top of the router tree, wrapping
+// Mounted at the top of the router tree, wrapping
 // the existing AniList AuthProvider (src/client/* hosts that one and is off-limits).
 import { AuthProvider as SupabaseAuthProvider } from './providers/AuthProvider';
 import ReactGA from 'react-ga4';
@@ -35,7 +35,7 @@ import './components/global-chrome.css';
 // Task wave — global crash boundary (wraps everything below the nav so a
 // caught crash still leaves the navbar alive for the resetKey route change),
 // AniList outage banner (Aniraku AniListAvailabilityBanner port) and the
-// rich 404 (Aniraku Error.jsx port) that replaces the minimal Page404 on the
+// Rich 404 that replaces the minimal Page404 on the
 // catch-all route.
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import { AniListStatusBanner } from './components/AniListStatusBanner';
@@ -58,7 +58,7 @@ const ProfilePage = lazy(() => import('./pages/Profile'));
 // NOTE: no swiper custom-element register() — nothing renders
 // <swiper-container>; carousels use swiper/react (code-split with Home).
 
-// Wave A routes are lazy so the auth/legal chunks stay out of the initial
+// Routes are lazy so the auth/legal chunks stay out of the initial
 // bundle (no prior lazy/Suspense pattern in this repo — see report deviations).
 const Auth = lazy(() => import('./pages/Auth'));
 const NewPassword = lazy(() => import('./pages/NewPassword'));
@@ -72,7 +72,7 @@ const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 // URLs and are lazy like the rest of the static pages.
 const About = lazy(() => import('./pages/About'));
 const Faq = lazy(() => import('./pages/Faq'));
-// Wave C — MAL/AniList OAuth landing page (Aniraku `SyncCallback.jsx` port;
+// MAL/AniList OAuth landing page (Aniraku port;
 // providers redirect to /sync/callback with ?code=&state=).
 const SyncCallback = lazy(() => import('./pages/SyncCallback'));
 
@@ -240,11 +240,11 @@ function App() {
   );
 }
 
-// Live's shortcut hook (`Uh`) lives inside its navbar shell; here it needs
+// The app's shortcut hook (`Uh`) lives inside its navbar shell; here it needs
 // router access so ⌃/⌘/⇧+, can toggle Profile's settings modal (?settings=1)
 // — the same route App already uses for /settings and /profile/settings.
 // Navigation toggles: being on /profile?settings=1 closes it, anything else
-// opens it (live `Vh.toggle` semantics).
+// Opens it.
 function GlobalShortcutsBridge() {
   useGlobalShortcuts();
   const navigate = useNavigate();

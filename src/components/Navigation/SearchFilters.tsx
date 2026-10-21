@@ -4,12 +4,10 @@ import Select from 'react-select';
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { FaUndo } from 'react-icons/fa';
 
-// ---------------------------------------------------------------------------
 // Filter value model — mirrors the live Search route.
 // URL params written/read: query (handled by the page), tags, genres, format,
 // status, countryOfOrigin, season, startDate_like, source, isAdult,
 // averageScoreMin, averageScoreMax, sort, type, dubLanguage.
-// ---------------------------------------------------------------------------
 
 export interface SearchFilterValues {
   tags: string[];
@@ -89,9 +87,7 @@ export const serializeFilterValues = (
   return params;
 };
 
-// ---------------------------------------------------------------------------
 // Option lists — exact labels/order from the live bundle.
-// ---------------------------------------------------------------------------
 
 interface SelOption {
   label: string;

@@ -1,4 +1,4 @@
-// TS port of Aniraku's src/pages/Privacy.jsx — content kept verbatim in the
+// TS port of the src/pages/ — content kept in the
 // source's own wording (final brand: Aniraku); GitHub issue link restored.
 import { useSeo, breadcrumbLd } from '../utils/seo';
 import LegalPage from '../components/LegalPage';
@@ -14,7 +14,6 @@ const sections = [
 ];
 
 const Privacy = () => {
-  // SEO (ported from Aniraku's lib/seo.js setStaticPageSEO).
   useSeo({
     title: 'Privacy Policy | Aniraku',
     description:

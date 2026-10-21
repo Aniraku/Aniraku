@@ -28,8 +28,8 @@ import { SkeletonPlayer } from '../components/Skeletons/Skeletons';
 import { Episode } from '../index';
 import { Comments } from '../components/Watch/Comments';
 // Item 1 (GAP 4) — immediate history upload after the first-playback
-// record: thin wrapper over Wave B's 10s flush engine (guests no-op,
-// idempotent diff-upsert). Import-only — sync.ts stays Wave B's file.
+// Record: thin wrapper over the 10s flush engine (guests no-op,
+// Idempotent diff-upsert). Import-only — sync.ts stays the file.
 import {
   publishHistoryNow,
   getSessionUserId,
@@ -57,16 +57,14 @@ import {
 import { syncAverageScore } from '../lib/providerSync';
 import { resolveDisplayTitle } from '../lib/displayLanguage';
 import { recordWatchEvent } from '../lib/watchEvents';
-// Item 1 (NSFW gate) — Aniraku Watch.jsx:1520/:5578.
+// Item 1 (NSFW gate) — Aniraku:5578.
 import { isNsfw, useNsfw } from '../hooks/useNsfw';
 // Runtime SEO (SEO layer) — old setWatchSEO (seo.js:190-260) via shared helper.
 import { SITE_URL, useSeo } from '../utils/seo';
 
-// ---------------------------------------------------------------------------
 // Live local-storage keys (per-anime prefs moved from the legacy
 // `source-[id]` / `subOrDub-[id]` names to `aniraku:anime:source:{id}` /
 // `aniraku:anime:language:{id}`; legacy keys stay readable/writable).
-// ---------------------------------------------------------------------------
 const getSourceTypeKey = (animeId: string | undefined) =>
   `aniraku:anime:source:${animeId}`;
 const getLanguageKey = (animeId: string | undefined) =>
@@ -2132,7 +2130,7 @@ const WatchInner: React.FC = () => {
           <GoToHomePageButton />
         </NoEpsFoundDiv>
       ) : (
-        // Zenime structure (ported from ~/Zenime Watch.tsx): ONE player row
+        // Structure: ONE player row
         // [player(3fr) | episode list(1fr, ≤380px)], then the 2-col data
         // grid [mediaSource + comments + details | seasons + related].
         // CSS handles the <1000px collapse; theater forces the row to a

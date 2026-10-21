@@ -1,10 +1,8 @@
-// ---------------------------------------------------------------------------
 // Shared Random action — SINGLE SOURCE for the Navbar dice (Navbar.tsx:68-82
 // pre-extraction) and the mobile bottom-nav Random tab (BottomNav.tsx). Body
-// moved verbatim so there is no logic drift between the two callers:
+// Moved so there is no logic drift between the two callers:
 //   trending fetch → filterAdult NSFW pool → navigate(infoPathFor(pick)).
-// The explicit `filterAdult<Anime>` type arg is REQUIRED for TS (verbatim).
-// ---------------------------------------------------------------------------
+// The explicit `filterAdult<Anime>` type arg is REQUIRED for TS.
 
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -24,7 +22,7 @@ export const runRandomAnime = async (
 ): Promise<void> => {
   try {
     const trending = await fetchTrendingAnime(1, 20);
-    // Aniraku Random.jsx:319 — filter the candidate pool before the pick.
+    // Aniraku — filter the candidate pool before the pick.
     const list = filterAdult<Anime>(trending.results ?? [], nsfwEnabled);
     if (list.length > 0) {
       const randomIndex = Math.floor(Math.random() * list.length);

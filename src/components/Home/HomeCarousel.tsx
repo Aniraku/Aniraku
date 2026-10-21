@@ -13,12 +13,10 @@ import type { Anime } from '../../hooks/animeInterface';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { infoPathFor, watchPathFor } from '../../utils/animePaths';
 
-// ---------------------------------------------------------------------------
-// Hero carousel (the live site 1:1) — fade crossfade swiper with the action
+// Hero carousel — fade crossfade swiper with the action
 // buttons, airing badge and ‹ n / N › pager rendered outside the swiper.
 // Slide content block bottom-left with animated slide transforms; title uses
 // the per-anime gradient (--home-carousel-title-*).
-// ---------------------------------------------------------------------------
 
 const Wrapper = styled.div`
   position: relative;
@@ -324,7 +322,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-// Fisher-Yates shuffle (live `nr`).
+// Fisher-Yates shuffle.
 function shuffle<T>(input: T[]): T[] {
   const list = [...input];
   for (let i = list.length - 1; i > 0; i--) {
@@ -334,7 +332,7 @@ function shuffle<T>(input: T[]): T[] {
   return list;
 }
 
-// Live `tr`: remaining-ms → "5D 3H" / "3H 5M" / "45s" / "Airing Now".
+// Remaining-ms → "5D 3H" / "3H 5M" / "45s" / "Airing Now".
 function formatCountdown(ms: number): string {
   if (ms <= 0) return 'Airing Now';
   const totalSeconds = Math.floor(ms / 1000);

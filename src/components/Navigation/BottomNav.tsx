@@ -15,14 +15,13 @@ import { useNotifications } from '../Notifications';
 import { useRandomAnime } from '../../utils/randomAnime';
 import './BottomNav.css';
 
-// ---------------------------------------------------------------------------
-// BottomNav — PORT of Aniraku `src/components/MobileBottomNav.jsx`:
+// BottomNav — PORT of Aniraku `src/components/`:
 //   - geometry/visibility: Bar :5-25 (fixed pill, ≤768px display, ≤360px
 //     compact — BottomNav.css, declarations mapped line-for-line);
 //   - Item :27-53 (flex 1, min-height 48px, ellipsized label, press scale);
-//   - show/hide rules :60-78 — Aniraku's `focusedRoutes` set remapped to OUR
+//   - show/hide rules:60-78 — the `focusedRoutes` set remapped to OUR
 //     auth/legal routes, plus the spec-mandated hide on /watch/* (route check
-//     lives HERE, in the nav layer — Watch files stay untouched). Aniraku's
+//     Lives HERE, in the nav layer — Watch files stay untouched). the
 //     compact Back bar on /anime|/watch is superseded by that hide mandate;
 //     we render no second variant.
 //   - tab set :80-87 mapped per spec (its /catalog /schedule /support slots
@@ -44,9 +43,8 @@ import './BottomNav.css';
 //
 // Shell clearance: body.has-bottom-nav toggled below; padding rule scoped to
 // ≤768px in BottomNav.css so the footer/last row is never covered.
-// ---------------------------------------------------------------------------
 
-// Aniraku MobileBottomNav.jsx:60 `focusedRoutes`, remapped 1:1 onto our route
+// Aniraku `focusedRoutes`, remapped 1:1 onto our route
 // set (App.tsx auth/legal routes) — focused surfaces show no dock there.
 const FOCUSED_ROUTES = new Set([
   '/login',

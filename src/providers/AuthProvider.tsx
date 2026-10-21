@@ -1,4 +1,4 @@
-// TS port of Aniraku's src/hooks/useAuth.jsx (provider half) — verbatim
+// TS port of the src/hooks/ (provider half) —
 // semantics: server revalidation via getUser(access_token) with transient
 // network tolerance, email-verification enforcement + PASSWORD_RECOVERY /
 // recovery-marker exception, race-safe profile seed (insert-once, 23505

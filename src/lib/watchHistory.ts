@@ -6,10 +6,9 @@ import {
   episodeWatchTime,
 } from './episodeWatchTimes';
 
-// ---------------------------------------------------------------------------
 // Local watch-history shape + merge helpers — TS port of Aniraku
 // `src/lib/watchHistory.js` (entry keys, local upsert/remove/clear/subscribe,
-// server row deletes) re-based onto Aniraku's LIVE localStorage contract:
+// Server row deletes) re-based onto the LIVE localStorage contract:
 //
 //  Native keys (written by Watch/EpisodeList, read by History/Continue
 //  Watching — unchanged by this port):
@@ -17,17 +16,16 @@ import {
 //   - `last-anime-visited`      -> Record<animeId, {timestamp, titleEnglish, titleRomaji}>
 //   - `all_episode_times`       -> Record<episodeId, {currentTime, playbackPercentage, timestamp?}>
 //                                  (`timestamp` = epoch ms stamped by THIS lib
-//                                  on every entry it writes — Delta 2(b))
+//                                  on every entry it writes — (b))
 //
 //  Imported keys (merged on login, read-only here):
-//   - `aniraku-watch-history`   -> Aniraku's legacy entry array
+//   - `aniraku-watch-history` -> the legacy entry array
 //   - `aniraku:watching`         -> pref record (array/entries read
 //                                  defensively; prefs fields ignored)
 //
 // Normalized unit everywhere is `HistoryRow` (1:1 with a `watch_history`
 // table row minus user_id). Merge precedence: max(progress) wins, ties go to
 // the newest timestamp.
-// ---------------------------------------------------------------------------
 
 export const LOCAL_HISTORY_KEYS = {
   WATCHED_EPISODES: 'watched-episodes',
@@ -103,9 +101,7 @@ const toCount = (value: unknown): number => {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 };
 
-// ---------------------------------------------------------------------------
 // Keys + merge precedence (ports Aniraku `historyEntryKey` + mission rules)
-// ---------------------------------------------------------------------------
 
 /** Server/native merge key: `animeId:episodeNumber`. */
 export const historyRowKey = (row: HistoryRow): string =>

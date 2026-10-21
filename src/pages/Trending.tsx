@@ -7,7 +7,7 @@ import {
 import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
 import { SkeletonCard } from '../components/Skeletons/Skeletons';
 import { Anime } from '../index';
-// NSFW gate (Wave C) — Aniraku Catalog.jsx:970-974 shelf filtering: browse
+// NSFW gate — Aniraku shelf filtering: browse
 // results run through filterAdult (Hentai-genre rule, default OFF → hidden).
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 import { useSeo, breadcrumbLd } from '../utils/seo';
@@ -23,7 +23,7 @@ const YEAR_OPTIONS = Array.from(
   (_, i) => CURRENT_YEAR - i,
 ); // current year down to 1980
 
-// Live `Eg` season helper: months 1-3 Winter, 4-6 Spring, 7-9 Summer, 10-12 Fall.
+// Season helper: months 1-3 Winter, 4-6 Spring, 7-9 Summer, 10-12 Fall.
 const currentSeason = (): (typeof SEASONS)[number] => {
   const m = new Date().getMonth() + 1;
   if (m >= 1 && m <= 3) return 'WINTER';
@@ -81,7 +81,7 @@ const Container = styled.div`
   --animation-easing: ease-in-out;
 `;
 
-// Visually-hidden heading, same as live `.vh`.
+// Visually-hidden heading, consistent `.vh`.
 const VisuallyHiddenH1 = styled.h1`
   position: absolute;
   width: 1px;
@@ -216,7 +216,7 @@ const PaginationControls = styled.div`
   margin-left: auto;
 `;
 
-// Pagination — ported from the live `_wrapper_1xyro` module.
+// Pagination — based on the module.
 const PagerWrapper = styled.div`
   display: flex;
   width: 100%;
@@ -299,7 +299,7 @@ interface PagerProps {
   onPageChange: (page: number) => void;
 }
 
-// Numbered pagination with page input (live Pagination component markup).
+// Numbered pagination with page input.
 const Pagination: React.FC<PagerProps> = ({
   currentPage,
   totalPages,

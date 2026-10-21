@@ -16,11 +16,11 @@ import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { useBookmarks } from '../../hooks/useBookmarks';
 
-// Card corner bookmark control (Wave B) — Aniraku Card.jsx:37-45 toggle
-// semantics restyled onto Aniraku's card chrome (live corpus has no bookmark
+// Card corner bookmark control — Aniraku toggle
+// Semantics restyled onto the card chrome (live corpus has no bookmark
 // UI): mirrors `.editListButton`'s hover reveal + CSS vars, sits top-left.
 // Guest = LS-only toggle; signed-in = LS optimistic + server upsert/delete
-// via useBookmarks. (the live site EditList control that used to sit
+// Via useBookmarks. (the app EditList control that used to sit
 // top-right is gone — AniList sign-in surface, no AniList auth here.)
 const CardBookmarkBtn = styled.button`
   position: absolute;
@@ -71,7 +71,6 @@ const CardBookmarkBtn = styled.button`
   }
 `;
 
-
 interface CardItemProps {
   anime: Anime;
 }
@@ -87,7 +86,7 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
   const rawScore = anime.rating;
   const score = rawScore ? Math.round(rawScore * 10) : '?';
 
-  // Live parity: show the aired episode count until airing finishes,
+  // Parity: show the aired episode count until airing finishes,
   // then switch to the final total.
   const currentEpisode = useMemo(() => {
     const Y = anime.totalEpisodes ?? 0;

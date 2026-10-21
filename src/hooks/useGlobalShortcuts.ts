@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { useTheme } from '../components/ThemeContext';
 
-// ---------------------------------------------------------------------------
 // Global keyboard shortcuts — direct port of live matcher map
-// (`Os`) and dispatcher (`Uh`, live/index.js @227066–227900).
+// (`Os`) and dispatcher.
 //
 // Listener target: live attaches to `document`; this port attaches to
 // `window` because the local Settings page dispatches its synthetic Shift+?
@@ -17,7 +16,6 @@ import { useTheme } from '../components/ThemeContext';
 // Page-scoped actions use the mission contract: `aniraku:shortcut` CustomEvents
 // (`next-ep`, `prev-ep`, `theater`). `lights` has NO key on live (button
 // only), so it is never dispatched here.
-// ---------------------------------------------------------------------------
 
 /** Mission contract event emitted for page-scoped (Watch) shortcuts. */
 export const ANIRAKU_SHORTCUT_EVENT = 'aniraku:shortcut';
@@ -29,8 +27,8 @@ type Matcher = (e: KeyboardEvent) => boolean;
 const hasNoBlockingModifier = (e: KeyboardEvent): boolean =>
   !e.ctrlKey && !e.altKey && !e.metaKey;
 
-// live `Os` — matcher map, one entry per ShortcutsPopup row (order of keys
-// mirrors the popup; theme/settings modifiers match live verbatim, including
+// Matcher map, one entry per ShortcutsPopup row (order of keys
+// Mirrors the popup; theme/settings modifiers match live, including
 // theme having no modifier exclusions).
 const Os: Record<string, Matcher> = {
   theme: (e) => e.shiftKey && e.key.toLowerCase() === 'd',
@@ -50,7 +48,7 @@ const Os: Record<string, Matcher> = {
     e.shiftKey &&
     ['p', 'b'].includes(e.key.toLowerCase()) &&
     hasNoBlockingModifier(e),
-  // Contract-only extension (no global matcher on live): unmodified t →
+  // Contract-only extension: unmodified t →
   // theater for Watch pages. Player keys (k/j/l/f/m/space/arrows/,/./0-9 and
   // Shift+S / Shift+Enter) are not global on live — they live inside the
   // player, which is out of scope here.
@@ -62,9 +60,9 @@ const Os: Record<string, Matcher> = {
     !e.metaKey,
 };
 
-// live `Uh` typing guard — same conditions, hardened so synthetic events
+// Typing guard — same conditions, hardened so synthetic events
 // whose target is window/document (Settings' Shift+? dispatch) return false
-// instead of crashing on a missing `.closest` (live would throw there).
+// Instead of crashing on a missing `.closest`.
 const isTypingTarget = (e: KeyboardEvent): boolean => {
   const t = e.target as Element | null;
   if (!t || typeof t.tagName !== 'string') return false;
@@ -119,7 +117,7 @@ export function useGlobalShortcuts(): void {
     const handleKeydown = (e: KeyboardEvent) => {
       if (isTypingTarget(e)) return;
 
-      // live `Uh` dispatch order: theme → openShortcuts → settings → search →
+      // Dispatch order: theme → openShortcuts → settings → search →
       // notifications → sidemenu → watchNext → watchPrev (+ contract theater)
       if (Os.theme(e)) {
         e.preventDefault();

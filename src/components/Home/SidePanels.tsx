@@ -9,14 +9,12 @@ import type { Anime } from '../../hooks/animeInterface';
 import StatusIndicator from '../shared/StatusIndicator';
 import { infoPathFor } from '../../utils/animePaths';
 
-// ---------------------------------------------------------------------------
-// SidePanels (the live site 1:1) — side-list sections: TOP AIRING, UPCOMING,
+// SidePanels — side-list sections: TOP AIRING, UPCOMING,
 // JUST FINISHED, TOP MOVIES. Bordered wrapper contains the header, the 6rem
 // cards (poster + optional grayscale banner + title/status + detail chips)
 // and a boxed chevron-down link at the bottom that NAVIGATES to the full
 // list page (`listPath`, per the user's redirect spec — not in-place
-// expand). Renders nothing when empty (live `X`).
-// ---------------------------------------------------------------------------
+// expand). Renders nothing when empty.
 
 // Same format whitelist as the live side list (matched case-insensitively
 // because the local API reports e.g. "Movie" vs live "MOVIE").

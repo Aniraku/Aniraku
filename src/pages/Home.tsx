@@ -29,18 +29,15 @@ import { MiniSchedule } from '../components/Home/MiniSchedule';
 import { SidePanel } from '../components/Home/SidePanels';
 import { runNewEpisodeNotifications, subscribeToSession } from '../lib/sync';
 import { useSeo } from '../utils/seo';
-// NSFW gate (Wave C) — Aniraku Home.jsx:544-550 / Hero.jsx:33: every browse
+// NSFW gate — Aniraku /: every browse
 // row + the hero carousel run through filterAdult (Hentai-genre rule, default
 // OFF → hidden). Sync payloads stay unfiltered (user decision).
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 
-// ---------------------------------------------------------------------------
-// Home (the live site 1:1 page structure):
 //   sr-only h1 → simpleLayout [hero, genre rail, continue watching,
 //   contentSidebarLayout [mainContent: tabs block (banner + tabs + grid),
 //   sidelist row (JUST FINISHED / TOP MOVIES); side: TOP AIRING, ad slot,
 //   UPCOMING (megaphone), schedule slot (MiniSchedule)]]
-// ---------------------------------------------------------------------------
 
 const SimpleLayout = styled.div`
   display: flex;
@@ -51,7 +48,7 @@ const SimpleLayout = styled.div`
   border-radius: var(--global-border-radius);
 `;
 
-// Live uses class `vh` (visually-hidden h1); can't edit shared CSS.
+// Uses class `vh` (visually-hidden h1); can't edit shared CSS.
 const VisuallyHidden = styled.h1`
   position: absolute;
   width: 1px;
@@ -163,7 +160,7 @@ const MegaPhone = styled(FaBullhorn)`
 `;
 
 // NEWEST tab = latest episodes (AniList airingSchedules, deduped by anime),
-// matching what the live site shows; falls back to trending on failure.
+// Matching what the app shows; falls back to trending on failure.
 const TAB_FETCHERS: Record<
   string,
   (page: number, perPage: number) => Promise<Paging>

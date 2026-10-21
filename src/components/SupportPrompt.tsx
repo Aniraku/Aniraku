@@ -1,4 +1,4 @@
-// SupportPrompt — verbatim port of the old Aniraku `components/SupportPrompt.jsx`
+// SupportPrompt — port of the old Aniraku `components/`
 // (Patreon + Binance panel, 30-min active-time auto-prompt, 7-day dismissal,
 // `/watch/*` exclusion, `aniraku:open-support` open event from the navbar heart).
 // Copy/brand/IDs kept byte-identical; only TS types added.

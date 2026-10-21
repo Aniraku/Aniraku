@@ -2,10 +2,8 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { IoChevronBack, IoChevronForward } from 'react-icons/io5';
 
-// ---------------------------------------------------------------------------
-// HomeTabs (the live site 1:1) — NEWEST / POPULAR / TOP RATED tabs with a compact
+// HomeTabs — NEWEST / POPULAR / TOP RATED tabs with a compact
 // ‹ page › pager and a digits-only go-to-page input (commits onBlur/Enter).
-// ---------------------------------------------------------------------------
 
 const TabsRow = styled.div`
   display: flex;
