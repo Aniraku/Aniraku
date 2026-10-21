@@ -1,25 +1,14 @@
 import { useEffect, useState } from 'react';
 
-// AniList outage banner — port of Aniraku
-// (AniListAvailabilityBanner). Same window-event wiring
-// (`aniraku:anilist-status` there → our `aniraku:anilist-status`, dispatched
-// by useApi.ts anilistQuery on every failed/succeeded AniList GraphQL
-// fetch), same role/aria-live and the reference's copy ("AniList is
-// temporarily unavailable. Discovery, search, and some metadata will recover
-// automatically when the upstream service responds.") on its #251717 /
-// #fee2e2 outage palette.
+// AniList outage banner, driven by the `aniraku:anilist-status` window event
+// dispatched by useApi.ts after each failed or successful AniList GraphQL
+// fetch. Uses role/aria-live and the standard outage copy.
 //
-// Deltas vs the reference:
-//  - Dismissible (task mandate). The reference had NO dismissal, so the
-//    dismiss flag is SESSION-level state (per the task's fallback rule);
-//    a success event re-arms it for the next outage.
-//  - No "Try again" button: the reference refetched react-query queries via
-//    `queryClient.refetchQueries({type:'active'})` — this build
-//    has no react-query, and the banner already auto-clears on the next
-//    successful AniList fetch (useApi.ts reportAnilistStatus(false)).
+// Dismissal is session-level state; a success event re-arms the banner for
+// the next outage. There is no "Try again" button: the banner clears on the
+// next successful fetch.
 
-// Mirrors useApi.ts's ANILIST_STATUS_EVENT (kept in sync by hand — both
-// files are owned by the same agent; see the signal comment there).
+// Mirrors useApi.ts's ANILIST_STATUS_EVENT (kept in sync by hand).
 const ANILIST_STATUS_EVENT = 'aniraku:anilist-status';
 
 type AniListStatusDetail = { unavailable?: boolean };

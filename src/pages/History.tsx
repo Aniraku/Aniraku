@@ -18,9 +18,7 @@ import {
 } from '../lib/sync';
 import ThemedSelect from '../components/ThemedSelect';
 
-/* ------------------------------------------------------------------ *
- * Constants & helpers (ported from the live v1.14.x History route)   *
- * ------------------------------------------------------------------ */
+/* Constants and helpers. */
 
 const PAGE_SIZE = 20;
 const HOUR_MS = 36e5;
@@ -40,7 +38,7 @@ function startOfDay(time: number): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-/** Relative "Last watched" label (same buckets as the live site's relative time). */
+/** Relative "Last watched" label. */
 function relativeLastWatched(timestamp: number, now: number = Date.now()): string {
   if (!timestamp) return '';
   const diff = Math.max(0, now - timestamp);
@@ -101,7 +99,7 @@ function sortFieldsOf(entry: WatchHistoryEntry): SortFields {
   };
 }
 
-/** Comparator ported from the live route: last-watched / a-z / episode / air-date. */
+/** Comparator: last-watched / a-z / episode / air-date. */
 function compareBy(
   a: SortFields,
   b: SortFields,
@@ -131,10 +129,8 @@ function matchesFilter(entry: WatchHistoryEntry, filter: string): boolean {
   );
 }
 
-/* ------------------------------------------------------------------ *
- * Bulk operations (ported from Aniraku Profile's history tab:        *
- * Select all / Remove N / Clear History + Settings' undoSnapshot bar)*
- * ------------------------------------------------------------------ */
+/* Bulk operations: select all, remove N, clear history, and the settings
+ * undo-snapshot bar. */
 
 /** Page-local undo bar window. */
 const UNDO_WINDOW_MS = 8000;
@@ -175,10 +171,7 @@ function readLocalJSON<T>(key: string, fallback: T): T {
   }
 }
 
-/* ------------------------------------------------------------------ *
- * Styles — exact values ported from the production style.css          *
- * (modules cmums = page, 1wtl4 = history card, e6kfs = switch)        *
- * ------------------------------------------------------------------ */
+/* Styles: page, history card, and switch. */
 
 const PageContainer = styled.div`
   display: flex;
@@ -187,7 +180,7 @@ const PageContainer = styled.div`
   width: 100%;
 `;
 
-/* live `.vh` utility */
+/* Visually hidden utility. */
 const VisuallyHiddenHeading = styled.h1`
   position: absolute;
   width: 1px;
@@ -299,7 +292,7 @@ const DirectionButton = styled.button`
   }
 `;
 
-/* Switch (live module e6kfs: row/track/thumb) */
+/* Switch row, track, and thumb. */
 const PauseRow = styled(FullRowControl)`
   box-sizing: border-box;
   align-items: center;
@@ -517,7 +510,7 @@ const LoadingContainer = styled.div`
   margin: auto;
 `;
 
-/* Live wraps empty/error/login content in `_prompt_1xdbq_1` (prompt panel). */
+/* Prompt panel for empty/error/login content. */
 const PromptWrapper = styled.div`
   --animation-duration: 0.3s;
   --animation-easing: ease-in-out;
@@ -553,7 +546,7 @@ const EmptyLabel = styled.span`
   padding: 0.5rem;
 `;
 
-/* Live `_image_1r2hh_1`: fades in via `data-loaded`. */
+/* Image fades in via `data-loaded`. */
 const EmptyStateImage = styled.img`
   display: block;
   image-rendering: auto;
@@ -574,7 +567,7 @@ const Sentinel = styled.div`
   height: 1px;
 `;
 
-/* History card (live module 1wtl4) */
+/* History card. */
 const VerticalCardShell = styled.div<{ $selected?: boolean }>`
   position: relative;
   display: flex;
@@ -781,7 +774,7 @@ const WrapperWithHover = styled(CardWrapper)`
   }
 `;
 
-/* Toast (live uses a toast lib; no toast dependency exists locally) */
+/* Toast (no toast dependency exists locally). */
 const Toast = styled.div`
   position: fixed;
   bottom: 1.5rem;
@@ -840,7 +833,7 @@ const BulkActions = styled.div`
   margin-left: auto;
 `;
 
-/* Ghost button (DirectionButton parity) with Aniraku DangerBtn danger mode */
+/* Ghost button with a danger mode. */
 const BulkButton = styled.button<{ $danger?: boolean; $armed?: boolean }>`
   box-sizing: border-box;
   padding: 0.5rem 0.75rem;
@@ -1113,7 +1106,7 @@ const History = () => {
   const undoTimerRef = useRef<number | null>(null);
   const repushTimerRef = useRef<number | null>(null);
 
-  // Live route sets `document.title = 'History · Aniraku'` (Wave B brand).
+  // Route sets `document.title = 'History · Aniraku'`.
   useEffect(() => {
     const previousTitle = document.title;
     document.title = 'History · Aniraku';
@@ -1130,7 +1123,7 @@ const History = () => {
       .map(({ entry }) => entry);
   }, [entries, filter, order, direction]);
 
-  // Reset paging whenever the result set changes shape (live does the same).
+  // Reset paging whenever the result set changes shape.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [filter, order, direction]);
@@ -1145,7 +1138,7 @@ const History = () => {
     [order, visibleItems],
   );
 
-  // --- Bulk selection derived state ------------------------------------
+  // Bulk selection derived state
   const entryIdSet = useMemo(
     () => new Set(entries.map((entry) => entry.animeId)),
     [entries],
@@ -1261,7 +1254,7 @@ const History = () => {
     [removeEpisode],
   );
 
-  // --- Bulk operations --------------------------------------------------
+  // Bulk operations
 
   const armRemoveConfirm = useCallback(() => {
     if (removeArmTimerRef.current !== null) {

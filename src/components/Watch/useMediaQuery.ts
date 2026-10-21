@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Live mediaQuery helpers — `Ue(768)` (comments compact slot) and
- * `He(1200)` (MediaSource moves between the main column `ki` and the
- * source-and-data column `Yn`) — as a tiny SSR-safe matchMedia hook.
+ * SSR-safe matchMedia hook used for the compact comments slot (768px) and
+ * for MediaSource moving between the main column and the source-and-data
+ * column (1200px).
  */
 export function useMediaQuery(
   query: string,

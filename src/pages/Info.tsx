@@ -50,21 +50,18 @@ import {
 } from '../lib/listStatus';
 // Escape closes only the top-most overlay (menu over page overlays).
 import { registerOverlayHandler } from '../components/overlayStack';
-// NSFW gate — Aniraku: Hentai titles
-// gate the page when OFF (default) and recommendations run through
-// filterAdult. Sync payloads stay unfiltered (user decision).
+// NSFW gate: Hentai titles gate the page when OFF (default), and
+// recommendations run through filterAdult. Sync payloads stay unfiltered.
 import { filterAdult, isNsfw, useNsfw } from '../hooks/useNsfw';
-// Episode ratings — Aniraku fetch + the
-// per-episode RatingBadge in the episode grid.
-// Session id comes from lib/sync's bridge (no auth-hook import — cross-wave
-// rule, same as useNsfw/lib consumers).
+// Episode ratings fetch plus the per-episode RatingBadge in the episode grid.
+// The session id comes from lib/sync's bridge (no auth-hook import).
 import { getSessionUserId } from '../lib/sync';
 import {
   EPISODE_RATINGS_LS_KEY,
   fetchEpisodeRatings,
 } from '../lib/episodeRatings';
-// Runtime SEO (SEO layer) — old setAnimeDetailSEO (seo.js:108) via the
-// shared helper: title/desc/keywords/og/twitter/canonical/JSON-LD + cleanup.
+// Runtime SEO through the shared helper: title, description, keywords,
+// og/twitter, canonical, JSON-LD, and cleanup.
 import { SITE_URL, useSeo } from '../utils/seo';
 import { infoPathFor } from '../utils/animePaths';
 import {
@@ -72,32 +69,31 @@ import {
   resolveDisplayTitle,
 } from '../lib/displayLanguage';
 
-// Info page — the app 1:1, hydrated tabbed rebuild.
+// Info page: hydrated tabbed rebuild.
 //
-// Structure follows the live InfoRoute `zt` layout:
-//   banner → infoDataWrapper (side column: poster + details `ht` rows |
-//   main column: h1 + stat chips + tab bar + section panel) → related/
+// Structure:
+//   banner → infoDataWrapper (side column: poster + details rows | main
+//   column: h1 + stat chips + tab bar + section panel) → related/
 //   recommendations → The Anime Community comments.
 //
-// Tabs follow with
-// `ot = [Overview, Characters, Artwork, Episodes]` (accessMode defaults to
-// 'watch'). The active section is persisted per media id in the
-// `aniraku:navigation` record under `infoSection` (live INFO_SECTION key
-// `aniraku:navigation:info-section`, legacy standalone key migrated).
+// The four tabs follow in display order (accessMode defaults to 'watch').
+// The active section is persisted per media id in the `aniraku:navigation`
+// record under `infoSection`; the legacy standalone key
+// `aniraku:navigation:info-section` is migrated on read.
 //
 // Overview = the trailer box only (double-details fix: the details block
 // that used to sit below it is gone — ONE details copy per breakpoint: the
-// click-to-reveal hero card ≤950, the sidebar rows ≥951). Genres/Tags live
-// Only as sidebar genreTag pills and Related/
-// Recommendations render as the always-on `ulm8c` drag lists below the
-// two-column block. Characters/Artwork/Episodes are the live tab bodies.
+// click-to-reveal hero card ≤950, the sidebar rows ≥951). Genres/Tags appear
+// only as sidebar genre-tag pills, and Related/Recommendations render as the
+// always-on drag lists below the two-column block. Characters/Artwork/
+// Episodes are the tab bodies.
 //
-// Link targets use the live links chunk (`slugify`/`pickTitle`/
+// Link targets use the links chunk (`slugify`/`pickTitle`/
 // `watchPathFor` = Q/$/At). Supplementary AniList GraphQL
 // fills tags / source / bannerImage / characters + voiceActors that
 // MEDIA_DETAIL_QUERY drops.
 
-// Live link helpers — behavior
+// Link helpers — behavior
 
 // Slugify (NFD-strip → lowercase → strip non-slug → spaces to '-').
 const slugify = (value: string): string =>
@@ -149,9 +145,7 @@ const watchPathFor = (item: Linkable, episode?: number | null): string => {
 const plusEncode = (value: string): string =>
   encodeURIComponent(value).replace(/%20/g, '+');
 
-// ---------------------------------------------------------------------------
-// Sanitizers / labels (live tt / nt / Qe equivalents)
-// ---------------------------------------------------------------------------
+// Sanitizers and labels.
 
 const sanitizeText = (html: string): string =>
   typeof html === 'string'
@@ -170,7 +164,7 @@ const displayTitle = (anime: Anime): string =>
 const capitalize = (value: string): string =>
   value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : '';
 
-// live Qe(): known statuses -> live labels, otherwise the raw value.
+// Map known statuses to display labels; otherwise render the raw value.
 const displayStatus = (status?: string): string => {
   switch (status) {
     case 'Ongoing':
@@ -222,7 +216,7 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 const countryName = (code: string): string => COUNTRY_NAMES[code] || code;
 
-// live genreTag component custom properties (`Ze` in the live chunk).
+// Custom properties for the genre tag.
 const genreTagVars = (color: string): React.CSSProperties =>
   ({
     '--genre-tag-bg': color || 'grey',
@@ -247,7 +241,7 @@ const toCardAnime = (
     totalEpisodes: (item as { episodes?: number }).episodes ?? 0,
   }) as unknown as Anime;
 
-// live ut(): YouTube search URL for the trailer fallback.
+// YouTube search URL for the trailer fallback.
 const trailerSearchUrl = (anime: Anime): string | null => {
   const title = resolveDisplayTitle(anime.title);
   if (!title) return null;
@@ -262,12 +256,11 @@ const trailerSearchUrl = (anime: Anime): string | null => {
 
 type InfoTab = 'Overview' | 'Characters' | 'Artwork' | 'Episodes';
 
-// Gated by `st = e => e === 'watch' ? ot : B`
-// with accessMode defaulting to `watch` → the four hydrated tabs, in order.
+// Four hydrated tabs, gated by accessMode (default `watch`), in display order.
 const INFO_TABS: InfoTab[] = ['Overview', 'Characters', 'Artwork', 'Episodes'];
 
-// = `${c.NAVIGATION}:info-section`, stored through the
-// record map as `localStorage['aniraku:navigation'].infoSection[mediaId]`.
+// Info-section key, stored in the navigation record map under
+// `localStorage['aniraku:navigation'].infoSection[mediaId]`.
 const NAVIGATION_KEY = 'aniraku:navigation';
 const LEGACY_INFO_SECTION_KEY = 'aniraku:navigation:info-section';
 
@@ -313,11 +306,11 @@ const writeInfoSection = (mediaId: string, section: InfoTab): void => {
   }
 };
 
-// Sidebar / artwork / episode-toolbar helpers (`Tt` `Sg` `Nt`,
-// Watch EpisodeList `listLayout-[{animeId}]`)
+// Sidebar, artwork, and episode-toolbar helpers (the episode layout key is
+// `listLayout-[{animeId}]`).
 
-// live settings default `langTitle: 'English'` (SettingsProvider not required
-// on this page — read the persisted record like Comments does).
+// Default `langTitle` is 'English' (SettingsProvider isn't mounted on this
+// page, so read the persisted record like Comments does).
 const readLangTitle = (): string => {
   try {
     const raw = localStorage.getItem('aniraku:settings');
@@ -366,7 +359,7 @@ const startDateSearchPath = (year: number): string =>
   `/search?startDate_like=${encodeURIComponent(String(year))}%25` +
   '&sort=POPULARITY_DESC&type=ANIME';
 
-// live `Tt(title, langTitle)` — title-variant rows minus the preferred one.
+// Title-variant rows minus the preferred one.
 type VariantRow = { label: string; value: string };
 
 const titleVariantRows = (
@@ -385,7 +378,7 @@ const titleVariantRows = (
     .map((row) => ({ label: row.label, value: row.value }));
 };
 
-// live `Sg(updatedAt)` — unix seconds → "YYYY-MM-DD HH:MM:SS".
+// Unix seconds → "YYYY-MM-DD HH:MM:SS".
 const formatLastUpdate = (seconds: number | undefined | null): string | null => {
   if (!seconds) return null;
   try {
@@ -395,7 +388,7 @@ const formatLastUpdate = (seconds: number | undefined | null): string | null => 
   }
 };
 
-// live `Nt` artwork category labels.
+// Artwork category labels.
 const ARTWORK_LABELS: Record<string, string> = {
   all: 'All',
   background: 'Backgrounds',
@@ -410,10 +403,10 @@ const ARTWORK_LABELS: Record<string, string> = {
 
 type ArtworkItem = { img: string; type: string };
 
-// Live artwork comes from `tvdbArtwork` via the site's own
+// Artwork comes from `tvdbArtwork` via the site's own
 // `anilist.merged(id)` backend (see info-BnlMMjW_.js error string) — not
 // reachable from this client. Flatten what we DO have into the same
-// `{img, type}` shape live's `Pt` renders.
+// `{img, type}` shape.
 const collectArtwork = (
   animeInfo: Anime,
   bannerImage: string | null | undefined,
@@ -453,12 +446,12 @@ const readListLayout = (mediaId: string | undefined): EpisodeMode | null => {
   return null;
 };
 
-// live `qt` cycle: grid→list, list→imageList, imageList→grid — i.e.
+// Cycle: grid→list, list→imageList, imageList→grid — i.e.
 // list → imageList → grid → list.
 const nextListLayout = (mode: EpisodeMode): EpisodeMode =>
   mode === 'list' ? 'imageList' : mode === 'imageList' ? 'grid' : 'list';
 
-// live `$t` default-mode memo `C` (its `loading ||` arm collapses to the
+// Default-mode heuristic (the `loading ||` arm collapses to the
 // length===1 case here — this tab only renders with loaded episodes).
 const episodeHeuristic = (episodes: Episode[]): EpisodeMode => {
   const images = new Set(episodes.map((episode) => episode.image));
@@ -470,7 +463,7 @@ const episodeHeuristic = (episodes: Episode[]): EpisodeMode => {
   return 'grid';
 };
 
-// live airDate formatter (index chunk `Ag`) — verbatim semantics.
+// Format an air date.
 const formatAirDate = (value: string): string => {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -482,9 +475,9 @@ const formatAirDate = (value: string): string => {
       });
 };
 
-// live `Yt(isSelected, isWatched, filler)` → the root's CSS-var bag (applied
-// as inline style). Info never renders the selected state (no episodeId on
-// this route) — the branch is kept for declaration parity (flagged).
+// Episode CSS-var bag, applied as inline style on the root. Info never
+// renders the selected state (no episodeId on this route), but the shared
+// declaration is kept intact.
 const episodeVars = (
   isSelected: boolean,
   isWatched: boolean,
@@ -544,8 +537,7 @@ const episodeVars = (
   } as React.CSSProperties;
 };
 
-// Live icon-factory glyphs with no exact react-icons match — paths verbatim
-// from the live chunks (links `oe` list-mode, bi `f` CC badge, Seasons `Jt`
+// Icon-factory glyphs with no exact react-icons match (list-mode, CC badge,
 // filler tag).
 const ListModeIcon: React.FC<{ size?: string }> = ({ size = '1rem' }) => (
   <svg
@@ -586,9 +578,7 @@ const FillerTagIcon: React.FC<{ size?: string }> = ({ size = '0.9rem' }) => (
   </svg>
 );
 
-// ---------------------------------------------------------------------------
-// Live no-image placeholders (no_image_banner chunk + InfoRoute inline poster)
-// ---------------------------------------------------------------------------
+// No-image placeholders (no_image_banner chunk + InfoRoute inline poster)
 
 const BANNER_PLACEHOLDER =
   'data:image/webp;base64,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';
@@ -596,9 +586,7 @@ const BANNER_PLACEHOLDER =
 const POSTER_PLACEHOLDER =
   'data:image/webp;base64,UklGRuwBAABXRUJQVlA4TOABAAAv5QBWAA9wlZmbnDxpaf5jCXJc25Ik5QXRUpgf4WF9i3WECztgBawBL5LZRayBJSDsRO2yBaRgNgnmRHz+M7I685fw5oj+TwD+l5spaMlD0VmiylAs1CjpAmMLGwIno3QoGFe7TCRT1JCZ75iDWteZYAnikN5gx6hYJOq5dj3CRxmCEfZ21cO+6kqjKKMcR9Al6CN1pUFvKUMw5Gc4pXaNu0fpFcsxGqwEZepMeFRxmXnKHDeRYdl0lYLKInASRzC2qDwUC2tU6YJOCbqeZ8HEHHT4PH5lfIpHwNWE+ydAr8C1xxe3eLIES1gKYEwgdUeGZ5gAZAFZt3mGp9VECkjdZhk8MJMaUFau6GQFWYMGqSB1m8vEDK5M9plMTGDFonNBw2ZPpvMZMiUwZGKDFQBtj9fONLUGywC4x2pnnupZz87tGUxzJTytmHe0DU6QZZu3hWlWPytvMy5MXT1FGXOc8wdTF0uWI4xkGo3ZsjfwwZ4ftDS4mghisyf/Rs8HCoi2x77T00KWRULeNzukM8E9/r55MrKMNhrIus1e1gMyyIjn1bLlIZ2sIHWbP1dPnofOh+o2O12lrhMpAU/UDsBZQOo2vyWemXrFwgSybrmMy0gP8QDTCXoDLl25sOV/tAE=';
 
-// ---------------------------------------------------------------------------
 // Supplementary AniList GraphQL (fields MEDIA_DETAIL_QUERY drops)
-// ---------------------------------------------------------------------------
 
 interface SupplementaryInfo {
   tags?: Tag[];
@@ -716,8 +704,8 @@ const fetchSupplementary = async (
                 },
                 image: e.node.image?.large ?? e.node.image?.medium ?? '',
                 imageHash: '',
-                // ADDITIVE: live `Ft` renders `voiceActors` from the character
-                // edge (`languageV2` → VoiceActor.language).
+                // Voice actors come from the character edge
+                // (`languageV2` → VoiceActor.language).
                 voiceActors: Array.isArray(e.voiceActors)
                   ? e.voiceActors
                       .filter((v) => !!v?.id)
@@ -743,16 +731,11 @@ const fetchSupplementary = async (
   }
 };
 
-// ---------------------------------------------------------------------------
-// Styles (live style.css class text: aojp4 / 1vmn8 / 4yc5g / vni8n / 1tk52 /
-// llxst / p7i3w)
-// ---------------------------------------------------------------------------
+// Styles (class text: aojp4 / 1vmn8 / 4yc5g / vni8n / 1tk52 / llxst / p7i3w)
 
-// _infoContainer_aojp4_1
-// _infoContainer_aojp4_1 — carries `animFadeIn` (live mount class) via attrs
-// + the live .4s/ease-in-out animation vars (--animation-timing = our
-// animations.css consumer for live's --animation-easing).
-// max-width/margin = our shell's page container (live constrains in `.shell`).
+// Carries `animFadeIn` via attrs, plus the .4s/ease-in-out animation vars
+// (--animation-timing is the animations.css consumer for --animation-easing).
+// max-width/margin come from the shell's page container.
 const InfoContainer = styled.div.attrs({ className: 'animFadeIn' })`
   --animation-duration: 0.4s;
   --animation-timing: ease-in-out;
@@ -763,7 +746,6 @@ const InfoContainer = styled.div.attrs({ className: 'animFadeIn' })`
   margin: 0 auto;
 `;
 
-// _infoBannerImage_aojp4_115
 const BannerImg = styled.img`
   display: block;
   width: 100%;
@@ -799,7 +781,6 @@ const HeroPanel = styled.div`
   }
 `;
 
-// _infoRow_aojp4_43 — poster row (live carries a transform transition)
 const HeroRow = styled.div`
   display: flex;
   flex-direction: row;
@@ -832,7 +813,6 @@ const PosterCol = styled.div`
   }
 `;
 
-// _infoCoverCard_aojp4_285
 const CoverCard = styled.div`
   overflow: hidden;
   background-color: var(--global-div-tr);
@@ -840,7 +820,6 @@ const CoverCard = styled.div`
   box-shadow: 0 0 10px var(--global-shadow);
 `;
 
-// _infoImage_aojp4_125
 const Poster = styled.img`
   display: block;
   width: 100%;
@@ -851,7 +830,7 @@ const Poster = styled.img`
     filter 0.3s ease-in-out;
 `;
 
-// _watchNowButton_4yc5g_32 (+ search trailer shares it)
+// (+ search trailer shares it)
 const watchNowCss = css`
   display: flex;
   gap: 0.5rem;
@@ -888,7 +867,6 @@ const WatchNow = styled(Link)`
   ${watchNowCss}
 `;
 
-// Wave B → split "Add to List" (AniList detail-page pattern, our chrome):
 // main action + caret that opens the list-status menu. In Aniraku the
 // bookmark IS the library entry (it carries Watching/Plan to Watch/...),
 // so one split button covers add / change status / remove — no separate
@@ -903,7 +881,7 @@ const ListSplit = styled.div`
   z-index: 30;
 `;
 
-// _watchNowButton_4yc5g_32 chrome, split across main + caret so the pair
+// chrome, split across main + caret so the pair
 // reads as one button (shared radius, divider between the halves).
 const listHalfCss = css`
   display: flex;
@@ -1101,13 +1079,11 @@ const PosterActions = styled.div`
   }
 `;
 
-// _infoFlexWithGap_aojp4_215
 const StatsRow = styled.div`
   display: flex;
   gap: 0.5rem;
 `;
 
-// _malAnilistSvg_vni8n_1 (live has no transition — hover flips instantly)
 const StatsLink = styled.a`
   display: flex;
   flex: 1;
@@ -1135,11 +1111,9 @@ const StatsLink = styled.a`
   }
 `;
 
-// ---------------------------------------------------------------------------
-// Two-column data wrapper (live infoDataWrapper + side/main columns)
-// ---------------------------------------------------------------------------
+// Two-column data wrapper
 
-// _infoDataWrapper_aojp4_15 — row of side + main column, stacked on mobile
+// row of side + main column, stacked on mobile
 const DataWrapper = styled.div`
   --info-desktop-side-column-width: 14rem;
   --info-desktop-side-column-inset: 1rem;
@@ -1179,9 +1153,9 @@ const DataWrapper = styled.div`
   }
 `;
 
-// _infoDesktopSideColumn_aojp4_27 — poster + details sidebar. Live insets the
-// poster/details wrappers by `side-column-inset` margin + padding (content
-// 2rem…16rem inside the 16rem basis); one `border-box` padding reproduces it.
+// Poster + details sidebar. The wrappers are inset by `side-column-inset`
+// margin plus padding (content 2rem…16rem inside the 16rem basis); one
+// `border-box` padding reproduces it.
 const SideColumn = styled.div`
   box-sizing: border-box;
   display: flex;
@@ -1200,9 +1174,9 @@ const SideColumn = styled.div`
   }
 `;
 
-// _infoDesktopMainColumn_aojp4_35 — title + chips + tab bar + panel.
-// ≤950 the panel-height var feeds `infoScrollableSection` (live scopes it on
-// `infoButtonGroupWrapper` — same descendant resolution on this layout).
+// title + chips + tab bar + panel.
+// ≤950 the panel-height var feeds `infoScrollableSection` (same descendant
+// resolution on this layout).
 const MainColumn = styled.div`
   display: flex;
   flex: 1 1 auto;
@@ -1216,12 +1190,11 @@ const MainColumn = styled.div`
   }
 `;
 
-// _infoDesktopTitle_aojp4_185 / _infoMobileTitle_aojp4_171 — dual h1: the
-// desktop one lives in the main column (hidden ≤950), the mobile one sits
-// beside the poster (hidden ≥951), exactly as live `Qe` + `Ze`.
-// Live puts `padding-right` (1rem desktop / .5rem mobile) + the mobile
-// `overflow: hidden` chip-clip on the h1 itself; our h1 and chips share
-// TitleBlock, so those declarations live there for identical widths/clip.
+// Title block. The desktop title lives in the main column (hidden ≤950) and
+// the mobile one sits beside the poster (hidden ≥951). The padding-right
+// (1rem desktop / .5rem mobile) and mobile `overflow: hidden` chip-clip sit
+// on the h1 itself; our h1 and chips share TitleBlock, so those declarations
+// live there for identical widths and clipping.
 const Title = styled.h1<{ $mobile?: boolean }>`
   position: relative;
   display: flex;
@@ -1248,8 +1221,7 @@ const Title = styled.h1<{ $mobile?: boolean }>`
 `;
 
 // h1 + stat chips (+ mobile description) wrapper — one instance per
-// breakpoint so the chips group with the title on both (live renders `_t`
-// inside both `Ze` and `vt`).
+// breakpoint so the chips group with the title at both.
 const TitleBlock = styled.div<{ $mobile?: boolean }>`
   display: flex;
   flex-direction: column;
@@ -1271,9 +1243,9 @@ const TitleBlock = styled.div<{ $mobile?: boolean }>`
     @media (max-width: 950px) { display: none; }`}
 `;
 
-// _infoTagsContainer_aojp4_241 — chip row (live renders links as direct
-// children of a div; live clips with nowrap ≤950 inside the mobile h1 — that
-// hard clip read as broken/overflowing on phones, so chips wrap instead)
+// Chip row. Links are direct children of a div; the original clips with
+// nowrap ≤950 inside the mobile h1, which read as broken/overflowing on
+// phones, so chips wrap instead.
 const ChipList = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -1285,7 +1257,6 @@ const ChipList = styled.div`
   }
 `;
 
-// _genreTag_1tk52_1
 const Chip = styled(Link)`
   display: inline-flex;
   align-items: center;
@@ -1305,7 +1276,6 @@ const Chip = styled(Link)`
   }
 `;
 
-// _borderVariant_1tk52_20 (stat chips)
 const StatChip = styled(Chip)`
   padding: 0.15rem 0.4rem;
   font-size: 0.8rem;
@@ -1316,7 +1286,6 @@ const StatChip = styled(Chip)`
   }
 `;
 
-// _trailerContainer_1vmn8_1
 const TrailerBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -1327,8 +1296,7 @@ const TrailerBox = styled.div`
   border-radius: var(--global-border-radius);
 `;
 
-// _infoDescription_aojp4_200 (+ collapsed/expanded overflow, live `yt`)
-// `$desktopOnly` = `_descDesktopOnly_1vmn8_14` (hidden ≤950 — the mobile
+// `$desktopOnly` = (hidden ≤950 — the mobile
 // breakpoint renders its own description inside the poster-side title block).
 const DescriptionText = styled.div<{
   $expanded: boolean;
@@ -1362,10 +1330,10 @@ const TrailerFrame = styled.iframe`
   }
 `;
 
-// (live has NO show-more on the description — `yt` expands via its own click;
-//  the only `infoShowMoreBtn` lives in the sidebar details → DetailsToggle.)
+// No show-more on the description; the only "show more" control lives in
+// the sidebar details (DetailsToggle).
 
-// _emptyState_1jdkw_21 — episodes empty (padding/color/center + ≤950 fill)
+// episodes empty (padding/color/center + ≤950 fill)
 const EmptyState = styled.div`
   display: flex;
   flex-direction: column;
@@ -1387,7 +1355,7 @@ const EmptyState = styled.div`
   }
 `;
 
-// _listContainer_llxst_1 (+ max-height:100%, min-width reset ≤1199)
+// Adds max-height: 100% and a min-width reset ≤1199px.
 const EpisodeListContainer = styled.div`
   box-sizing: border-box;
   display: flex;
@@ -1410,8 +1378,6 @@ const EpisodeListContainer = styled.div`
   }
 `;
 
-// _episodeGrid_llxst_18 + _rowLayout_llxst_27 (list/imageList) /
-// _gridLayout_llxst_30 (grid)
 const EpisodeGrid = styled.div<{ $mode: EpisodeMode }>`
   display: grid;
   flex-grow: 1;
@@ -1429,11 +1395,10 @@ const EpisodeGrid = styled.div<{ $mode: EpisodeMode }>`
       : 'repeat(auto-fill, minmax(min(20rem, 100%), 1fr))'};
 `;
 
-// _root_p7i3w_1 (live's class string carries `animFadeIn`) + _rowLayout_p7i3w_25
-// via $row (justify space-between + svg -0.15rem). State colors/outline/padding/
-// text-align arrive as CSS vars from `episodeVars` (live Yt) — no local color
-// logic. Anchor adaptation: live root is <button onClick>, ours is the
-// mandated /watch Link (text-decoration: none) — decls otherwise verbatim.
+// Row via $row (justify space-between + svg -0.15rem). State colors/outline/
+// padding/text-align arrive as CSS vars from `episodeVars` — no local color
+// logic. The root is a /watch Link (text-decoration: none) rather than a
+// button; declarations are otherwise unchanged.
 const EpisodeButton = styled(Link).attrs({ className: 'animFadeIn' })<{
   $row: boolean;
 }>`
@@ -1482,20 +1447,18 @@ const EpisodeButton = styled(Link).attrs({ className: 'animFadeIn' })<{
   }
 `;
 
-// _link_p7i3w_40
 const EpLink = styled.div`
   width: 100%;
   color: inherit;
   text-decoration: none;
 `;
 
-// _imageListContent_p7i3w_45
 const EpImageListContent = styled.div`
   display: flex;
   gap: 0;
 `;
 
-// _imageListHeader_p7i3w_46 (align/justify + gap rules)
+// (align/justify + gap rules)
 const EpImageListHeader = styled.div`
   display: flex;
   align-items: center;
@@ -1503,7 +1466,6 @@ const EpImageListHeader = styled.div`
   gap: 0.25rem;
 `;
 
-// _metaIcons_p7i3w_47
 const EpMetaIcons = styled.div`
   display: flex;
   flex-shrink: 0;
@@ -1512,7 +1474,6 @@ const EpMetaIcons = styled.div`
   margin-bottom: 0.1rem;
 `;
 
-// _gridContent_p7i3w_48
 const EpGridContent = styled.div`
   display: flex;
   flex-direction: column;
@@ -1521,7 +1482,6 @@ const EpGridContent = styled.div`
   height: 100%;
 `;
 
-// _listContent_p7i3w_49
 const EpListContent = styled.div`
   display: flex;
   align-items: center;
@@ -1529,14 +1489,12 @@ const EpListContent = styled.div`
   width: 100%;
 `;
 
-// _listTitleGroup_p7i3w_79
 const EpListTitleGroup = styled.div`
   display: flex;
   gap: 0.5rem;
   align-items: center;
 `;
 
-// _imageWrapper_p7i3w_84 (+ ≤500 120×80)
 const EpImageWrapper = styled.div`
   position: relative;
   flex-shrink: 0;
@@ -1554,7 +1512,7 @@ const EpImageWrapper = styled.div`
   }
 `;
 
-// _image_p7i3w_45 (+ _spoilerHidden_p7i3w_116 via $spoiler; ≤500 120×80)
+// (+ via $spoiler; ≤500 120×80)
 const EpImage = styled.img<{ $spoiler?: boolean }>`
   display: block;
   width: 150px;
@@ -1574,7 +1532,6 @@ const EpImage = styled.img<{ $spoiler?: boolean }>`
   }
 `;
 
-// _imageFallback_p7i3w_106
 const EpImageFallback = styled.span`
   display: flex;
   align-items: center;
@@ -1586,7 +1543,6 @@ const EpImageFallback = styled.span`
   color: var(--global-text-muted);
 `;
 
-// _spoilerOverlay_p7i3w_119 (+ _isVisible_p7i3w_134 via $visible)
 const EpSpoilerOverlay = styled.div<{ $visible?: boolean }>`
   position: absolute;
   inset: 0;
@@ -1603,7 +1559,6 @@ const EpSpoilerOverlay = styled.div<{ $visible?: boolean }>`
   transition: opacity 0.3s ease-in-out;
 `;
 
-// _label_p7i3w_137
 const EpLabel = styled.span`
   position: absolute;
   bottom: 0.25rem;
@@ -1617,7 +1572,6 @@ const EpLabel = styled.span`
   border-radius: var(--global-border-radius);
 `;
 
-// _episodeNumber_p7i3w_149 (+ _episodeNumberStrong_p7i3w_157 via $strong)
 const EpEpisodeNumber = styled.span<{ $strong?: boolean }>`
   display: -webkit-box;
   overflow: hidden;
@@ -1628,7 +1582,7 @@ const EpEpisodeNumber = styled.span<{ $strong?: boolean }>`
   ${({ $strong }) => ($strong ? 'font-weight: 500;' : '')}
 `;
 
-// _descriptionWrapper_p7i3w_160 (+ ≤500 gap/padding)
+// (+ ≤500 gap/padding)
 const EpDescriptionWrapper = styled.div`
   box-sizing: border-box;
   display: flex;
@@ -1643,7 +1597,6 @@ const EpDescriptionWrapper = styled.div`
   }
 `;
 
-// _description_p7i3w_160 (+ ≤500)
 const EpDescription = styled.div`
   display: -webkit-box;
   height: 100%;
@@ -1666,7 +1619,6 @@ const EpDescription = styled.div`
   }
 `;
 
-// _imageListFooter_p7i3w_184
 const EpImageListFooter = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -1674,7 +1626,6 @@ const EpImageListFooter = styled.div`
   justify-content: space-between;
 `;
 
-// _airDate_p7i3w_190 (+ ≤500)
 const EpAirDate = styled.div`
   font-size: 0.65rem;
   text-align: end;
@@ -1684,13 +1635,11 @@ const EpAirDate = styled.div`
   }
 `;
 
-// toolbar range select — live `qt` applies `Gt` inline:
-// {padding:.5rem, bg global-div, color global-text, border, radius, center}
-// Episode-range pager — replaces the old native <select> chunk picker. The OS
-// picker looked out of place on mobile and the opaque "1 - 100" options gave no
-// sense of scale for long-running series; a prev/next pager with a live
-// "1–100 / 1122" readout is thumb-friendly (big touch targets) and shows exactly
-// where you are in the episode list.
+// Episode-range pager — replaces the old native <select> chunk picker.
+// The OS picker looked out of place on mobile and the opaque "1 - 100"
+// options gave no sense of scale for long-running series; a prev/next pager
+// with a live "1–100 / 1122" readout is thumb-friendly (big touch targets)
+// and shows exactly where you are in the episode list.
 const EpRangeNav = styled.div`
   display: inline-flex;
   flex-shrink: 0;
@@ -1764,11 +1713,8 @@ const ErrorBox = styled.div`
   font-weight: bold;
 `;
 
-// ---------------------------------------------------------------------------
 // Tab bar + sidebar details + tab-body sections
-// ---------------------------------------------------------------------------
 
-// _rowSlideButtonContainer_1vfm3_1 + _infoButtonContainer_aojp4_367
 const TabBar = styled.div`
   box-sizing: border-box;
   display: flex;
@@ -1793,7 +1739,6 @@ const TabBar = styled.div`
   }
 `;
 
-// _rowSlideButton_4yc5g_1 + _rowSlideButtonActive_4yc5g_16
 const Tab = styled.button<{ $active?: boolean }>`
   display: flex;
   flex: 1 1 auto;
@@ -1819,8 +1764,7 @@ const Tab = styled.button<{ $active?: boolean }>`
   }
 `;
 
-// Panel wrapper under the tab bar (live `He > b` → _infoDesktopPanelContent_
-// aojp4_90 — no gap, no animation in live; children flex to fill).
+// Panel wrapper under the tab bar: no gap, no animation; children flex to fill.
 const TabPanel = styled.div`
   display: flex;
   flex: 1;
@@ -1835,7 +1779,7 @@ const TabPanel = styled.div`
   }
 `;
 
-// _infoOverviewContainer_aojp4_160 — Overview body column (live `Xe` in `Lt`)
+// Overview body column
 const OverviewBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -1852,11 +1796,10 @@ const OverviewBox = styled.div`
   }
 `;
 
-// _infoScrollableSection_aojp4_71 — scroll box for Characters/Artwork/
-// Episodes: base = display:flex + min-w/h0 + `>*` fill; ≥951 adds
-// flex:1 1 auto + overflow:hidden (live also sets `height:0`, which needs the
-// app shell's definite-height chain our shell lacks → omitted, residual
-// flagged); ≤950 = height var + overflow:hidden.
+// Scroll box for Characters/Artwork/Episodes: base = display:flex + min-w/h0
+// + `>*` fill; ≥951 adds flex:1 1 auto + overflow:hidden (the original also
+// sets `height:0`, which needs a definite-height chain our shell lacks →
+// omitted); ≤950 = height var + overflow:hidden.
 const TabScroll = styled.div`
   display: flex;
   min-width: 0;
@@ -1879,14 +1822,13 @@ const TabScroll = styled.div`
   }
 `;
 
-// _infoDetailsWrapper_aojp4_196
 const DetailsWrapper = styled.div`
   width: 100%;
   overflow: hidden;
   border-radius: var(--global-border-radius);
 `;
 
-// _infoDataContainer_aojp4_143 — sidebar rows; horizontal scroller ≤950px
+// sidebar rows; horizontal scroller ≤950px
 const DetailsPanel = styled.div`
   box-sizing: border-box;
   display: flex;
@@ -1922,8 +1864,8 @@ const DetailsPanel = styled.div`
   }
 `;
 
-// _infoLabelValuePair_aojp4_212 — label above value; value nowrap/scrollable
-// ≥951 only (live `>span` rule), weight-300 muted from `infoDataContainer span`
+// label above value; value nowrap/scrollable
+// ≥951 only, weight-300 muted from `infoDataContainer span`
 const DetailRow = styled.div<{
   $hideOnDesktop?: boolean;
   $hideOnMobile?: boolean;
@@ -2102,9 +2044,8 @@ const HeroDetailRow = styled.div`
   }
 `;
 
-// SEASONS strip (user spec): prequel/sequel cards under the trailer in the
-// main column, each marked with a PREQUEL/SEQUEL badge, linking to that
-// anime's info page.
+// SEASONS strip: prequel/sequel cards under the trailer in the main column,
+// each marked with a PREQUEL/SEQUEL badge, linking to that anime's info page.
 const SeasonsBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -2200,7 +2141,6 @@ const SeasonSub = styled.span`
 `;
 
 // Genres + Tags rows: always visible ≤950, collapsed behind the desktop
-// show-more toggle (live `ht` with `desktop` + `$e`).
 const DetailsExtra = styled.div<{ $expanded: boolean }>`
   display: flex;
   flex-direction: column;
@@ -2213,7 +2153,7 @@ const DetailsExtra = styled.div<{ $expanded: boolean }>`
   }
 `;
 
-// _infoShowMoreBtn_aojp4_249 — full-bleed footer bar (desktop only)
+// full-bleed footer bar (desktop only)
 const DetailsToggle = styled.button`
   display: flex;
   align-items: center;
@@ -2255,8 +2195,8 @@ const DetailsToggle = styled.button`
   }
 `;
 
-// Shared tab-section shell — _container_hsaph_1 / _container_1lfbt_1
-// (both carry `animFadeIn` + the live .4s/ease-in-out animation vars)
+// Shared tab-section shell (both variants carry `animFadeIn` and the
+// .4s/ease-in-out animation vars).
 const TabSection = styled.div.attrs({ className: 'animFadeIn' })`
   --animation-duration: 0.4s;
   --animation-timing: ease-in-out;
@@ -2279,7 +2219,6 @@ const TabSection = styled.div.attrs({ className: 'animFadeIn' })`
   }
 `;
 
-// _sectionTitle_hsaph_14 / _sectionTitle_1lfbt_14
 const SectionBar = styled.h2`
   display: flex;
   gap: 0.5rem;
@@ -2295,7 +2234,6 @@ const SectionBar = styled.h2`
   border-radius: var(--global-border-radius);
 `;
 
-// _sectionTitleLabel_hsaph_25
 const SectionBarLabel = styled.span`
   display: flex;
   gap: 0.25rem;
@@ -2307,8 +2245,8 @@ const SectionBarLabel = styled.span`
   }
 `;
 
-// _scrollWrapper_hsaph_46 / _scrollWrapper_1lfbt_79 — position/overflow base;
-// live adds the same flex fill under both ≥951 and ≤950 → unconditional here.
+// Position and overflow base. The flex fill applies at both breakpoints, so
+// it is unconditional here.
 const SectionScroll = styled.div`
   position: relative;
   display: flex;
@@ -2319,7 +2257,6 @@ const SectionScroll = styled.div`
   border-radius: var(--global-border-radius);
 `;
 
-// _fadeTop_hsaph_48 / _fadeBottom_hsaph_49 (+ _isVisible → opacity 1)
 const SectionFade = styled.div<{ $bottom?: boolean; $visible?: boolean }>`
   position: absolute;
   right: 0;
@@ -2335,8 +2272,8 @@ const SectionFade = styled.div<{ $bottom?: boolean; $visible?: boolean }>`
       : 'top: 0; background: linear-gradient(to bottom, var(--global-primary-bg) 10%, transparent);'}
 `;
 
-// _emptyState_hsaph_137 / _emptyState_1lfbt_97 — chars/art empty (centered
-// only; ≤950 fills the shell) vs EmptyState below = live _emptyState_1jdkw_21
+// Characters/artwork empty state (centered only; ≤950 fills the shell),
+// distinct from EmptyState below.
 const SectionEmpty = styled.div`
   display: flex;
   align-items: center;
@@ -2350,7 +2287,7 @@ const SectionEmpty = styled.div`
   }
 `;
 
-// _infoRelatedContentContainer_aojp4_102 — related + recs below the columns
+// related + recs below the columns
 const RelatedContent = styled.div`
   display: flex;
   flex-direction: column;
@@ -2362,11 +2299,8 @@ const RelatedContent = styled.div`
   }
 `;
 
-// ---------------------------------------------------------------------------
-// Related / Recommendations — live `Et` → `Tt` (ulm8c drag list)
-// ---------------------------------------------------------------------------
-
-// _scrollButton_ulm8c_55 (+ data-side / data-visible + container-hover reveal)
+// Scroll button for the related/recommendations drag list. Side and
+// visibility are driven by data attributes, with a container-hover reveal.
 const DragListScrollBtn = styled.button<{ $side: 'left' | 'right' }>`
   position: absolute;
   top: 42.5%;
@@ -2404,8 +2338,8 @@ const DragListScrollBtn = styled.button<{ $side: 'left' | 'right' }>`
   }
 `;
 
-// _dragListContainer_ulm8c_1 (+ `_dragListContainer:hover
-// ._scrollButton[data-visible=true]{opacity:1}`)
+// Drag list container; the scroll button appears on hover via
+// `._scrollButton[data-visible=true]`.
 const DragListBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -2425,7 +2359,6 @@ const DragListBox = styled.div`
   }
 `;
 
-// _listTitle_ulm8c_99
 const DragListTitle = styled.h2`
   display: flex;
   align-items: center;
@@ -2439,12 +2372,10 @@ const DragListTitle = styled.h2`
   }
 `;
 
-// _relativeWrapper_ulm8c_107
 const DragListRelative = styled.div`
   position: relative;
 `;
 
-// _dragListWrapper_ulm8c_12 — horizontal scroller
 const DragListWrapper = styled.ul`
   position: relative;
   display: flex;
@@ -2464,7 +2395,6 @@ const DragListWrapper = styled.ul`
   }
 `;
 
-// _dragListItemWrapper_ulm8c_27
 const DragListItem = styled.li`
   width: var(--drag-list-item-width);
   min-width: var(--drag-list-item-width);
@@ -2480,7 +2410,7 @@ const DragListItem = styled.li`
   }
 `;
 
-// _fadeLeft_ulm8c_32 / _fadeRight_ulm8c_33 (+ [data-visible=true] → opacity 1)
+// / (+ [data-visible=true] → opacity 1)
 const DragListFade = styled.div<{ $side: 'left' | 'right'; $visible?: boolean }>`
   position: absolute;
   top: 0;
@@ -2496,13 +2426,12 @@ const DragListFade = styled.div<{ $side: 'left' | 'right'; $visible?: boolean }>
       : 'right: 0; background: linear-gradient(to left, var(--global-primary-bg) 10%, transparent 100%);'}
 `;
 
-// _iconNudgeLeft_ulm8c_110 / _iconNudgeRight_ulm8c_114
 const DragNudge = styled.span<{ $left?: boolean }>`
   position: relative;
   ${({ $left }) => ($left ? 'right: 0.065rem;' : 'left: 0.065rem;')}
 `;
 
-// _icon_dlwq6_58 — episodes filter magnifier wrapper
+// episodes filter magnifier wrapper
 const EpFilterIcon = styled.span`
   display: flex;
   font-size: 0.8rem;
@@ -2515,7 +2444,7 @@ const EpFilterIcon = styled.span`
   }
 `;
 
-// Characters — _gridContainer_hsaph_38 (base 3 cols; ≤1400 → 2; ≤1100 → 1;
+// Characters — (base 3 cols; ≤1400 → 2; ≤1100 → 1
 // ≤500 → 1fr; flex fill under ≥951 and ≤950 resets the 53rem cap)
 const CharGrid = styled.div`
   position: relative;
@@ -2549,7 +2478,6 @@ const CharGrid = styled.div`
   }
 `;
 
-// _cardWrapper_hsaph_64
 const CharCardWrap = styled.div`
   height: 4.5rem;
   transition: padding 0.2s ease-in-out;
@@ -2559,7 +2487,6 @@ const CharCardWrap = styled.div`
   }
 `;
 
-// _card_hsaph_70
 const CharCard = styled.div`
   z-index: var(--z-index-base);
   display: flex;
@@ -2578,7 +2505,6 @@ const CharCard = styled.div`
   }
 `;
 
-// _image_hsaph_93
 const CharImage = styled.img`
   width: 4rem;
   height: 4.5rem;
@@ -2587,7 +2513,6 @@ const CharImage = styled.img`
   box-shadow: 0 0 10px var(--global-shadow);
 `;
 
-// _details_hsaph_100 + _alignRight_hsaph_117 (live: no ellipsis, no min-width)
 const CharDetails = styled.div<{ $right?: boolean }>`
   display: flex;
   flex: 1;
@@ -2613,22 +2538,19 @@ const CharDetails = styled.div<{ $right?: boolean }>`
       : ''}
 `;
 
-// _mutedText_hsaph_121
 const CharMuted = styled.span`
   color: var(--global-text-muted);
 `;
 
-// _actorImageLink_hsaph_124
 const CharActorLink = styled.a`
   height: 100%;
   padding: 0;
   margin: 0;
 `;
 
-// Artwork — CSS-column masonry standing in for react-masonry-css (no new deps):
-// live `breakpointCols { default: 3, 1100: 2 }` → 3 → 2 only (no 1-col step);
-// live `_flexContainer_1lfbt_38` = flex-wrap container (masonry children adapt)
-// with max-height 53rem / padding .5rem / overflow-y auto
+// Artwork grid — CSS-column masonry standing in for react-masonry-css
+// (no new deps). Columns step down to 3 then 2 (no 1-column step); the
+// container adapts with max-height 53rem, padding .5rem and overflow-y auto.
 const ArtGrid = styled.div`
   position: relative;
   column-count: 3;
@@ -2653,8 +2575,8 @@ const ArtGrid = styled.div`
   }
 `;
 
-// _artworkImage_1lfbt_117 (column child → break-inside/margin-bottom stand in
-// for live's `masonryGridColumn > div { margin-bottom: 1rem }`)
+// Column child; break-inside and margin-bottom stand in for the original's
+// `masonryGridColumn > div { margin-bottom: 1rem }`.
 const ArtImage = styled.img`
   display: block;
   width: 100%;
@@ -2672,11 +2594,9 @@ const ArtImage = styled.img`
   }
 `;
 
-// Artwork lightbox — _overlayContainer_1bzcd_1 + _overlayContent_1uu4r_12 /
-// _overlayImage_1uu4r_24 / _navigationContainer_1uu4r_31 /
-// _navigationButton_1uu4r_41 (live `Dt`). Live mounts already-shown end state
-// (its .4s opacity/visibility transition only plays on property changes —
-// none occur at mount) → we render visible with the same declarations.
+// The lightbox mounts already visible: its .4s opacity/visibility transition
+// only plays on property changes, and none occur at mount. The same
+// declarations are rendered here.
 const Lightbox = styled.div`
   position: fixed;
   top: 0;
@@ -2706,7 +2626,6 @@ const Lightbox = styled.div`
   }
 `;
 
-// _overlayContent_1uu4r_12
 const LightboxContent = styled.div`
   position: relative;
   display: flex;
@@ -2714,8 +2633,8 @@ const LightboxContent = styled.div`
   justify-content: center;
 `;
 
-// _overlayImage_1uu4r_24 (animPopIn class; live --animation-easing → our
-// --animation-timing)
+// animPopIn class; the original's --animation-easing maps to our
+// --animation-timing.
 const LightboxImg = styled.img.attrs({ className: 'animPopIn' })`
   max-width: 60%;
   border-radius: var(--global-border-radius);
@@ -2727,7 +2646,6 @@ const LightboxImg = styled.img.attrs({ className: 'animPopIn' })`
   }
 `;
 
-// _navigationContainer_1uu4r_31 (animFadeIn class, .2s)
 const LightboxNav = styled.div.attrs({ className: 'animFadeIn' })`
   position: absolute;
   bottom: 1rem;
@@ -2744,7 +2662,6 @@ const LightboxNav = styled.div.attrs({ className: 'animFadeIn' })`
   }
 `;
 
-// _navigationButton_1uu4r_41
 const LightboxBtn = styled.button`
   display: flex;
   align-items: center;
@@ -2765,8 +2682,8 @@ const LightboxBtn = styled.button`
   }
 `;
 
-// Episodes toolbar — _container_dlwq6_1 family (no radius/align on the bar;
-// ≤500 container/buttonBase get padding .5rem from live's media rule).
+// Episodes toolbar — family (no radius/align on the bar
+// ≤500 container/buttonBase get padding.5rem from the app's media rule).
 // flex-wrap lets the range pager + filter + 2 icon buttons reflow onto two rows
 // on narrow phones instead of squeezing the filter to nothing.
 const EpToolbar = styled.div`
@@ -2783,8 +2700,7 @@ const EpToolbar = styled.div`
   }
 `;
 
-// _filterContainer_dlwq6_30 (magnifier styling lives in EpFilterIcon — live
-// scopes it to its own `_icon_dlwq6_58` wrapper, not the container)
+// Magnifier styling lives in EpFilterIcon, scoped to its own wrapper.
 const EpFilter = styled.div`
   display: flex;
   flex: 1;
@@ -2805,7 +2721,7 @@ const EpFilter = styled.div`
   }
 `;
 
-// _filterInput_dlwq6_48 (incl. ≤500 gray placeholder)
+// (incl. ≤500 gray placeholder)
 const EpFilterInput = styled.input`
   width: 100%;
   color: var(--global-text);
@@ -2823,7 +2739,6 @@ const EpFilterInput = styled.input`
   }
 `;
 
-// _buttonBase_dlwq6_8 (live :hover ungated; ≤500 padding .5rem)
 const EpToolBtn = styled.button`
   display: flex;
   flex-shrink: 0;
@@ -2851,12 +2766,9 @@ const EpToolBtn = styled.button`
   }
 `;
 
-// ---------------------------------------------------------------------------
 // Component
-// ---------------------------------------------------------------------------
 
-// NSFW gate card (Aniraku AnimeDetail.jsx:553-590 NsfwCard/NsfwBtn/
-// OutlineLink — copy verbatim, chrome on our CSS vars).
+// NSFW gate card (copy and chrome on our CSS vars).
 const NsfwCard = styled.div`
   max-width: 400px;
   margin: 0 auto;
@@ -2926,8 +2838,8 @@ const NsfwOutline = styled(Link)`
   cursor: pointer;
 `;
 
-// Own 1-10 rating badge on an episode row (Aniraku AnimeDetail.jsx:224
-// RatingBadge, verbatim colors) — shown when the user has rated the episode.
+// Own 1-10 rating badge on an episode row; shown when the user has rated
+// the episode.
 const RatingBadge = styled.span`
   display: inline-flex;
   align-items: center;
@@ -2943,14 +2855,14 @@ const RatingBadge = styled.span`
 
 const Info: React.FC = () => {
   const { animeId } = useParams<{ animeId?: string }>();
-  // Wave B — bookmark store (module singleton; supabase session bridge, no
+  // Bookmark store (module singleton; supabase session bridge, no
   // auth-hook import). Declared with the other hooks, above every early
   // return, so the hook order stays stable.
   const { bookmarks, userId, isBookmarked, toggleBookmark, setListStatus } =
     useBookmarks();
   const navigate = useNavigate();
-  // NSFW (Aniraku AnimeDetail.jsx:632) + own episode ratings (AnimeDetail
-  // :641) — both hooks sit above every early return.
+  // NSFW preference and episode ratings; both hooks sit above every early
+  // return.
   const { nsfwEnabled } = useNsfw();
   const [episodeRatings, setEpisodeRatings] = useState<Record<number, number>>(
     {},
@@ -3039,7 +2951,6 @@ const Info: React.FC = () => {
   const recsScrollRef = useRef<HTMLUListElement>(null);
 
   // Tab state — effective localStorage record `aniraku:navigation`
-  // `.infoSection[mediaId]` (live `INFO_SECTION`), defaulting to Overview.
   // No query-param read: the stored section (or Overview) is the entry tab.
   const [activeSection, setActiveSection] = useState<InfoTab>('Overview');
   // Stored `listLayout-[{animeId}]`; null → EpisodeList's default heuristic,
@@ -3051,7 +2962,7 @@ const Info: React.FC = () => {
   const [artFilter, setArtFilter] = useState('all');
   const [artIndex, setArtIndex] = useState<number | null>(null);
   const [characterLanguage, setCharacterLanguage] = useState('Japanese');
-  // Episodes toolbar — spoiler toggle persists in the live `aniraku:settings`
+  // Episodes toolbar — spoiler toggle persists in the `aniraku:settings`
   // record (our useSettings subset has no hideSpoiler), default false.
   const [hideSpoiler, setHideSpoiler] = useState<boolean>(() => {
     try {
@@ -3062,13 +2973,13 @@ const Info: React.FC = () => {
       return false;
     }
   });
-  // live `$t` interval state — [start, end] bounds of the 100-page slice.
+  // Interval state — [start, end] bounds of the 100-page slice.
   const [episodeInterval, setEpisodeInterval] = useState<[number, number]>([
     0,
     99,
   ]);
 
-  // live `qt` spoiler toggle: flips `settings.hideSpoiler` in the unified
+  // Spoiler toggle: flips `settings.hideSpoiler` in the unified
   // `aniraku:settings` record with a merge-write preserving theme and
   // schemaVersion (our useSettings subset doesn't expose hideSpoiler —
   // pattern copied from SettingsProvider's record writer).
@@ -3099,7 +3010,7 @@ const Info: React.FC = () => {
     }
   };
 
-  // live `zt` mount: read the stored section, validate it against the tab
+  // Mount: read the stored section, validate it against the tab
   // set (readInfoSection falls back to Overview) and write the resolution
   // back so stale/legacy values normalise into the record map.
   useEffect(() => {
@@ -3139,7 +3050,7 @@ const Info: React.FC = () => {
         console.error('Failed to load anime info:', e);
         if (mounted) {
           setError('Something went wrong');
-          // D9 — live failure toast (mandate error string still renders below).
+          // Failure toast; the inline error message still renders below.
           showToast('Failed to load anime info', {
             description: 'Please try again later.',
             type: 'error',
@@ -3155,7 +3066,7 @@ const Info: React.FC = () => {
     };
   }, [animeId]);
 
-  // Own episode ratings (Aniraku AnimeDetail.jsx:748-758): signed-in →
+  // Own episode ratings: signed-in →
   // backend (`GET /api/v1/anime/{id}/ratings`); guest → LS
   // `aniraku-episode-ratings-{animeId}`.
   useEffect(() => {
@@ -3189,11 +3100,9 @@ const Info: React.FC = () => {
     };
   }, [animeId]);
 
-  // Runtime SEO — old Aniraku setAnimeDetailSEO (seo.js:108-185) through the
-  // shared useSeo helper. Replaces the live-parity manual effect: same
-  // og/twitter/image/video.tv_show behavior, plus canonical on the canonical
-  // domain (the old effect used window.location.origin → localhost
-  // canonicals), per-page keywords, and JSON-LD (TVSeries|Movie + breadcrumb)
+  // Runtime SEO through the shared useSeo helper: per-title
+  // og/twitter/image/video.tv_show behavior, canonical on the canonical
+  // domain, per-page keywords, and JSON-LD (TVSeries|Movie + breadcrumb)
   // with helper-managed cleanup. Anime-shape notes: format lives in `type`,
   // episode count in `totalEpisodes` (`.episodes` is the episode list).
   const seoTitle = animeInfo ? displayTitle(animeInfo) : '';
@@ -3305,10 +3214,10 @@ const Info: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animeId, episodes]);
 
-  // D10 — fade-edge initial state + window-resize updates for all four
-  // scrollers (chars/art grids, related/recs drag lists). Each tuple is
-  // [startVisible, endVisible] = [!atStart, !atEnd] = live's
-  // `!atTop`/`!atBottom`; runs on [animeInfo] so the DOM exists.
+  // Fade-edge initial state + window-resize updates for all four scrollers
+  // (chars/art grids, related/recs drag lists). Each tuple is
+  // [startVisible, endVisible] = [!atStart, !atEnd]; runs on [animeInfo] so
+  // the DOM exists.
   useEffect(() => {
     const horizontal = (el: HTMLUListElement | null) =>
       el
@@ -3404,7 +3313,7 @@ const Info: React.FC = () => {
     );
   }
 
-  // NSFW gate (Aniraku AnimeDetail.jsx:878-895): a Hentai-genre title stays
+  // NSFW gate: a Hentai-genre title stays
   // behind the settings gate while the preference is OFF (default).
   if (isNsfw(animeInfo) && !nsfwEnabled) {
     return (
@@ -3427,7 +3336,7 @@ const Info: React.FC = () => {
 
   const title = displayTitle(animeInfo);
   const fullDesc = sanitizeText(animeInfo.description || '');
-  // Wave B — bookmark state for the sidebar toggle (id = AniList id, else MAL).
+  // Bookmark state for the sidebar toggle (id = AniList id, else MAL).
   const bookmarkId = Number(animeInfo.id || animeInfo.malId);
   const hasBookmarkId = Number.isFinite(bookmarkId) && bookmarkId > 0;
   const bookmarked = hasBookmarkId && isBookmarked(bookmarkId);
@@ -3457,11 +3366,11 @@ const Info: React.FC = () => {
       ? animeInfo.cover
       : '');
   const hasBanner = !!bannerImage;
-  // WATCH NOW / Watch free use live At(media) with NO episode param.
+  // WATCH NOW / Watch free use watchPathFor with no episode param.
   const watchPath = watchPathFor(animeInfo);
-  // Seasons strip (user spec): PREQUEL/SEQUEL anime relations only,
-  // prequels first. Drives the details compaction (cut at End Date when
-  // seasons exist, at Episodes otherwise) + the SEASONS strip itself.
+  // Seasons strip: PREQUEL/SEQUEL anime relations only, prequels first.
+  // Drives the details compaction (cut at End Date when seasons exist, at
+  // Episodes otherwise) and the SEASONS strip itself.
   const seasonList = (animeInfo.relations || [])
     .filter(
       (rel) =>
@@ -3475,15 +3384,14 @@ const Info: React.FC = () => {
         (b.relationType === 'PREQUEL' ? 0 : 1),
     );
   const hasSeasons = seasonList.length > 0;
-  // live ft(): relations exclude source links and manga/novel nodes.
+  // Relations exclude source links and manga/novel nodes.
   const relatedList = (animeInfo.relations || []).filter(
     (rel) =>
       (rel.relationType || '').toLowerCase() !== 'source' &&
       !['manga', 'novel'].includes((rel.type || '').toLowerCase()),
   );
-  // live pt(): recommendations exclude manga/novel nodes. NSFW (Aniraku
-  // AnimeDetail.jsx:658): recommendations additionally run through
-  // filterAdult — Hentai-genre entries drop while the preference is OFF.
+  // Recommendations exclude manga/novel nodes. They also run through
+  // filterAdult, so Hentai-genre entries drop while NSFW is off.
   const recsList = filterAdult(
     (animeInfo.recommendations || []).filter(
       (rec) => !['manga', 'novel'].includes((rec.type || '').toLowerCase()),
@@ -3491,13 +3399,13 @@ const Info: React.FC = () => {
     nsfwEnabled,
   );
 
-  // ---- sidebar `ht` rows ---------------------------------------------------
+  // Sidebar detail rows.
   const officialSite = (animeInfo.externalLinks || []).find(
     (link) => link?.site === 'Official Site' && link?.url,
   );
   const startText = formatDateValue(animeInfo.startDate);
   const endText = formatDateValue(animeInfo.endDate);
-  // live labels the start row "Release Date" when both dates are identical.
+  // The start row is labelled "Release Date" when both dates are identical.
   const sameDate =
     !!animeInfo.startDate?.year &&
     !!animeInfo.endDate?.year &&
@@ -3508,10 +3416,9 @@ const Info: React.FC = () => {
   const studioNames = (animeInfo.studios || []).join(', ') || 'Unknown';
   const variantRows = titleVariantRows(animeInfo.title, readLangTitle());
 
-  // Stat chips are rendered into both breakpoint title blocks — live mounts
-  // `_t` inside `Ze` (mobile, beside the poster, NO season chip) and again
-  // inside `vt` (desktop, showSeason: !0), each gated by its wrapper's
-  // display rule.
+  // Stat chips render into both breakpoint title blocks: the mobile one sits
+  // beside the poster (no season chip) and the desktop one includes the
+  // season, each gated by its wrapper's display rule.
   const chipList = (showSeason: boolean) => (
     <ChipList>
       {animeInfo.type && (
@@ -3567,8 +3474,7 @@ const Info: React.FC = () => {
     </ChipList>
   );
 
-  // Characters tab — languages gathered from `voiceActors[].language` (live
-  // `Ft` collects `languageV2` the same way).
+  // Characters tab — languages gathered from `voiceActors[].language`.
   const languageSet = new Set<string>();
   characters.forEach((character) =>
     (character.voiceActors || []).forEach((actor) => {
@@ -3577,8 +3483,7 @@ const Info: React.FC = () => {
   );
   const characterLanguages = Array.from(languageSet);
 
-  // Artwork tab — live `Nt` labels over whatever artwork rows we can source
-  // (live itself reads `tvdbArtwork` from its own `anilist.merged` backend).
+  // Artwork tab — labels over whatever artwork rows we can source.
   const artworkItems = collectArtwork(animeInfo, bannerImage);
   const artworkTypes = Array.from(
     new Set(['all', ...artworkItems.map((item) => item.type)]),
@@ -3590,12 +3495,12 @@ const Info: React.FC = () => {
   const lightboxItem =
     artIndex !== null ? filteredArtwork[artIndex] ?? null : null;
 
-  // Episodes tab — stored preference wins, else live's `C` heuristic
-  // (episodes are loaded by this point — the `loading` arm can't trigger).
+  // Episodes tab — stored preference wins, else the heuristic (episodes are
+  // loaded by this point, so the loading arm can't trigger).
   const episodeMode: EpisodeMode =
     storedEpisodeMode ?? episodeHeuristic(episodes);
   const episodeQuery = episodeSearch.trim().toLowerCase();
-  // live `A`: 100-episode interval options for the toolbar range box.
+  // 100-episode interval options for the toolbar range box.
   const intervalOptions = episodes.reduce<{ start: number; end: number }[]>(
     (acc, _, index) => {
       if (index % 100 === 0) {
@@ -3621,7 +3526,7 @@ const Info: React.FC = () => {
       .getElementById('episodes-list-container')
       ?.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  // live `ee`: a search shows every match; otherwise slice the selected
+  // A search shows every match; otherwise slice the selected
   // 100-page interval.
   const visibleEpisodes = episodeQuery
     ? episodes.filter(
@@ -3630,7 +3535,7 @@ const Info: React.FC = () => {
           (ep.title || '').toLowerCase().includes(episodeQuery),
       )
     : episodes.slice(episodeInterval[0], episodeInterval[1] + 1);
-  // live `$t` dubCount — passed from Watch's context there; the Info route
+  // DubCount — passed from Watch's context there; the Info route
   // has no progress/dub source → the dub meta icon stays hidden (flagged).
   const dubCount: number | null = null;
 
@@ -4557,8 +4462,8 @@ const Info: React.FC = () => {
                         </EpRangeBtn>
                       </EpRangeNav>
                     ) : (
-                      /* live `m` label — quirk kept: shows the raw interval
-                         bounds (e.g. "1 - 100") even with fewer episodes */
+                      /* Shows the raw interval bounds (e.g. "1 - 100") even
+                         when fewer episodes exist. */
                       <EpIntervalBox>
                         {`${episodeInterval[0] + 1} - ${episodeInterval[1] + 1}`}
                       </EpIntervalBox>
@@ -4612,8 +4517,8 @@ const Info: React.FC = () => {
                       const row =
                         episodeMode === 'list' || episodeMode === 'imageList';
                       const isFiller = !!ep.filler;
-                      // Your rating for this episode (Aniraku AnimeDetail
-                      // :1049/1070 — `rated > 0` renders the star badge).
+                      // Your rating for this episode; a positive value
+                      // renders the star badge.
                       const rated = Number(episodeRatings[ep.number]) || 0;
                       return (
                         <EpisodeButton

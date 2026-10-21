@@ -1,7 +1,6 @@
-// SupportPrompt — port of the old Aniraku `components/`
-// (Patreon + Binance panel, 30-min active-time auto-prompt, 7-day dismissal,
-// `/watch/*` exclusion, `aniraku:open-support` open event from the navbar heart).
-// Copy/brand/IDs kept byte-identical; only TS types added.
+// Support prompt (Patreon + Binance panel). Auto-prompts after 30 minutes of
+// active time, dismisses for 7 days, and stays off /watch/*. It also opens
+// from the navbar heart via the `aniraku:open-support` event.
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';

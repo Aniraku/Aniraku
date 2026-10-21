@@ -19,7 +19,7 @@ interface DropSearchProps {
   results: Anime[];
   isVisible: boolean;
   isLoading: boolean;
-  /** live keys the pikachu loader on the error branch too (plus toast) */
+  /** Error branch: show the error loader and toast. */
   error?: boolean;
   query: string;
   onClear: () => void;
@@ -132,8 +132,8 @@ const DropSearch = ({
     }
   }, [results]);
 
-  // Search failure → error toast (fires once per error flip;
-  // fires only for guests' visible searches, same copy as live)
+  // Search failure → error toast (fires once per error flip, and only for
+  // guests' visible searches).
   useEffect(() => {
     if (error) {
       showToast('Failed to load search results', {

@@ -12,7 +12,7 @@ import { Anime } from '../index';
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 import { useSeo, breadcrumbLd } from '../utils/seo';
 
-// Same order as the live bundle (`ys` / `qt` season list).
+// Season display order.
 const SEASONS = ['WINTER', 'SPRING', 'SUMMER', 'FALL'] as const;
 const PER_PAGE = 21;
 
@@ -55,7 +55,7 @@ const centerRailItem = (
   });
 };
 
-// Initial state from URL params (season, year, page), like live.
+// Initial state from URL params (season, year, page).
 const readUrlState = () => {
   const params = new URLSearchParams(window.location.search);
   const seasonParam = params.get('season')?.toUpperCase();
@@ -416,14 +416,13 @@ const Trending = () => {
   const didScrollToSeason = useRef(true);
   const fetchSeq = useRef(0);
 
-  // NSFW (Aniraku Catalog.jsx:970): filter at render derivation.
+  // NSFW: filter at render derivation.
   const { nsfwEnabled } = useNsfw();
   const visibleAnime = useMemo(
     () => filterAdult(anime, nsfwEnabled),
     [anime, nsfwEnabled],
   );
 
-  // SEO (ported from Aniraku's lib/seo.js page SEO pattern).
   useSeo({
     title: 'Trending Anime — Most Popular This Season | Aniraku',
     description:
@@ -482,7 +481,7 @@ const Trending = () => {
     return () => window.clearTimeout(timeout);
   }, [error]);
 
-  // Keep the selected season button in view on first load, like live.
+  // Keep the selected season button in view on first load.
   useEffect(() => {
     if (didScrollToSeason.current) {
       centerRailItem(
@@ -594,7 +593,7 @@ const Trending = () => {
             animeData={visibleAnime}
             hasNextPage={false}
             onLoadMore={() => {
-              /* paginated page — live has no infinite scroll here */
+              /* Paginated page — no infinite scroll here. */
             }}
           />
         )}

@@ -1,7 +1,6 @@
-// TS port of the src/pages/ — the recovery / password
-// reset screen. Verbatim flow semantics: isSupabaseConfigured gate, recovery
-// marker or PASSWORD_RECOVERY event → ready, URL token cleanup, one-shot
-// updateUser + local signOut, redirect back to /login?password=updated.
+// Password reset screen. Flow: isSupabaseConfigured gate, recovery marker or
+// PASSWORD_RECOVERY event → ready, URL token cleanup, one-shot updateUser +
+// local signOut, then redirect back to /login?password=updated.
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -159,7 +158,7 @@ const NewPassword = () => {
     return hash.get('type') === 'recovery' || query.get('type') === 'recovery';
   }, []);
 
-  // Aniraku route title (Aniraku App.jsx routeTitles, brand-swapped).
+  // Aniraku route title.
   useEffect(() => {
     const previousTitle = document.title;
     document.title = 'Choose a New Password · Aniraku';

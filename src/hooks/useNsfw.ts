@@ -2,24 +2,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getSessionUserId, subscribeToSession } from '../lib/sync';
 
-// useNsfw — TS port of Aniraku `src/hooks/useNsfw.js` (hook body + shared
-// module state + isNsfw/filterAdult), based on the live reference:
-//   - session detection goes through lib/sync (`supabase.auth` getSession /
-//     onAuthStateChange bridge) — NO auth-hook import (cross-wave rule),
-//     with an explicit "loading" phase so a stale guest key can never seed
-//     Before the bridge has answered.
-//   - account value lives in `user_settings` (key `nsfw_enabled`,
+// NSFW preference hook: shared session state plus the isNsfw/filterAdult
+// helpers.
+//   - Session detection goes through lib/sync (`supabase.auth` getSession /
+//     onAuthStateChange bridge). No auth-hook import; there is an explicit
+//     "loading" phase so a stale guest key can never seed before the bridge
+//     has answered.
+//   - The account value lives in `user_settings` (key `nsfw_enabled`,
 //     select eq user_id+key, upsert onConflict `user_id,key`); guests fall
-//     Back to the device key `aniraku-nsfw-enabled` (kept — the
+//     back to the device key `aniraku-nsfw-enabled` (kept — the
 //     AuthProvider already clears it on sign-out).
-//   - DEFAULT IS OFF / hidden: `readLocal()` is `=== 'true'` (→ false) and
+//   - Default is off / hidden: `readLocal()` is `=== 'true'` (→ false) and
 //     the account read is `data?.value === true` (→ false when no row).
-//   - shared per-account state: N instances fire a single user_settings
+//   - Shared per-account state: N instances fire a single user_settings
 //     query and stay in sync when the toggle flips anywhere.
 //
-// NSFW gates browse/display ONLY (Hentai-genre rule via isNsfw/filterAdult);
-// it must never influence sync payloads (sync = unfiltered, per user
-// decision — see lib/sync.ts import/export).
+// NSFW gates browse/display only (Hentai-genre rule via isNsfw/filterAdult);
+// it must never influence sync payloads (sync = unfiltered — see
+// lib/sync.ts import/export).
 
 const LOCAL_KEY = 'aniraku-nsfw-enabled';
 

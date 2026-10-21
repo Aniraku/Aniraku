@@ -6,25 +6,25 @@ import {
   episodeWatchTime,
 } from './episodeWatchTimes';
 
-// Local watch-history shape + merge helpers — TS port of Aniraku
-// `src/lib/watchHistory.js` (entry keys, local upsert/remove/clear/subscribe,
-// Server row deletes) re-based onto the LIVE localStorage contract:
+// Local watch-history shape and merge helpers: entry keys, local
+// upsert/remove/clear/subscribe, and server row deletes, all using the
+// localStorage contract below.
 //
 //  Native keys (written by Watch/EpisodeList, read by History/Continue
-//  Watching — unchanged by this port):
+//  Watching):
 //   - `watched-episodes`        -> Record<animeId, Episode[]>
 //   - `last-anime-visited`      -> Record<animeId, {timestamp, titleEnglish, titleRomaji}>
 //   - `all_episode_times`       -> Record<episodeId, {currentTime, playbackPercentage, timestamp?}>
-//                                  (`timestamp` = epoch ms stamped by THIS lib
-//                                  on every entry it writes — (b))
+//                                  (`timestamp` = epoch ms stamped by this lib
+//                                  on every entry it writes)
 //
 //  Imported keys (merged on login, read-only here):
 //   - `aniraku-watch-history` -> the legacy entry array
 //   - `aniraku:watching`         -> pref record (array/entries read
 //                                  defensively; prefs fields ignored)
 //
-// Normalized unit everywhere is `HistoryRow` (1:1 with a `watch_history`
-// table row minus user_id). Merge precedence: max(progress) wins, ties go to
+// Normalized unit everywhere is `HistoryRow`, matching a `watch_history`
+// table row minus user_id. Merge precedence: max(progress) wins, ties go to
 // the newest timestamp.
 
 export const LOCAL_HISTORY_KEYS = {
@@ -39,10 +39,10 @@ export const LEGACY_HISTORY_KEYS = ['aniraku-watch-history'];
 /** Window event broadcast on local history writes. */
 export const WATCH_HISTORY_EVENT = 'aniraku:watch-history-changed';
 
-/** Hard cap on locally-derived rows (Aniraku caps its local list at 100). */
+/** Hard cap on locally-derived rows. */
 const LOCAL_ROW_LIMIT = 200;
 
-/** Normalized history row — maps 1:1 onto `watch_history` columns. */
+/** Normalized history row matching the `watch_history` columns. */
 export interface HistoryRow {
   anime_id: number;
   anime_title: string;
@@ -62,7 +62,7 @@ interface LastVisitedEntry {
 interface PlaybackEntry {
   currentTime?: number;
   playbackPercentage?: number;
-  /** Epoch ms stamped by this lib when it writes the entry (Delta 2(b)). */
+  /** Epoch ms stamped by this lib when it writes the entry. */
   timestamp?: number;
 }
 
@@ -159,9 +159,7 @@ export const historyRowEquals = (a: HistoryRow, b: HistoryRow): boolean => {
   return true;
 };
 
-// ---------------------------------------------------------------------------
 // Row builders
-// ---------------------------------------------------------------------------
 
 /** Shape-map one Aniraku legacy entry (`aniraku-watch-history` element). */
 function legacyEntryToRow(item: unknown): HistoryRow | null {
@@ -391,9 +389,7 @@ export function readLocalHistoryRows(): HistoryRow[] {
     .slice(0, LOCAL_ROW_LIMIT);
 }
 
-// ---------------------------------------------------------------------------
 // Local reconciliation — server ∪ local written back into the native stores
-// ---------------------------------------------------------------------------
 
 function synthEpisode(animeId: string, row: HistoryRow): NativeEpisode {
   return {
@@ -440,7 +436,7 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
     const animeId = String(row.anime_id);
     const eps = Array.isArray(watched[animeId]) ? watched[animeId] : null;
 
-    // --- episode list -----------------------------------------------------
+    // Episode list
     let episodeId: string;
     const existing = eps?.find((e) => Number(e.number) === row.episode_number);
     if (existing) {
@@ -467,7 +463,7 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
       watchedDirty = true;
     }
 
-    // --- per-episode watch time (History / Continue Watching "latest") --
+    // Per-episode watch time (History / Continue Watching "latest")
     // Server rows carry per-episode timestamps: fold them in so the
     // most-recently-watched pick works cross-device. Never lowers a
     // newer local stamp (stampEpisodeWatch is max-only).
@@ -475,7 +471,7 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
       stampEpisodeWatch(animeId, row.episode_number, row.timestamp);
     }
 
-    // --- last visit -------------------------------------------------------
+    // Last visit
     // Per-anime guard (not the loop-global flag): each row decides its own
     // visit write so a future per-row condition can't mis-fire siblings.
     const visit = lastVisited[animeId] ?? {};
@@ -494,7 +490,7 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
       visitedDirty = true;
     }
 
-    // --- playback / resume ------------------------------------------------
+    // Playback / resume
     const pb =
       playback[episodeId] ??
       playback[`${animeId}-episode-${row.episode_number}`] ??
@@ -505,7 +501,7 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
         row.duration > 0
           ? Math.min(100, Math.round((row.progress / row.duration) * 100))
           : Number(pb?.playbackPercentage ?? 0);
-      // Delta 2(b) — ONLY `all_episode_times` write site in this lib: stamp
+      // ONLY `all_episode_times` write site in this lib: stamp
       // epoch-ms on the entry (server event time when the row carries one,
       // write time otherwise) so mergeHistoryRow's newest-timestamp tiebreak
       // has data to work with.
@@ -526,9 +522,7 @@ export function reconcileLocalHistory(rows: HistoryRow[]): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Episode resume query (Delta 2 — Player resume path)
-// ---------------------------------------------------------------------------
+// Episode resume query (Player resume path)
 
 /** Winning resume values for one (anime, episode). */
 export interface EpisodeProgress {
@@ -606,23 +600,23 @@ async function readServerEpisodeProgress(
 }
 
 /**
- * RESUME POINT for one episode (Delta 2).
+ * Resume point for one episode.
  *
- * - Signed in → SERVER-FIRST: a scoped `watch_history` row
+ * - Signed in → server-first: a scoped `watch_history` row
  *   (eq user_id + anime_id + episode_number) is the primary source; the local
  *   `all_episode_times` entry fills the gap when the server has none (and is
  *   returned if the server query fails).
  * - Guest → local `all_episode_times` only (no session probe when `userId`
  *   is passed as `null`).
- * - Both present → THIS LIB'S EXISTING MERGE PRECEDENCE: max(progress) wins,
- *   ties go to the newest timestamp (identical to `mergeHistoryRow`).
+ * - Both present → max(progress) wins, ties go to the newest timestamp
+ *   (identical to `mergeHistoryRow`).
  * - `null` when neither store knows the episode.
  *
  * @param animeId numeric AniList id (string accepted, coerced)
  * @param episode episode number (1-based)
  * @param userId  optional: omit → auto-detect via `supabase.auth.getSession()`;
  *                pass a userId to skip the probe; pass `null` to force
- *                local-only (guest). Documented as "your call" per Delta 2.
+ *                local-only (guest).
  */
 export async function getEpisodeProgress(
   animeId: string | number,
@@ -657,9 +651,7 @@ export async function getEpisodeProgress(
   return server.timestamp >= local.timestamp ? server : local;
 }
 
-// ---------------------------------------------------------------------------
 // Events (ports Aniraku subscribeToWatchHistory / publish)
-// ---------------------------------------------------------------------------
 
 export interface WatchHistoryChange {
   type: 'upsert' | 'remove' | 'clear' | 'reconcile' | 'sync';
@@ -698,9 +690,7 @@ export function subscribeToWatchHistory(
   };
 }
 
-// ---------------------------------------------------------------------------
 // Server row deletes (Aniraku removeWatchHistoryEntries / clearWatchHistory)
-// ---------------------------------------------------------------------------
 
 /** Remove one anime's rows locally (whole-anime removal, History semantics).
  * Full cleanup: unified + suffixed episode lists, visit record, per-episode

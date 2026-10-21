@@ -30,7 +30,7 @@ import {
  *  - `last-anime-visited`      -> Record<animeId, { timestamp: ms, titleEnglish, titleRomaji }>
  *  - `all_episode_times`       -> Record<episodeId, { currentTime, playbackPercentage }>
  *
- * Preference persistence mirrors the live site v1.14.x keys:
+ * Preference persistence uses these keys:
  *  - history paused: localStorage `aniraku:watching:history-paused` (record `aniraku:watching`.historyPaused)
  *  - sort order:     localStorage `aniraku:filters:order`           (record `aniraku:filters`.order)
  */
@@ -65,7 +65,7 @@ interface PlaybackEntry {
 }
 
 export interface WatchHistoryEntry {
-  /** Live id format: `local:${animeId}:${episodeId || 'unknown-ep'}` */
+  /** Id format: `local:${animeId}:${episodeId || 'unknown-ep'}` */
   id: string;
   /** `${animeId}:${episodeNumber}` — one card per anime */
   mergeKey: string;
@@ -103,8 +103,8 @@ function readJSON<T>(key: string, fallback: T): T {
 }
 
 /**
- * Read a preference the way live v1.14.x does: prefer the namespaced record
- * field (`aniraku:watching` / `aniraku:filters`), fall back to the legacy
+ * Read a preference: prefer the namespaced record field
+ * (`aniraku:watching` / `aniraku:filters`), fall back to the legacy
  * standalone key.
  */
 function readPref<T>(recordKey: string, field: string, legacyKey: string, fallback: T): T {
@@ -135,9 +135,8 @@ function parseAirTime(airDate: string | null | undefined): number {
   return Number.isNaN(time) ? 0 : time;
 }
 
-// Resume-intent URL via the shared live helper (utils/animePaths): live
-// `At(media, ep)` → /watch/{id}/{slug}?ep={N}; without a stored title it
-// Degrades to bare /watch/{id}?ep={N}.
+// Resume-intent URL: /watch/{id}/{slug}?ep={N}; without a stored title it
+// degrades to bare /watch/{id}?ep={N}.
 function buildWatchPath(
   animeId: string,
   episodeNumber: number,
@@ -240,10 +239,10 @@ export interface UseWatchHistoryResult {
   removeEntry: (animeId: string) => void;
   /** Removes a single episode; drops the card when the anime empties. */
   removeEpisode: (animeId: string, episodeNumber: number) => void;
-  /** Persisted like live: `aniraku:watching:history-paused`. */
+  /** Persisted as `aniraku:watching:history-paused`. */
   historyPaused: boolean;
   setHistoryPaused: (paused: boolean) => void;
-  /** Persisted like live: `aniraku:filters:order` (default `last-watched`). */
+  /** Persisted as `aniraku:filters:order` (default `last-watched`). */
   order: SortValue;
   setOrder: (order: SortValue) => void;
 }
@@ -285,20 +284,19 @@ export function useWatchHistory(): UseWatchHistoryResult {
     return () => window.removeEventListener('storage', onStorage);
   }, [refresh]);
 
-  // DATA SYNC (Wave B): arm the session bridge + throttled `watch_history`
-  // upsert engine, and run merge-on-login the moment a Supabase session
-  // user exists (local `aniraku-watch-history`/native rows → server →
-  // reconcile back so resume prefers max(server, local)). Session detection
-  // goes through lib/sync (supabase.auth directly — no auth-hook import).
+  // Arm the session bridge + throttled `watch_history` upsert engine, and
+  // run merge-on-login as soon as a Supabase session user exists (local
+  // `aniraku-watch-history`/native rows → server → reconcile back so resume
+  // prefers max(server, local)). Session detection goes through lib/sync
+  // (supabase.auth directly — no auth-hook import).
   //
-  // MISSION 2 — History source-of-truth: for a signed-in user the server
-  // `watch_history` rows are pulled on every session (re)establish / page
-  // mount and reconciled into the native stores via watchHistory.ts
-  // (`reconcileLocalHistory`): rows the server has land locally (server
-  // wins for what it has), local-only rows remain (local fills gaps), and
-  // resume/max-progress semantics are unchanged (reconcile never lowers
+  // For a signed-in user the server `watch_history` rows are pulled on every
+  // session (re)establish / page mount and reconciled into the native stores
+  // via watchHistory.ts (`reconcileLocalHistory`): server rows land locally
+  // (server wins for what it has), local-only rows remain (local fills gaps),
+  // and resume/max-progress semantics are unchanged (reconcile never lowers
   // stored progress — max(server, local)). Guests skip the fetch and read
-  // local as today. Rendering (watchPathFor/slug links) untouched.
+  // local as today. Rendering (watchPathFor/slug links) is untouched.
   useEffect(() => subscribeToSession((userId) => {
     if (!userId) return; // guest → local as today
     ensureDataSync(userId); // merge-on-login (uploads local-only) + engine

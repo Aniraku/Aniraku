@@ -35,7 +35,7 @@ interface ToastItem {
 
 type CSSVars = React.CSSProperties & Record<`--${string}`, string | number>;
 
-// live `ty` toastOptions.style — verbatim
+// ToastOptions.style —
 const TOAST_STYLE: CSSVars = {
   fontFamily: 'var(--app-font-family)',
   backgroundColor: 'var(--global-secondary-bg)',
@@ -44,7 +44,7 @@ const TOAST_STYLE: CSSVars = {
   borderRadius: 'var(--global-border-radius)',
 };
 
-// live `ty` config (position bottom-right → x=right, y=bottom)
+// Config (position bottom-right → x=right, y=bottom)
 const TOASTER_OFFSET = {
   bottom: '24px',
   right: '16px',
@@ -147,10 +147,8 @@ export const toast = Object.assign(
   }
 );
 
-// ---------------------------------------------------------------------------
-// Icons — verbatim from live's sonner chunk: dn (success check-circle),
+// Icons — from the app's sonner chunk: dn (success check-circle)
 // fn (warning triangle), pn (info circle-i), mn (error circle-!)
-// ---------------------------------------------------------------------------
 const SuccessIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -240,7 +238,7 @@ export function Toaster() {
     return () => cancelAnimationFrame(frame);
   }, [items]);
 
-  // live maps theme St.mode → sonner's data-sonner-theme:
+  // Map the app theme to sonner's data-sonner-theme:
   // system → system, light → light, dark/anilist/catppuccin → dark
   const sonnerTheme =
     theme === 'system' ? 'system' : theme === 'light' ? 'light' : 'dark';

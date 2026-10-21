@@ -1,6 +1,5 @@
-// Support prompt rules — port of the old Aniraku `lib/support.js`
-// (SupportPrompt + NavBar heart). The LS key is a legacy `aniraku.*` key kept
-// Per the internal-key mandate.
+// Support prompt rules and links. The LS key is a legacy `aniraku.*` key kept
+// for continuity with existing devices.
 export const PATREON_URL = 'https://patreon.com/ShoIslam';
 export const SUPPORT_FUNDING_COPY =
   'Hosting, releases, and open-source development.';

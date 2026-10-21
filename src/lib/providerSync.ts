@@ -1,5 +1,4 @@
-// Provider progress + score sync — restored Aniraku
-// auto-sync engine, upgraded with throttling + average-score pushes.
+// Provider progress and score sync, with throttling and average-score pushes.
 //
 // - `syncWatchProgress({ animeId, episode, progress, duration, mode })`
 //   pushes to every configured+connected provider (MAL + AniList) via

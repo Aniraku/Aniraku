@@ -1,4 +1,4 @@
-// TS port of the src/lib/accountSessionPolicy.js — byte-equivalent logic.
+// Account session policy helpers.
 import type { User } from '@supabase/supabase-js';
 
 function normalizeUsername(value: unknown, fallback = 'user'): string {

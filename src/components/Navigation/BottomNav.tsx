@@ -15,37 +15,20 @@ import { useNotifications } from '../Notifications';
 import { useRandomAnime } from '../../utils/randomAnime';
 import './BottomNav.css';
 
-// BottomNav — PORT of Aniraku `src/components/`:
-//   - geometry/visibility: Bar :5-25 (fixed pill, ≤768px display, ≤360px
-//     compact — BottomNav.css, declarations mapped line-for-line);
-//   - Item :27-53 (flex 1, min-height 48px, ellipsized label, press scale);
-//   - show/hide rules:60-78 — the `focusedRoutes` set remapped to OUR
-//     auth/legal routes, plus the spec-mandated hide on /watch/* (route check
-//     Lives HERE, in the nav layer — Watch files stay untouched). the
-//     compact Back bar on /anime|/watch is superseded by that hide mandate;
-//     we render no second variant.
-//   - tab set :80-87 mapped per spec (its /catalog /schedule /support slots
-//     map to our Search/Notifications/Random/History surfaces — see report).
+// Mobile bottom navigation (≤768px, compact ≤360px).
 //
-// Wiring (spec Step 2):
-//   - Notifications tab dispatches the EXISTING bus event
-//     `global-shortcuts:open-notifications`, which Navbar.tsx:206 already
-//     listens to — the bell and the tab toggle the SAME
-//     `showNotificationsDropdown` state and the SAME portal drawer
-//     (Notifications.tsx). No second drawer, no new event, no Navbar state
-//     lifted. Badge = useNotifications().unreadCount (store fed by the single
-//     30s lib/sync poll — a second hook instance adds NO new poll).
-//   - Random tab runs the shared useRandomAnime() helper (utils/randomAnime)
-//     — byte-identical to the Navbar dice (same module, no drift).
-//   - Profile tab → /profile for everyone: guests already get a login CTA
-//     there (Profile.tsx:1141 guest branch → <Link to='/login'>Log In</Link>),
-//     so no /login redirect is needed.
+// Five tabs: Home, Search, Notifications, Random, and Profile. The
+// notifications tab dispatches the existing
+// `global-shortcuts:open-notifications` bus event, so the bell and the tab
+// share one drawer and one 30s poll. The random tab uses the shared
+// `useRandomAnime` helper, and the profile tab always goes to /profile
+// (guests see a login CTA there).
 //
-// Shell clearance: body.has-bottom-nav toggled below; padding rule scoped to
-// ≤768px in BottomNav.css so the footer/last row is never covered.
+// Hidden on auth/legal routes and anywhere under /watch (player immersion).
+// `body.has-bottom-nav` adds the scoped bottom padding so the footer and the
+// last row are never covered.
 
-// Aniraku `focusedRoutes`, remapped 1:1 onto our route
-// set (App.tsx auth/legal routes) — focused surfaces show no dock there.
+// Auth and legal routes hide the dock.
 const FOCUSED_ROUTES = new Set([
   '/login',
   '/signup',
@@ -59,7 +42,7 @@ const FOCUSED_ROUTES = new Set([
 ]);
 
 const isHiddenRoute = (path: string): boolean =>
-  // spec Step 3: player immersion — never over /watch/*
+  // Never over the player.
   path === '/watch' ||
   path.startsWith('/watch/') ||
   FOCUSED_ROUTES.has(path);
@@ -78,9 +61,9 @@ const BottomNav = () => {
   const navigate = useNavigate();
   const path = location.pathname;
 
-  // Badge hook — shared store subscriber (Navbar.tsx:56 uses the same one).
+  // Badge hook — shares the same store subscriber as the navbar.
   const { unreadCount } = useNotifications();
-  // Shared dice logic with the Navbar (extracted this wave).
+  // Shared dice logic with the navbar.
   const randomAnime = useRandomAnime();
 
   const hidden = isHiddenRoute(path);
@@ -102,7 +85,7 @@ const BottomNav = () => {
       key: 'notifications',
       label: 'Notifications',
       icon: FiBell,
-      // existing bus → Navbar.tsx:207-222 listener toggles the drawer state
+      // Existing bus: the navbar listener toggles the drawer state.
       action: () =>
         window.dispatchEvent(
           new Event('global-shortcuts:open-notifications'),

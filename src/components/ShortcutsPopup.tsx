@@ -49,8 +49,8 @@ const ShortcutsPopup: React.FC<ShortcutsPopupProps> = ({
       window.removeEventListener('global-shortcuts:toggle-shortcuts-popup', toggle);
   }, [open, showShortcuts, onClose]);
 
-  // live overlay stack: Escape closes only the top-most overlay (a
-  // notifications drawer stacked above this popup wins the Escape)
+  // Escape closes only the top-most overlay (a notifications drawer stacked
+  // above this popup wins the Escape).
   useEffect(() => {
     if (!open) return;
     return registerOverlayHandler(onClose);

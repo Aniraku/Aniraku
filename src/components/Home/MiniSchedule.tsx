@@ -263,7 +263,7 @@ export const MiniSchedule: React.FC = () => {
   const [hovered, setHovered] = useState<number | null>(null);
   const selectedRef = useRef<HTMLParagraphElement>(null);
 
-  // Week starts Sunday (the live site parity).
+  // Week starts Sunday.
   const weekDays = useMemo(() => {
     const now = new Date();
     const start = new Date(now);
@@ -280,8 +280,7 @@ export const MiniSchedule: React.FC = () => {
     selectedRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [selectedDay]);
 
-  // Local fetches per day (same output as the live week-fetch; reported as a
-  // mechanism difference only).
+  // Fetch each day locally (same output as a week-fetch).
   useEffect(() => {
     let cancelled = false;
     const load = async () => {

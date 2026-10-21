@@ -29,9 +29,8 @@ import { MiniSchedule } from '../components/Home/MiniSchedule';
 import { SidePanel } from '../components/Home/SidePanels';
 import { runNewEpisodeNotifications, subscribeToSession } from '../lib/sync';
 import { useSeo } from '../utils/seo';
-// NSFW gate — Aniraku /: every browse
-// row + the hero carousel run through filterAdult (Hentai-genre rule, default
-// OFF → hidden). Sync payloads stay unfiltered (user decision).
+// NSFW gate: every browse row and the hero carousel run through filterAdult
+// (Hentai-genre rule, default OFF → hidden). Sync payloads stay unfiltered.
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 
 //   sr-only h1 → simpleLayout [hero, genre rail, continue watching,
@@ -249,7 +248,7 @@ const Home = () => {
     `&startDate_like=${upcomingSeason.year}%25` +
     `&status=NOT_YET_RELEASED&sort=POPULARITY_DESC`;
 
-  // NSFW (Aniraku Home.jsx:544): rows are filtered at render derivation.
+  // NSFW: rows are filtered at render derivation.
   const { nsfwEnabled } = useNsfw();
 
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -277,7 +276,6 @@ const Home = () => {
   const [tabLoading, setTabLoading] = useState(true);
   const [tabError, setTabError] = useState(false);
 
-  // Side data (+ hero — TOP AIRING is shared with the carousel, live `n`).
   const [topAiring, setTopAiring] = useState<Anime[]>([]);
   const [topAiringLoading, setTopAiringLoading] = useState(true);
   const [topAiringError, setTopAiringError] = useState(false);
@@ -291,7 +289,7 @@ const Home = () => {
   const [finishedLoading, setFinishedLoading] = useState(true);
   const [finishedError, setFinishedError] = useState(false);
 
-  // Hero / TOP AIRING (live `k({page:1, perPage:12})` feeds both).
+  // Hero / TOP AIRING share one query (page 1, 12 per page).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -355,8 +353,7 @@ const Home = () => {
   }, []);
 
   // JUST FINISHED (below the fold — deferred) — popular shows from the
-  // season that just ended (local season/year query vs live endDate_greater;
-  // reported as a difference).
+  // season that just ended (local season/year query).
   // The listPath carries the same season/year (see justFinishedSeason above)
   // so "view all" shows the same just-finished season — not every old
   // FINISHED title.
@@ -410,7 +407,6 @@ const Home = () => {
     };
   }, [activeTab, page, perPage]);
 
-  // SEO (ported from Aniraku's lib/seo.js setHomepageSEO + index.html copy).
   useSeo({
     title: 'Aniraku — Free Anime Streaming | Watch Sub & Dub Online',
     description:
@@ -430,9 +426,8 @@ const Home = () => {
     },
   });
 
-  // Wave B — NEW-EPISODE NOTIFICATION LOOP (mount point = Aniraku's Home,
-  // Home.jsx:589-614): logged-in only, once per session user. For each
-  // bookmarked anime it compares the last-known episode (LS
+  // NEW-EPISODE NOTIFICATION LOOP (logged-in only, once per session user).
+  // For each bookmarked anime it compares the last-known episode (LS
   // `aniraku:episode-track`, 6h cooldown), dedupes against the
   // `notifications` table, then inserts {user_id, type:'new_episode',
   // message, anime_id}. Session detection goes through lib/sync
@@ -455,7 +450,7 @@ const Home = () => {
     };
   }, []);
 
-  // Live toast texts → console (no toast system locally; reported).
+  // Toast texts → console (no toast system locally; reported).
   useEffect(() => {
     if (topAiringError)
       console.error('Failed to load top airing anime', 'Please try again later.');
@@ -492,7 +487,6 @@ const Home = () => {
     setPage(1);
   }, []);
 
-  // Live `g = loading || (error && empty)`.
   const heroLoading =
     topAiringLoading || (topAiringError && topAiring.length === 0);
   const upcomingPanelLoading =
@@ -502,9 +496,8 @@ const Home = () => {
   const finishedPanelLoading =
     finishedLoading || (finishedError && justFinished.length === 0);
 
-  // NSFW-derived views (Aniraku Home.jsx:545-550 filterAdult per row +
-  // Hero.jsx:33 for the carousel): Hentai titles drop out while the
-  // preference is OFF (default).
+  // NSFW-derived views (filterAdult per row and for the carousel): Hentai
+  // titles drop out while the preference is OFF (default).
   const heroList = useMemo(
     () => filterAdult(topAiring, nsfwEnabled),
     [topAiring, nsfwEnabled],

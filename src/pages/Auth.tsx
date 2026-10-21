@@ -1,9 +1,8 @@
-// TS port of the src/pages/ — mode = login | signup | forgot.
-// Visuals and validation messages are 1:1; every user-visible brand
-// string says "Aniraku". UI availability honours isSupabaseConfigured the same
-// way Aniraku does (username check + recovery request gate; login/signup
-// attempts surface the transport error from the placeholder client when env
-// vars have not landed yet).
+// Login / signup / forgot-password screen, selected by `mode`. Every
+// user-visible brand string says "Aniraku". UI availability honours
+// isSupabaseConfigured (username check and recovery request gate);
+// login/signup attempts surface the transport error from the placeholder
+// client when env vars are missing.
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -250,7 +249,7 @@ const Auth = ({ mode }: { mode: 'login' | 'signup' | 'forgot' }) => {
         : '/signup',
   });
 
-  // Aniraku route titles (Aniraku App.jsx routeTitles, brand-swapped).
+  // Aniraku route titles.
   useEffect(() => {
     const previousTitle = document.title;
     document.title = isForgot
