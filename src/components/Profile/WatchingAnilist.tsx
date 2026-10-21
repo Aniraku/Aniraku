@@ -12,7 +12,7 @@ const Container = styled.div`
   margin-bottom: 1rem;
 `;
 
-// Live heading row (_headingRow_76nxj_1 / _title_76nxj_27)
+// Heading row (_headingRow_76nxj_1 / _title_76nxj_27)
 const HeadingRow = styled.div`
   position: sticky;
   top: 3.5rem;
@@ -52,7 +52,7 @@ const StateMessage = styled.div`
   color: var(--global-text-muted);
 `;
 
-// Live login prompt (_loginPromptBox_76nxj_202 / _loginPromptText_76nxj_210)
+// Login prompt (_loginPromptBox_76nxj_202 / _loginPromptText_76nxj_210)
 const LoginPromptBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -67,7 +67,7 @@ const LoginPromptText = styled.span`
   text-align: center;
 `;
 
-// Live status labels (AniList list names used by the live site)
+// Status labels
 const statusLabels: Record<string, string> = {
   CURRENT: 'Watching',
   PLANNING: 'Planning',

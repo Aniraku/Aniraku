@@ -1,5 +1,5 @@
-// TS port of Aniraku's src/pages/CommunityGuidelines.jsx — content kept
-// verbatim in the source's own wording (final brand: Aniraku); GitHub issue
+// TS port of the src/pages/ — content kept
+// in the source's own wording (final brand: Aniraku); GitHub issue
 // link restored.
 import { Link } from 'react-router-dom';
 import LegalPage from '../components/LegalPage';
@@ -13,7 +13,6 @@ const sections = [
 ];
 
 const CommunityGuidelines = () => {
-  // SEO (ported from Aniraku's lib/seo.js setStaticPageSEO).
   useSeo({
     title: 'Community Guidelines | Aniraku',
     description:

@@ -1,4 +1,4 @@
-// TS port of Aniraku's src/pages/Terms.jsx — content copied verbatim with
+// TS port of the src/pages/ — content copied with
 // every user-visible brand mention swapped to "Aniraku".
 import { Link } from 'react-router-dom';
 import LegalPage from '../components/LegalPage';
@@ -15,7 +15,6 @@ const sections = [
 ];
 
 const Terms = () => {
-  // SEO (ported from Aniraku's lib/seo.js setStaticPageSEO).
   useSeo({
     title: 'Terms of Service | Aniraku',
     description:

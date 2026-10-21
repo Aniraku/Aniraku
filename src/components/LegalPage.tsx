@@ -1,5 +1,5 @@
-// TS port of Aniraku's src/components/LegalPage/LegalPage.jsx — shared shell
-// for the static legal pages, kept verbatim in the source's own wording
+// TS port of the src/components/LegalPage/ — shared shell
+// For the static legal pages, kept in the source's own wording
 // (final brand: Aniraku); source/issue GitHub links restored.
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';

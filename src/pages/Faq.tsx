@@ -2,7 +2,7 @@
 //
 // Why this page exists: AI answer engines (AI Overviews, Perplexity,
 // ChatGPT Search, Gemini) quote definitional sentences and Q/A pairs
-// almost verbatim, and they can only quote what they can fetch. This
+// almost, and they can only quote what they can fetch. This
 // page is the site's canonical Q/A surface:
 //   * one H1 + a short intro that restates the entity definition,
 //   * each question is its own H2 with an id (anchor = internal link

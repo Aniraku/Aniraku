@@ -231,7 +231,7 @@ const MalAnilistSvg = styled.div`
   }
 `;
 
-// Live show-more button: full-width, muted, icon-only with the
+// Show-more button: full-width, muted, icon-only with the
 // `Show more` / `Show less` aria-labels.
 const ShowMoreButton = styled.button`
   background-color: var(--global-div);
@@ -308,7 +308,7 @@ const TrailerOverlayContent = styled.div`
   }
 `;
 
-// Live status labels (Qe): Finished / Airing / Not Yet Released / Cancelled.
+// Status labels (Qe): Finished / Airing / Not Yet Released / Cancelled.
 const statusLabel = (status?: string): string => {
   if (!status) return '—';
   if (status === 'Completed') return 'Finished';
@@ -318,7 +318,7 @@ const statusLabel = (status?: string): string => {
   return status;
 };
 
-// Live date formatter (Un): "Sep 15, 2023" — month, `day,`, year.
+// Date formatter (Un): "Sep 15, 2023" — month, `day,`, year.
 const MONTH_ABBR = [
   'Jan',
   'Feb',

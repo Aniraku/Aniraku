@@ -20,7 +20,7 @@ import type { Episode } from '../../hooks/animeInterface';
 import { subscribeToWatchHistory } from '../../lib/watchHistory';
 import ThemedSelect from '../ThemedSelect';
 
-// Live `hideSpoiler` pref ("Hide Spoilers" — blocks episode images behind a
+// Pref ("Hide Spoilers" — blocks episode images behind a
 // HIDDEN SPOILER overlay). StoredSettings keeps it internal to the settings
 // record (the public useSettings shape doesn't expose it), so EpisodeList
 // reads/merge-writes `aniraku:settings` → .settings.hideSpoiler directly —

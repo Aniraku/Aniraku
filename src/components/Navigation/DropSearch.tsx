@@ -132,7 +132,7 @@ const DropSearch = ({
     }
   }, [results]);
 
-  // live `wv`: search failure → error toast (fires once per error flip;
+  // Search failure → error toast (fires once per error flip;
   // fires only for guests' visible searches, same copy as live)
   useEffect(() => {
     if (error) {

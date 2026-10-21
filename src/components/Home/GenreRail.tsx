@@ -4,10 +4,8 @@ import { Link } from 'react-router-dom';
 import { TbCircleChevronLeft } from 'react-icons/tb';
 import { FaChevronRight } from 'react-icons/fa';
 
-// ---------------------------------------------------------------------------
-// GenreRail (the live site 1:1) — horizontally scrollable genre chips below hero.
+// GenreRail — horizontally scrollable genre chips below hero.
 // Dynamic edge mask + fade-in scroll buttons, centered on mount, 200px steps.
-// ---------------------------------------------------------------------------
 
 const GENRES = [
   'Action',
@@ -30,7 +28,7 @@ const GENRES = [
   'Thriller',
 ];
 
-// Exact per-genre hover colors from the live site.
+// Exact per-genre hover colors from the app.
 const GENRE_HOVER_COLOR: Record<string, string> = {
   Action: '#FF4500',
   Adventure: '#FFD700',

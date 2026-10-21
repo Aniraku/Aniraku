@@ -1,4 +1,4 @@
-// Provider progress + score sync — restored Aniraku Watch.jsx:1904-1956
+// Provider progress + score sync — restored Aniraku
 // auto-sync engine, upgraded with throttling + average-score pushes.
 //
 // - `syncWatchProgress({ animeId, episode, progress, duration, mode })`

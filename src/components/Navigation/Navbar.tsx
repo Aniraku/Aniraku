@@ -10,7 +10,7 @@ import Notifications, { useNotifications } from '../Notifications';
 import type { Anime } from '../../hooks/animeInterface';
 import { fetchAdvancedSearch } from '../../hooks/useApi';
 import { useAuth } from '../../client/useAuth';
-// Wave A Supabase auth (aliased — `useAuth` above is the AniList client hook)
+// `useAuth` above is the AniList client hook)
 import { useAuth as useSupabaseAuth } from '../../hooks/useAuth';
 import { avatarUrl, defaultAvatar } from '../../lib/avatars';
 import { BRAND_LOGO } from '../../lib/brand';
@@ -18,7 +18,7 @@ import { BRAND_LOGO } from '../../lib/brand';
 // Random tab runs byte-identical behavior (no logic drift).
 import { useRandomAnime } from '../../utils/randomAnime';
 
-// Bell badge (Wave C delta): unread count now comes from Wave B's blessed
+// Bell badge (delta): unread count now comes from the blessed
 // `useNotifications()` hook — the shared 30s session poll in lib/sync feeds
 // the store, the server `read` column is the authority, and the store clears
 // on sign-out. The lib/sync shim pair (fetchNotifications /
@@ -43,7 +43,7 @@ const Navbar = () => {
   const [showSideMenu, setShowSideMenu] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const { isLoggedIn, userData } = useAuth();
-  // Wave A: Supabase account state (null outside provider = guest)
+  // Supabase account state (null outside provider = guest)
   const supabaseAuth = useSupabaseAuth();
   const supabaseUser = supabaseAuth?.user ?? null;
   const supabaseProfile = supabaseAuth?.profile ?? null;
@@ -51,7 +51,7 @@ const Navbar = () => {
     supabaseUser &&
     (avatarUrl(supabaseProfile?.avatar_url) ||
       defaultAvatar(supabaseUser.id).url);
-  // Delta 4 → Wave C: the badge hook is live. `unreadCount` derives from
+  // The badge hook is live. `unreadCount` derives from
   // the store's rows minus the server `read` column; `refresh` re-polls the
   // endpoint (drawer toggle — close re-reads marks-made inside the drawer).
   // No AniList auth anywhere here (Supabase session only).
@@ -66,7 +66,7 @@ const Navbar = () => {
   }, []);
 
   // Mobile wave — shared Random action (utils/randomAnime.ts). The helper
-  // holds the former inline body verbatim: trending fetch → filterAdult
+  // Holds the former inline body: trending fetch → filterAdult
   // NSFW pool (explicit <Anime> type arg) → navigate(infoPathFor(pick)).
   const fetchRandomAnime = useRandomAnime();
 
@@ -174,7 +174,7 @@ const Navbar = () => {
     setShowMobileSearch(false);
   }, [location]);
 
-  // live `Gv`: Escape blurs the search box, clears the query and closes the
+  // Escape blurs the search box, clears the query and closes the
   // results dropdown (DropSearch additionally handles its own visible-state
   // Escape through onClear/onClose — idempotent with this)
   useEffect(() => {
@@ -190,7 +190,7 @@ const Navbar = () => {
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
-  // live `sv`/`Kv`: open-* toggles the surface, close-* force-closes it.
+  // Open-* toggles the surface, close-* force-closes it.
   // useGlobalShortcuts dispatches these for Shift+M / Shift+T|V with mutual
   // exclusion (open one → close the other).
   useEffect(() => {

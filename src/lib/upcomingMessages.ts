@@ -1,7 +1,7 @@
-// Upcoming/unreleased fallback copy — ported from old Aniraku
-// (`src/lib/watchEpisodeAvailability.js` + Watch.jsx usage).
+// Upcoming/unreleased fallback copy — based on old Aniraku
+// .
 //
-// The episode line is verbatim; the anime/movie siblings are written in the
+// The episode line is; the anime/movie siblings are written in the
 // same voice (apology + time-travel + promise) for the title-level empty
 // state. Classification stays conservative like the original: only an
 // explicit unreleased status (or an explicit future-episode request)

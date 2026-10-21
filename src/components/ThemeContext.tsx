@@ -17,8 +17,7 @@ const THEME_META_COLORS: Record<string, string> = {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// ---------------------------------------------------------------------------
-// Storage parity with live
+// Storage consistency
 //
 // The theme lives in the unified record written by both this context and
 // SettingsProvider (merge-writes, so neither clobbers the other):
@@ -30,14 +29,13 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 //   1. record field `theme`            (aniraku:settings JSON)
 //   2. legacy live key                 (aniraku:settings:theme, JSON-encoded)
 //   3. legacy local key                (themePreference, {"mode": ...})
-//   4. live default                    ('dark' — live `Ct`)
+//   4. live default
 //
-// Valid stored values mirror live's theme list `St`: system | light | dark |
+// Valid stored values mirror the app's theme list `St`: system | light | dark |
 // anilist | catppuccin ('system' is a first-class stored value resolved via
 // prefers-color-scheme at runtime). Anything else falls back to 'dark' like
-// live's runtime; the pre-paint matchMedia resolution for invalid/'system'
+// The app's runtime; the pre-paint matchMedia resolution for invalid/'system'
 // values stays in index.html's bootstrap.
-// ---------------------------------------------------------------------------
 
 const SETTINGS_RECORD = 'aniraku:settings';
 const LEGACY_LIVE_THEME_KEY = 'aniraku:settings:theme';

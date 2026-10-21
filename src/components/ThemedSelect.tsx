@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { FaCheck, FaChevronDown } from 'react-icons/fa';
 
-// ---------------------------------------------------------------------------
 // ThemedSelect — a reusable replacement for the native <select> everywhere it
 // would otherwise open the phone's OS picker on Android/touch. It renders the
 // SAME themed menu the Watch-page server/language dropdown already uses: a
@@ -13,7 +12,6 @@ import { FaCheck, FaChevronDown } from 'react-icons/fa';
 // Each call site controls layout (width / flex) by wrapping this component or
 // passing `className`; the trigger and menu styling are theme-aware via the
 // global CSS variables so it fits every context it's dropped into.
-// ---------------------------------------------------------------------------
 
 export type ThemedSelectOption = {
   value: string;

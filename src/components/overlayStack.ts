@@ -1,4 +1,4 @@
-// Shared Escape-key overlay stack — port of live's `yh`/`Ch`/`Sh` handlers
+// Shared Escape-key overlay stack — port of the app's `yh`/`Ch`/`Sh` handlers
 // around the `_h` handler array: Escape closes ONLY the top-most registered
 // overlay (so a notifications drawer stacked over the shortcuts popup closes
 // the drawer first, like live). Handlers register while their overlay is open
