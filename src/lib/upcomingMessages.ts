@@ -1,12 +1,11 @@
-// Upcoming/unreleased fallback copy — based on old Aniraku
-// .
+// Upcoming/unreleased fallback copy.
 //
-// The episode line is; the anime/movie siblings are written in the
+// The episode line is kept; the anime/movie siblings are written in the
 // same voice (apology + time-travel + promise) for the title-level empty
-// state. Classification stays conservative like the original: only an
-// explicit unreleased status (or an explicit future-episode request)
-// triggers these — a merely-missing episode list keeps the generic empty
-// copy, so transient backend gaps are never misreported as unreleased.
+// state. Classification stays conservative: only an explicit unreleased
+// status (or an explicit future-episode request) triggers these — a
+// merely-missing episode list keeps the generic empty copy, so transient
+// backend gaps are never misreported as unreleased.
 
 /** Verbatim old-Aniraku line for a requested-but-unaired episode. */
 export const UPCOMING_EPISODE_MESSAGE =

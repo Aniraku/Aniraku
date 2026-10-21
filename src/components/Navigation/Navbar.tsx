@@ -18,11 +18,9 @@ import { BRAND_LOGO } from '../../lib/brand';
 // Random tab runs byte-identical behavior (no logic drift).
 import { useRandomAnime } from '../../utils/randomAnime';
 
-// Bell badge (delta): unread count now comes from the blessed
-// `useNotifications()` hook — the shared 30s session poll in lib/sync feeds
-// the store, the server `read` column is the authority, and the store clears
-// on sign-out. The lib/sync shim pair (fetchNotifications /
-// readNotificationReadIds) is no longer read from here.
+// Bell badge: unread count comes from `useNotifications()` — the shared 30s
+// session poll in lib/sync feeds the store, the server `read` column is the
+// authority, and the store clears on sign-out.
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -51,10 +49,9 @@ const Navbar = () => {
     supabaseUser &&
     (avatarUrl(supabaseProfile?.avatar_url) ||
       defaultAvatar(supabaseUser.id).url);
-  // The badge hook is live. `unreadCount` derives from
-  // the store's rows minus the server `read` column; `refresh` re-polls the
-  // endpoint (drawer toggle — close re-reads marks-made inside the drawer).
-  // No AniList auth anywhere here (Supabase session only).
+  // The badge derives from the store's rows minus the server `read` column;
+  // `refresh` re-polls the endpoint (drawer toggle — close re-reads marks made
+  // inside the drawer). No AniList auth here (Supabase session only).
   const { unreadCount, refresh: refreshUnread } = useNotifications();
 
   useEffect(() => {
@@ -160,8 +157,7 @@ const Navbar = () => {
       inputRef.current?.focus();
     };
 
-    // live event name (was local 'focusSearch'); dispatched by
-    // useGlobalShortcuts for / and ⌃/⌘S
+    // Focus search when the global shortcut fires (/ and ⌃/⌘S).
     window.addEventListener('global-shortcuts:focus-search', handleGlobalSearch);
     return () =>
       window.removeEventListener('global-shortcuts:focus-search', handleGlobalSearch);
@@ -195,10 +191,10 @@ const Navbar = () => {
   // exclusion (open one → close the other).
   useEffect(() => {
     const openNotifications = () => {
-      // Mobile wave parity: the bottom-nav Notifications tab rides this same
-      // bus event, so refresh the unread badge on every toggle — identical
-      // semantics to toggleNotificationsDropdown (the bell), open AND close.
-      // `refreshUnread` is a stable useCallback([]) (Notifications.tsx:107).
+      // The bottom-nav Notifications tab rides this same bus event, so
+      // refresh the unread badge on every toggle — same semantics as
+      // toggleNotificationsDropdown (the bell), open and close.
+      // `refreshUnread` is a stable useCallback([]).
       refreshUnread();
       setShowNotificationsDropdown((v) => !v);
     };

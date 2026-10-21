@@ -50,18 +50,17 @@ import { FaCheckCircle, FaRedo, FaStepForward, FaUndo } from 'react-icons/fa';
 type ArtInstance = import('artplayer').default;
 type HlsInstance = import('hls.js').default;
 
-// Resume discard threshold — based on Aniraku
-// (`RESUME_MIN_TIME = 30`): a stored position only restores
-// playback when it is strictly greater than 30s; 0 / absent / short values
-// are ignored. The reference has NO near-end restart rule (a completed
-// episode simply restores near its end), so none is added here.
+// Resume discard threshold (`RESUME_MIN_TIME = 30`): a stored position only
+// restores playback when it is strictly greater than 30s; 0 / absent / short
+// values are ignored. There is no near-end restart rule — a completed
+// episode simply restores near its end.
 const RESUME_MIN_TIME = 30;
 
-// History-paused gate — byte-for-byte mirror of Watch.tsx:435's
-// isHistoryPaused (Player cannot import it: pages/Watch imports this
-// module, so importing back would create a cycle). Reads the same
+// History-paused gate, matching Watch's isHistoryPaused (Player cannot
+// import it: pages/Watch imports this module, so importing back would
+// create a cycle). Reads the same
 // `aniraku:watching` record and legacy `aniraku:watching:history-paused`
-// key. Used by the Item 3 ended-progress save.
+// key. Used by the ended-progress save.
 const isHistoryPaused = (): boolean => {
   try {
     const record = localStorage.getItem('aniraku:watching');
@@ -116,7 +115,7 @@ const Button = styled.button`
   }
 `;
 
-// ─── player chrome ─────────
+// Player chrome
 // 16:9 black viewport around the ArtPlayer mount; $aspect lets theater mode
 // stretch it to 21/9.
 const PlayerViewport = styled.div<{ $aspect?: string }>`
@@ -183,7 +182,7 @@ type PlayerProps = {
   onEpisodeEnd: () => Promise<void>;
   onPrevEpisode: () => void;
   onNextEpisode: () => void;
-  // GAP 4 (Item 1) — fired ONCE when playback genuinely starts for the
+  // Fired once when playback genuinely starts for the
   // current episode (HLS: first `video:timeupdate` with t>0; embed: first
   // postMessage progress). Watch records the episode through its
   // EpisodeList-style dual-write history path — a direct-URL first visit
@@ -198,18 +197,18 @@ type PlayerProps = {
   // (`EP n` / `Episode n` vs the `Prev` / `Next` fallbacks) + disabled state.
   hasPrev?: boolean;
   hasNext?: boolean;
-  // Live "Lights" toggle state (owned by Watch — the button below only
+  // "Lights" toggle state (owned by Watch — the button below only
   // dispatches `aniraku:shortcut` {action:'lights'}; Watch's single listener
   // performs the toggle).
   lightsOn?: boolean;
-  // Zenime composition: embedded (FlixCloud) servers render INSIDE Player as
+  // Composition: embedded (FlixCloud) servers render INSIDE Player as
   // an iframe + control bar instead of a sibling <EmbedPlayer> component.
   embedded?: boolean;
   embeddedUrl?: string;
   // Viewport aspect — theater mode stretches the frame to 21/9.
   aspectRatio?: string;
-  // Server pools + active selection for KeyD/KeyS source cycling (Aniraku
-  // Watch.jsx:1406-1438). Watch owns these; Player reads them through a
+  // Server pools + active selection for KeyD/KeyS source cycling.
+  // Watch owns these; Player reads them through a
   // render-assigned ref so the once-registered keydown never goes stale.
   serversSub?: any[];
   serversDub?: any[];
@@ -263,7 +262,6 @@ function dedupeSubtitles(
     .map((t) => ({ url: t.url, lang: t.lang, label: t.label ?? '' }));
 }
 
-// ─── Subtitle customization system (ported from the reference ArtPlayer build) ───
 // size              → percent scale of the 20px base (50%–200%)
 // position          → pixel offset from the player bottom (0–400px)
 // color             → text color, one of SUBTITLE_COLOR_OPTIONS
@@ -631,7 +629,7 @@ export const SETTING_ICON_TUNE = `<svg xmlns="http://www.w3.org/2000/svg" viewBo
 // other row, without drawing a decorative gear inside the sub-menu.
 export const SETTING_ICON_BLANK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"></svg>`;
 
-// Full-buffer cache indicator (ported from the reference build): paints every
+// Full-buffer cache indicator: paints every
 // video.buffered range into the progress bar as translucent segments. It reads
 // video.buffered directly, so the same wiring covers hls.js/MSE and native
 // loaders; segment keys are deduped and the DOM only updates inside a rAF
@@ -702,15 +700,15 @@ function createFullBufferIndicator(
   };
 }
 
-// ── Chapter segments on the progress bar: Intro │ Main episode │ Outro ──────
+// Chapter segments on the progress bar: Intro │ Main episode │ Outro
 // Data comes from the same skipSegmentsRef the auto-skip and hover layers
 // read (AniSkip op/ed + provider windows) — chapters are DERIVED, not
 // fetched. Null guards: no intro → Main starts at 0; no outro → Main runs to
 // duration; neither → render nothing at all (a lone full-width "Main
-// episode" bar would be noise). Corpus note: live bundle has no
+// episode" bar would be noise). Corpus note: bundle has no
 // progress-bar chapter UI at all (its only Intro/Outro strings are the
 // "Auto Skip Intro/Outro" setting row and the shortcuts-popup row), so the
-// labels follow the requested wording verbatim.
+// labels follow the requested wording.
 type ChapterSegment = {
   id: 'intro' | 'main' | 'outro';
   label: string;
@@ -962,7 +960,6 @@ export function buildSubtitleSettingsSetting(
   };
 }
 
-// ─── ArtPlayer engine helpers (ported from the reference build) ────────────
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent : '';
 const IS_IOS = /iPad|iPhone|iPod/.test(UA) && !('MSStream' in window);
 const IS_MOBILE =
@@ -1173,7 +1170,7 @@ function selectLevelForQualityTarget(
   })[0];
 }
 
-// Ended-overlay actions (ported): card-styled text buttons. Aniraku's var
+// Ended-overlay actions: card-styled text buttons. Aniraku's var
 // names lead; Aniraku's theme name then a literal cover other themes.
 const navBtnStyle = {
   background: 'var(--bg-card, var(--global-card-bg, rgba(255,255,255,0.07)))',
@@ -1220,7 +1217,7 @@ export function Player({
   onSelectServer,
   onPlayingSource,
 }: PlayerProps) {
-  // ── Zenime bridge state (ported): embedded-iframe progress/ended machine
+  // ── bridge state: embedded-iframe progress/ended machine
   // + single-transition lock so double-ended events can't stack auto-next.
   const [builtEmbeddedUrl, setBuiltEmbeddedUrl] = useState<string>('');
   const playbackTransitionRef = useRef(false);
@@ -1288,7 +1285,7 @@ export function Player({
   const candidateIndexRef = useRef(-1);
   const overrideFailedRef = useRef(false);
   const fetchFnRef = useRef<() => void>(() => {});
-  // ── No-source UI (task) ───────────────────────────────────────────────────
+  // No-source UI.
   // `streamRetry` rides the discovery effect's deps so the overlay's Retry
   // button re-runs the SAME /stream fetch path; `sourceFailed` flips when
   // that discovery errors or yields zero playable sources (HLS mode);
@@ -1319,7 +1316,7 @@ export function Player({
 
   const { settings, setSettings } = useSettings();
   const { autoPlay } = settings;
-  // ── Settings-page AUTHORITY for auto-skip/auto-next (mission rule) ────────
+  // Settings-page AUTHORITY for auto-skip/auto-next (mission rule)
   // The `aniraku:settings` record (written by SettingsProvider + the Settings
   // page) is the SINGLE source of truth. Per-elsewhere local values (flat
   // `autoSkip`/`autoNext`, legacy `aniraku-auto-*`) never win — the old
@@ -1345,7 +1342,7 @@ export function Player({
     : settings.autoNext;
   const navigate = useNavigate();
 
-  // Stale-closure guards (Zenime parity): callbacks/refs always see fresh
+  // Stale-closure guards: callbacks/refs always see fresh
   // values even when registered once (bridge effect, media events).
   const onEpisodeEndRef = useRef(onEpisodeEnd);
   const autoNextRef = useRef(autoNext);
@@ -1386,7 +1383,6 @@ export function Player({
     return () => style.remove();
   }, []);
 
-  // ── ArtPlayer engine refs (ported): mount node, instance, hls, build guard ──
   const artMountRef = useRef<HTMLDivElement | null>(null);
   const artInstanceRef = useRef<ArtInstance | null>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
@@ -1413,7 +1409,7 @@ export function Player({
   const resumeTokenRef = useRef(0);
   const resumeAppliedRef = useRef(false);
   const instanceEpisodeTokenRef = useRef(0);
-  // ── Item 2 — resume countdown overlay (Aniraku Watch.jsx:1593-1594) ──────
+  // Resume countdown overlay.
   // `resumeTarget` mirrors the reference's `resumePos` (seconds; null =
   // hidden), `resumeCountdown` its `resumeCountdown` (3 → 0). The seed no
   // longer seeks silently: it opens the dialog, and the seek happens from
@@ -1481,7 +1477,7 @@ export function Player({
     },
     [clearResumeCountdown],
   );
-  // "Start Over" (Aniraku Watch.jsx:6112-6119): drop the dialog, no seek.
+  // "Start Over": drop the dialog, no seek.
   const dismissResume = useCallback(() => {
     resumeTargetRef.current = null;
     resumeAppliedRef.current = true; // decision consumed for this load
@@ -1516,7 +1512,7 @@ export function Player({
   }, []);
   const [forceMse, setForceMse] = useState(false);
   const [posterHidden, setPosterHidden] = useState(false);
-  // Auto-skip attempt machine (ported): per-segment handled/failed flags so
+  // Auto-skip attempt machine: per-segment handled/failed flags so
   // the manual overlay only appears as a fallback (or after seeking back).
   const autoSkipRef = useRef(autoSkip);
   const autoSkippedRef = useRef({ intro: false, outro: false });
@@ -1533,7 +1529,7 @@ export function Player({
   const [showEndedOverlay, setShowEndedOverlay] = useState(false);
   const onPrevEpisodeRef = useRef(onPrevEpisode);
   const onNextEpisodeRef = useRef(onNextEpisode);
-  // Item 1 — first-playback reporter (Watch's dual-write trigger), mirrored
+  // First-playback reporter (the dual-write trigger), mirrored
   // like the episode refs so the once-built timeupdate/embed listeners
   // never hold a stale prop. `playbackStartRecordedRef` fires it at most
   // once per episode load; Watch dedupes per `${animeId}:${episode.id}` on
@@ -1659,8 +1655,8 @@ export function Player({
     [destroyPlayer],
   );
 
-  // Zenime: ONE Player owns both modes — iframe for embedded servers.
-  // Degrade rule (no-source task): when the embed URL never arrived AND the
+  // ONE Player owns both modes — iframe for embedded servers.
+  // Degrade rule: when the embed URL never arrived AND the
   // visitor's Retry re-ran discovery which found a direct HLS source, drop
   // to direct playback — a working player beats an empty iframe. Otherwise
   // keep the embed shell.
@@ -1687,9 +1683,9 @@ export function Player({
   }, [embedded, embeddedUrl]);
 
   useEffect(() => {
-    // Zenime parity: embedded servers own their fetch path — never hit
-    // Aniraku /stream while the iframe is up (and clear stale HLS state).
-    // Exception (no-source task): the embed URL never arrived AND the
+    // Embedded servers own their fetch path — never hit /stream while the
+    // iframe is up (and clear stale HLS state).
+    // Exception: the embed URL never arrived AND the
     // visitor pressed Retry — fall through to /stream discovery so the
     // frame isn't a permanent black box.
     if (embedded && !(embedMissing && streamRetry > 0)) {
@@ -1730,19 +1726,17 @@ export function Player({
     streamRetry,
   ]);
 
-  // ── Recovery position (ported: Aniraku Watch.jsx:2616-2707) ───────────────
   // One lookup per episode load, keyed like Aniraku's [animeId, epNumber]:
-  //  - signed-in → server-first: Wave B's `watch_history` reader
-  //    (fetchServerHistoryRows), local fills gaps / leads — Wave B's merge
+  // - signed-in → server-first: the `watch_history` reader
+  // (fetchServerHistoryRows), local fills gaps / leads — the merge
   //    precedence is max(progress); the native store carries no timestamp,
-  //    so Aniraku's newest-timestamp tiebreak can't be ported literally.
+  // so Aniraku's newest-timestamp tiebreak can't be literally.
   //  - guest → the documented local stores only (`all_episode_times` +
   //    watchHistory's merged rows, which also fold `aniraku-watch-history`).
   // Discard rule: only Aniraku's RESUME_MIN_TIME (>30s) — stored=0 / short
   // positions never seek; the reference has NO near-end restart rule.
   // Apply paths (seed consumed once per episode load via resumeAppliedRef):
-  //  - Item 2: a valid seed now OPENS the 3-second countdown dialog instead
-  //    of seeking silently (Aniraku Watch.jsx:2616-2632 + 2704-2707); the
+  //  - A valid seed now OPENS the 3-second countdown dialog instead
   //    seek runs from commitResume when the countdown hits zero or the
   //    user presses Resume. Start Over dismisses without seeking.
   //  - commitResume keeps the original two seek paths: direct when this
@@ -1752,12 +1746,12 @@ export function Player({
     const token = ++resumeTokenRef.current;
     resumeAppliedRef.current = false;
     pendingResumeRef.current = null;
-    // Item 2 — drop any countdown carried over from the previous load.
+    // Drop any countdown carried over from the previous load.
     resumeTargetRef.current = null;
     clearResumeCountdown();
     setResumeTarget(null);
     setResumeCountdown(0);
-    // Item 1 — the first-playback record fires once per episode load.
+    // The first-playback record fires once per episode load.
     playbackStartRecordedRef.current = false;
     // One cleanup for every exit — the countdown interval must never
     // outlive this episode load (also runs on unmount).
@@ -1772,7 +1766,7 @@ export function Player({
       if (resumeTokenRef.current !== token || resumeAppliedRef.current) return;
       if (!(seconds > RESUME_MIN_TIME)) return; // 0 / <30s → no dialog
       resumeAppliedRef.current = true; // consumed ONCE per episode load
-      // Item 2 — Aniraku Watch.jsx:2621-2631: show the dialog, count
+      // Show the dialog, count
       // 3 → 2 → 1; at zero the auto-resume effect below performs the
       // guarded seek.
       resumeTargetRef.current = seconds;
@@ -1857,8 +1851,8 @@ export function Player({
     return stopCountdown;
   }, [animeId, episode, embedded, isLoggedIn]);
 
-  // Item 2 — countdown reached zero with a target still open → perform the
-  // guarded seek now (Aniraku Watch.jsx:2704-2707: `if (resumeCountdown > 0
+  // Countdown reached zero with a target still open → perform the
+  // guarded seek now (`if (resumeCountdown > 0
   // || !resumePos) return; handleResume()`). Resume and Start Over both
   // clear the target first, so only the interval hitting 0 can fire this.
   useEffect(() => {
@@ -1867,8 +1861,7 @@ export function Player({
   }, [resumeCountdown, resumeTarget, commitResume]);
 
   // Playback error → advance candidates → fall back to /stream once.
-  // Shared by ArtPlayer's video:error handler and the hls.js fatal path
-  // .
+  // Shared by ArtPlayer's video:error handler and the hls.js fatal path.
   function advanceOnError() {
     const candidates = candidatesRef.current;
     const nextIndex = candidateIndexRef.current + 1;
@@ -2089,7 +2082,7 @@ export function Player({
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 
-  // Manual skip (ported): seek to the verified segment end (duration-capped)
+  // Manual skip: seek to the verified segment end (duration-capped)
   // and report whether the media accepted the target.
   const skipSegmentNow = (type: 'intro' | 'outro') => {
     const segment = skipSegmentsRef.current[type];
@@ -2123,7 +2116,7 @@ export function Player({
   const toggleAutoPlay = () => {
     const next = !autoPlay;
     setSettings({ ...settings, autoPlay: next });
-    // Turned ON: kick the live ArtPlayer instance immediately — the old
+    // Turned ON: kick the ArtPlayer instance immediately — the old
     // vidstack readiness effect that handled this died with the player swap.
     if (next) {
       const played = artInstanceRef.current?.play() as unknown;
@@ -2139,7 +2132,7 @@ export function Player({
   };
   const toggleAutoSkip = () => {
     const next = !autoSkip;
-    // Arming/disarming re-arms the per-segment attempt state (Aniraku parity).
+    // Reset the per-segment attempt state when auto-skip is toggled.
     autoSkipRef.current = next;
     autoSkippedRef.current = { intro: false, outro: false };
     const clearedFailures = { intro: false, outro: false };
@@ -2148,9 +2141,8 @@ export function Player({
     setSettings({ autoSkip: next });
   };
 
-  // ─── Zenime builtEmbeddedUrl (ported) ─────────────────────────────────────
   // FlixCloud reads its own autoPlay/skI/skO params — autoSkip rides along so
-  // embeds honor the same setting as HLS playback. (Zenime's animePahe/kwik
+  // embeds honor the same setting as HLS playback. (animePahe/kwik
   // iframe proxy is N/A: Embeds are FlixCloud via Aniraku.)
   useEffect(() => {
     if (!embeddedUrl) {
@@ -2175,7 +2167,6 @@ export function Player({
     }
   }, [embeddedUrl, autoPlay, autoSkip]);
 
-  // ─── Embed ad-guard (ported: Aniraku Watch.jsx:1611-1676) ─────────────────
   // Cross-origin providers can't be inspected by the parent, so popups are
   // restricted by the iframe `sandbox` attr and this same-origin pass adds
   // overlay cleanup + window.open blocking without touching the video.
@@ -2268,7 +2259,6 @@ export function Player({
     };
   }, [builtEmbeddedUrl]);
 
-  // ─── Zenime iframe postMessage bridge (ported) ────────────────────────────
   // Progress → all_episode_times (timestamped); ended (ArtPlayer/FlixCloud/
   // MegaCloud/watching-log/generic) → transition-locked auto-next.
   // Provider sync: 60% → `watching`, end → `completed` (restored auto-sync).
@@ -2282,11 +2272,11 @@ export function Player({
       ) {
         return;
       }
-      // Item 3 — embed end record (Aniraku saves completion at embed end:
-      // Watch.jsx:4540-4553 and :4594-4607 upsert time=duration before
-      // navigating). Saved BEFORE the auto-next gate too, so an embed
-      // finished with auto-next OFF still reflects completion — a strict
-      // superset of the reference, same native `all_episode_times` shape.
+      // Embed end record (completion is saved at embed end: the history
+      // entry is upserted with time=duration before navigating). Saved
+      // BEFORE the auto-next gate too, so an embed finished with auto-next
+      // OFF still reflects completion — a strict superset of the reference,
+      // same native `all_episode_times` shape.
       saveEpisodeCompletion(iframeProgressRef.current.duration);
       playbackTransitionRef.current = true;
       playbackTransitionLockUntilRef.current = Date.now() + 2_000;
@@ -2329,12 +2319,11 @@ export function Player({
       } catch {
         // localStorage unavailable — ignore
       }
-      // Item 1 — first GENUINE embed playback: postMessage progress only
+      // First genuine embed playback: postMessage progress only
       // arrives while the iframe is actually playing, so t>0 here is the
-      // embed twin of the HLS first-timeupdate trigger (Aniraku
-      // Watch.jsx:4327 `lastSave = 0` + :4381). Watch runs its dual-write
-      // record once per episode; publishHistoryNow (inside Watch) uploads
-      // it immediately for signed-in users.
+      // embed twin of the HLS first-timeupdate trigger. Watch runs its
+      // dual-write record once per episode; publishHistoryNow (inside
+      // Watch) uploads it immediately for signed-in users.
       if (time > 0 && !playbackStartRecordedRef.current) {
         playbackStartRecordedRef.current = true;
         onPlaybackStartRef.current?.();
@@ -2343,8 +2332,8 @@ export function Player({
         try {
           const dur = Math.floor(Number(iframeProgressRef.current.duration) || 0);
           const pos = Math.floor(Number(time) || 0);
-          // 60% threshold → `watching` (HLS + OLD embed parity) — the lib
-          // throttles repeat pushes at 60s/episode.
+          // 60% threshold → `watching` (HLS and embedded); the lib throttles
+          // repeat pushes at 60s/episode.
           if (dur > 0 && pos >= dur * 0.6) {
             pushProviderProgress('watching', pos, dur);
           }
@@ -2352,7 +2341,7 @@ export function Player({
           // provider push is best-effort
         }
       }
-      // FlixCloud time-based ended detection (Zenime parity).
+      // FlixCloud time-based ended detection.
       if (isFlixcloudEmbed) {
         const remaining = duration - time;
         if (
@@ -2527,7 +2516,7 @@ export function Player({
   }, [isEmbedded, isFlixcloudEmbed, episodeKey, settings, isLoggedIn]);
 
   const handlePlaybackEnded = async () => {
-    // Zenime transition lock — double-fires (vidstack ended + bridge) can't
+    // Transition lock — double-fires (vidstack ended + bridge) can't
     // stack two auto-next jumps.
     const lockUntil = playbackTransitionLockUntilRef.current;
     if (
@@ -2582,19 +2571,19 @@ export function Player({
     setShowEndedOverlay(false);
   };
 
-  // ── Item 3 — ended-progress save (Aniraku Watch.jsx:4264-4294) ──────────
+  // Ended-progress save.
   // On `video:ended` (HLS) and on every embed end signal, persist position
   // = duration → 100% in `all_episode_times` — NO schema change: the
   // native {currentTime, playbackPercentage} shape the reconcile /
   // flushHistorySync already read. A finished episode therefore reflects
   // completion in history, and the next open restores at its end → walks
-  // straight into the auto-next path (Aniraku's restore-at-duration).
+  // straight into the auto-next path.
   // Idempotent: an already-complete entry is NOT rewritten (no double-write
   // against the 10s `video:timeupdate` saver; a double `ended` fire is a
   // no-op); a REWATCH re-qualifies once intermediate saves make the entry
   // incomplete again. Gated by the same history-paused pref Watch's
   // dual-write honors (mirror at the top of this file), then published
-  // immediately via Wave B's `publishHistoryNow` (guests no-op) instead of
+  // immediately via the `publishHistoryNow` (guests no-op) instead of
   // waiting for the 10s engine tick.
   const saveEpisodeCompletion = (durationSeconds: number | undefined) => {
     const duration = Math.floor(Number(durationSeconds) || 0);
@@ -2609,7 +2598,7 @@ export function Player({
       ) {
         return; // already recorded complete — don't double-write
       }
-      // Timestamped write (Delta 2b): recency tiebreaks need epoch ms.
+      // Timestamped write: recency tiebreaks need epoch ms.
       all[episodeKey] = {
         currentTime: duration,
         playbackPercentage: 100,
@@ -2641,7 +2630,6 @@ export function Player({
     chapterLayerRef.current?.refresh();
   }, [anirakuSkip]);
 
-  // ─── ArtPlayer construction (ported from the reference build) ─────────────
   // Replaces the former direct-video vidstack branch: config assembly, the
   // async artplayer import, subtitle mounting and the full control/settings
   // registry live here. The embed-iframe branch above never reaches this.
@@ -2666,7 +2654,7 @@ export function Player({
     void (async () => {
       const proxied = (u: string) => proxiedMediaUrl(u, streamHeaders);
 
-      // ── Subtitle tracks: dedupe + language numbering, then normalize ──
+      // Subtitle tracks: dedupe + language numbering, then normalize
       const numberedTracks = subTracks.map((t, i, list) => {
         const language = t.lang || 'Unknown';
         const dupBefore = list.slice(0, i).filter((x) => x.lang === language)
@@ -2689,7 +2677,6 @@ export function Player({
       const initialSubtitleTrack =
         preferredSubtitleTrack || subtitleTracks[0] || null;
 
-      // ── Caption switching (ported): generation guard + flags BEFORE prefs ──
       const switchSubtitleTrack = async (
         track: SubtitleTrack | null,
       ): Promise<unknown> => {
@@ -2841,7 +2828,7 @@ export function Player({
         // the24×24 grid — the reference build's icon philosophy ("exact
         // Material Design filled paths … renders identically crisp at any
         // DPI"). Aniraku itself registers no override (its control bar at
-        // Watch.jsx:3317-3324 relies on ArtPlayer's built-in setting
+        // relies on ArtPlayer's built-in setting
         // control, icons.setting); this pins that same built-in control's
         // glyph to the official MD path instead of art's internal sketch.
         icons: {
@@ -3580,7 +3567,6 @@ export function Player({
       destroyPlayer();
       const art = new Artplayer(playerConfig);
 
-      // ── Preferences restore + live persistence (ported) ──
       const savedPlayerPreferences = playerPreferencesRef.current;
       art.volume = savedPlayerPreferences.volume;
       art.muted = savedPlayerPreferences.muted;
@@ -3651,7 +3637,7 @@ export function Player({
       }
 
       // Timeline hover preview + intro/outro markers + full-buffer cache
-      // indicator (ported) — both mount into the progress-bar inner layer.
+      // indicator — both mount into the progress-bar inner layer.
       const progressInner =
         art.video
           ?.closest('.art-video-player')
@@ -3686,7 +3672,6 @@ export function Player({
         advanceOnError();
       });
 
-      // ── Subtitle flags + mount state (ported) ──
       const artFlags = art as unknown as Record<string, unknown>;
       artFlags._anirakuSubtitles = subtitleTracks;
       artFlags._anirakuSwitchSubtitle = switchSubtitleTrack;
@@ -3737,7 +3722,7 @@ export function Player({
       });
 
       art.on('video:ended', () => {
-        // Item 3 — completion record runs FIRST, before the transition
+        // Completion record runs first, before the transition
         // lock/auto-next below can swallow or delay anything; it is
         // idempotent, so a locked-out second ended never double-writes.
         saveEpisodeCompletion(art.video?.duration);
@@ -3779,13 +3764,12 @@ export function Player({
         const now = Date.now();
         const position = Number(art.video?.currentTime) || 0;
 
-        // Item 1 (GAP 4) — first GENUINE playback of this episode → Watch
+        // First genuine playback of this episode → Watch
         // records it through its dual-write history path (a direct-URL
         // first visit never runs handleEpisodeSelect, so a first-ever
-        // session had no history entry until a click/auto-next). Reference
-        // trigger: Aniraku Watch.jsx:4327 (`let lastSave = 0`) + :4381 —
-        // its history upsert fires on the FIRST `video:timeupdate`, never
-        // on page load, so a page you never play is never marked watched.
+        // session had no history entry until a click/auto-next). The
+        // history upsert fires on the FIRST `video:timeupdate`, never on
+        // page load, so a page you never play is never marked watched.
         // Runs before the 10s throttle; publishHistoryNow's first await
         // yields past this handler, so the position write below lands
         // before the flush reads it.
@@ -3866,7 +3850,7 @@ export function Player({
           'all_episode_times',
           JSON.stringify(allPlaybackInfo),
         );
-        // 60% threshold → `watching` provider push (Aniraku embed parity).
+        // 60% threshold → `watching` provider push.
         if (savedDuration > 0 && savedPosition >= savedDuration * 0.6) {
           pushProviderProgress('watching', savedPosition, savedDuration);
         }
@@ -3877,17 +3861,16 @@ export function Player({
       // seed may only direct-seek an instance built for the same token.
       instanceEpisodeTokenRef.current = resumeTokenRef.current;
 
-      // ── Keyboard controls (ported: Aniraku Watch.jsx:1292-1473) ──────────
       // ONE `document` keydown in the CAPTURE phase, owned by the player and
       // registered only while an ArtPlayer instance exists: this effect's
       // cleanup AND destroyPlayer() both call removePlayerKeydown() (proof of
       // removal below), and the attach idempotently detaches any previous
       // handler first — the double-fire class of bug that once removed the
-      // legacy Watch.tsx handler (see Watch.tsx:782-784). ArtPlayer's own
-      // hotkeys are disabled (`hotkey: false` in playerConfig) so nothing
+      // legacy Watch handler. ArtPlayer's own hotkeys are disabled
+      // (`hotkey: false` in playerConfig) so nothing
       // double-fires from inside art either.
       //
-      // Plain unmodified keys only: Aniraku declares `ctrl` at Watch.jsx:1300
+      // Plain unmodified keys only: Aniraku declares `ctrl`
       // but never reads it — we implement that guard and extend it to
       // shift/alt because useGlobalShortcuts owns every modified chord
       // (Shift+D/M/N/P/B/T/V/?, Ctrl/Cmd+S, Ctrl/Cmd/Meta+, …); with it the
@@ -3896,7 +3879,7 @@ export function Player({
       // theater belongs to useGlobalShortcuts' unmodified-t contract (a
       // player-side KeyT would double-toggle through Watch's single
       // `aniraku:shortcut` listener). KeyD/KeyS cycle the pools Watch hands
-      // down via sourceCycleRef (ported from Aniraku Watch.jsx:1406-1438).
+      // down via sourceCycleRef.
       // KeyK is our one addition — Aniraku has no K, but the app's own
       // ShortcutsPopup advertises "K / Space". Aniraku's handler contains
       // no download key, so there is nothing to skip there.
@@ -3905,7 +3888,7 @@ export function Player({
         if (!liveArt) return;
         const target = e.target as HTMLElement | null;
         const tag = target?.tagName;
-        // Aniraku guard (Watch.jsx:1295-1297): typing targets, buttons and
+        // Aniraku guard: typing targets, buttons and
         // links keep native behavior — comments box, search, and any focused
         // control (also keeps DropSearch's ArrowUp/Down/Enter result
         // navigation intact, which only runs while its input/links hold
@@ -3938,10 +3921,9 @@ export function Player({
           return;
         }
         if (key === 'ArrowLeft' || key === 'KeyJ' || key === 'Home') {
-          // Home/End are OUR addition (in Aniraku and the live corpus alike):
-          // relative seek mapped to the SAME step, clamps and toast as the
-          // ArrowLeft/KeyJ branch above/below — Home ≡ −SEEK_SECONDS,
-          // End ≡ +SEEK_SECONDS.
+          // Home/End seek by the same step, clamps and toast as the
+          // ArrowLeft/KeyJ branch below (Home ≡ −SEEK_SECONDS,
+          // End ≡ +SEEK_SECONDS).
           e.preventDefault();
           const nextTime = seekVideoBy(liveArt, -SEEK_SECONDS);
           if (nextTime !== null) {
@@ -4039,27 +4021,27 @@ export function Player({
           return;
         }
         if (key === 'KeyN') {
-          // Aniraku (Watch.jsx:1396-1399) is silent at the end of the list —
+          // Aniraku is silent at the end of the list
           // no such toast exists anywhere in its source.
           e.preventDefault();
           if (hasNext) onNextEpisodeRef.current();
           return;
         }
         if (key === 'KeyB') {
-          // Aniraku (Watch.jsx:1401-1404) is silent at the start too; its
+          // Aniraku is silent at the start too; its
           // "This is the first episode" string belongs to the prev BUTTON
-          // (Watch.jsx:3342), which our own button keeps — body-by-body the
+          // which our own button keeps — body-by-body the
           // key handler carries no toast.
           e.preventDefault();
           if (hasPrev) onPrevEpisodeRef.current();
           return;
         }
-        // ── Source cycle (Aniraku Watch.jsx:1406-1438) ──────────────────────
-        // Pool = SUB servers then DUB servers, keyed `${lang}:${name}` — byte
-        // for byte with Watch's keyOf (Watch.tsx:632) and MediaSource's
-        // serverKey, so a selection always lands on a real handleSelectServer
-        // entry. Both keys no-op below 2 candidates (Aniraku's own guard); a
-        // missed findIndex (-1) rolls to entry 0. Toasts follow Aniraku.
+        // Source cycle.
+        // Pool = SUB servers then DUB servers, keyed `${lang}:${name}` —
+        // the same key as Watch's keyOf and MediaSource's serverKey, so a
+        // selection always lands on a real handleSelectServer entry. Both
+        // keys no-op below 2 candidates; a missed findIndex (-1) rolls to
+        // entry 0. Toasts use the shared Toaster.
         if (key === 'KeyD' || key === 'KeyS') {
           e.preventDefault();
           const { serversSub, serversDub, selectedServer, onSelectServer } =
@@ -4102,7 +4084,7 @@ export function Player({
             return;
           }
           // KeyS walks past entries equal to the active one first — a no-op
-          // over our unique `${lang}:${name}` keys, kept verbatim so pools
+          // over our unique `${lang}:${name}` keys, kept so pools
           // with colliding names behave exactly like Aniraku's.
           let nextIdx = (currentIdx + 1) % allSources.length;
           let attempts = 0;
@@ -4141,20 +4123,18 @@ export function Player({
           return;
         }
         if (key === 'Escape') {
-          // Tiered port of Aniraku (Watch.jsx:1464-1470, which consumes
-          // Escape unconditionally): take the key ONLY for state the player
-          // owns — native fullscreen, ArtPlayer web-fs (config sets
-          // fullscreenWeb: true), or theater (21/9 aspect mirror) — and pass
-          // it through untouched otherwise, so overlayStack's Escape and the
-          // other bubble-phase owners (MediaSource dropdowns, trailer modal,
-          // navbar search) keep their key whenever the player is in none of
-          // those states. Theater-off rides Watch's single
-          // `aniraku:shortcut` listener (case 'theater' toggles it off);
-          // Escape is in neither useGlobalShortcuts' table nor overlayStack's
-          // contract, so no double-fire. Known tiering edge: with theater on
-          // AND an overlay open, the first Escape drops theater and the
-          // second closes the overlay — overlayStack exposes no open-state
-          // query we could consult from here.
+          // Take Escape only for state the player owns — native fullscreen,
+          // ArtPlayer web-fs (config sets fullscreenWeb: true), or theater
+          // (21/9 aspect mirror) — and pass it through otherwise, so
+          // overlayStack's Escape and other bubble-phase owners (MediaSource
+          // dropdowns, trailer modal, navbar search) keep their key whenever
+          // the player is in none of those states. Theater-off rides Watch's
+          // single `aniraku:shortcut` listener (case 'theater' toggles it
+          // off); Escape is in neither useGlobalShortcuts' table nor
+          // overlayStack's contract, so no double-fire. Known tiering edge:
+          // with theater on and an overlay open, the first Escape drops
+          // theater and the second closes the overlay — overlayStack exposes
+          // no open-state query we could consult from here.
           const inNativeFs = Boolean(
             liveArt.fullscreen || document.fullscreenElement,
           );
@@ -4213,7 +4193,7 @@ export function Player({
     setSubtitlePreference,
   ]);
 
-  // Manual skip overlay inputs (ported): prompt window start-2..end-0.5;
+  // Manual skip overlay inputs: prompt window start-2..end-0.5
   // hidden while auto-skip is armed unless the attempt already ran or failed.
   const showSkipIntro = shouldShowManualSkipOverlay({
     segment: anirakuSkip.intro,
@@ -4233,7 +4213,7 @@ export function Player({
     skipSegmentNow(type);
   };
 
-  // ── No-source overlay (task): a discovery dead-end instead of a dead
+  // No-source overlay: a discovery dead-end instead of a dead
   // black box. Same panel conventions as the ended overlay above (absolute
   // inset, rgba backdrop, navBtnStyle actions); shown per mode — HLS mode
   // when /stream failed or returned no sources, embed mode when the URL
@@ -4369,7 +4349,7 @@ export function Player({
       }}
       className='player-cc'
     >
-      {/* Zenime composition — embedded: iframe shell + shared control bar */}
+      {/* Embedded composition: iframe shell + shared control bar */}
       {isEmbedded ? (
         <EmbeddedPlayerWrapper>
           <EmbeddedIframeWrapper key={stableIframeKey} $aspect={aspectRatio}>
@@ -4417,7 +4397,7 @@ export function Player({
                 aria-hidden='true'
               />
             )}
-            {/* Item 2 — Resume countdown (Aniraku Watch.jsx:6069-6130):
+            {/* Resume countdown:
                 shown only for a >30s stored position; seeks on zero or the
                 Resume button, "Start Over" dismisses without seeking.
                 Bottom-center above the control strip — clears the

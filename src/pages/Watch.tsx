@@ -27,16 +27,15 @@ import { Seasons } from '../components/Watch/Seasons';
 import { SkeletonPlayer } from '../components/Skeletons/Skeletons';
 import { Episode } from '../index';
 import { Comments } from '../components/Watch/Comments';
-// Item 1 (GAP 4) — immediate history upload after the first-playback
-// Record: thin wrapper over the 10s flush engine (guests no-op,
-// Idempotent diff-upsert). Import-only — sync.ts stays the file.
+// Immediate history upload after the first-playback record: a thin wrapper
+// over the 10s flush engine (guests no-op, idempotent diff-upsert).
 import {
   publishHistoryNow,
   getSessionUserId,
   PROVIDER_LABELS,
 } from '../lib/sync';
 import { showToast } from '../components/Toaster';
-// Unreleased-title/episode fallback copy (old Aniraku voice).
+// Unreleased-title/episode fallback copy.
 import {
   UNRELEASED_ANIME_MESSAGE,
   UNRELEASED_MOVIE_MESSAGE,
@@ -57,12 +56,11 @@ import {
 import { syncAverageScore } from '../lib/providerSync';
 import { resolveDisplayTitle } from '../lib/displayLanguage';
 import { recordWatchEvent } from '../lib/watchEvents';
-// Item 1 (NSFW gate) — Aniraku:5578.
 import { isNsfw, useNsfw } from '../hooks/useNsfw';
-// Runtime SEO (SEO layer) — old setWatchSEO (seo.js:190-260) via shared helper.
+// Runtime SEO through the shared helper.
 import { SITE_URL, useSeo } from '../utils/seo';
 
-// Live local-storage keys (per-anime prefs moved from the legacy
+// Local-storage keys (per-anime prefs moved from the legacy
 // `source-[id]` / `subOrDub-[id]` names to `aniraku:anime:source:{id}` /
 // `aniraku:anime:language:{id}`; legacy keys stay readable/writable).
 const getSourceTypeKey = (animeId: string | undefined) =>
@@ -77,7 +75,7 @@ const legacyLanguageKey = (animeId: string | undefined) =>
 const readStoredPref = (key: string, legacyKey: string): string | null =>
   localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
 
-// Live theater prefs: `aniraku:ui:theater` (legacy) + `aniraku:ui` record
+// Theater prefs: `aniraku:ui:theater` (legacy) + `aniraku:ui` record
 // field `theaterMode`. Both are kept in sync.
 const readUiRecord = (): Record<string, unknown> => {
   try {
@@ -113,7 +111,7 @@ const readTheaterPref = (): boolean => {
 const serverIsEmbed = (s: any) =>
   (s?.sources ?? []).some((src: any) => src?.type === 'embed');
 
-// Load-time server sanitation (Aniraku parity): dedupe backend name repeats
+// Load-time server sanitation: dedupe backend name repeats
 // (a name can repeat within a pool — duplicates would collide as duplicate
 // `${lang}:${name}` picker keys) and drop rows with NOTHING mountable:
 // direct sources whose signed token is expired, and embeds that are
@@ -134,18 +132,16 @@ const sanitizeServers = (list: any[]): any[] => {
   });
 };
 
-// ---------------------------------------------------------------------------
-// Live episode-in-query-string contract (links `At`/`Q`/`$`, Seasons `ht`/`_t`):
-//   READ  `?ep=N` from the query string FIRST (float > 0; `latest` → last
+// Episode-in-query-string contract:
+//   READ  `?ep=N` from the query string first (float > 0; `latest` → last
 //         episode), then the legacy `:episodeNumber` path param so old
 //         3-segment links keep working.
-//   WRITE ALWAYS the live 2-segment + `?ep=N` format
-//         `/watch/{id}[/{slug}][?ep={N}]` — with REPLACE semantics (live's
-//         episode-select does `history.replaceState` +
-//         `setSearchParams({replace:true})`, never a push).
-// ---------------------------------------------------------------------------
+//   WRITE always the 2-segment + `?ep=N` format
+//         `/watch/{id}[/{slug}][?ep={N}]`, with replace semantics (the
+//         episode select uses `history.replaceState` +
+//         `setSearchParams({ replace: true })`, never a push).
 
-// live links `Q` — slugify a title.
+// Slugify a title.
 const slugify = (value: string): string =>
   value
     .normalize('NFD')
@@ -156,8 +152,7 @@ const slugify = (value: string): string =>
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
-// live links `$` — pick the title: shortest of english/romaji, else native,
-// else String(id).
+// Pick the title: shortest of english/romaji, else native, else String(id).
 type WatchUrlMedia = {
   id: string | number;
   title?: { english?: string; romaji?: string; native?: string };
@@ -172,8 +167,8 @@ const pickSlugTitle = (title: WatchUrlMedia['title'], id: WatchUrlMedia['id']): 
   return title?.native ?? String(id);
 };
 
-// live links `At(media, ep)` — the watch URL builder. Slug empty or equal to
-// the id → bare `/watch/{id}` (live's `n && n !== String(id)` guard).
+// Build the watch URL. A slug that is empty or equal to the id yields the
+// bare `/watch/{id}`.
 const buildWatchUrl = (
   media: WatchUrlMedia,
   episodeNumber?: number | null,
@@ -186,9 +181,8 @@ const buildWatchUrl = (
   return episodeNumber == null ? path : `${path}?ep=${episodeNumber}`;
 };
 
-// live Seasons `ht` — read `?ep` from a search string: parsed episode
-// (float > 0), `latest` verbatim (resolved by live `_t`), or null when
-// absent/invalid (caller falls back to the legacy path param).
+// Read `?ep` from a search string: parsed episode absent/invalid (the caller
+// falls back to the legacy path param).
 const parseRequestedEpisode = (search: string): number | 'latest' | null => {
   const raw = new URLSearchParams(search).get('ep');
   if (!raw) return null;
@@ -197,8 +191,8 @@ const parseRequestedEpisode = (search: string): number | 'latest' | null => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-// live Seasons `_t` — resolve a request against the loaded list: exact
-// number match → closest episode ≤ requested → first. `latest` → last.
+// Resolve a request against the loaded list: exact number match → closest
+// episode ≤ requested → first. `latest` → last.
 const resolveRequestedEpisode = <T extends { number: number }>(
   list: T[],
   requested: number | 'latest',
@@ -219,7 +213,7 @@ const EMPTY_HEADERS: Record<string, string> = {};
 
 const WatchContainer = styled.div``;
 
-// Live lights-out veil (.dimmed-background / .dimmed-overlay): a fixed
+// Lights-out veil (.dimmed-background /.dimmed-overlay): a fixed
 // #000000ec backdrop at --z-index-modal-backdrop, the player lifted to
 // --z-index-modal, and a dismiss layer above the veil but below the player.
 const LightsGlobalStyle = createGlobalStyle`
@@ -262,14 +256,14 @@ const WatchWrapper = styled.div`
     align-items: flex-start;
   }
 
-  /* Live data-theater-mode: video row becomes a full-width column. */
+  /* data-theater-mode: video row becomes a full-width column. */
   &[data-theater-mode='true'] {
     flex-direction: column;
     align-items: stretch;
   }
 `;
 
-// Zenime DataWrapper (verbatim rules): 2-col grid below the player row —
+// DataWrapper: 2-col grid below the player row —
 // left = source/comments/details sized to the player, right = relations +
 // recommendations. Collapses to one column under 1000px.
 const DataWrapper = styled.div`
@@ -283,7 +277,7 @@ const DataWrapper = styled.div`
   }
 `;
 
-// Zenime SourceAndData — grid col 1 width tracks the measured player width,
+// SourceAndData — grid col 1 width tracks the measured player width,
 // 100% under 1000px. Slot order: [mediaSource, comments, details].
 const SourceAndData = styled.div<{ $videoPlayerWidth: string }>`
   display: flex;
@@ -296,8 +290,8 @@ const SourceAndData = styled.div<{ $videoPlayerWidth: string }>`
   }
 `;
 
-// Zenime RalationsTable (verbatim rules) + column gap so the SEASONS stack
-// sits above RELATED / RECOMMENDATIONS (Aniraku feature parity).
+// RalationsTable + column gap so the SEASONS stack sits above RELATED /
+// RECOMMENDATIONS.
 const RalationsTable = styled.div`
   display: flex;
   flex-direction: column;
@@ -363,9 +357,9 @@ const NoEpsMessage = styled.p`
   line-height: 1.6;
 `;
 
-// In-player upcoming notice — old Aniraku `watch-error` language verbatim:
-// a black 16:9 stage with the no-source icon + message (no action buttons
-// for upcoming — there is nothing to retry, the episode simply is not out).
+// In-player upcoming notice — a black 16:9 stage with the no-source icon
+// and message (no action buttons for upcoming: there is nothing to retry,
+// the episode simply is not out).
 const UpcomingPanel = styled.div`
   position: relative;
   aspect-ratio: 16 / 9;
@@ -488,7 +482,7 @@ const IframeTrailer = styled.iframe`
   }
 `;
 
-// Live error boundary (yn): "Playback unavailable" + Retry / Go Home,
+// Error boundary (yn): "Playback unavailable" + Retry / Go Home,
 // resetKey = pathname so navigating away clears the error state.
 const BoundaryBox = styled.div`
   display: flex;
@@ -575,7 +569,7 @@ const LOCAL_STORAGE_KEYS = {
   LAST_ANIME_VISITED: 'last-anime-visited',
 };
 
-// Live local-history gate: while the user paused history recording, skip
+// Local-history gate: while the user paused history recording, skip
 // persisting watched-episodes. The pref is written by useWatchHistory's
 // writePref as either the `historyPaused` field of the `aniraku:watching`
 // record or (legacy) as a JSON boolean under
@@ -597,12 +591,9 @@ const isHistoryPaused = (): boolean => {
   return false;
 };
 
-// ---------------------------------------------------------------------------
-// NSFW gate chrome — Info.tsx NsfwCard pattern (Aniraku AnimeDetail.jsx:553-590
-// card, copy/buttons structure), carrying Aniraku's WATCH-variant paragraph
-// (Watch.jsx:5578-5614 says "This anime contains adult content…", the
-// AnimeDetail variant says "This title contains…").
-// ---------------------------------------------------------------------------
+// NSFW gate chrome — Info.tsx NsfwCard pattern, carrying the Watch-variant
+// paragraph ("This anime contains adult content…", versus the AnimeDetail
+// variant's "This title contains…").
 const NsfwGateCard = styled.div`
   max-width: 400px;
   margin: 0 auto;
@@ -672,13 +663,9 @@ const NsfwOutline = styled(Link)`
   cursor: pointer;
 `;
 
-// ---------------------------------------------------------------------------
-// Episode rating row — Aniraku Watch.jsx:6512-6564 `.watch-rating`: label
-// ("Rated n/10" | "Rate this episode") + ten 1-10 star buttons + saving
-// spinner + 2s "Saved" flag. Sits right under the current-episode meta bar
-// (MediaSource), above the details column — the Watch-page slot Aniraku
-// fills between `watch-current-meta` and `watch-nav`.
-// ---------------------------------------------------------------------------
+// Episode rating row: label ("Rated n/10" | "Rate this episode") + ten 1-10
+// star buttons + saving spinner + 2s "Saved" flag. Sits right under the
+// current-episode meta bar (MediaSource), above the details column.
 const WatchRatingRow = styled.div`
   display: flex;
   align-items: center;
@@ -691,8 +678,8 @@ const spinKeyframes = keyframes`
   to { transform: rotate(360deg); }
 `;
 
-// Aniraku pairs FaSpinner with a `.watch-spin` class that doesn't exist in
-// this repo's stylesheets — animate the icon itself instead (same visual).
+// FaSpinner with a local spin animation (no `.watch-spin` class exists in
+// this repo's stylesheets).
 const RatingSpinner = styled(FaSpinner)`
   animation: ${spinKeyframes} 1s linear infinite;
 `;
@@ -715,7 +702,7 @@ const WatchInner: React.FC = () => {
     episodeNumber?: string;
   }>();
   const navigate = useNavigate();
-  // Aniraku Watch.jsx:1520 — reactive NSFW preference (shared per-account
+  // reactive NSFW preference (shared per-account
   // state via useNsfw, default OFF). Flipping it anywhere re-renders this
   // page, so the gate below lifts/drops live without a reload.
   const { nsfwEnabled } = useNsfw();
@@ -796,12 +783,12 @@ const WatchInner: React.FC = () => {
   // overwrite the user's saved Dub preference (and vice versa).
   const autoLangFallbackRef = useRef(false);
   const [downloadLink, setDownloadLink] = useState('');
-  // Live theater + lights state (toggled ONLY through the single
+  // Theater + lights state (toggled ONLY through the single
   // `aniraku:shortcut` listener below, plus the player menu Lights button
   // which dispatches the same contract event).
   const [theaterMode, setTheaterMode] = useState<boolean>(readTheaterPref);
   const [lightsOn, setLightsOn] = useState(false);
-  // Responsive slots are pure CSS now (Zenime parity — @1000px media
+  // Responsive slots are pure CSS now (consistency — @1000px media
   // queries on WatchWrapper/DataWrapper); no JS breakpoint needed.
   const nextEpisodeAiringTime =
     animeInfo && animeInfo.nextAiringEpisode
@@ -851,7 +838,7 @@ const WatchInner: React.FC = () => {
   );
   const [languageChanged, setLanguageChanged] = useState(false);
 
-  // ── Episode ratings (own, 1-10) — Aniraku Watch.jsx:2079-2176 ──
+  // Episode ratings (own, 1-10).
   // Transport = lib/episodeRatings (import-only): authed saves go to the
   // backend, guests keep LS `aniraku-episode-ratings-{animeId}`; after a
   // successful save the score push below fires for every CONNECTED sync
@@ -861,7 +848,6 @@ const WatchInner: React.FC = () => {
   const [epRatingSaved, setEpRatingSaved] = useState(false);
   const epRatingSaveTimerRef = useRef<number | null>(null);
 
-  //----------------------------------------------MORE VARIABLES----------------------------------------------
   const GoToHomePageButton = () => {
     const navigate = useNavigate();
 
@@ -1146,18 +1132,16 @@ const WatchInner: React.FC = () => {
     });
   };
 
-  // GAP 4 (Item 1) — record the CURRENT episode on first GENUINE playback.
-  // A direct-URL first visit never runs handleEpisodeSelect, so a
-  // first-ever session uploaded nothing until a click or auto-next. Player
-  // calls this once per episode load from its first `video:timeupdate`
-  // (t>0) — the same first-timeupdate trigger Aniraku records at
-  // (Watch.jsx:4327 `lastSave = 0` + :4381), NEVER on mere page load, so
-  // pages you never play are never marked watched; the embed path fires it
-  // from the first postMessage progress (t>0). Routes through
-  // updateWatchedEpisodes — the EpisodeList-style dual-write,
-  // `isHistoryPaused()` gated at :711 — so Wave B's flushHistorySync sees
-  // the anime; `publishHistoryNow` then pushes the row immediately for
-  // signed-in users (guests no-op).
+  // Record the CURRENT episode on first genuine playback.
+  // A direct-URL first visit never runs handleEpisodeSelect, so a first-ever
+  // session uploaded nothing until a click or auto-next. Player calls this
+  // once per episode load from its first `video:timeupdate` (t>0) — the same
+  // trigger used for history, and never on mere page load, so pages you
+  // never play are never marked watched. The embed path fires it from the
+  // first postMessage progress (t>0). Routes through updateWatchedEpisodes
+  // (the EpisodeList-style dual-write, `isHistoryPaused` gated), so the
+  // flushHistorySync sees the anime; `publishHistoryNow` then pushes the row
+  // immediately for signed-in users (guests no-op).
   const playbackRecordedKeyRef = useRef('');
   const handlePlaybackStarted = () => {
     if (!animeId || !currentEpisode.id) return;
@@ -1197,7 +1181,7 @@ const WatchInner: React.FC = () => {
       // browsing episodes inflates watch counts and exports full progress
       // for half-watched series.
 
-      // Live episode write: `/watch/{id}/{slug}?ep={N}` with REPLACE (live's
+      // Episode write: `/watch/{id}/{slug}?ep={N}` with REPLACE (the app's
       // `history.replaceState` + `setSearchParams({replace:true})` — never a
       // push, never the legacy 3-segment path).
       navigate(
@@ -1249,7 +1233,6 @@ const WatchInner: React.FC = () => {
   );
   const toggleLights = useCallback(() => setLightsOn((value) => !value), []);
 
-  //----------------------------------------------USEFFECTS----------------------------------------------
   // THE one `aniraku:shortcut` listener (contract: detail.action ∈
   // prev-ep | next-ep | theater | lights). Registered on mount, cleaned on
   // unmount; latest handlers are read through a ref so the listener never
@@ -1293,7 +1276,7 @@ const WatchInner: React.FC = () => {
     return () => window.removeEventListener('aniraku:shortcut', onShortcut);
   }, []);
 
-  // Own episode ratings (Aniraku Watch.jsx:2088-2109, upgraded):
+  // Own episode ratings
   // authed → backend (`GET /api/v1/anime/{id}/ratings`) with guest-merge on
   // login (server wins per-episode, guest-only uploads); guest → LS
   // `aniraku-episode-ratings-{animeId}`. Session identity resolves through
@@ -1364,8 +1347,8 @@ const WatchInner: React.FC = () => {
     );
   }, [animeId]);
 
-  // TODO SAVES LANGUAGE PREFERENCE TO LOCAL STORAGE (live + legacy keys).
-  // Skipped once after an automatic fallback flip (see above) so a
+  // TODO: persist the language preference to localStorage (current + legacy
+  // keys). Skipped once after an automatic fallback flip (see above) so a
   // single-language episode never rewrites the saved preference.
   useEffect(() => {
     if (autoLangFallbackRef.current) {
@@ -1450,7 +1433,7 @@ const WatchInner: React.FC = () => {
               image: ep.image,
             }));
           setEpisodes(transformedEpisodes);
-          // Episode resolution order (live parity): `?ep=N` from the query
+          // Episode resolution order: `?ep=N` from the query
           // string FIRST, then the legacy `:episodeNumber` path param, then
           // the saved-episode fallback for bare /watch/{id}[/slug] URLs.
           const queryEpisode = parseRequestedEpisode(window.location.search);
@@ -1472,7 +1455,6 @@ const WatchInner: React.FC = () => {
               );
             } else if (requestedEpisode !== null) {
               // Exact → closest ≤ requested → first; `latest` → last
-              // (live `_t` semantics).
               return resolveRequestedEpisode(
                 transformedEpisodes,
                 requestedEpisode,
@@ -1503,8 +1485,8 @@ const WatchInner: React.FC = () => {
               airDate: navigateToEpisode.airDate,
             });
 
-            // Initial normalization: always land (or stay) on the live
-            // 2-segment + `?ep=N` format — REPLACE, so a legacy 3-segment
+            // Initial normalization: always land (or stay) on the
+            // 2-segment + `?ep=N` format — replace, so a legacy 3-segment
             // deep link (`/watch/21/title/5`) rewrites to
             // `/watch/21/slug?ep=5` without adding a history entry.
             navigate(
@@ -1565,8 +1547,8 @@ const WatchInner: React.FC = () => {
     language,
     languageChanged,
     currentEpisode.number,
-    // Re-normalizes the URL once the media title loads so the slug in
-    // `?ep=N` writes matches live's `At` builder.
+    // Re-normalizes the URL once the media title loads so the slug in the
+    // `?ep=N` writes matches the URL builder.
     animeInfo?.title,
   ]);
 
@@ -1627,18 +1609,18 @@ const WatchInner: React.FC = () => {
     return () => window.removeEventListener('resize', updateMaxHeight);
   }, []);
 
-  // TODO SAVES SOURCE TYPE PREFERENCE TO LOCAL STORAGE (live + legacy keys)
+  // TODO: persist the source-type preference to localStorage (current and
+  // legacy keys).
   useEffect(() => {
     localStorage.setItem(getSourceTypeKey(animeId), sourceType);
     localStorage.setItem(legacySourceTypeKey(animeId), sourceType);
   }, [sourceType, animeId]);
 
-  // Runtime SEO — old setWatchSEO (seo.js:190-260) through useSeo: per-episode
-  // title/description/keywords, canonical on the canonical domain (pathname
-  // strips ?ep=/server/language query churn — per-episode whenever the route
-  // carries the number), og/twitter image + video.episode type, and JSON-LD
-  // (VideoObject + 4-level breadcrumb, old's Catalog mapped to our /search)
-  // with helper-managed cleanup. (Replaces the rebrand-sweep title effect.)
+  // Runtime SEO through useSeo: per-episode title/description/keywords,
+  // canonical on the canonical domain (pathname strips ?ep=/server/language
+  // query churn — per-episode whenever the route carries the number),
+  // og/twitter image + video.episode type, and JSON-LD (VideoObject +
+  // 4-level breadcrumb) with helper-managed cleanup.
   const { pathname: seoPathname } = useLocation();
   const watchSeoTitle =
     resolveDisplayTitle(animeInfo?.title) || 'Unknown Anime';
@@ -1736,7 +1718,7 @@ const WatchInner: React.FC = () => {
     }
   }, [loading, episodes]);
 
-  // ── saveRating — Aniraku Watch.jsx:2111-2177 (upgraded flow) ──
+  // Save an episode rating.
   // authed → saveEpisodeRating (server); guest → LS `…-{animeId}`.
   // On success, push the AVERAGE of all episode ratings as the provider
   // anime score (providers only support anime-level scores) via the shared
@@ -1791,7 +1773,7 @@ const WatchInner: React.FC = () => {
     [epRatingSaving, epRatings, animeId, currentEpisode.number],
   );
 
-  // ── NSFW gate — Aniraku Watch.jsx:5578-5614 ──
+  // NSFW gate.
   // Hentai-genre title (isNsfw, genre rule) + NSFW preference OFF
   // (useNsfw default) → the page returns the gate INSTEAD of the player
   // row, so <Player> never mounts for the blocked title: no source fetch,
@@ -1800,7 +1782,7 @@ const WatchInner: React.FC = () => {
   // decision always precedes the player mount; flipping the setting
   // re-renders through useNsfw's shared state and lifts the gate live.
   // Copy: Info.tsx NsfwCard pattern (Open Settings → /profile/settings,
-  // Go Back → /) + Aniraku's WATCH-variant paragraph, verbatim.
+  // Go Back → /) with the Watch-specific paragraph.
   if (animeInfo && isNsfw(animeInfo) && !nsfwEnabled) {
     return (
       <WatchContainer className='nsfw-gate' style={{ padding: '80px 20px' }}>
@@ -1820,7 +1802,6 @@ const WatchInner: React.FC = () => {
     );
   }
 
-  //----------------------------------------------SLOT CONTENT----------------------------------------------
   const mediaSourceEl =
     animeInfo && animeInfo.status !== 'Not yet aired' ? (
       <MediaSource
@@ -1850,7 +1831,7 @@ const WatchInner: React.FC = () => {
       />
     ) : null;
 
-  // `.watch-rating` row (Aniraku Watch.jsx:6512-6564) — placed directly
+  // `.watch-rating` row — placed directly
   // under the current-episode meta bar (mediaSourceEl), matching Aniraku's
   // meta → rating order inside `watch-info`. Renders once the title is
   // known; `loading` is NOT part of the condition (it re-toggles on every
@@ -2028,7 +2009,7 @@ const WatchInner: React.FC = () => {
           </UpcomingContent>
         </UpcomingPanel>
       ) : (
-        // Zenime composition: ONE Player owns both render modes — HLS chrome
+        // Composition: ONE Player owns both render modes — HLS chrome
         // (PlayerViewport) or the embedded FlixCloud iframe + control bar —
         // chosen inside the player from `embedded`/`embeddedUrl`.
         <Player
@@ -2164,7 +2145,7 @@ const WatchInner: React.FC = () => {
   );
 };
 
-// Route-level wrapper: live error boundary (yn) with resetKey=pathname.
+// Route-level error boundary with resetKey=pathname.
 const Watch: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();

@@ -1,4 +1,3 @@
-// TS port of the src/lib/avatars.js — same preset catalog, same URL logic.
 /** Preset avatars hosted on the public Supabase Storage bucket "Anixen Avatars". */
 import { supabase } from './supabase';
 

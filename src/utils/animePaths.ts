@@ -1,11 +1,10 @@
-// Shared anime path helpers — SINGLE SOURCE for slug-bearing navigation.
+// Shared anime path helpers — the single source for slug-bearing navigation.
 //
-// Byte-for-byte copies of the live link helpers proven in src/pages/Info.tsx
-// (live links chunk — `Q/$/kt/At` = slugify/pickTitle/
-// infoPathFor/watchPathFor). Info.tsx keeps its internal copies untouched
-// (forbidden file); every OTHER emitter routes through this module instead of
-// the legacy useApi `animeSlug/infoPath` (different algorithm) or hand-rolled
-// `/watch/{id}` strings.
+// Copies of the link helpers proven in src/pages/Info.tsx
+// (`Q/$/kt/At` = slugify/pickTitle/infoPathFor/watchPathFor). Info.tsx keeps
+// its internal copies; every other emitter routes through this module
+// instead of the legacy useApi `animeSlug/infoPath` (different algorithm) or
+// hand-rolled `/watch/{id}` strings.
 //
 // Spec: NFD-normalize → strip combining marks → lowercase → drop
 // `[^a-z0-9\s-]` → trim → collapse spaces/dashes; pick shortest of
@@ -56,7 +55,7 @@ export const infoPathFor = (item: Linkable): string => {
     : `/info/${item.id}`;
 };
 
-// live At(media, ep?) — /watch/{id}/{slug} (+ ?ep= only when ep != null).
+// /watch/{id}/{slug} (+ ?ep= only when ep != null).
 export const watchPathFor = (item: Linkable, episode?: number | null): string => {
   const id = String(item.id);
   const slug = slugify(pickTitle(item.title, id));

@@ -4,7 +4,7 @@ import Select from 'react-select';
 import { FiCheck, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { FaUndo } from 'react-icons/fa';
 
-// Filter value model — mirrors the live Search route.
+// Filter value model — mirrors the Search route.
 // URL params written/read: query (handled by the page), tags, genres, format,
 // status, countryOfOrigin, season, startDate_like, source, isAdult,
 // averageScoreMin, averageScoreMax, sort, type, dubLanguage.
@@ -87,7 +87,7 @@ export const serializeFilterValues = (
   return params;
 };
 
-// Option lists — exact labels/order from the live bundle.
+// Option lists — exact labels/order from the bundle.
 
 interface SelOption {
   label: string;
@@ -247,7 +247,7 @@ export const dubLanguageOptionsList: string[] = [
   'Urdu',
 ];
 
-// Full MediaSort enum shown by the live "Sort By" multi-select.
+// Full MediaSort enum used by the "Sort By" multi-select.
 export const sortOptionsList: string[] = [
   'ID',
   'ID_DESC',
@@ -346,9 +346,7 @@ const yearOptions: SelOption[] = [
   })),
 ];
 
-// ---------------------------------------------------------------------------
-// Styles — ported from live _filter*_90nii module classes.
-// ---------------------------------------------------------------------------
+// Styles for the filter panel.
 
 const FilterContainer = styled.div`
   display: grid;
@@ -542,9 +540,7 @@ const FilterGroupRow: React.FC<FilterGroupRowProps> = ({ label, children }) => (
   </FilterGroup>
 );
 
-// ---------------------------------------------------------------------------
-// Filter form state (expanded section applies on "Apply", like live).
-// ---------------------------------------------------------------------------
+// Filter form state; the expanded section applies on "Apply".
 
 interface FilterForm {
   selectedTags: SelOption[];
@@ -641,7 +637,7 @@ export const SearchFilters: React.FC<{
     valuesToForm(currentFilters),
   );
 
-  // Live behavior: resizing collapses the expanded section unless the user
+  // Behavior: resizing collapses the expanded section unless the user
   // just toggled it (protected while interacting).
   useEffect(() => {
     const onResize = () => {

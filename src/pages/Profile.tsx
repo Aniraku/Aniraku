@@ -1,14 +1,11 @@
-// Profile — Aniraku src/pages/ SUBSET port, scope reduced
-// coordinator delta 3: ships ONLY (a) Profile Overview and (b) Bookmarks.
-//   • Overview: identity card (avatar/username/display/email/verified),
-//     sign-out, guest = login prompt, and the edit card — avatar preset
-//     Picker (Aniraku selectAvatar → updateProfile
-//     immediately) + username/display_name/bio edit
-//   • Bookmarks: server bookmarks select anime_id,title,image → cards
-// REMOVED per delta 3: the watch-history section (history has its own page)
-// and ALL banner_url UI (column unused; no upload/edit/preview). Preserved:
-// settings-as-modal (?settings=1 + <Settings />) + gear — required by the
-// App /settings routes and GlobalShortcutsBridge.
+// Profile page: overview and bookmarks.
+//   - Overview: identity card (avatar/username/display/email/verified),
+//     sign-out, guest login prompt, and the edit card with avatar preset
+//     selection plus username/display_name/bio editing.
+//   - Bookmarks: server bookmarks (anime_id, title, image) rendered as cards.
+//
+// Settings opens as a modal (?settings=1 plus <Settings />) from the gear;
+// the App /settings routes and GlobalShortcutsBridge depend on it.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -27,10 +24,9 @@ import {
   listAvatars,
   type Avatar,
 } from '../lib/avatars';
-// Library tab (upgraded) — Aniraku sync
-// import/export + the provider row/status copy (:554-672). Transports live
-// in lib/sync.ts; import AND export run as background jobs (auto-loop on
-// `limited`, per-provider mutex, bell notifications).
+// Library tab: import/export plus the provider rows and status copy.
+// Transports live in lib/sync.ts; import and export run as background jobs
+// (auto-loop on `limited`, per-provider mutex, bell notifications).
 import {
   describeExport,
   describeImport,
@@ -54,7 +50,7 @@ import ProviderIcon from '../components/ProviderIcon';
 import { showToast } from '../components/Toaster';
 import { infoPathFor } from '../utils/animePaths';
 
-// Same as the live .vh helper (visually hidden heading)
+// Same as the.vh helper (visually hidden heading)
 const VisuallyHidden = styled.h1`
   position: absolute;
   width: 1px;
@@ -67,7 +63,7 @@ const VisuallyHidden = styled.h1`
   border: 0;
 `;
 
-// _userProfileContainer_y1j45_47: profile details column (banner UI removed
+// profile details column (banner UI removed
 // per delta 3 — no banner_url upload/edit/preview anywhere on Profile)
 const ProfileShell = styled.div`
   position: relative;
@@ -80,7 +76,7 @@ const ProfileShell = styled.div`
   border-radius: var(--global-border-radius);
 `;
 
-// Settings gear — kept from the banner's _bannerSettingsButton_y1j45_87
+// Settings gear — kept from the banner's
 // (banner wrapper/image removed per delta 3; the gear still opens
 // /profile?settings=1 from both guest and authed states)
 const HeaderBar = styled.div`
@@ -224,7 +220,7 @@ const Loginbutton = styled.div`
   }
 `;
 
-// ── Aniraku Profile edit card / list sections ──────────────────────────────
+// Aniraku Profile edit card / list sections
 const EditCard = styled.section`
   width: 100%;
   padding: 24px;
@@ -264,7 +260,7 @@ const ListSection = styled.section`
   }
 `;
 
-// ── Profile section tabs ─────────────────────────────────────────
+// Profile section tabs
 // Aniraku `.profile-tabs` (Profile / Avatars / Bookmarks
 // / Library; History + Badges stay out of scope — history has its own page),
 // restyled onto our CSS vars.
@@ -307,8 +303,7 @@ const TabButton = styled.button`
   }
 `;
 
-// Avatars tab grid — same tile interaction as Aniraku
-// (3px accent ring while selected), on our card vars.
+// Avatars tab grid with a 3px accent ring while selected.
 const AvatarGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
@@ -344,9 +339,8 @@ const AvatarTile = styled.button<{ $selected: boolean }>`
   }
 `;
 
-// ── Library tab (Wave C) ──────────────────────────────────────────────────
-// Aniraku Profile.jsx:554-672 provider rows / result box / export confirm,
-// on our card chrome (ListSection above supplies the surrounding card).
+// Library tab provider rows, result box, and export confirmation on our
+// card chrome (ListSection above supplies the surrounding card).
 const LibraryRow = styled.div`
   display: flex;
   flex-direction: column;
@@ -450,7 +444,7 @@ const GhostLink = styled(Link)`
   text-decoration: none;
 `;
 
-// Result box — Aniraku Profile.jsx:634-645 (✓ / ⚠ + tone colors verbatim).
+// Result box — Aniraku.
 const ResultBox = styled.div<{ $tone: 'ok' | 'error' }>`
   margin-top: 12px;
   padding: 8px 12px;
@@ -465,7 +459,7 @@ const ResultBox = styled.div<{ $tone: 'ok' | 'error' }>`
   line-height: 1.5;
 `;
 
-// Export confirm — Aniraku Profile.jsx:647-667 (amber box, copy verbatim).
+// Export confirm — Aniraku.
 const ConfirmBox = styled.div`
   margin-top: 12px;
   padding: 12px 14px;
@@ -481,7 +475,7 @@ const ConfirmBox = styled.div`
   }
 `;
 
-// Guest "Sync needs an account" row (Aniraku Settings.jsx:650-655 copy).
+// Guest "Sync needs an account" row.
 const AccountNeededRow = styled.div`
   display: flex;
   align-items: center;
@@ -693,7 +687,6 @@ const LoadingDots = styled.div`
   }
 `;
 
-// Settings-as-modal (_overlayContainer_1bzcd_1 + _modal_8w0d1_1)
 const popIn = keyframes`
   from {
     opacity: 0;
@@ -756,7 +749,6 @@ const ModalPanel = styled.div`
   }
 `;
 
-// _closeButton_8w0d1_46
 const ModalCloseButton = styled.button`
   position: absolute;
   top: 0.75rem;
@@ -784,7 +776,6 @@ const ModalCloseButton = styled.button`
   }
 `;
 
-// _body_8w0d1_68 / _content_8w0d1_138
 const ModalBody = styled.div`
   display: flex;
   flex: 1;
@@ -816,7 +807,7 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'inherit',
 };
 
-// Library tab intro paragraph (Aniraku Profile.jsx:557-563 copy + colors).
+// Library tab intro paragraph.
 const libraryDescStyle: React.CSSProperties = {
   color: 'var(--global-text-muted)',
   fontSize: 13,
@@ -824,7 +815,7 @@ const libraryDescStyle: React.CSSProperties = {
   lineHeight: 1.6,
 };
 
-// Avatars tab intro (Aniraku Profile.jsx:399).
+// Avatars tab intro.
 const avatarDescStyle: React.CSSProperties = {
   color: 'var(--global-text-muted)',
   fontSize: 13,
@@ -840,10 +831,10 @@ interface BookmarkEntry {
   total_episodes?: number | null;
 }
 
-// Wave C — tab set (Aniraku Profile.jsx:354-360; History + Badges stay out
+// Tab set (Aniraku; History + Badges stay out
 // of scope — history has its own page, badges not in this port). Guests get
 // Profile + Library only: Library shows the account-needed row instead of
-// the import/export rows (Aniraku Settings.jsx:650).
+// the import/export rows.
 type ProfileTab = 'profile' | 'avatars' | 'bookmarks' | 'library';
 
 const TABS: Array<{ id: ProfileTab; label: string; authedOnly?: boolean }> = [
@@ -876,9 +867,8 @@ export const Profile: React.FC = () => {
   const [bookmarkFilter, setBookmarkFilter] = useState<ListStatus | 'ALL'>('ALL');
   const [avatars, setAvatars] = useState<Avatar[]>(AVATAR_LIST);
 
-  // Wave C — section tabs (Aniraku Profile.jsx:33 activeTab) + Library
-  // import/export state (Profile.jsx:38-41) + avatar-library readiness
-  // (Profile.jsx:43).
+  // Section tabs + Library
+  // import/export state + avatar-library readiness
   // Deep-link: `/profile?tab=bookmarks` (Info split button's "Open List
   // Editor"). Any `?tab=` matching a tab id seeds the initial tab; the guard
   // effect below clamps authed-only tabs for real guests (auth is async, so
@@ -988,7 +978,7 @@ export const Profile: React.FC = () => {
     document.title = guest ? 'Profile · Aniraku' : `${resolvedDisplayName} · Profile · Aniraku`;
   }, [guest, resolvedDisplayName]);
 
-  // Seed the edit form from the loaded profile (Aniraku Profile.jsx:132-137).
+  // Seed the edit form from the loaded profile.
   useEffect(() => {
     if (profile) {
       setUsername(profile.username || '');
@@ -998,8 +988,7 @@ export const Profile: React.FC = () => {
   }, [profile]);
 
   // Server bookmark rows — one loader shared by the Bookmarks tab effect
-  // and the Library import flow (Aniraku Profile.jsx:100-130
-  // loadServerBookmarks; our merge-on-login lives in lib/sync).
+  // and the Library import flow (merge-on-login lives in lib/sync).
   const loadBookmarks = useCallback(() => {
     if (!user) {
       setBookmarks([]);
@@ -1052,16 +1041,16 @@ export const Profile: React.FC = () => {
       );
   }, [user]);
 
-  // Bookmarks list (AnimeDetail.jsx:669-674) — cloud rows are the source of
+  // Bookmarks list — cloud rows are the source of
   // truth; local mirrors are owned by the Watch scope, never written here.
   // Watch history intentionally absent: history has its own page (delta 3).
   useEffect(() => {
     loadBookmarks();
   }, [loadBookmarks]);
 
-  // Avatar library: the storage bucket is the source of truth (Aniraku
-  // Profile.jsx:49-77, minus the 15s poll + realtime channel — one load per
-  // signed-in user; static AVATAR_LIST remains the fallback).
+  // Avatar library: the storage bucket is the source of truth — one load per
+  // signed-in user, no polling or realtime channel; static AVATAR_LIST
+  // remains the fallback.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -1077,15 +1066,14 @@ export const Profile: React.FC = () => {
     };
   }, [user?.id]);
 
-  // Avatars tab (Wave C) — Aniraku Profile.jsx:52-95: while the tab is open
+  // Avatars tab — while the tab is open
   // the bucket is polled every 15s AND a storage.objects realtime channel
   // reloads on changes for AVATAR_BUCKET (realtime covers projects with
   // storage in their publication; the poll covers the rest). A public object
   // can be readable while Storage list permissions are restricted — keep the
-  // supplied catalog visible in that case (Aniraku :60-64).
-  // NOTE: Aniraku has NO avatar upload flow anywhere in its source (verified
-  // by grep — avatars.js only lists/links); this tab mirrors the reference:
-  // list + select + live refresh. See report for bucket/RLS findings.
+  // supplied catalog visible in that case.
+  // NOTE: there is no avatar upload flow; the tab only lists and selects
+  // avatars.
   useEffect(() => {
     if (activeTab !== 'avatars' || !user) return undefined;
     let cancelled = false;
@@ -1159,7 +1147,7 @@ export const Profile: React.FC = () => {
     setSaving(false);
   };
 
-  // Aniraku Profile.jsx:188-193 — a preset click saves immediately
+  // a preset click saves immediately
   const selectAvatar = async (av: Avatar) => {
     if (!updateProfile) return;
     try {
@@ -1172,7 +1160,7 @@ export const Profile: React.FC = () => {
     }
   };
 
-  // ── Library import / export (Aniraku Profile.jsx:267-315, upgraded) ───
+  // Library import / export.
   // Both run as background jobs (auto-loop on `limited`, per-provider
   // mutex): Import pulls provider library → bookmarks + statuses +
   // progress + scores; Export writes status + progress + average score.
@@ -1183,9 +1171,9 @@ export const Profile: React.FC = () => {
     });
   }, [user]);
 
-  // Refresh the provider status when the Library tab opens (Aniraku :275-278),
-  // plus re-verify COMPLETED bookmark rows against authoritative series
-  // totals (repairs false-COMPLETED derived from truncated episode lists).
+  // Refresh the provider status when the Library tab opens, plus re-verify
+  // COMPLETED bookmark rows against authoritative series totals (repairs
+  // false-COMPLETED derived from truncated episode lists).
   // Runs once per session inside the lib; reloads when it fixed anything.
   useEffect(() => {
     if (activeTab === 'library' && user) refreshSyncStatus();

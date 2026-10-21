@@ -16,7 +16,7 @@ const Iframe = styled.iframe`
 
 type EmbedPlayerProps = {
   src: string;
-  /** Live switches the embed aspect: 16/9 normal, 21/9 in theater mode. */
+  /** Embed aspect: 16/9 normal, 21/9 in theater mode. */
   aspectRatio?: string;
 };
 

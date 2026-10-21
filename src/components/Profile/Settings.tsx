@@ -93,7 +93,7 @@ const SettingsDiv = styled.div`
   margin: auto;
 `;
 
-// Settings modal title (_title_8w0d1_24): 1.5rem / 700 / muted
+// Settings modal title: 1.5rem / 700 / muted
 const Title = styled.h2`
   display: flex;
   align-items: center;
@@ -112,7 +112,7 @@ const PreferencesTable = styled.div`
   padding: 0.5rem 1rem 1rem;
 `;
 
-// Section heading (_sectionTitle_8w0d1_170): uppercase / 1rem / 700 / muted
+// Section heading: uppercase / 1rem / 700 / muted
 const SectionTitle = styled.h3`
   display: flex;
   gap: 0.5rem;
@@ -137,7 +137,7 @@ const Row = styled.div`
   }
 `;
 
-// Row label block (_rowLabel_8w0d1_204 / _rowTitle_8w0d1_211 /
+// Row label block
 const RowLabel = styled.div`
   display: flex;
   flex: 1;
@@ -223,7 +223,7 @@ const StyledButton = styled.button<{ $danger?: boolean }>`
   }
 `;
 
-// Mission 2 — change-password fields (Aniraku `Input`, Settings.jsx:773-788)
+// Change-password fields
 const StyledInput = styled.input`
   background: var(--global-tertiary-bg);
   color: var(--global-text);
@@ -240,7 +240,7 @@ const StyledInput = styled.input`
   }
 `;
 
-// Mission 2 — provider connection badge (Aniraku `Badge`, ok/off variants)
+// Provider connection badge (Aniraku `Badge`, ok/off variants)
 const Badge = styled.span<{ $ok: boolean }>`
   display: inline-block;
   padding: 0.05rem 0.45rem;
@@ -267,15 +267,15 @@ const THEME_CARDS: {
   { mode: 'catppuccin', icon: <FaCat />, label: 'Catppuccin' },
 ];
 
-// Yes/No toggle labels with Enabled/Disabled values (live `oh` option set)
+// Yes/No toggle labels with Enabled/Disabled values
 const YES_NO: Option[] = [
   { value: 'Disabled', label: 'No' },
   { value: 'Enabled', label: 'Yes' },
 ];
 
-// Labels and descriptions extracted from the live settings modal
-// (Wave B: the local-only `Default Servers` row was removed — old Aniraku
-// has no default-server concept, so the preference is no longer rendered
+// Labels and descriptions for the settings modal
+// (the local-only `Default Servers` row was removed — there is no
+// default-server concept, so the preference is no longer rendered
 // or written from this page.)
 const DISPLAY_LANGUAGE_ROWS: RowConfig[] = [
   {
@@ -352,11 +352,11 @@ export const Settings: React.FC = () => {
   const { theme: themeMode, setTheme } = useTheme();
   const { isLoggedIn, userData } = useAuth();
 
-  // ── Mission 2: NSFW toggle / Library Sync / change password ──────────────
-  // NSFW preference (Aniraku useNsfw.js + Settings Content card :611-634):
-  // account-backed `user_settings.key = nsfw_enabled` for signed-in users,
-  // device key `aniraku-nsfw-enabled` for guests, DEFAULT OFF/hidden. Gates
-  // browse/display ONLY — it never influences sync payloads.
+  // NSFW toggle, library sync, and change password.
+  // NSFW preference: account-backed `user_settings.key = nsfw_enabled` for
+  // signed-in users, device key `aniraku-nsfw-enabled` for guests, DEFAULT
+  // OFF/hidden. Gates browse/display ONLY — it never influences sync
+  // payloads.
   const { nsfwEnabled, updateNsfw } = useNsfw();
   const [nsfwSaving, setNsfwSaving] = useState(false);
 
@@ -386,7 +386,7 @@ export const Settings: React.FC = () => {
     [],
   );
 
-  // ── MAL / AniList watch-progress sync (Aniraku Settings.jsx:455-521) ──
+  // MAL / AniList watch-progress sync.
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncBusy, setSyncBusy] = useState<Record<string, boolean>>({});
   const [syncVersion, setSyncVersion] = useState(0);
@@ -429,9 +429,8 @@ export const Settings: React.FC = () => {
     return 'token expired — progress will refresh it automatically';
   };
 
-  // Aniraku fetches the authorize URL first (a bare redirect can't carry the
-  // Bearer header), then hands the browser off — SAME TAB (location.href,
-  // Aniraku :504).
+  // Fetch the authorize URL first (a bare redirect can't carry the Bearer
+  // header), then hand the browser off in the same tab (location.href).
   const handleConnect = async (provider: string): Promise<void> => {
     if (syncBusy[provider]) return;
     setSyncBusy((busy) => ({ ...busy, [provider]: true }));
@@ -464,9 +463,9 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // ── Change password (Aniraku Settings.jsx:523-549) ──
-  // Session + email required (Aniraku `canChangePassword`): updateUser needs
-  // a live session, and only email/password accounts have a password to set.
+  // Change password.
+  // Session + email required: updateUser needs an active session, and only
+  // email/password accounts have a password to set.
   const canChangePassword = Boolean(sessionUser?.email);
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState('');
@@ -504,7 +503,7 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // Aniraku handleNsfwToggle (Settings.jsx:408-420): saving guard + account
+  // Aniraku handleNsfwToggle: saving guard + account
   // upsert via updateNsfw (optimistic publish) + success/error toasts.
   const handleNsfwToggle = async (next: boolean): Promise<void> => {
     if (nsfwSaving) return;
@@ -572,12 +571,10 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // Signed-in clear must also delete the server `watch_history` rows (Aniraku
-  // handleClearHistory, Settings.jsx:556-575 — server + local) or the rows
+  // Signed-in clear must also delete the server `watch_history` rows, or they
   // repopulate the History page on the next mount. `clearWatchHistory` removes
-  // the same three native keys this handler used to clear inline, publishes the
-  // local change event, then deletes every server row for the userId. (Aniraku's
-  // undo snapshot is not ported — out of mission scope.)
+  // the same three native keys this handler used to clear inline, publishes
+  // the local change event, then deletes every server row for the userId.
   const handleClearWatchHistory = async (): Promise<void> => {
     try {
       await clearWatchHistory({ userId: sessionUser?.id ?? null });
@@ -588,10 +585,9 @@ export const Settings: React.FC = () => {
 
   const handleRestoreDefaults = () => {
     setSettings({
-      // DECIDED DEFAULT (Delta 2 / Player mission): auto-skip + auto-next
-      // are ON when their keys are missing — matches LIVE_DEFAULTS
-      // `autoSkip/autoNext: true` seeded in SettingsProvider.tsx (coordinator
-      // owns that file). Every other reset field keeps its old value.
+      // Defaults for auto-skip and auto-next: both are ON when their keys are
+      // missing, matching LIVE_DEFAULTS `autoSkip/autoNext: true` seeded in
+      // SettingsProvider.tsx. Every other reset field keeps its old value.
       autoSkip: true,
       autoPlay: false,
       autoNext: true,
@@ -616,8 +612,8 @@ export const Settings: React.FC = () => {
     navigate('/profile');
   };
 
-  // Settings doesn't change the document title on live (the profile title
-  // stays while the preferences modal is open)
+  // Settings doesn't change the document title (the profile title stays
+  // while the preferences modal is open)
   useEffect(() => {
     document.title =
       isLoggedIn && userData ? `${userData.name} · Profile` : 'Profile';

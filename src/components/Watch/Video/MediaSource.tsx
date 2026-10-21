@@ -14,7 +14,7 @@ import {
 import { FaFilm } from 'react-icons/fa6';
 import { ReportModal } from '../ReportModal';
 
-// MediaSource — live lyfa9 module (episode bar) + live 1uhbb dropdowns.
+// MediaSource — episode bar plus server/language dropdowns.
 // Server/language selection is keyed `${lang}:${name}` so the SAME backend
 // name (Niko/Momo exist in BOTH sub and dub) can never collide — that name
 // collision was the core server-selection bug (Dub always snapped back to
@@ -40,9 +40,9 @@ interface MediaSourceProps {
   onSelectServer?: (key: string, lang: 'sub' | 'dub') => void;
   /** Total episodes — drives the per-language count pills. */
   totalEpisodes?: number;
-  /** Per-episode filler flag (live fillerTag). */
+  /** Per-episode filler flag. */
   episodeFiller?: boolean;
-  /** AniList id — required by the report modal (live disables without it). */
+  /** AniList id — required by the report modal (it disables without it). */
   anilistId?: string | number | null;
   /**
    * True once the server pools settled for THIS episode. Until then both
@@ -344,9 +344,7 @@ const AiringInfoRow = styled.div`
   font-size: 0.9rem;
 `;
 
-// ---------------------------------------------------------------------------
-// 1uhbb — live dropdown (`At`): trigger + fading menu + touch native fallback.
-// ---------------------------------------------------------------------------
+// Dropdown: trigger + fading menu + touch native fallback.
 
 type SelectOption = {
   value: string;
@@ -509,7 +507,7 @@ const ItemTagRow = styled.span`
   align-items: center;
 `;
 
-// 1uhbb_140 base tag + hsub/ssub/dl variants (verbatim colors).
+// 1uhbb_140 base tag + hsub/ssub/dl variants.
 const ItemTag = styled.span<{ $variant?: 'hsub' | 'ssub' | 'dl' | 'embed' }>`
   padding: 0.1rem 0.35rem;
   font-size: 0.65rem;
@@ -566,7 +564,7 @@ type DropdownProps = {
   ariaLabel?: string;
 };
 
-/** Live `At` — trigger menu with icons/tags/check + touch native fallback. */
+/** Trigger menu with icons/tags/check + touch native fallback. */
 const SelectDropdown: React.FC<DropdownProps> = ({
   value,
   options,
@@ -581,7 +579,7 @@ const SelectDropdown: React.FC<DropdownProps> = ({
   const selected = options.find((o) => o.value === value);
   const icon = triggerIcon ?? selected?.icon;
 
-  // Live: menu closes whenever the value changes.
+  // Menu closes whenever the value changes.
   useEffect(() => {
     setOpen(false);
   }, [value]);
@@ -655,8 +653,6 @@ const SelectDropdown: React.FC<DropdownProps> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
-
 export const MediaSource: React.FC<MediaSourceProps> = ({
   language,
   downloadLink,
@@ -687,8 +683,8 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
   const embedSub = serversSub.filter((s: any) => isEmbedServer(s));
   const embedDub = serversDub.filter((s: any) => isEmbedServer(s));
 
-  // Per-language availability for the CURRENT episode (live disables a
-  // language option when it has no servers here — no dead clicks).
+  // Per-language availability for the current episode: disable a language
+  // option when it has no servers here (no dead clicks).
   const subAvailable = serversSub.length > 0;
   const dubAvailable = serversDub.length > 0;
   const langAvailable: Record<string, boolean> = {
@@ -696,7 +692,7 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     dub: dubAvailable,
   };
 
-  // Live langCountPill — `${count} episodes` aria-label; 0 → unavailable.
+  // LangCountPill — `${count} episodes` aria-label; 0 → unavailable.
   const subCount = subAvailable ? totalEpisodes : 0;
   const dubCount = dubAvailable ? totalEpisodes : 0;
 
@@ -769,7 +765,7 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     const list = next === 'dub' ? directDub : directSub;
     const first = list.find((s: any) => s?.name);
     if (first?.name && onSelectServer) {
-      // Live: language change also switches to the first usable provider.
+      // A language change also switches to the first usable provider.
       onSelectServer(serverKey(next, first.name), next);
     }
   };
@@ -798,7 +794,7 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     ? episodeDescription.replace(/<[^>]+>/g, '')
     : '';
 
-  // Live report modal provider lists (provider key = backend `provider`).
+  // Report modal provider lists (provider key = backend `provider`).
   const providerKeys = Array.from(
     new Set(
       [...serversSub, ...serversDub]

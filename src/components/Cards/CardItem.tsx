@@ -16,12 +16,10 @@ import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { useBookmarks } from '../../hooks/useBookmarks';
 
-// Card corner bookmark control — Aniraku toggle
-// Semantics restyled onto the card chrome (live corpus has no bookmark
-// UI): mirrors `.editListButton`'s hover reveal + CSS vars, sits top-left.
-// Guest = LS-only toggle; signed-in = LS optimistic + server upsert/delete
-// Via useBookmarks. (the app EditList control that used to sit
-// top-right is gone — AniList sign-in surface, no AniList auth here.)
+// Card corner bookmark control. Styled to fit the card chrome: hover reveal
+// plus CSS variables, sitting top-left. Guests toggle in localStorage;
+// signed-in users get an optimistic local update plus a server
+// upsert/delete through useBookmarks.
 const CardBookmarkBtn = styled.button`
   position: absolute;
   top: 0.25rem;

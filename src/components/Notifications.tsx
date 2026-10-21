@@ -16,9 +16,8 @@ import {
 import { infoPathFor } from '../utils/animePaths';
 import './notifications.css';
 
-// Export-compat shims (the badge-critical names live in lib/sync and keep
-// working over the API layer; re-exported here so the contract holds from
-// Either import site — the Navbar imports them from lib/sync today).
+// Export-compat shims: the badge-critical names live in lib/sync and work
+// over the API layer; re-exported here so either import site keeps working.
 export {
   fetchNotifications,
   readNotificationReadIds,
@@ -26,40 +25,34 @@ export {
   markAllNotificationsRead,
 } from '../lib/sync';
 
-// Notifications drawer — port of the app (overlay) + `U_` (drawer), portal
-// to document.body, live hashed class names rendered (styling
-// notifications.css). Open/close is driven by the Navbar state machine:
-// the bell toggles it, Shift+M dispatches global-shortcuts:open-notifications
-// (toggle) alongside global-shortcuts:close-sidemenu, and route changes close
-// it — same wiring as.
+// Notifications drawer, rendered in a portal on document.body.
+// Open/close is driven by the Navbar state machine: the bell toggles it,
+// Shift+M dispatches global-shortcuts:open-notifications (toggle) alongside
+// global-shortcuts:close-sidemenu, and route changes close it.
 //
-// Guest behavior (coordinator override — user rules: "no AniList sign-in"
-// anywhere + "notifications the same way Aniraku does"): the drawer renders
-// for everyone; guests see the same list body with the empty state (their
-// store stays empty — the 30s poll only runs on an account session), and the
-// header actions surface login warning toasts gated on the SUPABASE session.
-// There is no AniList login surface in this drawer.
+// The drawer renders for everyone. Guests see the same list body with the
+// empty state (their store stays empty — the 30s poll only runs on an
+// account session), and the header actions show login warning toasts gated
+// on the Supabase session. There is no AniList login surface here.
 //
-// Mission 2 — DATA LAYER = the exact mechanism, drawer visuals
-// unchanged:
+// Data flow:
 //   - rows come from the lib/sync store fed by the 30s session poll
-//   - server `read` column is the authority (the LS read-set
-//     `aniraku:notifications-read` is retired — no reads/writes here);
-//   - clicking an UNREAD row runs markRead → optimistic store flip + `PUT
-//     /api/v1/notifications/{id}/read`, then closes
-//     and routes to the title's info page when `anime_id` is present
-//   - empty payload → "No notifications yet".
-// BLESSED EXPORT: `useNotifications()` → { notifications, unreadCount,
-// markRead, refresh }. the bell badge still runs on the lib/sync shims
-// (fetchNotifications / readNotificationReadIds) and can migrate to this
-// hook whenever it is edited next.
+//   - server `read` column is the authority (the localStorage read-set is
+//     retired — no reads/writes here)
+//   - clicking an unread row runs markRead → optimistic store flip + PUT
+//     /api/v1/notifications/{id}/read, then closes and routes to the
+//     title's info page when `anime_id` is present
+//   - empty payload → "No notifications yet"
+// `useNotifications()` exposes { notifications, unreadCount, markRead,
+// refresh }; the bell badge still uses the lib/sync shims and can migrate
+// to this hook whenever it is edited next.
 
 interface NotificationsProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// Reload icon (viewBox 0 0 512 512), path
+// Reload icon.
 const ReloadIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

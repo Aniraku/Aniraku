@@ -61,9 +61,7 @@ const directAxios = axios.create({ timeout: 15000 });
 // needs its own long-timeout client. /stream gets 55s per request.
 const anirakuLongAxios = axios.create({ timeout: 100000 });
 
-// ---------------------------------------------------------------------------
 // AniList -> Aniraku shape adapters (keep UI components untouched)
-// ---------------------------------------------------------------------------
 
 function mapAnilistStatus(s?: string | null): string {
   switch ((s || '').toUpperCase()) {
@@ -181,7 +179,7 @@ export function mapAnilistMediaToAnime(m: any) {
                   ? media.averageScore / 10
                   : 0,
               type: media?.format ?? '',
-              // NSFW gate (Wave C): genres let isNsfw/filterAdult decide the
+              // NSFW gate: genres let isNsfw/filterAdult decide the
               // Hentai-genre rule for recommendation cards.
               genres: Array.isArray(media?.genres) ? media.genres : [],
             };
@@ -232,7 +230,7 @@ export function mapAnilistMediaToAnime(m: any) {
           })
       : [],
     mappings: [],
-    // Live details card row: `Official Site: <link>` reads externalLinks and
+    // Details card row: `Official Site: <link>` reads externalLinks and
     // picks the entry whose site is exactly `Official Site` (WatchRoute Wn).
     externalLinks: Array.isArray(m?.externalLinks)
       ? m.externalLinks.filter((l: any) => l?.site && l?.url)
@@ -287,9 +285,7 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
 
 const anilistInflight = new Map<string, Promise<unknown>>();
 
-// ---------------------------------------------------------------------------
 // Session-storage cache (unchanged behaviour)
-// ---------------------------------------------------------------------------
 
 function generateCacheKey(...args: string[]) {
   return args.join('-');
@@ -387,9 +383,7 @@ const animeEpisodesCache = createCache('Episodes v2');
 const anirakuStreamCache = createCache('Aniraku Stream v2');
 const anirakuServersCache = createCache('Aniraku Servers v2');
 
-// ---------------------------------------------------------------------------
 // AniList GraphQL documents
-// ---------------------------------------------------------------------------
 
 const MEDIA_LIST_FIELDS = `
   id idMal
@@ -484,9 +478,7 @@ function toAnilistFormat(format?: string): string | undefined {
   return undefined;
 }
 
-// ---------------------------------------------------------------------------
 // Metadata via AniList GraphQL (direct)
-// ---------------------------------------------------------------------------
 
 export async function fetchAdvancedSearch(
   searchQuery: string = '',
@@ -625,11 +617,9 @@ export async function fetchAnimeInfo(animeId: string) {
   return info;
 }
 
-// ---------------------------------------------------------------------------
 // Episode metadata via Aniraku Backend (AniZip + TMDB merge)
 // GET {base}api/v1/anime/{id}/episodes -> { episodes: [{number,title,thumbnail,description,airdate}] }
 // Mapped to Aniraku Episode[] so EpisodeList/Watch keep working.
-// ---------------------------------------------------------------------------
 
 export async function fetchAnimeEpisodes(
   animeId: string,
@@ -655,14 +645,12 @@ export async function fetchAnimeEpisodes(
   return mapped;
 }
 
-// ---------------------------------------------------------------------------
 // Streaming via Aniraku Backend (NEW — numeric AniList IDs)
 // POST {base}api/v1/stream { animeId, episode, lang, provider?, quality? }
 // GET  {base}api/v1/servers?animeId=&episode=&lang=
 // Response: { sources: [{url,type,quality,subtitles[]}], headers, intro/outro, downloads, servers }
 // NOTE: Watch.tsx / Player.tsx still call the legacy Consumet-style helpers
 // below. Migrate them to these functions (see proposed diff in chat).
-// ---------------------------------------------------------------------------
 
 export interface AnirakuStreamArgs {
   animeId: number;
@@ -731,7 +719,6 @@ export async function fetchAnirakuServers(
   return data;
 }
 
-// ---------------------------------------------------------------------------
 // Always pick the highest-quality download the backend offers.
 // Labels look like "1080p"/"720p"/"mp4" — highest parsed number wins,
 // otherwise the last entry (backends order ascending) or first.
@@ -751,9 +738,7 @@ export function pickHighestDownload(
   }
   return best?.url ?? '';
 }
-// ---------------------------------------------------------------------------
 // Skip times (AniSkip, keyed by MAL id) — unchanged
-// ---------------------------------------------------------------------------
 interface FetchSkipTimesParams {
   malId: string;
   episodeNumber: string;
@@ -792,7 +777,7 @@ export async function fetchSkipTimes({
   }
 }
 
-// Reference-style URL helpers (the live site 1:1): /info/:id/:slug
+// URL helpers: /info/:id/:slug
 export function animeSlug(
   title?: { english?: string | null; romaji?: string | null } | null,
   fallback: string = 'anime',

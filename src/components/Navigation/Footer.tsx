@@ -1,20 +1,10 @@
-// Footer — the ORIGINAL live-parity footer, adapted per the user's delta-2
-// correction ("update the OLD footer with adaption — NOT completely change
-// it"). Structure kept: footerPageWrapper → footer → Main Footer block
-// (disclaimer + easter-egg logo img) → Sub Footer block (copyright + theme
-// buttons), all on the existing globals.css framework.
-// REMOVED per mandate: the Schedule link, Status link, Domains link, the
-// Trending/Search page-redirect links, and the site-credit link.
-// RESTORED (user's later approval, supersedes delta-2 for these three only):
-// the GitHub social link, the "Report an issue" link, and the embedded TMDB
-// logo + attribution block. Discord stays out (not requested).
-// KEPT: the logo img (footerLogoImage + app-icon classes — the user's custom
-// logo has landed: img src = BRAND_LOGO import, mask = its public copy), the
-// easter-egg click handler, the disclaimer line, the
-// version badge, and the theme buttons (controls, not links).
-// BRAND: copyright line carries the Aniraku source wording — zero
-// user-visible brand outside "Aniraku" (final brand).
-// COMPACT: paddings tightened inline only (no stylesheet edits).
+// Site footer: disclaimer + logo, copyright, theme buttons, GitHub and
+// report links, and TMDB attribution.
+//
+// Structure: footerPageWrapper → footer → main block (disclaimer +
+// easter-egg logo) → sub block (copyright + theme buttons), on the existing
+// globals.css framework. The Schedule, Status, Domains, trending/search
+// redirect, and site-credit links were removed; Discord is not included.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaGithub } from 'react-icons/fa';
@@ -33,9 +23,8 @@ const GITHUB_ISSUES_URL = 'https://github.com/Aniraku/Aniraku/issues';
 const THEMES = ['system', 'light', 'dark', 'anilist', 'catppuccin'] as const;
 type ThemeName = (typeof THEMES)[number];
 
-// live renders icon glyphs here (We/Ye/qh/Jh/Wh svgs); text labels are kept
-// as the local presentation (reported divergence) while every attribute —
-// title, aria-label, data-current, setTheme(name) — matches live.
+// Text labels are used here; every attribute — title, aria-label,
+// data-current, setTheme(name) — is preserved.
 const THEME_LABELS: Record<ThemeName, string> = {
   system: 'System',
   light: 'Light',

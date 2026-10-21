@@ -24,30 +24,27 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 //
 //   localStorage['aniraku:settings'] = { schemaVersion, theme, settings }
 //
-// Read chain (presence-based, mirroring the live pre-paint bootstrap and
-// runtime `Et` context):
-//   1. record field `theme`            (aniraku:settings JSON)
-//   2. legacy live key                 (aniraku:settings:theme, JSON-encoded)
-//   3. legacy local key                (themePreference, {"mode": ...})
-//   4. live default
+// Read chain (presence-based, matching the pre-paint bootstrap):
+//   1. record field `theme`       (aniraku:settings JSON)
+//   2. legacy key                 (aniraku:settings:theme, JSON-encoded)
+//   3. legacy local key           (themePreference, {"mode": ...})
 //
-// Valid stored values mirror the app's theme list `St`: system | light | dark |
-// anilist | catppuccin ('system' is a first-class stored value resolved via
-// prefers-color-scheme at runtime). Anything else falls back to 'dark' like
-// The app's runtime; the pre-paint matchMedia resolution for invalid/'system'
-// values stays in index.html's bootstrap.
+// Valid values: system | light | dark | anilist | catppuccin. 'system' is
+// resolved via prefers-color-scheme at runtime. Anything else falls back to
+// 'dark'; the pre-paint matchMedia resolution for invalid/'system' values
+// stays in index.html's bootstrap.
 
 const SETTINGS_RECORD = 'aniraku:settings';
 const LEGACY_LIVE_THEME_KEY = 'aniraku:settings:theme';
 const LEGACY_LOCAL_THEME_KEY = 'themePreference';
-const DEFAULT_THEME: Theme = 'dark'; // live `Ct`
+const DEFAULT_THEME: Theme = 'dark';
 const VALID_THEMES: string[] = [
   'system',
   'light',
   'dark',
   'anilist',
   'catppuccin',
-]; // live `St` names
+];
 
 function readRecordTheme(): string | undefined {
   try {
@@ -66,7 +63,7 @@ function readRecordTheme(): string | undefined {
 
 function readLegacyTheme(): string | undefined {
   try {
-    // live legacy key: JSON-encoded string, e.g. `"dark"`
+    // Legacy key: JSON-encoded string, e.g. `"dark"`.
     const raw = localStorage.getItem(LEGACY_LIVE_THEME_KEY);
     if (raw !== null) {
       const value = JSON.parse(raw);
@@ -92,7 +89,7 @@ function readLegacyTheme(): string | undefined {
   return undefined;
 }
 
-/** Presence chain first, then live's validity check with live's default. */
+/** Presence chain first, then the validity check with the default. */
 function resolveStoredTheme(): Theme {
   const candidate = readRecordTheme() ?? readLegacyTheme();
   return candidate && VALID_THEMES.includes(candidate)
@@ -144,9 +141,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     applyTheme(theme);
-    // Persist like live (`useEffect(() => O.setTheme(i.name), [i.name])`):
-    // runs on mount too, so legacy-only values (themePreference / flat keys)
-    // land in the record for the pre-paint bootstrap to read next load.
+    // Persist on every change (and on mount), so legacy-only values
+    // (themePreference / flat keys) land in the record for the pre-paint
+    // bootstrap to read next load.
     writeRecordTheme(theme);
 
     if (theme === 'system') {

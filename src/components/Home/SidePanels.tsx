@@ -9,15 +9,14 @@ import type { Anime } from '../../hooks/animeInterface';
 import StatusIndicator from '../shared/StatusIndicator';
 import { infoPathFor } from '../../utils/animePaths';
 
-// SidePanels — side-list sections: TOP AIRING, UPCOMING,
-// JUST FINISHED, TOP MOVIES. Bordered wrapper contains the header, the 6rem
-// cards (poster + optional grayscale banner + title/status + detail chips)
-// and a boxed chevron-down link at the bottom that NAVIGATES to the full
-// list page (`listPath`, per the user's redirect spec — not in-place
-// expand). Renders nothing when empty.
+// SidePanels — side-list sections: TOP AIRING, UPCOMING, JUST FINISHED, TOP
+// MOVIES. Bordered wrapper contains the header, the 6rem cards (poster +
+// optional grayscale banner + title/status + detail chips), and a boxed
+// chevron-down link at the bottom that navigates to the full list page
+// (`listPath`) rather than expanding in place. Renders nothing when empty.
 
-// Same format whitelist as the live side list (matched case-insensitively
-// because the local API reports e.g. "Movie" vs live "MOVIE").
+// Same format whitelist as the side list (matched case-insensitively
+// because the API may report "Movie" rather than "MOVIE").
 const FORMATS = ['OVA', 'SPECIAL', 'TV', 'TV_SHORT', 'MOVIE', 'ONA', 'MUSIC'];
 const DEFAULT_VISIBLE = 5;
 
@@ -190,9 +189,8 @@ const Detail = styled.span`
   }
 `;
 
-// Boxed chevron-down at the bottom of the panel (live renders it as an
-// expand toggle; here it NAVIGATES to the panel's full list page — the
-// user's chosen redirect behavior, placement bottom-of-panel).
+// Boxed chevron-down at the bottom of the panel; it navigates to the
+// panel's full list page (placement bottom-of-panel).
 const ViewMoreButton = styled(Link)`
   display: block;
   padding: 0.5rem;
@@ -215,7 +213,7 @@ const ViewMoreButton = styled(Link)`
   }
 `;
 
-// 96px skeleton rows mirroring the live content-loader rects.
+// 96px skeleton rows matching the content-loader rects.
 const SkeletonRow = styled.div`
   height: 6rem;
   overflow: hidden;
@@ -252,7 +250,7 @@ export const SidePanel: React.FC<{
     FORMATS.includes((a.type || '').toUpperCase()),
   );
 
-  // Live renders the whole panel only when loading or non-empty.
+  // Renders the whole panel only when loading or non-empty.
   if (!loading && filtered.length === 0) return null;
 
   const visible = filtered.slice(0, defaultVisible);

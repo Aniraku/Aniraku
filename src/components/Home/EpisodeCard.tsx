@@ -247,7 +247,7 @@ const CloseButton = styled.button`
   }
 `;
 
-// Live `Zn` breakpoints: how many 16:9 cards fit at each viewport width.
+// Breakpoints: how many 16:9 cards fit at each viewport width.
 const calculateSlidesPerView = (windowWidth: number): number => {
   if (windowWidth >= 1750) return 5;
   if (windowWidth >= 1400) return 4;
@@ -263,11 +263,10 @@ export const EpisodeCard: React.FC = () => {
     localStorage.getItem('watched-episodes'),
   );
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  // Live loads 10 slides, +5 on reach-end, capped at 14 (Xn). Wave B starts
-  // at 12: Aniraku's Continue Watching merges server ∪ local and takes the
-  // top 12 (ContinueWatching.jsx:144-145); the +5 growth/cap 14 is kept.
+  // Slides load 10 at a time, +5 on reach-end, capped at 14.
+  // Continue Watching merges server ∪ local and takes the top 12.
   const [limit, setLimit] = useState(12);
-  // Wave B — server side of the merge + invalidation revision.
+  // Server side of the merge + invalidation revision.
   const [serverRows, setServerRows] = useState<HistoryRow[]>([]);
   const [historyRevision, setHistoryRevision] = useState(0);
 
@@ -325,7 +324,7 @@ export const EpisodeCard: React.FC = () => {
   );
 
   const episodesToRender = useMemo<ContinueCard[]>(() => {
-    // --- local native cards (unchanged derivation, one per anime) --------
+    // Local native cards (unchanged derivation, one per anime)
     const localByAnime = new Map<string, ContinueCard>();
     if (watchedEpisodesData) {
       try {
@@ -398,8 +397,8 @@ export const EpisodeCard: React.FC = () => {
       }
     }
 
-    // --- server ∪ local, merged by key, newer write wins -----------------
-    // (Aniraku ContinueWatching.jsx:112-161: byKey map, candidate wins when
+    // Server ∪ local, merged by key, newer write wins
+    // (byKey map, candidate wins when
     // `candidate.timestamp > existing.timestamp`, sort ts desc, top 12.)
     const mergedByKey = new Map<string, ContinueCard>();
     for (const card of localByAnime.values()) mergedByKey.set(card.key, card);
@@ -438,7 +437,7 @@ export const EpisodeCard: React.FC = () => {
 
     // Keep ONE card per anime (native invariant) — collapse to the
     // newest candidate, then sort timestamp desc and take the top `limit`
-    // (12 default per Aniraku).
+    // (12 by default).
     const byAnime = new Map<string, ContinueCard>();
     for (const card of mergedByKey.values()) {
       const existing = byAnime.get(card.animeId);
