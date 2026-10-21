@@ -1,10 +1,10 @@
-// TS port of the src/hooks/ (provider half) —
-// semantics: server revalidation via getUser(access_token) with transient
-// network tolerance, email-verification enforcement + PASSWORD_RECOVERY /
-// recovery-marker exception, race-safe profile seed (insert-once, 23505
-// re-read, never overwrite an existing name/username/bio), is_admin rpc,
-// updateProfile with auth user_metadata mirror, signUp/signIn guards, and a
-// best-effort signOut local-storage clear contract.
+// Supabase auth provider: server revalidation via getUser(access_token) with
+// transient network tolerance, email-verification enforcement (with a
+// PASSWORD_RECOVERY / recovery-marker exception), a race-safe profile seed
+// (insert-once, 23505 re-read, never overwrite an existing
+// name/username/bio), the is_admin rpc, updateProfile with an auth
+// user_metadata mirror, signUp/signIn guards, and a best-effort signOut
+// local-storage clear.
 import {
   createContext,
   useState,
@@ -351,5 +351,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Re-exported for source parity with Aniraku's useAuth.jsx exports.
+// Re-exported for compatibility.
 export type { AuthErrorLike };

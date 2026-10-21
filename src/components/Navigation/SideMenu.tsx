@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { FiX, FiHome, FiTrendingUp, FiCalendar, FiClock, FiSettings, FiLogIn, FiUserPlus } from 'react-icons/fi';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../../client/useAuth';
-// `useAuth` above is the AniList client hook)
 import { useAuth as useSupabaseAuth } from '../../hooks/useAuth';
 import { avatarUrl, defaultAvatar } from '../../lib/avatars';
 import { BRAND_LOGO } from '../../lib/brand';

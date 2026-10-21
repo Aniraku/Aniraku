@@ -2,13 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { FaFlag } from 'react-icons/fa';
 
-// Report modal — port of the component (WatchRoute chunk, module
-// 1tfyf). Issue options, labels, validation texts, submit payload and the
-// 60s cooldown match live exactly. Submit differs from live on purpose: the
-// backend `POST {api}/reports` route answers 404 (documented backend gap),
-// so delivery is a mailto: redirect with a pre-filled template to the
-// maintainer inbox — the visitor writes their message in their mail app and
-// presses Send.
+// Report modal. Issue options, labels, validation texts, submit payload and
+// the 60s cooldown are preserved. Submit intentionally differs: the backend
+// `POST {api}/reports` route answers 404, so delivery is a mailto: redirect
+// with a pre-filled template to the maintainer inbox — the visitor writes
+// their message in their mail app and presses Send.
 
 const W = {
   modalContent: `_modalContent_1tfyf_1`,
@@ -24,7 +22,7 @@ const W = {
   button: `_button_1tfyf_93`,
 } as const;
 
-// From live style.css (module 1tfyf).
+// From style.css (module 1tfyf).
 const LIVE_REPORT_CSS = `
 ._modalContent_1tfyf_1{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:flex;-webkit-box-orient:vertical;-webkit-box-direction:normal;-moz-box-orient:vertical;-moz-box-direction:normal;flex-direction:column;gap:.75rem;width:80%;max-width:35rem;max-height:90vh;padding:1rem;text-align:start;background-color:var(--global-div-tr);border:1px solid var(--global-border-color);border-radius:calc(var(--global-border-radius) + 2px);--animation-duration: .32s;--animation-easing: ease-out}
 ._title_1tfyf_17{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:flex;gap:.5rem;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;align-items:center;margin:0 0 .25rem;font-size:1.15rem;color:var(--global-text)}
@@ -104,9 +102,9 @@ type ReportModalProps = {
   isVisible: boolean;
   onClose: () => void;
   episode?: number;
-  /** Provider keys present for this episode (live `i` prop). */
+  /** Provider keys present for this episode. */
   providers?: string[];
-  /** Subset of `providers` that offer a download (live capability map). */
+  /** Subset of `providers` that offer a download. */
   downloadProviders?: string[];
   anilistId?: string | number | null;
 };
@@ -163,7 +161,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [lastAttemptAt, setLastAttemptAt] = useState<number>(0);
   const [cooldown, setCooldown] = useState(0);
 
-  // Live 60s report cooldown countdown.
+  // 60s report cooldown countdown.
   useEffect(() => {
     if (!lastAttemptAt) return;
     const tick = () => {
@@ -192,7 +190,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     return visible;
   }, [providers, downloadProviders, type]);
 
-  // Live `x` — options hidden when the backend can't serve them.
+  // Options hidden when the backend can't serve them.
   const visibleOptions = ISSUE_OPTIONS.filter((option) =>
     option.type === `video-broken`
       ? hasAnyProvider

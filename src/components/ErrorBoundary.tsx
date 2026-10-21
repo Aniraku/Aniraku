@@ -2,20 +2,15 @@ import React from 'react';
 import styled from 'styled-components';
 import { useLocation } from 'react-router-dom';
 
-// Global crash fallback — port of Aniraku 's inline class
-// ErrorBoundary: same `hasError`/`resetKey` shape, the
-// "Something went wrong" heading and the diagnostic note copy. Deltas vs the
-// reference (task-mandated):
-//  - "Report this crash" replaces the GitHub-issue link and follows the
-//    ReportModal.tsx mailto pattern (same maintainer inbox REPORT_EMAIL and
-//    `mailto:?subject=&body=` template shape — ReportModal.tsx:118-148).
-//  - Buttons are Reload (location.reload) + Report this crash; the error
-//    message and React component stack sit in a collapsed mono <details>.
-//  - Brand-consistent dark card (theme tokens) instead of the reference's
-//    inline black-screen styles.
+// Global crash fallback. Keeps the `hasError`/`resetKey` shape, the
+// "Something went wrong" heading, and the diagnostic note.
+//
+// "Report this crash" follows the ReportModal mailto pattern (same maintainer
+// inbox and `mailto:?subject=&body=` template). Buttons are Reload and
+// Report this crash; the error message and component stack sit in a
+// collapsed mono <details>. The card uses theme tokens.
 
-// Maintainer inbox — byte-identical to ReportModal.tsx REPORT_EMAIL (do not
-// edit that file; this copy keeps the two mailto flows in sync).
+// Maintainer inbox — keep in sync with ReportModal.tsx REPORT_EMAIL.
 const CRASH_REPORT_EMAIL = `sho.islam0311@proton.me`;
 
 const Backdrop = styled.div`
@@ -174,8 +169,7 @@ const CrashButton = styled.button<{ $variant?: 'primary' }>`
 
 type ErrorBoundaryProps = {
   children?: React.ReactNode;
-  /** Route key — navigating away clears a caught crash (Aniraku
-   *  RouteBoundary's resetKey=pathname pattern, App.jsx:22-25 / 73-76). */
+  /** Route key — navigating away clears a caught crash. */
   resetKey?: string;
 };
 
@@ -296,8 +290,8 @@ export class ErrorBoundary extends React.Component<
 
 /**
  * Router-aware wrapper mounted in App.tsx: `resetKey` is the current
- * pathname, so a navigation clears a caught crash without a reload
- * (Aniraku RouteBoundary, App.jsx:73-76). Must render inside <Router>.
+ * pathname, so a navigation clears a caught crash without a reload.
+ * Must render inside <Router>.
  */
 export function AppErrorBoundary({
   children,

@@ -1,23 +1,20 @@
 import { useEffect } from 'react';
 import { useTheme } from '../components/ThemeContext';
 
-// Global keyboard shortcuts — direct port of live matcher map
-// (`Os`) and dispatcher.
+// Global keyboard shortcuts and dispatcher.
 //
-// Listener target: live attaches to `document`; this port attaches to
-// `window` because the local Settings page dispatches its synthetic Shift+?
-// keydown on `window` (Settings.tsx:422) with bubbles:false, which a document
-// listener can never see. Real keydowns bubble up to window and no local
-// keydown handler calls stopPropagation(), so both targets are equivalent for
-// physical keys while window additionally catches that synthetic event. The
-// `strmcx-keydown` relay follows the same placement (live: document; no local
-// dispatcher exists yet).
+// The listener is attached to `window` because the local Settings page
+// dispatches its synthetic Shift+? keydown on `window` with bubbles:false,
+// which a document listener can never see. Real keydowns bubble to window
+// and no local handler calls stopPropagation(), so the two targets are
+// equivalent for physical keys; window also catches that synthetic event.
+// The `strmcx-keydown` relay follows the same placement.
 //
-// Page-scoped actions use the mission contract: `aniraku:shortcut` CustomEvents
-// (`next-ep`, `prev-ep`, `theater`). `lights` has NO key on live (button
-// only), so it is never dispatched here.
+// Page-scoped actions use the `aniraku:shortcut` CustomEvents
+// (`next-ep`, `prev-ep`, `theater`). `lights` has no global key, so it is
+// never dispatched here.
 
-/** Mission contract event emitted for page-scoped (Watch) shortcuts. */
+/** Event emitted for page-scoped (Watch) shortcuts. */
 export const ANIRAKU_SHORTCUT_EVENT = 'aniraku:shortcut';
 
 export type AnirakuShortcutAction = 'prev-ep' | 'next-ep' | 'theater' | 'lights';
@@ -27,9 +24,7 @@ type Matcher = (e: KeyboardEvent) => boolean;
 const hasNoBlockingModifier = (e: KeyboardEvent): boolean =>
   !e.ctrlKey && !e.altKey && !e.metaKey;
 
-// Matcher map, one entry per ShortcutsPopup row (order of keys
-// Mirrors the popup; theme/settings modifiers match live, including
-// theme having no modifier exclusions).
+// Matcher map, one entry per ShortcutsPopup row in the same order.
 const Os: Record<string, Matcher> = {
   theme: (e) => e.shiftKey && e.key.toLowerCase() === 'd',
   openShortcuts: (e) => e.shiftKey && e.key === '?',
@@ -48,10 +43,9 @@ const Os: Record<string, Matcher> = {
     e.shiftKey &&
     ['p', 'b'].includes(e.key.toLowerCase()) &&
     hasNoBlockingModifier(e),
-  // Contract-only extension: unmodified t →
-  // theater for Watch pages. Player keys (k/j/l/f/m/space/arrows/,/./0-9 and
-  // Shift+S / Shift+Enter) are not global on live — they live inside the
-  // player, which is out of scope here.
+  // Contract-only extension: unmodified t opens theater for Watch pages.
+  // Player keys (k/j/l/f/m/space/arrows/,/./0-9 and Shift+S / Shift+Enter)
+  // are handled inside the player, not globally.
   theater: (e) =>
     e.key === 't' &&
     !e.shiftKey &&
@@ -106,9 +100,9 @@ const emitShortcut = (action: AnirakuShortcutAction): void => {
 };
 
 /**
- * Installs the single global keydown listener set (live `Uh`): one window
- * `keydown` listener plus the `strmcx-keydown` relay, both removed on
- * unmount / theme change (deps `[toggleTheme]`, like live).
+ * Installs the single global keydown listener set: one window `keydown`
+ * listener plus the `strmcx-keydown` relay, both removed on unmount / theme
+ * change (deps `[toggleTheme]`).
  */
 export function useGlobalShortcuts(): void {
   const { toggleTheme } = useTheme();
@@ -141,7 +135,7 @@ export function useGlobalShortcuts(): void {
       }
       if (Os.notifications(e)) {
         e.preventDefault();
-        // live: open toggles, sidemenu force-closes (mutual exclusion)
+        // Opening notifications closes the side menu, and vice versa.
         emitWindowEvent('global-shortcuts:open-notifications');
         emitWindowEvent('global-shortcuts:close-sidemenu');
         return;
@@ -168,8 +162,8 @@ export function useGlobalShortcuts(): void {
       }
     };
 
-    // live relays `strmcx-keydown` CustomEvents (detail = KeyboardEventInit)
-    // through the exact same dispatcher
+    // Relay `strmcx-keydown` CustomEvents (detail = KeyboardEventInit)
+    // through the same dispatcher.
     const handleRelay = (ev: Event) => {
       const detail = (ev as CustomEvent<KeyboardEventInit>).detail ?? {};
       const synthetic = new KeyboardEvent('keydown', {

@@ -20,11 +20,11 @@ import type { Episode } from '../../hooks/animeInterface';
 import { subscribeToWatchHistory } from '../../lib/watchHistory';
 import ThemedSelect from '../ThemedSelect';
 
-// Pref ("Hide Spoilers" — blocks episode images behind a
-// HIDDEN SPOILER overlay). StoredSettings keeps it internal to the settings
-// record (the public useSettings shape doesn't expose it), so EpisodeList
-// reads/merge-writes `aniraku:settings` → .settings.hideSpoiler directly —
-// same record, same key the provider persists.
+// "Hide Spoilers" preference — blocks episode images behind a HIDDEN SPOILER
+// overlay. StoredSettings keeps it internal to the settings record (the
+// public useSettings shape doesn't expose it), so EpisodeList reads and
+// merge-writes `aniraku:settings` → .settings.hideSpoiler directly, using
+// the same record and key the provider persists.
 function readHideSpoilerPref(): boolean {
   try {
     const raw = localStorage.getItem('aniraku:settings');
@@ -34,7 +34,7 @@ function readHideSpoilerPref(): boolean {
       if (typeof value === 'boolean') return value;
     }
   } catch {
-    // Malformed record — fall through to the live default.
+    // Malformed record — fall through to the default.
   }
   return false; // LIVE_DEFAULTS.hideSpoiler = !1
 }
@@ -102,8 +102,8 @@ const EpisodeGrid = styled.div<{ $isRowLayout: boolean }>`
   flex-grow: 1;
 `;
 
-// p7i3w — image wrapper with the live spoiler treatment: the image is
-// blurred (`spoilerHidden`: blur(8px) brightness(1.5)) while the overlay
+// Image wrapper with the spoiler treatment: the image is blurred
+// (`spoilerHidden`: blur(8px) brightness(1.5)) while the overlay
 // (`spoilerOverlay` + `isVisible`: opacity 1, mix-blend difference) shows
 // `HIDDEN SPOILER`.
 const EpisodeImageWrap = styled.div`
@@ -202,8 +202,8 @@ const ListItem = styled.button<{
   }
 `;
 
-// dlwq6 — episode controls bar: flex, gap .5rem, padding .5rem, div-tr
-// background, border-bottom.
+// Episode controls bar: flex, gap .5rem, padding .5rem, div-tr background,
+// border-bottom.
 const ControlsContainer = styled.div`
   display: flex;
   align-items: center;
@@ -239,8 +239,8 @@ const LayoutToggle = styled.button`
   }
 `;
 
-// dlwq6 — filter container: flex-1, gap .25rem, padding .5rem,
-// secondary-bg, border, radius.
+// Filter container: flex-1, gap .25rem, padding .5rem, secondary background,
+// border, radius.
 const SearchContainer = styled.div`
   display: flex;
   flex: 1;
@@ -320,8 +320,8 @@ export const EpisodeList: React.FC<Props> = ({
       return defaultLayoutMode;
     },
   );
-  // Row vs grid view — the live row/grid toggle is driven purely by
-  // displayMode (grid ⇄ everything else).
+  // Row vs grid view — the toggle is driven purely by displayMode (grid ⇄
+  // everything else).
   const isRowLayout = displayMode !== 'grid';
 
   const [selectionInitiatedByUser, setSelectionInitiatedByUser] =
@@ -388,7 +388,7 @@ export const EpisodeList: React.FC<Props> = ({
     setInterval([start, end]);
   }, []);
 
-  // Live controls-bar spoiler toggle (`title="Toggle Spoilers"`): blocks
+  // Controls-bar spoiler toggle (`title="Toggle Spoilers"`): blocks
   // episode images behind the HIDDEN SPOILER overlay.
   const [hideSpoiler, setHideSpoiler] = useState(readHideSpoilerPref);
   const toggleHideSpoiler = useCallback(() => {
@@ -548,7 +548,6 @@ export const EpisodeList: React.FC<Props> = ({
           const $isSelected = episode.id === selectedEpisodeId;
           const $isWatched = watchedEpisodes.some((e) => e.id === episode.id);
           // List/image modes paint the episode thumbnail behind the title
-          // (blocked entirely while hideSpoiler is on — live `s` gate).
           const thumbBg =
             isRowLayout && episode.image && !hideSpoiler
               ? {
@@ -585,7 +584,7 @@ export const EpisodeList: React.FC<Props> = ({
                     <EpisodeImage
                       className={hideSpoiler ? 'spoiler-hidden' : undefined}
                       src={episode.image}
-                      // Live `s` gate: hidden alt drops the title entirely.
+                      // Gate: hidden alt drops the title entirely.
                       alt={
                         hideSpoiler
                           ? `EP ${episode.number}`

@@ -5,8 +5,8 @@ import { FaPlay, FaTimes, FaTv } from 'react-icons/fa';
 import { useMediaQuery } from './useMediaQuery';
 import TacLoginNotice from '../TacLoginNotice';
 
-// TheAnimeCommunity comments embed — 1:1 port of the component
-// (chunks/Seasons-O6-NO94x.js). The embed CONTRACT is byte-for-byte:
+// TheAnimeCommunity comments embed.
+// The embed contract:
 //   - <script id="anime-community-script" src="https://theanimecommunity.com/embed.js">
 //   - <div id="anime-community-comment-section">
 //   - window.theAnimeCommunityConfig = {AniList_ID, episodeChapterNumber,
@@ -14,8 +14,8 @@ import TacLoginNotice from '../TacLoginNotice';
 //   - loader promise + window.theAnimeCommunity.reload()
 //   - count API https://theanimecommunity.com/api/v1/comments/count
 //   - message TAC-TIMESTAMP-CLICK -> window 'comments:timestamp-click'
-// Surrounding chrome (title bar, ANIME/EP tabs, compact button + drag sheet)
-// Replicates markup and CSS rules below.
+// The surrounding chrome (title bar, ANIME/EP tabs, compact button + drag
+// sheet) is replicated below, along with its markup and CSS rules.
 
 const CONTAINER_ID = `anime-community-comment-section`;
 const SCRIPT_ID = `anime-community-script`;
@@ -100,9 +100,7 @@ const LIVE_COMMENTS_CSS = `
 html.overlay-open{overflow:hidden!important}
 `;
 
-// Live helpers
-
-// Ee — AniList id must be a finite positive number (or numeric string here).
+// AniList id must be a finite positive number (or numeric string here).
 function anilistIdOf(media: { id?: unknown } | null | undefined): string | null {
   if (!media) return null;
   const id = Number(media.id);
@@ -110,7 +108,7 @@ function anilistIdOf(media: { id?: unknown } | null | undefined): string | null 
   return String(id);
 }
 
-// De — episodeChapterNumber: `0` for overall/movie/unreleased, else String(ep).
+// episodeChapterNumber: `0` for overall/movie/unreleased, else String(ep).
 function chapterOf(args: {
   overall: boolean;
   isMovie: boolean;
@@ -123,7 +121,7 @@ function chapterOf(args: {
   return String(args.episodeNumber);
 }
 
-// He — count payload: {count} | {data:{count}}.
+// Count payload: {count} | {data:{count}}.
 function parseCount(payload: unknown): number | null {
   if (!payload || typeof payload !== 'object') return null;
   const p = payload as { count?: unknown; data?: { count?: unknown } };
@@ -133,7 +131,7 @@ function parseCount(payload: unknown): number | null {
   return null;
 }
 
-// qe — resolve a CSS color() expression through a detached element.
+// Resolve a CSS color() expression through a detached element.
 function resolveCssColor(expr: string): string {
   const el = document.createElement('div');
   el.style.color = expr;
@@ -166,7 +164,7 @@ const EMPTY_SCHEME: ColorScheme = {
   accentColor: ``,
 };
 
-// Je — colorScheme for the embed, sampled from the page's own CSS vars.
+// colorScheme for the embed, sampled from the page's own CSS vars.
 function computeColorScheme(): ColorScheme {
   if (typeof document === `undefined`) return EMPTY_SCHEME;
   const rootStyle = getComputedStyle(document.documentElement);
@@ -238,7 +236,7 @@ declare global {
   }
 }
 
-// Oe — ANIME / EP n tab buttons (qywzu markup)
+// ANIME / EP n tab buttons (qywzu markup).
 
 type TabButtonsProps = {
   animeActive: boolean;
@@ -296,7 +294,7 @@ const TabButtons: React.FC<TabButtonsProps> = ({
   );
 };
 
-// Te — compact comments button
+// Compact comments button.
 
 const CompactCommentsButton: React.FC<{
   onOpen: () => void;
@@ -319,7 +317,7 @@ const CompactCommentsButton: React.FC<{
   </button>
 );
 
-// Fe — compact bottom sheet with drag physics
+// Compact bottom sheet with drag physics.
 
 const CLOSE_AFTER_DRAG = 80;
 const EXPAND_AFTER_DRAG = 60;
@@ -539,13 +537,11 @@ const CommentsSheet: React.FC<SheetProps> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
-// Ye — the comments component itself
-// ---------------------------------------------------------------------------
+// The comments component.
 
 export type CommentsProps = {
   loading?: boolean;
-  // AniList media id (number or string — coerced exactly like live's Ee).
+  // AniList media id (number or string, coerced to a positive integer).
   mediaId?: string | number | null;
   episodeNumber?: number;
   // AniList format (`MOVIE`) + status (`Not yet aired`) + episode availability.
@@ -556,11 +552,11 @@ export type CommentsProps = {
   forceInline?: boolean;
 };
 
-// Live initializes its `f` state from `settings.comments` (StoredSettings
-// field, default true). The provider's public useSettings() shape does not
-// expose it, so read the same persisted record the provider writes
-// (`aniraku:settings` → .settings.comments) — same source, same snapshot-at-
-// mount semantics as live's useState(a.comments).
+// Initializes its state from `settings.comments` (StoredSettings field,
+// default true). The provider's public useSettings() shape does not expose
+// it, so read the persisted record the provider writes (`aniraku:settings` →
+// .settings.comments) — same source and snapshot-at-mount semantics as the
+// provider's own state.
 function readCommentsPref(): boolean {
   try {
     const raw = localStorage.getItem('aniraku:settings');
@@ -570,7 +566,7 @@ function readCommentsPref(): boolean {
       if (typeof value === 'boolean') return value;
     }
   } catch {
-    // Malformed record — fall through to the live default.
+    // Malformed record — fall through to the default.
   }
   return true; // LIVE_DEFAULTS.comments
 }
@@ -593,14 +589,14 @@ export const Comments: React.FC<CommentsProps> = ({
   const isUnreleased = mediaStatus === `Not yet aired` && !hasEpisodes;
   const canShowEpisode = episodeNumber > 0 && !isMovie && !isUnreleased;
 
-  // f — local copy of the `comments` accessibility setting (live useState(a.comments)).
+  // Local copy of the `comments` accessibility setting.
   const [commentsEnabled, setCommentsEnabled] = useState(readCommentsPref);
-  // m — overall (ANIME scope) vs episode scope.
+  // Overall (ANIME scope) vs episode scope.
   const [overall, setOverall] = useState(!canShowEpisode);
   const [colorScheme, setColorScheme] = useState<ColorScheme>(() =>
     computeColorScheme(),
   );
-  // v — compact sheet opened (gates embed config + count fetch on mobile).
+  // Compact sheet opened (gates embed config + count fetch on mobile).
   const [sheetOpened, setSheetOpened] = useState(false);
   const [count, setCount] = useState<number | null>(null);
 
@@ -608,7 +604,7 @@ export const Comments: React.FC<CommentsProps> = ({
     setOverall(!canShowEpisode);
   }, [canShowEpisode]);
 
-  // Keep scheme in sync with theme changes (live re-samples on theme name change).
+  // Re-sample the scheme when the theme name changes.
   useEffect(() => {
     let disposed = false;
     const frame = requestAnimationFrame(() => {
@@ -647,7 +643,7 @@ export const Comments: React.FC<CommentsProps> = ({
       ? z.framePad
       : `${z.framePad} ${z.hidden}`;
 
-  // Config + embed loader (live effect: skip on compact until the sheet opens).
+  // Config + embed loader; skip on compact until the sheet opens.
   useEffect(() => {
     if (anilistId === null || chapter === null) return;
     if (compact && !sheetOpened) return;
@@ -672,7 +668,7 @@ export const Comments: React.FC<CommentsProps> = ({
     };
   }, [anilistId, chapter, mediaType, colorScheme, compact, sheetOpened]);
 
-  // Comment count — fetched only in compact mode, exactly like live.
+  // Comment count — fetched only in compact mode.
   useEffect(() => {
     if (!compact) return;
     if (anilistId === null || chapter === null) return;
@@ -693,7 +689,7 @@ export const Comments: React.FC<CommentsProps> = ({
     return () => controller.abort();
   }, [compact, anilistId, chapter, mediaType]);
 
-  // TAC-TIMESTAMP-CLICK -> local `comments:timestamp-click` event (live verbatim).
+  // TAC-TIMESTAMP-CLICK -> local `comments:timestamp-click` event.
   // Origin-checked: only the TAC embed frame may drive player seeks.
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -747,11 +743,11 @@ export const Comments: React.FC<CommentsProps> = ({
     </div>
   );
 
-  // Live gate: nothing to show without a valid AniList id / chapter.
+  // Gate: nothing to show without a valid AniList id / chapter.
   if (anilistId === null || chapter === null) return null;
 
   if (compact) {
-    // Live compact branch: button + drag sheet (settings + ids must be present).
+    // Compact branch: button + drag sheet (settings + ids must be present).
     if (!commentsEnabled || !isValid) return null;
     const subtitleParts: string[] = [];
     if (!overall && !isMovie && !isUnreleased && episodeNumber > 0)
@@ -775,7 +771,7 @@ export const Comments: React.FC<CommentsProps> = ({
     );
   }
 
-  // Wide branch — live markup: commentSectionContainer > titleContainer >
+  // Wide branch — markup: commentSectionContainer > titleContainer >
   // titleWrapper > (label + `Comments`), tab buttons, then framePad > frame.
   return (
     <>
@@ -799,7 +795,7 @@ export const Comments: React.FC<CommentsProps> = ({
   );
 };
 
-// Inject the live CSS rules exactly once at module load (client-only SPA).
+// Inject the CSS rules exactly once at module load (client-only SPA).
 if (typeof document !== `undefined` && !document.getElementById(`live-comments-css`)) {
   const style = document.createElement(`style`);
   style.id = `live-comments-css`;

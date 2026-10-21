@@ -14,8 +14,8 @@ import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
 import { SkeletonCard } from '../components/Skeletons/Skeletons';
 import { Paging } from '../index';
 import { Anime } from '../index';
-// NSFW gate — Aniraku: browse results run
-// through filterAdult (Hentai-genre rule, default OFF → hidden).
+// NSFW gate: browse results run through filterAdult (Hentai-genre rule,
+// default OFF → hidden).
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 import { useSeo, breadcrumbLd } from '../utils/seo';
 
@@ -188,7 +188,7 @@ const Search = () => {
         sort: filters.sort.length ? filters.sort : ['POPULARITY_DESC'],
         // NOTE: tags, source, countryOfOrigin, isAdult, dubLanguage and
         // averageScore are URL-synced but not supported by the local API
-        // layer (useApi.ts fetchAdvancedSearch) — see report.
+        // layer (useApi.ts fetchAdvancedSearch).
       });
       if (seq !== fetchSeq.current) return; // stale response
       setAnimeData((prev) =>
@@ -229,7 +229,7 @@ const Search = () => {
   }, [initiateFetchAdvancedSearch]);
 
   // Infinite scroll: sentinel observed with IntersectionObserver (rootMargin
-  // 20px, threshold 1) exactly like the live Search route.
+  // 20px, threshold 1) exactly like the Search route.
   const handleLoadMore = useCallback(() => {
     if (!pageInfo?.hasNextPage) return;
     if (isLoading || isFetchingNextPage) return;

@@ -17,9 +17,9 @@ import { statusForNewBookmark, type ListStatus } from '../lib/listStatus';
 // useBookmarks — local-first bookmark store with merge-on-login Supabase
 //
 // Local store: `aniraku:bookmarks` (JSON array of {id,title,image,...}).
-// Merge-on-login folds in BOTH `aniraku:bookmarks` and the legacy Aniraku
-// Key `aniraku-bookmarks`: read cloud →
-// upsert local-only rows → store the union. Guests stay LS-only; signed-in
+// Merge-on-login folds in both `aniraku:bookmarks` and the legacy
+// `aniraku-bookmarks` key: read cloud → upsert local-only rows → store the
+// union. Guests stay LS-only; signed-in
 // toggles are optimistic-LS + server upsert/delete passthrough.
 // Sign-out cleanup of these keys is the contract — not done here.
 //
@@ -109,7 +109,7 @@ export interface UseBookmarksResult {
   isBookmarked: (id: number | string) => boolean;
   /**
    * Guest: LS-only toggle. Signed-in: LS optimistic write, then server
-   * upsert (add) / delete (remove) — Aniraku Card.jsx:37-45 semantics.
+   * upsert (add) / delete (remove).
    */
   toggleBookmark: (entry: ToggleableBookmark) => Promise<void>;
   /**

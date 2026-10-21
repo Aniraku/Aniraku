@@ -146,7 +146,7 @@ export const GenreRail: React.FC = () => {
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
 
-  // Live `br` helper: edge-aware mask + button visibility, rAF-throttled.
+  // Helper: edge-aware mask + button visibility, rAF-throttled.
   const update = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
@@ -173,7 +173,7 @@ export const GenreRail: React.FC = () => {
     });
   }, []);
 
-  // Center the rail on mount (live centers the selected genre).
+  // Center the rail on mount.
   useEffect(() => {
     const el = railRef.current;
     if (el) {

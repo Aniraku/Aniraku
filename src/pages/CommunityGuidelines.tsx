@@ -1,6 +1,4 @@
-// TS port of the src/pages/ — content kept
-// in the source's own wording (final brand: Aniraku); GitHub issue
-// link restored.
+// Community guidelines content.
 import { Link } from 'react-router-dom';
 import LegalPage from '../components/LegalPage';
 import { useSeo, breadcrumbLd } from '../utils/seo';

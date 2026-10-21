@@ -34,7 +34,7 @@ function readStored(key: 'langTitle' | 'langCharacter'): string | null {
   }
 }
 
-/** Stored title preference; defaults to English (live default). */
+/** Stored title preference; defaults to English. */
 export function getTitleLanguage(): TitleLanguage {
   const stored = readStored('langTitle');
   const normalized = stored?.trim().toLowerCase();
@@ -43,7 +43,7 @@ export function getTitleLanguage(): TitleLanguage {
     : 'english';
 }
 
-/** Stored character-name preference; defaults to Romaji (live default). */
+/** Stored character-name preference; defaults to Romaji. */
 export function getCharacterNameLanguage(): CharacterNameLanguage {
   const stored = readStored('langCharacter');
   const normalized = stored?.trim().toLowerCase();

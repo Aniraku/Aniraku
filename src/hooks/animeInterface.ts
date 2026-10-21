@@ -32,7 +32,7 @@ export interface Recommendation {
   coverHash: string;
   rating: number;
   type: string;
-  /** AniList genres — NSFW gate (Hentai-genre rule) reads this (Wave C). */
+  /** AniList genres — the NSFW gate (Hentai-genre rule) reads this. */
   genres?: string[];
 }
 
@@ -73,7 +73,7 @@ export interface Artwork {
   providerId: string;
 }
 
-/** AniList `Media.tags` entry (live Info Tags section). ADDITIVE. */
+/** AniList `Media.tags` entry (Info page Tags section). */
 export interface Tag {
   id: string;
   name: string;
@@ -82,7 +82,7 @@ export interface Tag {
   isGeneralSpoiler: boolean;
 }
 
-/** AniList `Media.externalLinks` entry. ADDITIVE. */
+/** AniList `Media.externalLinks` entry. */
 export interface ExternalLink {
   site: string;
   url: string;
@@ -96,8 +96,8 @@ export interface Episode {
   image: string;
   imageHash: string;
   airDate: string | null;
-  /** ADDITIVE (Info page): live tags filler episodes with the tag icon +
-   *  the #B9986D state color (AniList mapper never sets it). */
+  /** Filler episode flag; the Info page renders it with the tag icon and
+   *  the #B9986D state color. */
   filler?: boolean;
 }
 
@@ -152,16 +152,16 @@ export interface Anime {
     airingTime: number;
     timeUntilAiring: number;
   };
-  // ADDITIVE (Info page enrichment; mapper never sets/removes these)
-  /** AniList tags — shown in the live Info Tags section. */
+  // Info page enrichment fields.
+  /** AniList tags — shown in the Info page Tags section. */
   tags?: Tag[];
   /** AniList `Media.source` enum (e.g. ORIGINAL) — shown in the Details dl. */
   source?: string;
   /** Raw AniList banner (nullable) so a missing banner can use the placeholder. */
   bannerImage?: string;
-  /** Unix seconds of the last AniList edit (live "Last Update"). */
+  /** Unix seconds of the last AniList edit ("Last Update"). */
   updatedAt?: number;
-  /** AniList external links (live "Official Site"). */
+  /** AniList external links ("Official Site"). */
   externalLinks?: ExternalLink[];
 }
 

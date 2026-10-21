@@ -8,29 +8,29 @@ import React, {
 
 // Storage consistency
 //
-// Live centralizes every preference in ONE namespaced JSON record:
+// Centralizes every preference in ONE namespaced JSON record:
 //
 //   localStorage['aniraku:settings'] = {
-//     schemaVersion: 3, //
-//     theme: <ThemeName>,        // written by ThemeContext (not this provider)
-//     settings: { ...user settings, live field names/defaults },
+//     schemaVersion: 3,
+//     theme: <ThemeName>,   // written by ThemeContext (not this provider)
+//     settings: { ...user settings }
 //   }
 //
-// Legacy keys are read once by migration (semantics: a field is
-// only filled while it's still `undefined` in the record):
-//   - live:   'aniraku:settings:user' (JSON) -> record.settings
-//   - local:  autoSkip / autoPlay / autoNext / defaultLanguage / defaultServers
+// Legacy keys are read once by migration (a field is only filled while it
+// is still `undefined` in the record):
+//   - 'aniraku:settings:user' (JSON) -> record.settings
+//   - autoSkip / autoPlay / autoNext / defaultLanguage / defaultServers
 //
 // The public `useSettings()` shape is unchanged for consumers; the mapping
-// between local names and live storage names happens here:
+// between local names and storage names happens here
 //   defaultLanguage <-> settings.langDefault
 //   defaultServers  <-> settings.defaultServers (local-only extension)
 
 const SETTINGS_RECORD = 'aniraku:settings';
 const LEGACY_LIVE_USER_SETTINGS = 'aniraku:settings:user';
-const SCHEMA_VERSION = 3; // live `se`
+const SCHEMA_VERSION = 3;
 
-/** Exact live settings payload (`ne`/`Ge` in the bundle) + one local-only field. */
+/** Stored settings payload plus one local-only field. */
 type StoredSettings = {
   langDefault: string;
   langTitle: string;
@@ -52,7 +52,7 @@ type StoredSettings = {
   cardSize: string;
   listLayout: string;
   comments: boolean;
-  /** Local-only extension: live has no default-server preference. */
+  /** Local-only extension: no default-server preference exists in the schema. */
   defaultServers: string;
 };
 
@@ -61,7 +61,7 @@ const isCoarsePointer =
   typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;
 
-/** Exact live defaults (borderRadius: c() ? 1 : .5). */
+/** Default settings values (borderRadius: c() ? 1 : .5). */
 const LIVE_DEFAULTS: StoredSettings = {
   langDefault: 'sub',
   langTitle: 'English',
@@ -86,7 +86,7 @@ const LIVE_DEFAULTS: StoredSettings = {
   defaultServers: 'Default',
 };
 
-// Valid value sets enforced live-side (index.js `xt` provider validation)
+// Valid value sets enforced by the provider.
 const CARD_LAYOUTS = ['classic', 'anichart', 'cardlist'];
 const CARD_SIZES = ['large', 'medium'];
 const LIST_LAYOUTS = ['auto', 'list', 'grid', 'imageList'];
@@ -118,7 +118,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** live `$m` boolean coercion ('Enabled'/'true' -> true). */
+/** Boolean coercion ('Enabled'/'true' -> true). */
 function normBool(value: unknown, fallback: boolean): boolean {
   if (value === undefined || value === null) return fallback;
   if (typeof value === 'boolean') return value;
@@ -151,10 +151,9 @@ function readLegacyFlatSettings(): Record<string, unknown> {
 }
 
 /**
- * Mirrors live's `we()` migration for the settings record: fill `settings`
- * from legacy sources only while the field is undefined (`live W` semantics),
- * stamp `schemaVersion`, persist once. `theme` is left untouched — ThemeContext
- * owns it and both writers merge into the same record.
+ * Fill `settings` from legacy sources only while the field is undefined,
+ * stamp `schemaVersion`, and persist once. `theme` is left untouched —
+ * ThemeContext owns it and both writers merge into the same record.
  */
 function migrateSettingsRecord(): Record<string, unknown> {
   const record = readRecord();
@@ -164,7 +163,7 @@ function migrateSettingsRecord(): Record<string, unknown> {
       const base: Record<string, unknown> = isPlainObject(liveLegacy)
         ? { ...liveLegacy }
         : {};
-      // local flat keys only fill fields the live legacy payload didn't provide
+      // local flat keys only fill fields the legacy payload didn't provide
       const flat = readLegacyFlatSettings();
       for (const [field, value] of Object.entries(flat)) {
         if (base[field] === undefined) base[field] = value;
@@ -181,7 +180,7 @@ function migrateSettingsRecord(): Record<string, unknown> {
   return record;
 }
 
-/** Merge record payload over live defaults with live's validation rules. */
+/** Merge the record payload over defaults, applying validation rules. */
 function buildStoredSettings(): StoredSettings {
   const record = migrateSettingsRecord();
   const stored: Partial<StoredSettings> = isPlainObject(record.settings)
@@ -242,7 +241,7 @@ function buildStoredSettings(): StoredSettings {
   } as StoredSettings;
 }
 
-/** Local (public) settings names -> live storage field names. */
+/** Local (public) settings names -> storage field names. */
 function toStoredPatch(
   patch: Partial<SettingsContextType['settings']>,
 ): Partial<StoredSettings> {
@@ -264,7 +263,7 @@ function toStoredPatch(
   return stored;
 }
 
-/** Dropdown labels → live `langTitle` values. */
+/** Dropdown labels → `langTitle` values. */
 function toLangTitle(value: unknown): string {
   const v = String(value ?? '');
   if (/native/i.test(v)) return 'Native';
@@ -272,7 +271,7 @@ function toLangTitle(value: unknown): string {
   return 'English';
 }
 
-/** Dropdown labels → live `langCharacter` values. */
+/** Dropdown labels → `langCharacter` values. */
 function toLangCharacter(value: unknown): string {
   const v = String(value ?? '');
   if (/native/i.test(v)) return 'Native';
@@ -313,7 +312,7 @@ interface SettingsProviderProps {
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   children,
 }) => {
-  // full live-shaped payload kept in state; the exposed value is mapped below
+  // Full stored payload kept in state; the exposed value is mapped below.
   const [stored, setStored] = useState<StoredSettings>(buildStoredSettings);
 
   useEffect(() => {

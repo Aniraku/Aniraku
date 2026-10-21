@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
 
-// Minimal centered design matching live NotFoundRoute
-// (_container_1299l_1 / _code_1299l_8 / _message_1299l_16 in production CSS)
+// Minimal centered design for the not-found route.
 const Container = styled.div`
   display: flex;
   flex-direction: column;

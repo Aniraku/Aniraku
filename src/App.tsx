@@ -18,25 +18,23 @@ import {
   SettingsProvider,
 } from './index';
 import { AuthProvider } from './client/useAuth';
-// Mounted at the top of the router tree, wrapping
-// the existing AniList AuthProvider (src/client/* hosts that one and is off-limits).
+// Mounted at the top of the router tree, wrapping the existing AniList
+// AuthProvider (the src/client/* one is off-limits).
 import { AuthProvider as SupabaseAuthProvider } from './providers/AuthProvider';
 import ReactGA from 'react-ga4';
 import { Toaster } from './components/Toaster';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
-// Mobile wave — Aniraku MobileBottomNav port (mounts next to the Navbar in
-// the router tree; route-based hide rules live inside the component).
+// Bottom navigation, mounted next to the Navbar in the router tree.
+// Route-based hide rules live inside the component.
 import BottomNav from './components/Navigation/BottomNav';
-// Aniraku parity: support modal behind the navbar heart (event-driven via
+// Support modal behind the navbar heart (event-driven via
 // `aniraku:open-support`; also auto-prompts after 30 min active time).
 import SupportPrompt from './components/SupportPrompt';
 import AnnouncementModal from './components/AnnouncementModal';
 import './components/global-chrome.css';
-// Task wave — global crash boundary (wraps everything below the nav so a
-// caught crash still leaves the navbar alive for the resetKey route change),
-// AniList outage banner (Aniraku AniListAvailabilityBanner port) and the
-// Rich 404 that replaces the minimal Page404 on the
-// catch-all route.
+// Global crash boundary (wraps everything below the nav so a caught crash
+// still leaves the navbar alive for the resetKey route change), the AniList
+// outage banner, and the rich 404 used on the catch-all route.
 import { AppErrorBoundary } from './components/ErrorBoundary';
 import { AniListStatusBanner } from './components/AniListStatusBanner';
 import NotFound from './pages/NotFound';
@@ -58,8 +56,7 @@ const ProfilePage = lazy(() => import('./pages/Profile'));
 // NOTE: no swiper custom-element register() — nothing renders
 // <swiper-container>; carousels use swiper/react (code-split with Home).
 
-// Routes are lazy so the auth/legal chunks stay out of the initial
-// bundle (no prior lazy/Suspense pattern in this repo — see report deviations).
+// Routes are lazy so the auth/legal chunks stay out of the initial bundle.
 const Auth = lazy(() => import('./pages/Auth'));
 const NewPassword = lazy(() => import('./pages/NewPassword'));
 const Privacy = lazy(() => import('./pages/Privacy'));
@@ -110,11 +107,10 @@ function RouteFallback() {
 function App() {
   usePreserveScrollOnReload();
   const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID;
-  // the live site 1:1: Shift+? is owned by useGlobalShortcuts — the hook matches
-  // the key (real presses AND the Settings row's synthetic window keydown,
-  // Settings.tsx:422) and dispatches global-shortcuts:toggle-shortcuts-popup;
-  // ShortcutsPopup listens for that event itself, so no local keydown state
-  // lives here anymore.
+  // Shift+? is owned by useGlobalShortcuts — the hook matches the key (real
+  // presses and the Settings row's synthetic window keydown) and dispatches
+  // global-shortcuts:toggle-shortcuts-popup; ShortcutsPopup listens for that
+  // event itself, so no local keydown state lives here.
 
   useEffect(() => {
     if (measurementId) {
@@ -240,11 +236,10 @@ function App() {
   );
 }
 
-// The app's shortcut hook (`Uh`) lives inside its navbar shell; here it needs
+// The global shortcut hook lives inside the navbar shell; here it needs
 // router access so ⌃/⌘/⇧+, can toggle Profile's settings modal (?settings=1)
 // — the same route App already uses for /settings and /profile/settings.
-// Navigation toggles: being on /profile?settings=1 closes it, anything else
-// Opens it.
+// Navigating to /profile?settings=1 closes it; any other navigation opens it.
 function GlobalShortcutsBridge() {
   useGlobalShortcuts();
   const navigate = useNavigate();

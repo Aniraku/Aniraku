@@ -425,7 +425,7 @@ export const HomeCarousel: FC<HomeCarouselProps> = ({ data = [] }) => {
     return () => clearInterval(t);
   }, []);
 
-  // ≤500px uses the poster-first image selection (live `ir(e, useMedia(500))`).
+  // ≤500px uses the poster-first image selection.
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 500px)');
     const update = () => setIsSmall(mq.matches);
@@ -434,7 +434,7 @@ export const HomeCarousel: FC<HomeCarouselProps> = ({ data = [] }) => {
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  // Strict filter first (live `rr`), looser fallback so the hero never
+  // Strict filter first, looser fallback so the hero never
   // disappears; then Fisher-Yates shuffle.
   const slides = useMemo(() => {
     const strict = data.filter(

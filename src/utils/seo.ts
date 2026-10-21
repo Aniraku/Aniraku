@@ -36,18 +36,17 @@ export interface SeoOptions {
   /** When true, robots meta becomes "noindex, nofollow" (default: indexable). */
   noindex?: boolean;
   /**
-   * og:image + twitter:image (+ twitter:card=summary_large_image). Ported for
-   * Info/Watch parity with old setAnimeDetailSEO/setWatchSEO image handling.
+   * og:image + twitter:image (+ twitter:card=summary_large_image).
    */
   image?: string;
   /** og:type override (e.g. 'video.tv_show', 'video.episode'); defaults 'website'. */
   ogType?: string;
   /**
-   * Separate og/twitter:description — old seo.js splits the meta description
-   * sentence from the og plot description. Defaults to `description`.
+   * Separate og/twitter:description from the meta description. Defaults to
+   * `description`.
    */
   ogDescription?: string;
-  /** meta[name=keywords] — old per-page setMeta('keywords', …) parity. */
+  /** meta[name=keywords]. */
   keywords?: string;
 }
 
@@ -151,13 +150,13 @@ export function useSeo(options: SeoOptions): void {
   const jsonLdKey = jsonLd === undefined ? '' : JSON.stringify(jsonLd);
 
   useEffect(() => {
-    // --- Title -----------------------------------------------------------
+    // Title
     document.title = title;
     setMeta('title', title);
     setMetaProperty('og:title', title);
     setMetaProperty('twitter:title', title);
 
-    // --- Description -----------------------------------------------------
+    // Description
     if (description !== undefined) {
       setMeta('description', description);
     }
@@ -169,7 +168,7 @@ export function useSeo(options: SeoOptions): void {
       setMetaProperty('twitter:description', socialDescription);
     }
 
-    // --- Canonical + social URLs ----------------------------------------
+    // Canonical + social URLs
     if (canonicalPath !== undefined) {
       setCanonical(canonicalPath);
       const url = `${SITE_URL}${canonicalPath}`;
@@ -178,22 +177,21 @@ export function useSeo(options: SeoOptions): void {
       setMetaProperty('og:type', ogType ?? 'website');
     }
 
-    // --- Social image (old setAnimeDetailSEO/setWatchSEO image parity) ---
+    // Social image.
     if (image !== undefined) {
       setMetaProperty('og:image', image);
       setMetaProperty('twitter:image', image);
       setMetaProperty('twitter:card', 'summary_large_image');
     }
 
-    // --- Per-page keywords (old setMeta('keywords', …) parity) -----------
+    // Per-page keywords.
     if (keywords !== undefined) {
       setMeta('keywords', keywords);
     }
 
-    // --- Robots (always written so a previous noindex can't go stale) ----
+    // Robots (always written so a previous noindex can't go stale)
     setMeta('robots', noindex === true ? 'noindex, nofollow' : INDEX_ROBOTS);
 
-    // --- JSON-LD ---------------------------------------------------------
     if (jsonLd === undefined) {
       clearStructuredData();
     } else {

@@ -1,14 +1,13 @@
-// Episode ratings transport — TS port of the rating trio in Aniraku
-// `src/lib/sync.js` (fetchEpisodeRatings :115-130, saveEpisodeRating
-// :132-146, updateSyncScore :98-113), based on the live reference:
-//   - Bearer via the Supabase session (same semantics as lib/sync.ts
-//     authHeaders :8-15; duplicated here so lib/sync.ts's export surface and
-//     Internals stay untouched — this is a NEW file).
+// Episode ratings transport: fetch own ratings, save an episode rating, and
+// update the provider-level score.
+//   - Bearer auth uses the Supabase session. The auth helper is duplicated
+//     from lib/sync.ts so that module's export surface stays untouched;
+//     this is a new file.
 //   - GET  ${API_BASE}/api/v1/anime/{id}/ratings           (own ratings)
 //   - POST ${API_BASE}/api/v1/anime/{id}/episode/{ep}/rating  {score}
 //   - PUT  ${API_BASE}/api/v1/sync/score  {provider, animeId, score}
 //     (both MAL and AniList only support an anime-level score, so the
-//     AVERAGE of the user's episode ratings becomes the pushed score).
+//     average of the user's episode ratings becomes the pushed score).
 // Guests keep ratings in localStorage under the
 // `aniraku-episode-ratings-{animeId}` key.
 import { supabase } from './supabase';
@@ -151,9 +150,9 @@ export async function saveEpisodeRating(
 }
 
 /**
- * Push a 1-10 anime score to a connected provider (Aniraku sync.js:97-113).
- * Both MAL and AniList only support an anime-level score — callers pass the
- * AVERAGE of the user's episode ratings (see `averageRating`).
+ * Push a 1-10 anime score to a connected provider. Both MAL and AniList only
+ * support an anime-level score — callers pass the average of the user's
+ * episode ratings (see `averageRating`).
  */
 export async function updateSyncScore({
   provider,

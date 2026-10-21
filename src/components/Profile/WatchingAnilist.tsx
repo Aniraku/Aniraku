@@ -12,7 +12,6 @@ const Container = styled.div`
   margin-bottom: 1rem;
 `;
 
-// Heading row (_headingRow_76nxj_1 / _title_76nxj_27)
 const HeadingRow = styled.div`
   position: sticky;
   top: 3.5rem;
@@ -52,7 +51,6 @@ const StateMessage = styled.div`
   color: var(--global-text-muted);
 `;
 
-// Login prompt (_loginPromptBox_76nxj_202 / _loginPromptText_76nxj_210)
 const LoginPromptBox = styled.div`
   display: flex;
   flex-direction: column;

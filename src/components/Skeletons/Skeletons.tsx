@@ -2,8 +2,7 @@ import React from "react";
 import styled, { keyframes } from "styled-components";
 
 /**
- * Loading skeleton components matching the live site's
- * skeleton pop-in + primary/secondary shimmer.
+ * Loading skeletons with the pop-in entrance and primary/secondary shimmer.
  */
 
 // Pop-in entrance

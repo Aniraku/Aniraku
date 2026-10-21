@@ -46,9 +46,9 @@ import {
 } from '../lib/sync';
 import { EPISODE_WATCH_TIMES_KEY } from '../lib/episodeWatchTimes';
 
-// Settings — page module (mirrors the visual language of the settings modal
-// in components/Profile/Settings.tsx: same styled shells + `--global-*` vars,
-// Copy based on old Aniraku `src/pages/` where it exists).
+// Settings page module. Mirrors the visual language of the settings modal
+// in components/Profile/Settings.tsx: same styled shells and `--global-*`
+// vars.
 //
 // Features added here beyond the modal copy:
 //  1. Clear Bookmarks (two-step confirm) over the shared bookmark data layer
@@ -58,8 +58,8 @@ import { EPISODE_WATCH_TIMES_KEY } from '../lib/episodeWatchTimes';
 //     — delete-then-reinsert through the same data layer.
 //  3. Two-step confirm on Clear Watch History (red armed label, auto-reverts
 //     after ~4s).
-//  4. Danger Zone → Delete Account: same `delete_my_account` RPC old Aniraku
-//     called on this Supabase project, with an honest best-effort fallback
+//  4. Danger Zone → Delete Account: the `delete_my_account` RPC on this
+//     Supabase project, with an honest best-effort fallback
 //     (delete every row this app writes, then sign out) + limitation copy.
 //  5. Account rows: email / Email verified yes-no / Member since / Sign Out,
 //     sourced from the Supabase session + `profiles`.
@@ -330,8 +330,8 @@ const DangerMsg = styled.span`
   margin-top: 0.5rem;
 `;
 
-// Page-local inline Undo strip (task: undo affordance lives on the page, not
-// in a toast action). Appears under the Data rows for the undo window.
+// Page-local inline Undo strip (the affordance lives on the page, not in a
+// toast action). Appears under the Data rows for the undo window.
 const UndoBar = styled.div`
   display: flex;
   align-items: center;
@@ -436,8 +436,8 @@ const OTHER_ROWS: RowConfig[] = [
   },
 ];
 
-// Undo windows (task spec): ~4s armed confirm, 8s undo, then the deleted
-// rows are gone for good (deletes already committed — undo reinserts).
+// Undo windows: ~4s armed confirm, 8s undo, then the deleted rows are gone
+// for good (deletes are already committed — undo reinserts).
 const ARM_WINDOW_MS = 4000;
 const UNDO_WINDOW_MS = 8000;
 
@@ -450,18 +450,18 @@ export const Settings: React.FC = () => {
   const { settings, setSettings } = useSettings();
   const { theme: themeMode, setTheme } = useTheme();
 
-  // Supabase session + profiles row from the Wave A AuthProvider (the same
+  // Supabase session + profiles row from the AuthProvider (the same
   // source Aniraku's useAuth exposed: email, verification, created_at,
   // signOut). null context = rendered outside the provider → treat as guest.
   const auth = useAuth();
   const user = auth?.user ?? null;
   const profile = auth?.profile ?? null;
 
-  // ── NSFW toggle (Aniraku Settings Content card) ─────────────────────────
+  // NSFW toggle (Aniraku Settings Content card)
   const { nsfwEnabled, updateNsfw } = useNsfw();
   const [nsfwSaving, setNsfwSaving] = useState(false);
 
-  // ── MAL / AniList watch-progress sync (Aniraku Settings.jsx:455-521) ──
+  // MAL / AniList watch-progress sync.
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncBusy, setSyncBusy] = useState<Record<string, boolean>>({});
   const [syncVersion, setSyncVersion] = useState(0);
@@ -538,7 +538,7 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // ── Change password (Aniraku Settings.jsx:523-549) ──
+  // Change password.
   const canChangePassword = Boolean(user?.email);
   const [pwOpen, setPwOpen] = useState(false);
   const [pw, setPw] = useState('');
@@ -576,7 +576,6 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // Aniraku handleNsfwToggle (Settings.jsx:408-420).
   const handleNsfwToggle = async (next: boolean): Promise<void> => {
     if (nsfwSaving) return;
     setNsfwSaving(true);
@@ -705,8 +704,8 @@ export const Settings: React.FC = () => {
     }
   };
 
-  // ── Data card: two-step confirms + inline Undo ─────────────────────────
-  // Undo strategy (task): DELETE-THEN-REINSERT through the same data layer.
+  // Data card: two-step confirms + inline Undo
+  // Undo strategy: delete then reinsert through the same data layer.
   // The clear commits immediately (server rows + localStorage); the removed
   // rows stay in memory for UNDO_WINDOW_MS so the inline Undo button can
   // reinsert them. When the window expires the snapshot is dropped — the
@@ -801,7 +800,6 @@ export const Settings: React.FC = () => {
 
       await clearWatchHistory({ userId: user?.id ?? null });
       // Aniraku also dropped the episode-progress tracker with history
-      // (Settings.jsx:563 removeLocalKey('aniraku-episode-track')).
       try {
         localStorage.removeItem(EPISODE_TRACK_KEY);
         localStorage.removeItem('aniraku-episode-track');
@@ -919,7 +917,7 @@ export const Settings: React.FC = () => {
     showToast('Watch history restored', { type: 'success' });
   };
 
-  // ── Danger Zone: delete account ─────────────────────────────────────────
+  // Danger Zone: delete account
   const [confirmArmed, setConfirmArmed] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -956,7 +954,7 @@ export const Settings: React.FC = () => {
     setDeleteErr('');
 
     try {
-      // Old Aniraku (Settings.jsx:428) called this RPC from the browser with
+      // Old Aniraku called this RPC from the browser with
       // the anon key on this same Supabase project — when the server exposes
       // it, it removes the auth user and everything attached.
       let rpcOk = false;
@@ -1218,8 +1216,8 @@ export const Settings: React.FC = () => {
     </PreferencesTable>
   );
 
-  // ── Account rows (task: email / Email verified yes-no / Member since /
-  // Sign Out — session + profiles, Aniraku Settings.jsx renderAccountCard) ─
+  // Account rows: email, Email verified yes/no, Member since, Sign Out —
+  // session and profile data.
   const renderAccountCard = () => {
     if (!user) {
       return (
@@ -1340,7 +1338,7 @@ export const Settings: React.FC = () => {
     );
   };
 
-  // ── Data card: Clear Watch History (two-step) + Clear Bookmarks ─────────
+  // Data card: Clear Watch History (two-step) + Clear Bookmarks
   const renderDataCard = () => (
     <PreferencesTable>
       <SectionTitle>Data</SectionTitle>
@@ -1433,7 +1431,7 @@ export const Settings: React.FC = () => {
     </PreferencesTable>
   );
 
-  // ── Danger Zone (Aniraku renderDangerCard: arm → type DELETE → delete) ──
+  // Danger Zone (Aniraku renderDangerCard: arm → type DELETE → delete)
   const renderDangerCard = () => {
     if (!user) return null;
     return (
