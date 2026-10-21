@@ -18,7 +18,7 @@ import './notifications.css';
 
 // Export-compat shims (the badge-critical names live in lib/sync and keep
 // working over the API layer; re-exported here so the contract holds from
-// either import site — Wave A's Navbar imports them from lib/sync today).
+// Either import site — the Navbar imports them from lib/sync today).
 export {
   fetchNotifications,
   readNotificationReadIds,
@@ -26,13 +26,12 @@ export {
   markAllNotificationsRead,
 } from '../lib/sync';
 
-// ---------------------------------------------------------------------------
-// Notifications drawer — port of live `wh` (overlay) + `U_` (drawer), portal
-// to document.body, live hashed class names rendered verbatim (styling in
+// Notifications drawer — port of the app (overlay) + `U_` (drawer), portal
+// to document.body, live hashed class names rendered (styling
 // notifications.css). Open/close is driven by the Navbar state machine:
 // the bell toggles it, Shift+M dispatches global-shortcuts:open-notifications
 // (toggle) alongside global-shortcuts:close-sidemenu, and route changes close
-// it — same wiring as live `sv`.
+// it — same wiring as.
 //
 // Guest behavior (coordinator override — user rules: "no AniList sign-in"
 // anywhere + "notifications the same way Aniraku does"): the drawer renders
@@ -41,29 +40,26 @@ export {
 // header actions surface login warning toasts gated on the SUPABASE session.
 // There is no AniList login surface in this drawer.
 //
-// Wave B mission 2 — DATA LAYER = Aniraku's exact mechanism, drawer visuals
+// Mission 2 — DATA LAYER = the exact mechanism, drawer visuals
 // unchanged:
 //   - rows come from the lib/sync store fed by the 30s session poll
-//     (`GET ${API_BASE}/api/v1/notifications`, Bearer — NavBar.jsx:32-55);
 //   - server `read` column is the authority (the LS read-set
 //     `aniraku:notifications-read` is retired — no reads/writes here);
 //   - clicking an UNREAD row runs markRead → optimistic store flip + `PUT
-//     /api/v1/notifications/{id}/read` (NavBar.jsx:57-70, :159), then closes
+//     /api/v1/notifications/{id}/read`, then closes
 //     and routes to the title's info page when `anime_id` is present
-//     (NavBar.jsx:158-160, our route = `/info/{id}`);
-//   - empty payload → "No notifications yet" (NavBar.jsx:154-155).
+//   - empty payload → "No notifications yet".
 // BLESSED EXPORT: `useNotifications()` → { notifications, unreadCount,
-// markRead, refresh }. Wave A's bell badge still runs on the lib/sync shims
+// markRead, refresh }. the bell badge still runs on the lib/sync shims
 // (fetchNotifications / readNotificationReadIds) and can migrate to this
 // hook whenever it is edited next.
-// ---------------------------------------------------------------------------
 
 interface NotificationsProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// live `Ah` — reload icon (viewBox 0 0 512 512), path verbatim
+// Reload icon (viewBox 0 0 512 512), path
 const ReloadIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -121,13 +117,13 @@ const Notifications = ({ isOpen, onClose }: NotificationsProps) => {
   const { notifications: items, markRead, refresh } = useNotifications();
   const unreadCount = items.filter((item) => !item.read).length;
 
-  // live `yh` overlay stack: Escape closes only the top-most overlay
+  // Overlay stack: Escape closes only the top-most overlay
   useEffect(() => {
     if (!isOpen) return;
     return registerOverlayHandler(onClose);
   }, [isOpen, onClose]);
 
-  // live `U_` outside-click via drawer ref. The full-screen overlay swallows
+  // Outside-click via drawer ref. The full-screen overlay swallows
   // its own mousedown (and closes on its click) first, so this listener only
   // catches elements painted above the overlay — e.g. toasts.
   useEffect(() => {
@@ -166,7 +162,7 @@ const Notifications = ({ isOpen, onClose }: NotificationsProps) => {
     );
   };
 
-  // Aniraku row interaction (NavBar.jsx:157-161): close the panel, mark read
+  // Aniraku row interaction: close the panel, mark read
   // ONLY when the row is unread, then open the title when it has an id.
   const handleOpenItem = (item: NotificationItem) => {
     onClose();

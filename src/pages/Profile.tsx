@@ -1,11 +1,10 @@
-// Profile — Aniraku src/pages/Profile.jsx SUBSET port, scope reduced per
+// Profile — Aniraku src/pages/ SUBSET port, scope reduced
 // coordinator delta 3: ships ONLY (a) Profile Overview and (b) Bookmarks.
 //   • Overview: identity card (avatar/username/display/email/verified),
 //     sign-out, guest = login prompt, and the edit card — avatar preset
-//     picker (Aniraku Profile.jsx:188-193 selectAvatar → updateProfile
-//     immediately) + username/display_name/bio edit (Profile.jsx:333-394)
+//     Picker (Aniraku selectAvatar → updateProfile
+//     immediately) + username/display_name/bio edit
 //   • Bookmarks: server bookmarks select anime_id,title,image → cards
-//     (AnimeDetail.jsx:669-674 pattern)
 // REMOVED per delta 3: the watch-history section (history has its own page)
 // and ALL banner_url UI (column unused; no upload/edit/preview). Preserved:
 // settings-as-modal (?settings=1 + <Settings />) + gear — required by the
@@ -28,7 +27,7 @@ import {
   listAvatars,
   type Avatar,
 } from '../lib/avatars';
-// Library tab (Wave C, upgraded) — Aniraku Profile.jsx:8-15 sync
+// Library tab (upgraded) — Aniraku sync
 // import/export + the provider row/status copy (:554-672). Transports live
 // in lib/sync.ts; import AND export run as background jobs (auto-loop on
 // `limited`, per-provider mutex, bell notifications).
@@ -147,7 +146,6 @@ const ProfileContainer = styled.div`
   }
 `;
 
-// _usernameText_y1j45_166
 const Username = styled.h2`
   margin: 0;
   font-size: 1.5rem;
@@ -266,8 +264,8 @@ const ListSection = styled.section`
   }
 `;
 
-// ── Profile section tabs (Wave C) ─────────────────────────────────────────
-// Aniraku Profile.jsx:353-371 `.profile-tabs` (Profile / Avatars / Bookmarks
+// ── Profile section tabs ─────────────────────────────────────────
+// Aniraku `.profile-tabs` (Profile / Avatars / Bookmarks
 // / Library; History + Badges stay out of scope — history has its own page),
 // restyled onto our CSS vars.
 const TabBar = styled.nav`
@@ -309,7 +307,7 @@ const TabButton = styled.button`
   }
 `;
 
-// Avatars tab grid — same tile interaction as Aniraku Profile.jsx:396-429
+// Avatars tab grid — same tile interaction as Aniraku
 // (3px accent ring while selected), on our card vars.
 const AvatarGrid = styled.div`
   display: grid;

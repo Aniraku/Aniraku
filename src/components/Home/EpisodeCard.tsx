@@ -25,8 +25,8 @@ import {
   subscribeToSession,
 } from '../../lib/sync';
 
-// Wave B — one rendered Continue Watching card (local native row or a
-// `watch_history` server row), normalized to Aniraku's ContinueWatching
+// One rendered Continue Watching card (local native row or a
+// `watch_history` server row), normalized to the ContinueWatching
 // candidate shape.
 interface ContinueCard {
   /** `animeId:episodeNumber` — Aniraku merge key (`${animeId}-${episode}`). */

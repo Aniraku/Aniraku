@@ -9,7 +9,7 @@ export interface UserData {
   avatar: {
     large: string;
   };
-  // the live site 1:1 profile fields (AniList Viewer)
+  // The app 1:1 profile fields (AniList Viewer)
   /** Unix seconds — rendered as "Joined <date>" */
   createdAt?: number | null;
   /** AniList bio — shown in the expandable About section */

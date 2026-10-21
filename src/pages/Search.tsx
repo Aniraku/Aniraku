@@ -14,7 +14,7 @@ import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
 import { SkeletonCard } from '../components/Skeletons/Skeletons';
 import { Paging } from '../index';
 import { Anime } from '../index';
-// NSFW gate (Wave C) — Aniraku Catalog.jsx:966-974: browse results run
+// NSFW gate — Aniraku: browse results run
 // through filterAdult (Hentai-genre rule, default OFF → hidden).
 import { filterAdult, useNsfw } from '../hooks/useNsfw';
 import { useSeo, breadcrumbLd } from '../utils/seo';
@@ -27,7 +27,7 @@ const Container = styled.div`
   font-size: 0.9rem;
 `;
 
-// Visually-hidden heading, same as live `.vh`.
+// Visually-hidden heading, consistent `.vh`.
 const VisuallyHiddenH1 = styled.h1`
   position: absolute;
   width: 1px;
@@ -49,7 +49,7 @@ const LoadMoreSentinel = styled.div`
   width: 100%;
 `;
 
-// Inline error toast (live uses sonner: title + description).
+// Inline error toast.
 const ErrorToast = styled.div`
   position: fixed;
   right: 1.5rem;
@@ -143,14 +143,14 @@ const Search = () => {
   const fetchSeq = useRef(0);
   const loadingMoreRef = useRef(false);
 
-  // NSFW (Aniraku Catalog.jsx:966-970): filter at render derivation.
+  // NSFW: filter at render derivation.
   const { nsfwEnabled } = useNsfw();
   const visibleResults = useMemo(
     () => filterAdult(animeData, nsfwEnabled),
     [animeData, nsfwEnabled],
   );
 
-  // SEO (ported from Aniraku's lib/seo.js setCatalogSEO search branch;
+  // SEO (based on the lib/seo.js setCatalogSEO search branch;
   // re-runs when the ?query= changes, jsonLD/meta replaced in place).
   useSeo({
     title: query

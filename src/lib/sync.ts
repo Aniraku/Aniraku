@@ -15,23 +15,21 @@ import {
   LOCAL_HISTORY_KEYS,
 } from './watchHistory';
 
-// ---------------------------------------------------------------------------
-// Data-sync layer — TS port of the Supabase-touching halves of Aniraku's
+// Data-sync layer — TS port of the Supabase-touching halves of the
 // `src/lib/sync.js` / `useNsfw`-style shared state, based on the live reference:
 //
-//  - Session bridge via `supabase.auth` ONLY (no auth hook import — Wave A
+//  - Session bridge via `supabase.auth` ONLY (no auth hook import —
 //    owns those files; this module keeps its own user state).
 //  - bookmarks          → table `bookmarks`,    LS `aniraku:bookmarks`
 //                         (+ legacy `aniraku-bookmarks` merged on login)
 //  - watch_history      → throttled 10s diff-upsert engine + merge-on-login
 //  - notifications      → backend API `${API_BASE}/api/v1/notifications`
-//                         (Aniraku NavBar.jsx:32-69 mechanism: Bearer fetch,
+//                         (Aniraku mechanism: Bearer fetch,
 //                         30s session poll, PUT `/notifications/{id}/read`;
 //                         server `read` column = authority — the LS key
 //                         `aniraku:notifications-read` is retired as
 //                         authority and no longer read/written here), plus
 //                         the new-episode insert loop with LS tracker
-//                         `aniraku:episode-track`
 //  - provider sync      → MAL/AniList grant endpoints (`/api/v1/sync*`,
 //                         `/api/v1/import|export/{provider}`) — UNFILTERED
 //                         payloads (no NSFW/rating filter anywhere, per
@@ -41,11 +39,8 @@ import {
 // Every network call is best-effort: the client may be a placeholder when
 // VITE_SUPABASE_* is unset, so all paths swallow errors and local-first UX
 // keeps working.
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // Session bridge (supabase.auth.getSession / onAuthStateChange)
-// ---------------------------------------------------------------------------
 
 type SessionListener = (userId: string | null) => void;
 
@@ -114,10 +109,7 @@ export function subscribeToSession(listener: SessionListener): () => void {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Bookmarks — LS store + server passthrough (Aniraku Card.jsx:37-45,
-// AnimeDetail.jsx:663-693)
-// ---------------------------------------------------------------------------
+// Bookmarks — LS store + server passthrough (Aniraku
 
 import {
   normalizeListStatus,
@@ -561,9 +553,7 @@ export async function healBookmarkStatuses(
   return summary;
 }
 
-// ---------------------------------------------------------------------------
 // Watch history — server transport + merge-on-login + throttled upserts
-// ---------------------------------------------------------------------------
 
 const HISTORY_SYNC_INTERVAL_MS = 10000; // Aniraku's save cadence (10 ticks/s)
 const UPsert_CHUNK = 100;

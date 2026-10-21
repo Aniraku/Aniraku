@@ -137,7 +137,7 @@ function parseAirTime(airDate: string | null | undefined): number {
 
 // Resume-intent URL via the shared live helper (utils/animePaths): live
 // `At(media, ep)` → /watch/{id}/{slug}?ep={N}; without a stored title it
-// degrades to bare /watch/{id}?ep={N} (same id-guard live uses).
+// Degrades to bare /watch/{id}?ep={N}.
 function buildWatchPath(
   animeId: string,
   episodeNumber: number,

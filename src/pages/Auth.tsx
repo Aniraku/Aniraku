@@ -1,5 +1,5 @@
-// TS port of Aniraku's src/pages/Auth.jsx — mode = login | signup | forgot.
-// Visuals and validation messages are ported 1:1; every user-visible brand
+// TS port of the src/pages/ — mode = login | signup | forgot.
+// Visuals and validation messages are 1:1; every user-visible brand
 // string says "Aniraku". UI availability honours isSupabaseConfigured the same
 // way Aniraku does (username check + recovery request gate; login/signup
 // attempts surface the transport error from the placeholder client when env

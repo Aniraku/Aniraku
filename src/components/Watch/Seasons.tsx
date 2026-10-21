@@ -12,7 +12,7 @@ const SeasonsSection = styled.div`
   gap: 0.5rem;
 `;
 
-// Section heading (mirrors the live RELATED / RECOMMENDATIONS headers).
+// Section heading.
 const SeasonsHeading = styled.p`
   display: flex;
   gap: 0.25rem;
@@ -108,7 +108,7 @@ const SeasonName = styled.div`
   -webkit-box-orient: vertical;
 `;
 
-// Live card label: OVA / SPECIAL relations render as `Specials`, everything
+// Card label: OVA / SPECIAL relations render as `Specials`, everything
 // else falls back to the relation type (live uses TVDB `Season {n}` numbers —
 // unavailable locally, noted as a gap).
 const SEASON_LIKE = ['SEASON', 'PREQUEL', 'SEQUEL', 'OVA', 'SPECIAL'];

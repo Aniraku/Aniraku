@@ -9,22 +9,20 @@ import {
   FaSearch,
 } from 'react-icons/fa';
 
-// ---------------------------------------------------------------------------
-// Rich 404 — port of Aniraku pages/Error.jsx + pages/error.style.js (the
+// Rich 404 — port of Aniraku pages/ + pages/error.style.js (the
 // ambient 404 mark, "Route unavailable" status chip, big code, card, path
 // row, actions and the bottom note). Deltas vs the reference:
 //  - Copy merges the reference's "This story is off the map." line into the
 //    body text and uses "Page not found" as the heading (task wording; the
-//    document title stays byte-identical to Error.jsx:11).
+//    Document title stays byte-identical to ).
 //  - Actions target THIS app's routes: Home (/), Search (/search), Trending
 //    (/trending) — the reference's /catalog and /random don't exist here.
 //  - error.style.js's theme vars (--accent/--bg/--text-*) map onto this
 //    build's tokens (--primary-accent/--global-*) and the fixed-header
 //    offset (--header-h/--content-pad) is dropped: App already renders this
 //    below the fixed navbar with body top padding (globals.css:12).
-//  - Error.jsx mounts its own <Footer compact />; App.tsx renders the global
+//  - mounts its own <Footer compact />; App.tsx renders the global
 //    Footer for every route, so no second footer is added here.
-// ---------------------------------------------------------------------------
 
 const Container = styled.main`
   position: relative;
@@ -263,7 +261,7 @@ const NotFound = () => {
 
   useEffect(() => {
     document.title = 'Page Not Found — Aniraku';
-    // Error.jsx:12-14 — keep the description meta honest for crawlers.
+    // Keep the description meta honest for crawlers.
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
       metaDesc = document.createElement('meta');

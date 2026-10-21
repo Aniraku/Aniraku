@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { FiX, FiHome, FiTrendingUp, FiCalendar, FiClock, FiSettings, FiLogIn, FiUserPlus } from 'react-icons/fi';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../../client/useAuth';
-// Wave A Supabase auth (aliased — `useAuth` above is the AniList client hook)
+// `useAuth` above is the AniList client hook)
 import { useAuth as useSupabaseAuth } from '../../hooks/useAuth';
 import { avatarUrl, defaultAvatar } from '../../lib/avatars';
 import { BRAND_LOGO } from '../../lib/brand';
@@ -35,7 +35,7 @@ const SideMenu = ({ isOpen, onClose }: SideMenuProps) => {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const { isLoggedIn, userData } = useAuth();
-  // Wave A: Supabase account state (null outside provider = guest)
+  // Supabase account state (null outside provider = guest)
   const supabaseAuth = useSupabaseAuth();
   const supabaseUser = supabaseAuth?.user ?? null;
   const supabaseProfile = supabaseAuth?.profile ?? null;

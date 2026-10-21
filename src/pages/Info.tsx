@@ -50,12 +50,12 @@ import {
 } from '../lib/listStatus';
 // Escape closes only the top-most overlay (menu over page overlays).
 import { registerOverlayHandler } from '../components/overlayStack';
-// NSFW gate (Wave C) — Aniraku AnimeDetail.jsx:632/658/878: Hentai titles
+// NSFW gate — Aniraku: Hentai titles
 // gate the page when OFF (default) and recommendations run through
 // filterAdult. Sync payloads stay unfiltered (user decision).
 import { filterAdult, isNsfw, useNsfw } from '../hooks/useNsfw';
-// Episode ratings (Wave C) — Aniraku AnimeDetail.jsx:748-758 fetch + the
-// per-episode RatingBadge (AnimeDetail.jsx:224/1070) in the episode grid.
+// Episode ratings — Aniraku fetch + the
+// per-episode RatingBadge in the episode grid.
 // Session id comes from lib/sync's bridge (no auth-hook import — cross-wave
 // rule, same as useNsfw/lib consumers).
 import { getSessionUserId } from '../lib/sync';
@@ -72,15 +72,14 @@ import {
   resolveDisplayTitle,
 } from '../lib/displayLanguage';
 
-// ---------------------------------------------------------------------------
-// Info page — the live site 1:1, hydrated tabbed rebuild.
+// Info page — the app 1:1, hydrated tabbed rebuild.
 //
 // Structure follows the live InfoRoute `zt` layout:
 //   banner → infoDataWrapper (side column: poster + details `ht` rows |
 //   main column: h1 + stat chips + tab bar + section panel) → related/
 //   recommendations → The Anime Community comments.
 //
-// Tabs follow live `st = e => e === 'watch' ? ot : B` with
+// Tabs follow with
 // `ot = [Overview, Characters, Artwork, Episodes]` (accessMode defaults to
 // 'watch'). The active section is persisted per media id in the
 // `aniraku:navigation` record under `infoSection` (live INFO_SECTION key
@@ -89,21 +88,18 @@ import {
 // Overview = the trailer box only (double-details fix: the details block
 // that used to sit below it is gone — ONE details copy per breakpoint: the
 // click-to-reveal hero card ≤950, the sidebar rows ≥951). Genres/Tags live
-// only as sidebar genreTag pills (live's visible copy) and Related/
+// Only as sidebar genreTag pills and Related/
 // Recommendations render as the always-on `ulm8c` drag lists below the
 // two-column block. Characters/Artwork/Episodes are the live tab bodies.
 //
-// Link targets use the live links chunk verbatim (`slugify`/`pickTitle`/
+// Link targets use the live links chunk (`slugify`/`pickTitle`/
 // `watchPathFor` = Q/$/At). Supplementary AniList GraphQL
 // fills tags / source / bannerImage / characters + voiceActors that
 // MEDIA_DETAIL_QUERY drops.
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Live link helpers (links-DAv5tLmw.js) — verbatim behavior
-// ---------------------------------------------------------------------------
+// Live link helpers — behavior
 
-// live Q(e) — slugify (NFD-strip → lowercase → strip non-slug → spaces to '-').
+// Slugify (NFD-strip → lowercase → strip non-slug → spaces to '-').
 const slugify = (value: string): string =>
   value
     .normalize('NFD')
@@ -121,7 +117,7 @@ interface LinkableTitle {
   userPreferred?: string | null;
 }
 
-// live $(title, id) — shortest of trimmed [english, romaji], else native,
+// Shortest of trimmed [english, romaji], else native,
 // else String(id).
 const pickTitle = (title: LinkableTitle | undefined, fallbackId: string): string => {
   const candidates = [title?.english, title?.romaji]
@@ -138,7 +134,7 @@ interface Linkable {
   title?: LinkableTitle;
 }
 
-// live At(media, ep?) — /watch/{id}/{slug} (+ ?ep= only when ep != null).
+// /watch/{id}/{slug} (+ ?ep= only when ep != null).
 const watchPathFor = (item: Linkable, episode?: number | null): string => {
   const id = String(item.id);
   const slug = slugify(pickTitle(item.title, id));
@@ -262,17 +258,15 @@ const trailerSearchUrl = (anime: Anime): string | null => {
 
 // (upsertMeta removed with the manual SEO effect — utils/seo.ts owns every
 // meta tag now.)
-// ---------------------------------------------------------------------------
-// Tab set + per-media persistence (live `st` / INFO_SECTION record)
-// ---------------------------------------------------------------------------
+// Tab set + per-media persistence
 
 type InfoTab = 'Overview' | 'Characters' | 'Artwork' | 'Episodes';
 
-// live `ot = [...B, 'Episodes']` gated by `st = e => e === 'watch' ? ot : B`
+// Gated by `st = e => e === 'watch' ? ot : B`
 // with accessMode defaulting to `watch` → the four hydrated tabs, in order.
 const INFO_TABS: InfoTab[] = ['Overview', 'Characters', 'Artwork', 'Episodes'];
 
-// live `c.INFO_SECTION` = `${c.NAVIGATION}:info-section`, stored through the
+// = `${c.NAVIGATION}:info-section`, stored through the
 // record map as `localStorage['aniraku:navigation'].infoSection[mediaId]`.
 const NAVIGATION_KEY = 'aniraku:navigation';
 const LEGACY_INFO_SECTION_KEY = 'aniraku:navigation:info-section';
@@ -319,10 +313,8 @@ const writeInfoSection = (mediaId: string, section: InfoTab): void => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// Sidebar / artwork / episode-toolbar helpers (live `ht` `Tt` `Sg` `Nt`,
+// Sidebar / artwork / episode-toolbar helpers (`Tt` `Sg` `Nt`,
 // Watch EpisodeList `listLayout-[{animeId}]`)
-// ---------------------------------------------------------------------------
 
 // live settings default `langTitle: 'English'` (SettingsProvider not required
 // on this page — read the persisted record like Comments does).
@@ -337,7 +329,7 @@ const readLangTitle = (): string => {
   }
 };
 
-// live `U({month, day, year})` — month name + `d,` + year, in that order.
+// Month name + `d,` + year, in that order.
 const MONTH_NAMES = [
   'January',
   'February',
@@ -4359,7 +4351,6 @@ const Info: React.FC = () => {
                 )}
               </OverviewBox>
             )}
-
 
             {activeSection === 'Characters' &&
               (characters.length > 0 ? (

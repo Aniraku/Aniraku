@@ -5,26 +5,24 @@ import { useTheme } from '../ThemeContext';
 import TacLoginNotice from '../TacLoginNotice';
 import type { Anime } from '../../hooks/animeInterface';
 
-// ---------------------------------------------------------------------------
-// The Anime Community comments embed — live `Ye` from Seasons-O6-NO94x.js.
+// The Anime Community comments embed — .
 //
 // The Info page renders it as `<Ye media episodeNumber:0 forceInline:!0>`
 // inside a `_infoCommentsSection_aojp4_108` wrapper (InfoRoute-BPEGjnwd.js),
 // so only the INLINE variant is built here: `forceInline` forces the compact
 // bottom-sheet (`L(Be)`, breakpoint 768) off. Strings, DOM order and every
-// qywzu_* class are taken verbatim from the live chunk + style.css.
+// qywzu_* class are taken from the bundle + style.css.
 //
 // Config keys / colorScheme probe / script loader mirror the live code:
 //   window.theAnimeCommunityConfig = { AniList_ID, episodeChapterNumber,
 //     mediaType, colorScheme, removeBorder, removePadding }
 //   https://theanimecommunity.com/embed.js  (id: anime-community-script)
 //   injected into <div id="anime-community-comment-section">.
-// ---------------------------------------------------------------------------
 
 const FRAME_ID = 'anime-community-comment-section';
 const SCRIPT_ID = 'anime-community-script';
 const EMBED_JS = 'https://theanimecommunity.com/embed.js';
-// live `Ve` — resolved through a detached div so `color-mix` computes.
+// Resolved through a detached div so `color-mix` computes.
 const PRIMARY_PROBE = 'color-mix(in srgb, var(--primary-accent) 65%, black)';
 
 interface ColorScheme {
@@ -38,7 +36,7 @@ interface ColorScheme {
   accentColor: string;
 }
 
-// live `We` (empty defaults) + `Ge` (keys) + `Ke` (key-by-key equality).
+// (empty defaults) + `Ge` (keys) + `Ke` (key-by-key equality).
 const EMPTY_SCHEME: ColorScheme = {
   primaryColor: '',
   backgroundColor: '',
@@ -58,13 +56,13 @@ type TacWindow = Window & {
   theAnimeCommunity?: { reload?: () => void };
 };
 
-// live `G(e,t)` — read a (custom) property from the root's computed style.
+// Read a (custom) property from the root's computed style.
 const cssVar = (prop: string): string =>
   getComputedStyle(document.documentElement)
     .getPropertyValue(prop)
     .trim();
 
-// live `qe(e)` — resolve a possibly-`color-mix` value to a concrete color.
+// Resolve a possibly-`color-mix` value to a concrete color.
 const resolveColor = (color: string): string => {
   const probe = document.createElement('div');
   probe.style.color = color;
@@ -75,7 +73,7 @@ const resolveColor = (color: string): string => {
   return resolved;
 };
 
-// live `Je()` — build the colorScheme from the current theme's CSS variables.
+// Build the colorScheme from the current theme's CSS variables.
 const buildScheme = (): ColorScheme => {
   if (typeof document === 'undefined') return EMPTY_SCHEME;
   const text = cssVar('--global-text');
@@ -107,7 +105,7 @@ const readCommentsSetting = (): boolean => {
   }
 };
 
-// live `Ue()` — module-level promise so remounts reuse the same <script>.
+// Module-level promise so remounts reuse the same <script>.
 let scriptPromise: Promise<void> | null = null;
 const ensureScript = (): Promise<void> => {
   const w = window as TacWindow;
@@ -142,11 +140,8 @@ const ensureScript = (): Promise<void> => {
   return scriptPromise;
 };
 
-// ---------------------------------------------------------------------------
-// Styles — live class text (qywzu_* + aojp4_108) as styled-components.
-// ---------------------------------------------------------------------------
+// Styles — classes text (qywzu_* + aojp4_108) as styled-components.
 
-// _commentButtonWrapper_qywzu_47
 const ButtonWrapper = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -155,7 +150,6 @@ const ButtonWrapper = styled.div`
   overflow: hidden;
 `;
 
-// _commentButton_qywzu_1
 const CommentButton = styled.button`
   display: flex;
   gap: 0.5rem;
@@ -188,7 +182,6 @@ const CommentButton = styled.button`
   }
 `;
 
-// _titleContainer_qywzu_70
 const TitleBar = styled.div`
   display: flex;
   flex-wrap: wrap;

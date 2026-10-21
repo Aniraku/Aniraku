@@ -1,5 +1,4 @@
-// =============================================================
-// Aniraku Client-Side SEO Helper (TS port of Aniraku's src/lib/seo.js)
+// Aniraku Client-Side SEO Helper
 // Handles dynamic document.title, meta tags, canonical URLs,
 // and JSON-LD structured data for SPA route changes.
 //
@@ -17,7 +16,6 @@
 // stacking duplicates, and (b) unmount removes exactly the nodes this hook
 // injected. Static site-level JSON-LD from index.html never matches the id
 // prefix and is never touched.
-// =============================================================
 import { useEffect } from 'react';
 
 /** Canonical site origin — visible/canonical brand domain. */

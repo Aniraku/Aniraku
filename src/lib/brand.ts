@@ -1,4 +1,3 @@
-// ---------------------------------------------------------------------------
 // Brand logo — SINGLE swap point for every <img> logo on the site
 // (Navbar, SideMenu header, SideMenu profile fallback).
 //
@@ -10,7 +9,6 @@
 // (The footer mask logo is the CSS-side twin: `.app-icon` in
 // src/components/global-chrome.css masks with the bundled logo via a relative
 // url() so Vite rewrites it to the hashed asset URL.)
-// ---------------------------------------------------------------------------
 
 import anirakuLogo from '../assets/aniraku_logo.webp';
 

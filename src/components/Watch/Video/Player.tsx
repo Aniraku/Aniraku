@@ -22,7 +22,7 @@ import {
   shouldShowManualSkipOverlay,
 } from '../lib/skipOverlayPolicy';
 // Recovery-position data sources (READ-ONLY consumption of the history
-// layer): Wave B's sync engine owns the `watch_history` server reads, the
+// layer): the sync engine owns the `watch_history` server reads, the
 // watchHistory lib owns the documented local stores.
 import {
   publishHistoryNow,
@@ -50,8 +50,8 @@ import { FaCheckCircle, FaRedo, FaStepForward, FaUndo } from 'react-icons/fa';
 type ArtInstance = import('artplayer').default;
 type HlsInstance = import('hls.js').default;
 
-// Resume discard threshold — ported verbatim from Aniraku
-// `Watch.jsx:87` (`RESUME_MIN_TIME = 30`): a stored position only restores
+// Resume discard threshold — based on Aniraku
+// (`RESUME_MIN_TIME = 30`): a stored position only restores
 // playback when it is strictly greater than 30s; 0 / absent / short values
 // are ignored. The reference has NO near-end restart rule (a completed
 // episode simply restores near its end), so none is added here.
@@ -116,7 +116,7 @@ const Button = styled.button`
   }
 `;
 
-// ─── Zenime player chrome (ported verbatim from ~/Zenime Player.tsx) ─────────
+// ─── player chrome ─────────
 // 16:9 black viewport around the ArtPlayer mount; $aspect lets theater mode
 // stretch it to 21/9.
 const PlayerViewport = styled.div<{ $aspect?: string }>`
@@ -262,7 +262,6 @@ function dedupeSubtitles(
     })
     .map((t) => ({ url: t.url, lang: t.lang, label: t.label ?? '' }));
 }
-
 
 // ─── Subtitle customization system (ported from the reference ArtPlayer build) ───
 // size              → percent scale of the 20px base (50%–200%)
@@ -1869,7 +1868,7 @@ export function Player({
 
   // Playback error → advance candidates → fall back to /stream once.
   // Shared by ArtPlayer's video:error handler and the hls.js fatal path
-  // (ported from the former vidstack vds-error listener).
+  // .
   function advanceOnError() {
     const candidates = candidatesRef.current;
     const nextIndex = candidateIndexRef.current + 1;

@@ -92,7 +92,7 @@ export function recordWatchEvent(
   const epId = episodeIdOf(idKey, number, episode.id);
 
   try {
-    // --- unified record (History / Continue Watching / sync engine) ----
+    // Unified record (History / Continue Watching / sync engine)
     const unified = readJSONRecord(LOCAL_HISTORY_KEYS.WATCHED_EPISODES);
     const unifiedList = Array.isArray(unified[idKey]) ? unified[idKey] : [];
     if (
@@ -114,7 +114,7 @@ export function recordWatchEvent(
       );
     }
 
-    // --- suffixed key (Info checkmarks / EpisodeList state) -------------
+    // Suffixed key (Info checkmarks / EpisodeList state)
     const suffixedKey = `${LOCAL_HISTORY_KEYS.WATCHED_EPISODES}-${idKey}`;
     let suffixed: unknown[];
     try {

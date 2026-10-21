@@ -6,27 +6,25 @@ import React, {
   ReactNode,
 } from 'react';
 
-// ---------------------------------------------------------------------------
-// Storage parity with live
+// Storage consistency
 //
 // Live centralizes every preference in ONE namespaced JSON record:
 //
 //   localStorage['aniraku:settings'] = {
-//     schemaVersion: 3,          // live `se`
+//     schemaVersion: 3, //
 //     theme: <ThemeName>,        // written by ThemeContext (not this provider)
 //     settings: { ...user settings, live field names/defaults },
 //   }
 //
-// Legacy keys are read once by migration (live `we()` semantics: a field is
+// Legacy keys are read once by migration (semantics: a field is
 // only filled while it's still `undefined` in the record):
 //   - live:   'aniraku:settings:user' (JSON) -> record.settings
 //   - local:  autoSkip / autoPlay / autoNext / defaultLanguage / defaultServers
 //
 // The public `useSettings()` shape is unchanged for consumers; the mapping
 // between local names and live storage names happens here:
-//   defaultLanguage <-> settings.langDefault   (live field name)
+//   defaultLanguage <-> settings.langDefault
 //   defaultServers  <-> settings.defaultServers (local-only extension)
-// ---------------------------------------------------------------------------
 
 const SETTINGS_RECORD = 'aniraku:settings';
 const LEGACY_LIVE_USER_SETTINGS = 'aniraku:settings:user';
@@ -58,7 +56,7 @@ type StoredSettings = {
   defaultServers: string;
 };
 
-// live `c()` — coarse-pointer check used for the borderRadius default
+// Coarse-pointer check used for the borderRadius default
 const isCoarsePointer =
   typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;
@@ -190,7 +188,7 @@ function buildStoredSettings(): StoredSettings {
     ? (record.settings as Partial<StoredSettings>)
     : {};
 
-  // live `xt` validation of enum-ish fields + accentColor fallback
+  // Validation of enum-ish fields + accentColor fallback
   const cardLayout =
     typeof stored.cardLayout === 'string' &&
     CARD_LAYOUTS.includes(stored.cardLayout)
@@ -319,7 +317,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
   const [stored, setStored] = useState<StoredSettings>(buildStoredSettings);
 
   useEffect(() => {
-    // Persist into the unified record (live `O.set(A.USER_SETTINGS, r)`):
+    // Persist into the unified record:
     // merge-write over the FRESH record (not a blind replace) so unknown
     // fields written by a newer bundle (or another tab) survive — a stale
     // writer must never delete settings it doesn't know about. Runs on

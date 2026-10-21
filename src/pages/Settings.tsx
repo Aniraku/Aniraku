@@ -46,10 +46,9 @@ import {
 } from '../lib/sync';
 import { EPISODE_WATCH_TIMES_KEY } from '../lib/episodeWatchTimes';
 
-// ---------------------------------------------------------------------------
 // Settings — page module (mirrors the visual language of the settings modal
 // in components/Profile/Settings.tsx: same styled shells + `--global-*` vars,
-// copy ported from old Aniraku `src/pages/Settings.jsx` where it exists).
+// Copy based on old Aniraku `src/pages/` where it exists).
 //
 // Features added here beyond the modal copy:
 //  1. Clear Bookmarks (two-step confirm) over the shared bookmark data layer
@@ -64,7 +63,6 @@ import { EPISODE_WATCH_TIMES_KEY } from '../lib/episodeWatchTimes';
 //     (delete every row this app writes, then sign out) + limitation copy.
 //  5. Account rows: email / Email verified yes-no / Member since / Sign Out,
 //     sourced from the Supabase session + `profiles`.
-// ---------------------------------------------------------------------------
 
 // Local mirror of ThemeContext's theme union (same reason as the modal:
 // ThemeContext no longer exports its mode type).

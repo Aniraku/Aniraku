@@ -10,10 +10,9 @@
 // logo + attribution block. Discord stays out (not requested).
 // KEPT: the logo img (footerLogoImage + app-icon classes — the user's custom
 // logo has landed: img src = BRAND_LOGO import, mask = its public copy), the
-// live `Zh.i`
-// easter-egg click handler (verbatim semantics), the disclaimer line, the
+// easter-egg click handler, the disclaimer line, the
 // version badge, and the theme buttons (controls, not links).
-// BRAND: copyright line carries the verbatim Aniraku source wording — zero
+// BRAND: copyright line carries the Aniraku source wording — zero
 // user-visible brand outside "Aniraku" (final brand).
 // COMPACT: paddings tightened inline only (no stylesheet edits).
 import { useState } from 'react';
@@ -23,11 +22,11 @@ import { BRAND_LOGO } from '../../lib/brand';
 import { useTheme } from '../ThemeContext';
 import { showToast } from '../Toaster';
 
-// old Footer.jsx constant — TMDB's official v4 long logo (external SVG).
+// Old constant — TMDB's official v4 long logo (external SVG).
 const TMDB_LOGO_URL =
   'https://www.themoviedb.org/assets/v4/logos/v2/blue_long_2-9665a76b1ae401a510ec1e0ca40ddcb3b0cfe45f1d51b77a308fea0845885648.svg';
 
-// old footer external links (GitHub + issues), verbatim targets.
+// Old footer external links (GitHub + issues), targets.
 const GITHUB_URL = 'https://github.com/Aniraku/Aniraku';
 const GITHUB_ISSUES_URL = 'https://github.com/Aniraku/Aniraku/issues';
 
@@ -36,7 +35,7 @@ type ThemeName = (typeof THEMES)[number];
 
 // live renders icon glyphs here (We/Ye/qh/Jh/Wh svgs); text labels are kept
 // as the local presentation (reported divergence) while every attribute —
-// title, aria-label, data-current, setTheme(name) — matches live verbatim.
+// title, aria-label, data-current, setTheme(name) — matches live.
 const THEME_LABELS: Record<ThemeName, string> = {
   system: 'System',
   light: 'Light',
@@ -45,7 +44,7 @@ const THEME_LABELS: Record<ThemeName, string> = {
   catppuccin: 'Catppuccin',
 };
 
-// live `Zh.i` toast-type ring: ['success','error','warning','info','default']
+// Toast-type ring: ['success','error','warning','info','default']
 const TOAST_TYPES = ['success', 'error', 'warning', 'info', 'default'] as const;
 
 const Footer = () => {
@@ -57,7 +56,7 @@ const Footer = () => {
       window.matchMedia('(display-mode: standalone)').matches
   );
 
-  // live `Zh.i` — footer-logo easter egg, verbatim semantics: the increment
+  // Footer-logo easter egg, semantics: the increment
   // is functional but the check reads the PRE-increment closure value (fires
   // on the click AFTER the count hits a positive multiple of 50), and the
   // toast type is TYPES[count % 5] (always 'success' at multiples of 50 —

@@ -93,7 +93,7 @@ const SettingsDiv = styled.div`
   margin: auto;
 `;
 
-// Live settings modal title (_title_8w0d1_24): 1.5rem / 700 / muted
+// Settings modal title (_title_8w0d1_24): 1.5rem / 700 / muted
 const Title = styled.h2`
   display: flex;
   align-items: center;
@@ -112,7 +112,7 @@ const PreferencesTable = styled.div`
   padding: 0.5rem 1rem 1rem;
 `;
 
-// Live section heading (_sectionTitle_8w0d1_170): uppercase / 1rem / 700 / muted
+// Section heading (_sectionTitle_8w0d1_170): uppercase / 1rem / 700 / muted
 const SectionTitle = styled.h3`
   display: flex;
   gap: 0.5rem;
@@ -137,8 +137,7 @@ const Row = styled.div`
   }
 `;
 
-// Live row label block (_rowLabel_8w0d1_204 / _rowTitle_8w0d1_211 /
-// _rowDescription_8w0d1_217)
+// Row label block (_rowLabel_8w0d1_204 / _rowTitle_8w0d1_211 /
 const RowLabel = styled.div`
   display: flex;
   flex: 1;
