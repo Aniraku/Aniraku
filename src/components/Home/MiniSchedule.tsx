@@ -6,11 +6,9 @@ import type { AiringEntry } from '../../hooks/useApi';
 import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
-// ---------------------------------------------------------------------------
-// MiniSchedule (the live site 1:1) — "Estimated Airing Schedule" widget in the
+// MiniSchedule — "Estimated Airing Schedule" widget in the
 // home side rail: big Sun–Sat day selector with date under the selection,
 // fixed-height list with progress bar, hover poster, max 10 rows + View More.
-// ---------------------------------------------------------------------------
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MAX_ROWS = 10;

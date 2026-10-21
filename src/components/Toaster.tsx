@@ -2,19 +2,17 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { useTheme } from './ThemeContext';
 import './toaster.css';
 
-// ---------------------------------------------------------------------------
 // Sonner-compatible toast host + imperative API.
 //
 // sonner is not a dependency of this project (no new deps allowed), so this
-// ports live's sonner bundle (chunk-OB3PAWPO): the DOM shape
+// Ports the app's sonner bundle (chunk-OB3PAWPO): the DOM shape
 // (<ol data-sonner-toaster …> / <li data-sonner-toast data-styled data-mounted
 // …> with [data-icon]/[data-content]/[data-title]/[data-description]), the
-// type icons (dn/fn/pn/mn paths, verbatim), the live `ty` config
+// Type icons, the config
 // (bottom-right, offset 24/16/16, gap 8, no richColors, mobileOffset) and its
 // inline toast style. Positioning math is replaced by the flow-stacking shim
 // in toaster.css (see that file's header). Used for NEW toasts only — other
 // pages keep their inline toast implementations.
-// ---------------------------------------------------------------------------
 
 export type ToastType = 'default' | 'success' | 'error' | 'warning' | 'info';
 

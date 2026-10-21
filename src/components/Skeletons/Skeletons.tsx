@@ -6,7 +6,7 @@ import styled, { keyframes } from "styled-components";
  * skeleton pop-in + primary/secondary shimmer.
  */
 
-// Pop-in entrance (live: popInSk base-animation)
+// Pop-in entrance
 const popInSk = keyframes`
   0% {
     opacity: 0;

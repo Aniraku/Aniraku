@@ -2,9 +2,8 @@ import React from 'react';
 import styled from 'styled-components';
 import { useLocation } from 'react-router-dom';
 
-// ---------------------------------------------------------------------------
-// Global crash fallback — port of Aniraku App.jsx's inline class
-// ErrorBoundary (App.jsx:15-76): same `hasError`/`resetKey` shape, the
+// Global crash fallback — port of Aniraku 's inline class
+// ErrorBoundary: same `hasError`/`resetKey` shape, the
 // "Something went wrong" heading and the diagnostic note copy. Deltas vs the
 // reference (task-mandated):
 //  - "Report this crash" replaces the GitHub-issue link and follows the
@@ -14,7 +13,6 @@ import { useLocation } from 'react-router-dom';
 //    message and React component stack sit in a collapsed mono <details>.
 //  - Brand-consistent dark card (theme tokens) instead of the reference's
 //    inline black-screen styles.
-// ---------------------------------------------------------------------------
 
 // Maintainer inbox — byte-identical to ReportModal.tsx REPORT_EMAIL (do not
 // edit that file; this copy keeps the two mailto flows in sync).

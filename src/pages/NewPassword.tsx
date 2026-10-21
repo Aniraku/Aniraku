@@ -1,4 +1,4 @@
-// TS port of Aniraku's src/pages/NewPassword.jsx — the recovery / password
+// TS port of the src/pages/ — the recovery / password
 // reset screen. Verbatim flow semantics: isSupabaseConfigured gate, recovery
 // marker or PASSWORD_RECOVERY event → ready, URL token cleanup, one-shot
 // updateUser + local signOut, redirect back to /login?password=updated.

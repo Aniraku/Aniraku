@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { year, getCurrentSeason, getNextSeason } from './useTIme';
 
-// ---------------------------------------------------------------------------
 // Aniraku data layer — post-Consumet wiring
 // - Metadata (search, lists, anime info): Aniraku GraphQL mirror DIRECT from
 //   browser (`https://graphql.aniraku.tech`). The mirror serves AniList
@@ -12,7 +11,6 @@ import { year, getCurrentSeason, getNextSeason } from './useTIme';
 //   the OAuth tokens and applies its own provider pacing.
 // - Episodes metadata: Aniraku Backend (AniZip + TMDB merge)
 // - Streaming: Aniraku Backend (POST /api/v1/stream, GET /api/v1/servers)
-// ---------------------------------------------------------------------------
 
 function ensureUrlEndsWithSlash(url: string): string {
   return url.endsWith('/') ? url : `${url}/`;

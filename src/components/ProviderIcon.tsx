@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { SiMyanimelist, SiAnilist } from 'react-icons/si';
 
 // Official provider brand glyphs (simple-icons) — port of Aniraku
-// `src/components/ProviderIcon.jsx` (byte-stable maps + brand colors).
+// `src/components/` (byte-stable maps + brand colors).
 // Falls back to null for unknown providers so callers can render their
 // own placeholder.
 const ICONS: Record<string, typeof SiAnilist> = {

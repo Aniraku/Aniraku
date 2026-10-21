@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
-// ---------------------------------------------------------------------------
-// HomeBanner (the live site 1:1) — community notice at the top of the tabs block.
+// HomeBanner — community notice at the top of the tabs block.
 // One random avatar, "Love the Site?" + rotating submessages (absolutely
 // positioned, slide + fade every 4s). Social strip (Reddit/Discord/X) removed
 // per Aniraku rebrand (Wave: global social strip).
-// ---------------------------------------------------------------------------
 
 const NoticeSection = styled.section`
   display: flex;
@@ -98,8 +96,8 @@ const MESSAGES = [
   'Comments are Back!',
 ];
 
-// Five avatars hotlinked from the live site; the two inline base64 avatars
-// from the live site are omitted (reported as a gap).
+// Five avatars hotlinked from the app; the two inline base64 avatars
+// From the app are omitted (reported as a gap).
 const LIVE = '/assets/'; // localized: downloaded to ~/assets, served via public/assets symlink
 const AVATARS = [
   `${LIVE}creepyegg-CYGjjnAR.webp`,

@@ -152,7 +152,7 @@ export interface Anime {
     airingTime: number;
     timeUntilAiring: number;
   };
-  // --- ADDITIVE (Info page enrichment; mapper never sets/removes these) ---
+  // ADDITIVE (Info page enrichment; mapper never sets/removes these)
   /** AniList tags — shown in the live Info Tags section. */
   tags?: Tag[];
   /** AniList `Media.source` enum (e.g. ORIGINAL) — shown in the Details dl. */

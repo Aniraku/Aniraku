@@ -2,16 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getSessionUserId, subscribeToSession } from '../lib/sync';
 
-// ---------------------------------------------------------------------------
 // useNsfw — TS port of Aniraku `src/hooks/useNsfw.js` (hook body + shared
 // module state + isNsfw/filterAdult), based on the live reference:
 //   - session detection goes through lib/sync (`supabase.auth` getSession /
 //     onAuthStateChange bridge) — NO auth-hook import (cross-wave rule),
 //     with an explicit "loading" phase so a stale guest key can never seed
-//     before the bridge has answered (Aniraku's `loading` guard, :36-39).
+//     Before the bridge has answered.
 //   - account value lives in `user_settings` (key `nsfw_enabled`,
 //     select eq user_id+key, upsert onConflict `user_id,key`); guests fall
-//     back to the device key `aniraku-nsfw-enabled` (kept verbatim — Wave A's
+//     Back to the device key `aniraku-nsfw-enabled` (kept — the
 //     AuthProvider already clears it on sign-out).
 //   - DEFAULT IS OFF / hidden: `readLocal()` is `=== 'true'` (→ false) and
 //     the account read is `data?.value === true` (→ false when no row).
@@ -21,7 +20,6 @@ import { getSessionUserId, subscribeToSession } from '../lib/sync';
 // NSFW gates browse/display ONLY (Hentai-genre rule via isNsfw/filterAdult);
 // it must never influence sync payloads (sync = unfiltered, per user
 // decision — see lib/sync.ts import/export).
-// ---------------------------------------------------------------------------
 
 const LOCAL_KEY = 'aniraku-nsfw-enabled';
 

@@ -29,7 +29,7 @@ const ShortcutsPopup: React.FC<ShortcutsPopupProps> = ({
     if (!controlled) setInternalOpen(false);
   }, [controlled, onCloseProp]);
 
-  // live `Hh` tab-aware toggle for global-shortcuts:toggle-shortcuts-popup
+  // Tab-aware toggle for global-shortcuts:toggle-shortcuts-popup
   // (dispatched by useGlobalShortcuts for Shift+?, including the Settings
   // row's synthetic window keydown): closed → open on the Shortcuts tab;
   // open on the Settings tab → jump to Shortcuts; open on Shortcuts → close.

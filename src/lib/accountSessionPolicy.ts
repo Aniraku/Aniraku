@@ -1,4 +1,4 @@
-// TS port of Aniraku's src/lib/accountSessionPolicy.js — byte-equivalent logic.
+// TS port of the src/lib/accountSessionPolicy.js — byte-equivalent logic.
 import type { User } from '@supabase/supabase-js';
 
 function normalizeUsername(value: unknown, fallback = 'user'): string {

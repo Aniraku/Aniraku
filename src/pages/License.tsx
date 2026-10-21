@@ -1,4 +1,4 @@
-// TS port of Aniraku's src/pages/License.jsx — content kept verbatim in the
+// TS port of the src/pages/ — content kept in the
 // source's own wording (final brand: Aniraku); repository URL restored.
 import { useSeo, breadcrumbLd } from '../utils/seo';
 import LegalPage from '../components/LegalPage';
@@ -12,7 +12,6 @@ const sections = [
 ];
 
 const License = () => {
-  // SEO (ported from Aniraku's lib/seo.js setStaticPageSEO).
   useSeo({
     title: 'AGPL-3.0 License | Aniraku',
     description:

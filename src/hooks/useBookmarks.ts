@@ -14,21 +14,18 @@ import {
 } from '../lib/sync';
 import { statusForNewBookmark, type ListStatus } from '../lib/listStatus';
 
-// ---------------------------------------------------------------------------
 // useBookmarks — local-first bookmark store with merge-on-login Supabase
-// sync (table `bookmarks`, upsert onConflict `user_id,anime_id`).
 //
 // Local store: `aniraku:bookmarks` (JSON array of {id,title,image,...}).
 // Merge-on-login folds in BOTH `aniraku:bookmarks` and the legacy Aniraku
-// key `aniraku-bookmarks` (AnimeDetail.jsx:663-693 pattern): read cloud →
+// Key `aniraku-bookmarks`: read cloud →
 // upsert local-only rows → store the union. Guests stay LS-only; signed-in
 // toggles are optimistic-LS + server upsert/delete passthrough.
-// Sign-out cleanup of these keys is Wave A's contract — not done here.
+// Sign-out cleanup of these keys is the contract — not done here.
 //
 // Module-level singleton so N card instances share one query/subscription.
 // Session detection goes through `lib/sync` (supabase.auth directly) — no
-// auth-hook import (Wave A owns those files).
-// ---------------------------------------------------------------------------
+// auth-hook import (owns those files).
 
 const listeners = new Set<() => void>();
 

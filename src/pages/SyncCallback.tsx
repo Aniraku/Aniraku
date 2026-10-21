@@ -10,14 +10,12 @@ import {
 import { completeSyncCallback, PROVIDER_LABELS } from '../lib/sync';
 import ProviderIcon from '../components/ProviderIcon';
 
-// ---------------------------------------------------------------------------
-// SyncCallback — TS port of Aniraku `src/pages/SyncCallback.jsx` (behavior +
-// copy verbatim; chrome restyled onto our CSS vars). Landing page for the
+// SyncCallback — TS port of Aniraku `src/pages/` (behavior +
+// copy; chrome restyled onto our CSS vars). Landing page for the
 // OAuth redirect from MAL / AniList. The providers append only
 // ?code=&state= to the registered redirect URI, so the provider is resolved
 // server-side from the pending OAuth state. The "Back to Settings" link
 // completes the loop (ours resolves to /profile?settings=1 via App).
-// ---------------------------------------------------------------------------
 
 const Page = styled.main`
   display: flex;
@@ -78,7 +76,7 @@ const SyncCallback: React.FC = () => {
   const [connectedProvider, setConnectedProvider] = useState('');
   const [error, setError] = useState('');
 
-  // Aniraku App.jsx:145 title map for '/sync/callback'.
+  // Aniraku title map for '/sync/callback'.
   useEffect(() => {
     document.title = 'Library Sync — Aniraku';
   }, []);

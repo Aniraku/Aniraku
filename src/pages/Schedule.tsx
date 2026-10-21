@@ -28,7 +28,7 @@ const PageWrapper = styled.div`
   margin: 0 auto;
 `;
 
-// Visually-hidden heading, same as live `.vh`.
+// Visually-hidden heading, consistent `.vh`.
 const VisuallyHiddenH1 = styled.h1`
   position: absolute;
   width: 1px;

@@ -14,13 +14,11 @@ import {
 import { FaFilm } from 'react-icons/fa6';
 import { ReportModal } from '../ReportModal';
 
-// ---------------------------------------------------------------------------
 // MediaSource — live lyfa9 module (episode bar) + live 1uhbb dropdowns.
 // Server/language selection is keyed `${lang}:${name}` so the SAME backend
 // name (Niko/Momo exist in BOTH sub and dub) can never collide — that name
 // collision was the core server-selection bug (Dub always snapped back to
 // Sub because `serverLangOf` preferred the sub pool).
-// ---------------------------------------------------------------------------
 
 interface MediaSourceProps {
   sourceType: string;

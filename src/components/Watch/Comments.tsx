@@ -5,8 +5,7 @@ import { FaPlay, FaTimes, FaTv } from 'react-icons/fa';
 import { useMediaQuery } from './useMediaQuery';
 import TacLoginNotice from '../TacLoginNotice';
 
-// ---------------------------------------------------------------------------
-// TheAnimeCommunity comments embed — 1:1 port of the live `Ye` component
+// TheAnimeCommunity comments embed — 1:1 port of the component
 // (chunks/Seasons-O6-NO94x.js). The embed CONTRACT is byte-for-byte:
 //   - <script id="anime-community-script" src="https://theanimecommunity.com/embed.js">
 //   - <div id="anime-community-comment-section">
@@ -16,8 +15,7 @@ import TacLoginNotice from '../TacLoginNotice';
 //   - count API https://theanimecommunity.com/api/v1/comments/count
 //   - message TAC-TIMESTAMP-CLICK -> window 'comments:timestamp-click'
 // Surrounding chrome (title bar, ANIME/EP tabs, compact button + drag sheet)
-// replicates live markup and live CSS rules verbatim below.
-// ---------------------------------------------------------------------------
+// Replicates markup and CSS rules below.
 
 const CONTAINER_ID = `anime-community-comment-section`;
 const SCRIPT_ID = `anime-community-script`;
@@ -26,7 +24,7 @@ const COUNT_URL = `https://theanimecommunity.com/api/v1/comments/count`;
 const COMPACT_BREAKPOINT = 768;
 const PRIMARY_MIX = `color-mix(in srgb, var(--primary-accent) 65%, black)`;
 
-// Live class map (CSS-module hashes kept verbatim so markup matches byte-for-byte).
+// Class map.
 const z = {
   commentButton: `_commentButton_qywzu_1`,
   commentButtonCompact: `_commentButtonCompact_qywzu_28`,
@@ -58,8 +56,8 @@ const H = {
   scroller: `_scroller_7nuxx_174`,
 } as const;
 
-// Live CSS rules for modules qywzu + 7nuxx, copied verbatim from
-// /tmp/opencode/live/style.css (values and class hashes unchanged).
+// CSS rules for modules qywzu + 7nuxx, copied
+// (values and class hashes unchanged).
 const LIVE_COMMENTS_CSS = `
 ._commentButton_qywzu_1{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:flex;gap:.5rem;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;align-items:center;-webkit-box-pack:center;-webkit-justify-content:center;-moz-box-pack:center;justify-content:center;padding:.75rem 1rem;font-size:.75rem;color:var(--global-text);cursor:pointer;background-color:transparent;border:1px solid var(--global-border-color);border-radius:var(--global-border-radius)}
 ._commentButton_qywzu_1[data-active=true]{color:var(--primary-accent);background-color:var(--primary-accent-tr);border-color:var(--primary-accent)}
@@ -102,9 +100,7 @@ const LIVE_COMMENTS_CSS = `
 html.overlay-open{overflow:hidden!important}
 `;
 
-// ---------------------------------------------------------------------------
 // Live helpers
-// ---------------------------------------------------------------------------
 
 // Ee — AniList id must be a finite positive number (or numeric string here).
 function anilistIdOf(media: { id?: unknown } | null | undefined): string | null {
@@ -201,7 +197,7 @@ function sameScheme(a: ColorScheme, b: ColorScheme): boolean {
   );
 }
 
-// Ue — singleton embed.js loader (same id/src/onload semantics as live).
+// Ue — singleton embed.js loader.
 let tacScriptPromise: Promise<void> | null = null;
 function loadTacScript(): Promise<void> {
   if (typeof document === `undefined` || window.theAnimeCommunity?.reload)
@@ -242,9 +238,7 @@ declare global {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Oe — ANIME / EP n tab buttons (qywzu markup)
-// ---------------------------------------------------------------------------
 
 type TabButtonsProps = {
   animeActive: boolean;
@@ -302,9 +296,7 @@ const TabButtons: React.FC<TabButtonsProps> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
 // Te — compact comments button
-// ---------------------------------------------------------------------------
 
 const CompactCommentsButton: React.FC<{
   onOpen: () => void;
@@ -327,9 +319,7 @@ const CompactCommentsButton: React.FC<{
   </button>
 );
 
-// ---------------------------------------------------------------------------
-// Fe — compact bottom sheet with drag physics (ported from live)
-// ---------------------------------------------------------------------------
+// Fe — compact bottom sheet with drag physics
 
 const CLOSE_AFTER_DRAG = 80;
 const EXPAND_AFTER_DRAG = 60;
@@ -482,7 +472,7 @@ const CommentsSheet: React.FC<SheetProps> = ({
     setDragOffset(0);
   };
 
-  // Live height/transform math (Fe return).
+  // Height/transform math (Fe return).
   const range = sizes.expanded - sizes.default;
   let height: number;
   let translate: number;
