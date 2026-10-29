@@ -39,6 +39,37 @@ export function proxiedMediaUrl(
 }
 
 export const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
+// MAIN BRANCH: the OFFICIAL AniList API (rate-limited ~30-90 req/min per
+// IP) — the limiter below keeps the app under the ceiling. The preview
+// branch keeps the Aniraku mirror (unlimited metadata-only) instead.
+export const ANIRAKU_GRAPHQL_UNLIMITED = false;
+
+// Minimal client-side rate limiter for the official API: at most 80
+// requests per rolling 60s window; extra requests wait their turn instead
+// of hammering AniList into 429s.
+const OFFICIAL_RATE_LIMIT = 80;
+const OFFICIAL_WINDOW_MS = 60_000;
+const officialRequestTimes: number[] = [];
+
+async function acquireOfficialSlot(): Promise<void> {
+  if (!ANILIST_GRAPHQL.includes('graphql.anilist.co')) return;
+  for (;;) {
+    const now = Date.now();
+    while (
+      officialRequestTimes.length > 0 &&
+      now - officialRequestTimes[0] > OFFICIAL_WINDOW_MS
+    ) {
+      officialRequestTimes.shift();
+    }
+    if (officialRequestTimes.length < OFFICIAL_RATE_LIMIT) {
+      officialRequestTimes.push(now);
+      return;
+    }
+    const waitMs = OFFICIAL_WINDOW_MS - (now - officialRequestTimes[0]) + 50;
+    await new Promise((resolve) => setTimeout(resolve, Math.max(waitMs, 200)));
+  }
+}
+
 // Module-level AniList availability signal for the global outage banner.
 // Only TRUE outages (network failure, 5xx, 429) flip the banner — ordinary
 // GraphQL errors (validation, not-found) and 4xx must not flap it.
@@ -251,6 +282,7 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
   if (inflight) return inflight;
   const task = (async () => {
     try {
+      await acquireOfficialSlot();
       const { data } = await directAxios.post(
         ANILIST_GRAPHQL,
         { query, variables },
