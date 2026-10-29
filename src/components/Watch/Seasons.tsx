@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import type { Relation } from '../../hooks/animeInterface';
 import { infoPathFor } from '../../utils/animePaths';
+import { filterAdult, useNsfw } from '../../hooks/useNsfw';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { FaFilm } from 'react-icons/fa';
 
@@ -120,8 +121,10 @@ const seasonLabel = (relation: Relation): string => {
 };
 
 export const Seasons: React.FC<{ relations: Relation[] }> = ({ relations }) => {
-  const seasonRelations = relations.filter((relation) =>
-    SEASON_LIKE.includes(relation.relationType || ''),
+  // NSFW gate: adult season entries drop while the preference is off.
+  const { nsfwEnabled } = useNsfw();
+  const seasonRelations = filterAdult(relations, nsfwEnabled).filter(
+    (relation) => SEASON_LIKE.includes(relation.relationType || ''),
   );
 
   // No seasons, no section.

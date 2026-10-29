@@ -6,6 +6,7 @@ import { FaStar } from 'react-icons/fa';
 import type { Anime } from '../../hooks/animeInterface';
 import StatusIndicator from '../shared/StatusIndicator';
 import { infoPathFor } from '../../utils/animePaths';
+import { filterAdult, useNsfw } from '../../hooks/useNsfw';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 
 const Sidebar = styled.div`
@@ -124,16 +125,25 @@ const DetailPill = styled.span`
 export const AnimeDataList: React.FC<{ animeData: Anime }> = ({
   animeData,
 }) => {
-  const filteredRecommendations = animeData.recommendations.filter((rec) =>
-    ['OVA', 'SPECIAL', 'TV', 'TV_SHORT', 'MOVIE', 'ONA', 'MUSIC'].includes(
-      rec.type || '',
+  // NSFW gate: adult relations/recommendations drop while the preference
+  // is off (same Hentai-genre rule as every browse surface).
+  const { nsfwEnabled } = useNsfw();
+  const filteredRecommendations = filterAdult(
+    animeData.recommendations.filter((rec) =>
+      ['OVA', 'SPECIAL', 'TV', 'TV_SHORT', 'MOVIE', 'ONA', 'MUSIC'].includes(
+        rec.type || '',
+      ),
     ),
+    nsfwEnabled,
   );
 
-  const filteredRelations = animeData.relations.filter((rel) =>
-    ['OVA', 'SPECIAL', 'TV', 'TV_SHORT', 'MOVIE', 'ONA', 'MUSIC'].includes(
-      rel.type || '',
+  const filteredRelations = filterAdult(
+    animeData.relations.filter((rel) =>
+      ['OVA', 'SPECIAL', 'TV', 'TV_SHORT', 'MOVIE', 'ONA', 'MUSIC'].includes(
+        rel.type || '',
+      ),
     ),
+    nsfwEnabled,
   );
 
   return (
@@ -158,9 +168,12 @@ export const AnimeDataList: React.FC<{ animeData: Anime }> = ({
                       alt={resolveDisplayTitle(relation.title)}
                       loading='lazy'
                     />
+                    <StatusIndicator
+                      status={relation.status}
+                      className='statusBadge'
+                    />
                     <Info>
                       <TitleWithDot>
-                        <StatusIndicator status={relation.status} />
                         <Title>
                           {resolveDisplayTitle(relation.title)}
                         </Title>

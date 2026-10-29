@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { IoChevronForward, IoChevronDown } from 'react-icons/io5';
 import { TbCards } from 'react-icons/tb';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
-import { FaStar, FaCalendarAlt } from 'react-icons/fa';
+import { FaStar } from 'react-icons/fa';
 import type { Anime } from '../../hooks/animeInterface';
 import StatusIndicator from '../shared/StatusIndicator';
 import { infoPathFor } from '../../utils/animePaths';
@@ -158,20 +158,44 @@ const TitleRow = styled.div`
 const Title = styled.span`
   display: -webkit-box;
   overflow: hidden;
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
   line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 `;
 
+// Big rank numeral over the poster's bottom-left corner (Re:Anime's
+// Top-Trending look) — index+1 of the visible list.
+const RankNumeral = styled.span`
+  position: absolute;
+  bottom: -0.2rem;
+  left: 0.15rem;
+  z-index: var(--z-index-above, 2);
+  font-size: 1.9rem;
+  font-weight: 800;
+  font-style: italic;
+  line-height: 1;
+  color: #fff;
+  pointer-events: none;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.85),
+    0 0 12px rgba(0, 0, 0, 0.55);
+`;
+
 const Details = styled.div`
   display: flex;
-  gap: 0.25rem;
+  gap: 0.3rem;
   align-items: center;
-  margin: 0 1.25rem;
+  margin: 0.2rem 1.25rem 0 0.5rem;
   font-size: 0.75rem;
   color: var(--global-text-muted);
+
+  svg {
+    color: var(--side-list-accent, var(--primary-accent));
+  }
 `;
 
 const Detail = styled.span`
@@ -315,32 +339,30 @@ export const SidePanel: React.FC<{
                         loading='lazy'
                         decoding='async'
                       />
+                      <StatusIndicator
+                        status={anime.status}
+                        className='statusBadge'
+                      />
+                      <RankNumeral>{index + 1}</RankNumeral>
                     </CardImage>
                     <CardContent>
                       <TitleRow>
-                        <StatusIndicator status={anime.status} />
                         <Title>{name}</Title>
                       </TitleRow>
                       <Details>
-                        {anime.type && <Detail>{anime.type}</Detail>}
-                        {!!anime.releaseDate && (
+                        {!!anime.rating && (
                           <Detail>
-                            <FaCalendarAlt />
-                            {anime.releaseDate}
+                            <FaStar />
+                            {Math.round(anime.rating * 10)}
                           </Detail>
                         )}
+                        {anime.type && <Detail>{anime.type}</Detail>}
                         {eps != null && eps > 0 && (
                           <Detail>
                             <TbCards />
                             {isPartial
                               ? `${anime.currentEpisode} / ${eps}`
                               : ` ${eps}`}
-                          </Detail>
-                        )}
-                        {!!anime.rating && (
-                          <Detail>
-                            <FaStar />
-                            {Math.round(anime.rating * 10)}
                           </Detail>
                         )}
                       </Details>

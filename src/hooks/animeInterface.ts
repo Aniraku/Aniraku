@@ -58,6 +58,8 @@ export interface Relation {
   coverHash: string;
   rating: number;
   type: string;
+  /** Present on AniList-mapped relations — drives the NSFW genre rule. */
+  genres?: string[];
 }
 
 export interface Mapping {
