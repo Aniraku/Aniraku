@@ -457,7 +457,6 @@ function toAnilistSort(sort?: string[]): string[] {
     'TRENDING_DESC',
     'TRENDING',
     'START_DATE_DESC',
-    'START_DATE_ASC',
     'END_DATE_DESC',
     'TITLE_ROMAJI',
     'EPISODES_DESC',
@@ -617,7 +616,7 @@ export const fetchUpcomingSeasons = (page: number, perPage: number) => {
     season,
     seasonYear: y,
     status: 'NOT_YET_RELEASED',
-    sort: ['START_DATE_ASC', 'POPULARITY_DESC'],
+    sort: ['START_DATE', 'POPULARITY_DESC'],
   });
 };
 
