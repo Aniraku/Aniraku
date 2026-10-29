@@ -16,6 +16,10 @@ import {
   faEye,
   faEyeSlash,
 } from '@fortawesome/free-solid-svg-icons';
+import {
+  FaClosedCaptioning,
+  FaMicrophone,
+} from 'react-icons/fa';
 import type { Episode } from '../../hooks/animeInterface';
 import { subscribeToWatchHistory } from '../../lib/watchHistory';
 import ThemedSelect from '../ThemedSelect';
@@ -72,6 +76,12 @@ interface Props {
    * that export to every provider as completed series.
    */
   seriesTotalEpisodes?: number | null;
+  /**
+   * Whole-anime dub high-water mark (lib/audioTracks): episodes 1..N are
+   * PROVEN to have dub servers. Rows at/below the mark show the dub mic
+   * icon; above it (or 0 = no dub knowledge) they show sub-only.
+   */
+  dubEpisodeCount?: number;
 }
 
 // Styled components for the episode list
@@ -280,6 +290,24 @@ const EpisodeTitle = styled.span`
   padding: 0.5rem;
 `;
 
+// Per-episode audio badges (right edge of list/image rows): CC = the sub
+// track every released episode carries; mic = the dub track, shown only for
+// episodes the whole-anime dub count proves are dubbed.
+const AudioBadges = styled.span`
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-right: 0.4rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+
+  svg {
+    display: block;
+  }
+`;
+
 // The updated EpisodeList component
 export const EpisodeList: React.FC<Props> = ({
   animeId,
@@ -287,6 +315,7 @@ export const EpisodeList: React.FC<Props> = ({
   selectedEpisodeId,
   onEpisodeSelect,
   maxListHeight,
+  dubEpisodeCount = 0,
 }) => {
   // State for interval, layout, user layout preference, search term, and watched episodes
   const episodeGridRef = useRef<HTMLDivElement>(null);
@@ -560,6 +589,14 @@ export const EpisodeList: React.FC<Props> = ({
             thumbBg !== undefined
               ? { color: '#fff', textShadow: '0 1px 3px #000' }
               : undefined;
+          // Row audio badges: every listed episode has subs; the mic only
+          // appears where the whole-anime dub count proves the dub exists.
+          const audioBadges = (
+            <AudioBadges style={onThumbStyle} aria-hidden='true'>
+              <FaClosedCaptioning />
+              {dubEpisodeCount >= Number(episode.number) && <FaMicrophone />}
+            </AudioBadges>
+          );
 
           return (
             <ListItem
@@ -580,6 +617,7 @@ export const EpisodeList: React.FC<Props> = ({
                     <EpisodeNumber>{episode.number}. </EpisodeNumber>
                     <EpisodeTitle>{episode.title}</EpisodeTitle>
                   </div>
+                  {audioBadges}
                   <EpisodeImageWrap>
                     <EpisodeImage
                       className={hideSpoiler ? 'spoiler-hidden' : undefined}
@@ -625,6 +663,7 @@ export const EpisodeList: React.FC<Props> = ({
                   <EpisodeTitle style={onThumbStyle}>
                     {episode.title}
                   </EpisodeTitle>
+                  {audioBadges}
                   {$isSelected && <FontAwesomeIcon icon={faPlay} />}
                 </>
               )}

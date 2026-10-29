@@ -23,6 +23,8 @@ import { AuthProvider } from './client/useAuth';
 import { AuthProvider as SupabaseAuthProvider } from './providers/AuthProvider';
 import ReactGA from 'react-ga4';
 import { Toaster } from './components/Toaster';
+// Floating episode-download pills (progress + cancel, bottom-left).
+import DownloadStack from './components/DownloadStack';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 // Bottom navigation, mounted next to the Navbar in the router tree.
 // Route-based hide rules live inside the component.
@@ -225,6 +227,8 @@ function App() {
               <Footer />
               {/* sonner-compatible toast host (live `ty` config baked in) */}
               <Toaster />
+              {/* in-flight episode downloads: progress pills, bottom-left */}
+              <DownloadStack />
               </AppErrorBoundary>
             </SettingsProvider>
           </ThemeProvider>

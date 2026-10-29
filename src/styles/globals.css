@@ -6,6 +6,13 @@ html {
   background-color: var(--global-primary-bg);
 }
 
+/* No horizontal page scroll at ANY width — a stray wide element must never
+   widen the document (the ≤768px rule below predates this global one). */
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--app-font-family);
   margin: 0 auto; /* Center the body content */
@@ -1542,9 +1549,24 @@ body {
 }
 
 .statusBadge {
+  /* Compact overlaying status dot: pinned to the poster corner instead of
+     sitting inline in the title row, where it could stretch or wrap the
+     layout. */
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  z-index: 2;
   display: flex;
-  flex-shrink: 0;
   align-items: center;
+  pointer-events: none;
+}
+
+.statusBadge .status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  box-shadow:
+    0 0 0 2px rgba(8, 8, 8, 0.55),
+    0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 .listButtonContainer {
@@ -1580,7 +1602,10 @@ body {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: var(--z-index-modal);
+  /* Above the profile settings modal (same --z-index-modal tier but later
+     in the DOM — the popup lost the tie and opened BEHIND settings when
+     launched from the settings page). */
+  z-index: 1200;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2225,4 +2250,38 @@ kbd {
 
 .editListAction:active {
   transform: scale(0.95);
+}
+
+/* ============================================================
+   Card polish pass — Home listing, Trending rail, all card grids
+   (layered on top of the base .cardItem rules above)
+   ============================================================ */
+
+/* Poster zoom on hover — pairs with the existing brightness dip */
+.cardImg {
+  transition:
+    filter 0.2s ease-in-out,
+    transform 0.35s ease-in-out;
+}
+
+.cardImgContainer:hover .cardImg {
+  transform: scale(1.06);
+}
+
+/* Accent ring + deeper lift when the card is focused/hovered */
+@media (min-width: 501px) {
+  .cardItem:hover .cardImgContainer,
+  .cardItem:focus-within .cardImgContainer {
+    box-shadow:
+      0 10px 26px var(--global-shadow),
+      0 0 0 1px var(--primary-accent);
+    transform: translateY(-6px);
+  }
+}
+
+/* Meta row (year · format · sub/dub chips · score): allow the chip
+   group to wrap on narrow cards instead of clipping */
+.cardDetails {
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
 }

@@ -59,8 +59,11 @@
     <meta name="apple-mobile-web-app-title" content="Aniraku" />
     <link rel="apple-touch-icon" href="/icons/icon-180.png" />
 
-    <!-- Icons / manifest — ported from Aniraku -->
+    <!-- Icons / manifest — SVG favicon (modern browsers) with an ICO +
+         PNG fallback chain for older clients and OS integrations -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" sizes="192x192" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Apple splash screens: none (Aniraku ships none; legacy splash PNGs orphaned on disk) -->
@@ -152,12 +155,7 @@
       h.setAttribute("data-theme", t);
     </script>
 
-<link
-      rel="stylesheet"
-      href="data:text/css;base64,LyogQmFzaWMgQW5pbWF0aW9ucyAqLwpAa2V5ZnJhbWVzIGZhZGVJbiB7CiAgZnJvbSB7CiAgICBvcGFjaXR5OiAwOwogIH0KICB0byB7CiAgICBvcGFjaXR5OiAxOwogIH0KfQoKQGtleWZyYW1lcyBncm93IHsKICAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiBzY2FsZSgwKTsKICB9CiAgMTAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiBzY2FsZSgxKTsKICB9Cn0KCkBrZXlmcmFtZXMgZ3JvdzEwIHsKICAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiBzY2FsZSgwLjEpOwogIH0KICAxMDAlIHsKICAgIG9wYWNpdHk6IDE7CiAgICB0cmFuc2Zvcm06IHNjYWxlKDEpOwogIH0KfQoKQGtleWZyYW1lcyBncm93WSB7CiAgMCUgewogICAgb3BhY2l0eTogMTsKICAgIHRyYW5zZm9ybTogc2NhbGVZKDApOwogIH0KICAxMDAlIHsKICAgIG9wYWNpdHk6IDE7CiAgICB0cmFuc2Zvcm06IHNjYWxlWSgxKTsKICB9Cn0KCkBrZXlmcmFtZXMgcG9wSW4wIHsKICAwJSB7CiAgICBvcGFjaXR5OiAwOwogICAgdHJhbnNmb3JtOiBzY2FsZSgwKTsKICB9CiAgMTAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiBzY2FsZSgxKTsKICB9Cn0KCkBrZXlmcmFtZXMgcG9wSW41MCB7CiAgMCUgewogICAgb3BhY2l0eTogMDsKICAgIHRyYW5zZm9ybTogc2NhbGUoMC41KTsKICB9CiAgMTAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiBzY2FsZSgxKTsKICB9Cn0KCkBrZXlmcmFtZXMgcG9wSW4gewogIDAlIHsKICAgIG9wYWNpdHk6IDA7CiAgICB0cmFuc2Zvcm06IHNjYWxlKDAuOTgpOwogIH0KICAxMDAlIHsKICAgIG9wYWNpdHk6IDE7CiAgICB0cmFuc2Zvcm06IHNjYWxlKDEpOwogIH0KfQoKQGtleWZyYW1lcyBwb3BJbjk4IHsKICAwJSB7CiAgICBvcGFjaXR5OiAwOwogICAgdHJhbnNmb3JtOiBzY2FsZSgwLjk2KTsKICB9CiAgMTAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiBzY2FsZSgwLjk4KTsKICB9Cn0KCkBrZXlmcmFtZXMgcG9wSW5TayB7CiAgMCUsCiAgMTAwJSB7CiAgICBvcGFjaXR5OiAwOwogICAgdHJhbnNmb3JtOiBzY2FsZSgwLjk1KTsKICB9CiAgNTAlIHsKICAgIG9wYWNpdHk6IDE7CiAgICB0cmFuc2Zvcm06IHNjYWxlKDEpOwogIH0KICA3NSUgewogICAgb3BhY2l0eTogMC41OwogICAgdHJhbnNmb3JtOiBzY2FsZSgxKTsKICB9Cn0KCkBrZXlmcmFtZXMgc2hyaW5rSW4gewogIDAlIHsKICAgIG9wYWNpdHk6IDA7CiAgICB0cmFuc2Zvcm06IHNjYWxlKDEuMDUpOwogIH0KICAxMDAlIHsKICAgIG9wYWNpdHk6IDE7CiAgICB0cmFuc2Zvcm06IHNjYWxlKDEpOwogIH0KfQoKLyogU2xpZGUgQW5pbWF0aW9ucyAqLwpAa2V5ZnJhbWVzIHNsaWRlVXAgewogIDAlIHsKICAgIG9wYWNpdHk6IDA7CiAgICB0cmFuc2Zvcm06IHRyYW5zbGF0ZVkoMTBweCk7CiAgfQogIDEwMCUgewogICAgb3BhY2l0eTogMTsKICAgIHRyYW5zZm9ybTogdHJhbnNsYXRlWSgwKTsKICB9Cn0KCkBrZXlmcmFtZXMgc2xpZGVEb3duIHsKICAwJSB7CiAgICBvcGFjaXR5OiAwOwogICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKC0yMHB4KTsKICB9CiAgMTAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDApOwogIH0KfQoKQGtleWZyYW1lcyBzbGlkZVJpZ2h0IHsKICAwJSB7CiAgICBvcGFjaXR5OiAwOwogICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVYKC0xMHB4KTsKICB9CiAgMTAwJSB7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDApOwogIH0KfQoKQGtleWZyYW1lcyBzbGlkZUxlZnQgewogIDAlIHsKICAgIG9wYWNpdHk6IDA7CiAgICB0cmFuc2Zvcm06IHRyYW5zbGF0ZVgoMTBweCk7CiAgfQogIDEwMCUgewogICAgb3BhY2l0eTogMTsKICAgIHRyYW5zZm9ybTogdHJhbnNsYXRlWSgwKTsKICB9Cn0KCi8qIERyb3AgQW5pbWF0aW9ucyAqLwpAa2V5ZnJhbWVzIGRyb3BEb3duIHsKICAwJSB7CiAgICBtYXgtaGVpZ2h0OiAwOwogIH0KICAxMDAlIHsKICAgIG1heC1oZWlnaHQ6IDUwMHB4OwogIH0KfQoKQGtleWZyYW1lcyBzbGlkZURyb3BEb3duIHsKICAwJSB7CiAgICBtYXgtaGVpZ2h0OiAwOwogICAgb3BhY2l0eTogMDsKICAgIHRyYW5zZm9ybTogdHJhbnNsYXRlWSgtMjBweCk7CiAgfQogIDEwMCUgewogICAgbWF4LWhlaWdodDogNTAwcHg7CiAgICBvcGFjaXR5OiAxOwogICAgdHJhbnNmb3JtOiB0cmFuc2xhdGVZKDApOwogIH0KfQoKLmFuaW1GYWRlSW4sCi5hbmltUG9wSW4sCi5hbmltUG9wSW5TaywKLmFuaW1TaHJpbmtJbiwKLmFuaW1TbGlkZVVwLAouYW5pbVNsaWRlUmlnaHQsCi5hbmltU2xpZGVMZWZ0IHsKICBhbmltYXRpb24tZHVyYXRpb246IHZhcigtLWFuaW1hdGlvbi1kdXJhdGlvbiwgMHMpOwogIGFuaW1hdGlvbi10aW1pbmctZnVuY3Rpb246IHZhcigtLWFuaW1hdGlvbi1lYXNpbmcsIGVhc2UpOwogIGFuaW1hdGlvbi1kZWxheTogdmFyKC0tYW5pbWF0aW9uLWRlbGF5LCAwcyk7CiAgYW5pbWF0aW9uLWl0ZXJhdGlvbi1jb3VudDogdmFyKC0tYW5pbWF0aW9uLWl0ZXJhdGlvbi1jb3VudCwgMSk7CiAgYW5pbWF0aW9uLWZpbGwtbW9kZTogdmFyKC0tYW5pbWF0aW9uLWZpbGwtbW9kZSwgbm9uZSk7Cn0KCi5hbmltRmFkZUluIHsKICBhbmltYXRpb24tbmFtZTogZmFkZUluOwp9CgouYW5pbVBvcEluIHsKICBhbmltYXRpb24tbmFtZTogcG9wSW47Cn0KCi5hbmltUG9wSW5TayB7CiAgYW5pbWF0aW9uLW5hbWU6IHBvcEluU2s7Cn0KCi5hbmltU2hyaW5rSW4gewogIGFuaW1hdGlvbi1uYW1lOiBzaHJpbmtJbjsKfQoKLmFuaW1TbGlkZVVwIHsKICBhbmltYXRpb24tbmFtZTogc2xpZGVVcDsKfQoKLmFuaW1TbGlkZVJpZ2h0IHsKICBhbmltYXRpb24tbmFtZTogc2xpZGVSaWdodDsKfQoKLmFuaW1TbGlkZUxlZnQgewogIGFuaW1hdGlvbi1uYW1lOiBzbGlkZUxlZnQ7Cn0K"
-      media="print"
-      onload="this.media = 'all'"
-    />
+
 
 
     <!-- ========================================================= -->
@@ -175,7 +173,6 @@
       "description": "Aniraku is an open-source anime streaming media client. Watch anime online for free with subtitles and dubs.",
       "sameAs": [
         "https://github.com/Aniraku/Aniraku",
-        "https://discord.gg/aniraku",
         "https://twitter.com/sho_islam0311"
       ],
       "foundingDate": "2025",

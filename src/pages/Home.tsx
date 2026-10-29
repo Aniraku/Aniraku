@@ -228,9 +228,7 @@ const Home = () => {
     return { season: prevSeason, year: String(prevYear) };
   }, []);
   const justFinishedPath =
-    `/search?season=${justFinishedSeason.season}` +
-    `&startDate_like=${justFinishedSeason.year}%25` +
-    `&status=FINISHED&sort=POPULARITY_DESC`;
+    `/search?status=FINISHED&sort=END_DATE_DESC`;
 
   // UPCOMING season/year (same treatment — the panel queries next season,
   // so its listPath must too instead of every NOT_YET_RELEASED title).
@@ -246,7 +244,7 @@ const Home = () => {
   const upcomingPath =
     `/search?season=${upcomingSeason.season}` +
     `&startDate_like=${upcomingSeason.year}%25` +
-    `&status=NOT_YET_RELEASED&sort=POPULARITY_DESC`;
+    `&status=NOT_YET_RELEASED&sort=START_DATE_ASC`;
 
   // NSFW: rows are filtered at render derivation.
   const { nsfwEnabled } = useNsfw();
@@ -352,21 +350,19 @@ const Home = () => {
     };
   }, []);
 
-  // JUST FINISHED (below the fold — deferred) — popular shows from the
-  // season that just ended (local season/year query).
-  // The listPath carries the same season/year (see justFinishedSeason above)
-  // so "view all" shows the same just-finished season — not every old
-  // FINISHED title.
+  // JUST FINISHED (below the fold — deferred) — the titles that ENDED most
+  // recently (AniList END_DATE_DESC across all FINISHED shows), so the
+  // panel reflects "just finished" literally instead of a popular show from
+  // a season that may have ended months ago. ListPath shares the same sort
+  // so "view all" matches the panel.
   useEffect(() => {
     let cancelled = false;
     const cancelDeferred = deferNonCritical(() => {
       (async () => {
         try {
           const data = await fetchAdvancedSearch('', 1, 12, {
-            season: justFinishedSeason.season,
-            year: justFinishedSeason.year,
             status: 'FINISHED',
-            sort: ['POPULARITY_DESC'],
+            sort: ['END_DATE_DESC'],
           });
           if (!cancelled) setJustFinished(data.results);
         } catch {

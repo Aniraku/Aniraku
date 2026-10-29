@@ -5,10 +5,10 @@
 // skeletons) MUST be imported directly by path inside lazy pages —
 // re-exporting them pins their subtrees (swiper, player engine) into the
 // initial bundle. See App.tsx route-split note.
-// TODO Shared components
+// Shared components
 export { default as StatusIndicator } from './components/shared/StatusIndicator';
 
-// TODO Basic UI Components
+// Basic UI components
 export { default as Navbar } from './components/Navigation/Navbar';
 export { default as SideMenu } from './components/Navigation/SideMenu';
 export { default as Footer } from './components/Navigation/Footer';
@@ -17,7 +17,7 @@ export { SearchFilters } from './components/Navigation/SearchFilters';
 export { default as ShortcutsPopup } from './components/ShortcutsPopup';
 export { ThemeProvider, useTheme } from './components/ThemeContext';
 
-// TODO User Components
+// User components
 // Settings completeness bundle: the superset page (Data card w/ Clear
 // Bookmarks + inline Undo, two-step Clear History, Danger Zone delete
 // account, Account rows). Import it directly from './pages/Settings' —
@@ -29,7 +29,7 @@ export {
 export { WatchingAnilist } from './components/Profile/WatchingAnilist';
 
 // * ==== Hooks ====
-// TODO Utilizing API and Other Functionalities
+// API and other functionality
 export * from './hooks/useApi';
 export * from './hooks/animeInterface';
 export * from './hooks/useScroll';
