@@ -244,7 +244,7 @@ const Home = () => {
   const upcomingPath =
     `/search?season=${upcomingSeason.season}` +
     `&startDate_like=${upcomingSeason.year}%25` +
-    `&status=NOT_YET_RELEASED&sort=START_DATE_ASC`;
+    `&status=NOT_YET_RELEASED&sort=START_DATE`;
 
   // NSFW: rows are filtered at render derivation.
   const { nsfwEnabled } = useNsfw();
