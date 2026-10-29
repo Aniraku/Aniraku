@@ -434,6 +434,20 @@ query ($page: Int, $perPage: Int, $search: String, $genre_in: [String], $season:
   }
 }`;
 
+// Page query with `description` included — only used where descriptions
+// actually render (the hero carousel / Top Airing panel). The shared
+// MEDIA_PAGE_QUERY stays description-free to keep rail/search payloads lean.
+const MEDIA_PAGE_QUERY_WITH_DESCRIPTION = `
+query ($page: Int, $perPage: Int, $search: String, $genre_in: [String], $season: MediaSeason, $seasonYear: Int, $format: MediaFormat, $status: MediaStatus, $sort: [MediaSort]) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo { total lastPage hasNextPage currentPage perPage }
+    media(type: ANIME, search: $search, genre_in: $genre_in, season: $season, seasonYear: $seasonYear, format: $format, status: $status, sort: $sort) {
+      ${MEDIA_LIST_FIELDS}
+      description(asHtml: false)
+    }
+  }
+}`;
+
 function toAnilistSort(sort?: string[]): string[] {
   const valid = new Set([
     'POPULARITY_DESC',
@@ -443,6 +457,8 @@ function toAnilistSort(sort?: string[]): string[] {
     'TRENDING_DESC',
     'TRENDING',
     'START_DATE_DESC',
+    'START_DATE_ASC',
+    'END_DATE_DESC',
     'TITLE_ROMAJI',
     'EPISODES_DESC',
     'FAVOURITES_DESC',
@@ -535,12 +551,13 @@ export async function fetchAdvancedSearch(
 async function fetchListViaAnilist(
   cacheName: string,
   variables: Record<string, any>,
+  query: string = MEDIA_PAGE_QUERY,
 ) {
   const cache = createCache(cacheName);
   const cacheKey = generateCacheKey(cacheName, JSON.stringify(variables));
   const cached = cache.get(cacheKey);
   if (cached) return cached;
-  const data = await anilistQuery(MEDIA_PAGE_QUERY, variables);
+  const data = await anilistQuery(query, variables);
   const media = data?.Page?.media ?? [];
   const pageInfo = data?.Page?.pageInfo ?? {};
   const result = {
@@ -576,24 +593,31 @@ export const fetchTopAiringAnime = (page: number, perPage: number) =>
   // NOTE: no season/year filter — AniList season tags only cover shows that
   // *started* in that season, so filtering guts the list (returned 1 anime
   // for FALL 2026). RELEASING alone = everything currently airing.
-  fetchListViaAnilist('TopAiring v2', {
-    page,
-    perPage,
-    status: 'RELEASING',
-    sort: ['POPULARITY_DESC'],
-  });
+  fetchListViaAnilist(
+    'TopAiring v3',
+    {
+      page,
+      perPage,
+      status: 'RELEASING',
+      sort: ['POPULARITY_DESC'],
+    },
+    MEDIA_PAGE_QUERY_WITH_DESCRIPTION,
+  );
 export const fetchUpcomingSeasons = (page: number, perPage: number) => {
-  // Next-season WINTER always belongs to the next calendar year
-  // (FALL 2026 -> WINTER 2027), otherwise AniList returns nothing.
+  // Nearest upcoming: soonest start date first (popularity tiebreak) so the
+  // panel leads with titles airing within days, not next-season blockbusters
+  // that may be a year out. Next-season WINTER always belongs to the next
+  // calendar year (FALL 2026 -> WINTER 2027), otherwise AniList returns
+  // nothing.
   const season = getNextSeason().toUpperCase();
   const y = Number(year) + (season === 'WINTER' && getCurrentSeason().toUpperCase() === 'FALL' ? 1 : 0);
-  return fetchListViaAnilist('Upcoming v2', {
+  return fetchListViaAnilist('Upcoming v3', {
     page,
     perPage,
     season,
     seasonYear: y,
     status: 'NOT_YET_RELEASED',
-    sort: ['POPULARITY_DESC'],
+    sort: ['START_DATE_ASC', 'POPULARITY_DESC'],
   });
 };
 

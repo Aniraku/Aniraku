@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fa';
 import { FaFilm } from 'react-icons/fa6';
 import { ReportModal } from '../ReportModal';
+import DownloadDialog from './DownloadDialog';
 
 // MediaSource — episode bar plus server/language dropdowns.
 // Server/language selection is keyed `${lang}:${name}` so the SAME backend
@@ -25,13 +26,14 @@ interface MediaSourceProps {
   setSourceType: (sourceType: string) => void;
   language: string;
   setLanguage: (language: string) => void;
-  downloadLink: string;
   episodeId?: string;
   episodeTitle?: string;
   episodeAirDate?: string | null;
   episodeDescription?: string | null;
   airingTime?: string;
   nextEpisodenumber?: string;
+  /** Series display name — labels the download pill. */
+  seriesTitle?: string;
   // All Aniraku servers for this episode (direct HLS + embed providers).
   serversSub?: any[];
   serversDub?: any[];
@@ -40,10 +42,22 @@ interface MediaSourceProps {
   onSelectServer?: (key: string, lang: 'sub' | 'dub') => void;
   /** Total episodes — drives the per-language count pills. */
   totalEpisodes?: number;
+  /**
+   * Whole-anime sub count (lib/audioTracks): aired episodes once any pool
+   * proved subs exist. Never fabricated — 0 stays 0.
+   */
+  subEpisodeCount?: number;
+  /**
+   * Whole-anime dub count (lib/audioTracks): the proven high-water mark of
+   * episodes with real dub servers. Never the series total, never assumed.
+   */
+  dubEpisodeCount?: number;
   /** Per-episode filler flag. */
   episodeFiller?: boolean;
   /** AniList id — required by the report modal (it disables without it). */
   anilistId?: string | number | null;
+  /** Slugified series title — file name for the internal MKV download. */
+  titleSlug?: string;
   /**
    * True once the server pools settled for THIS episode. Until then both
    * language options render (today's behaviour) so the menu never looks
@@ -383,6 +397,8 @@ const Trigger = styled.button`
   @media (max-width: 500px) {
     width: 100%;
     min-width: 0;
+    /* 44px tap target (mobile pass) */
+    min-height: 2.75rem;
     padding: 0.65rem 0.5rem;
   }
 `;
@@ -655,20 +671,23 @@ const SelectDropdown: React.FC<DropdownProps> = ({
 
 export const MediaSource: React.FC<MediaSourceProps> = ({
   language,
-  downloadLink,
   episodeId,
   episodeTitle,
   episodeAirDate,
   episodeDescription,
   airingTime,
   nextEpisodenumber,
+  seriesTitle,
   serversSub = [],
   serversDub = [],
   selectedServer = '',
   onSelectServer,
   totalEpisodes = 0,
+  subEpisodeCount,
+  dubEpisodeCount,
   episodeFiller = false,
   anilistId,
+  titleSlug,
   serversReady = true,
   activeServerKey = null,
   autoPlaying = false,
@@ -677,6 +696,7 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     'idle' | 'copying' | 'copied' | 'error'
   >('idle');
   const [reportOpen, setReportOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
 
   const directSub = serversSub.filter((s: any) => !isEmbedServer(s));
   const directDub = serversDub.filter((s: any) => !isEmbedServer(s));
@@ -692,9 +712,14 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     dub: dubAvailable,
   };
 
-  // LangCountPill — `${count} episodes` aria-label; 0 → unavailable.
-  const subCount = subAvailable ? totalEpisodes : 0;
-  const dubCount = dubAvailable ? totalEpisodes : 0;
+  // LangCountPill — whole-anime counts, computed in Watch.tsx from
+  // lib/audioTracks (the server pools this page already fetched — no extra
+  // backend calls). Sub = aired episodes once any pool proved subs exist;
+  // dub = ONLY the proven high-water mark (never the series total, never
+  // assumed — a language that hasn't released stays 0 and hidden).
+  const subCount =
+    subEpisodeCount ?? (subAvailable ? totalEpisodes : 0);
+  const dubCount = dubEpisodeCount ?? 0;
 
   const serverKey = (lang: string, name: string) => `${lang}:${name}`;
   const currentLang: 'sub' | 'dub' = language === 'dub' ? 'dub' : 'sub';
@@ -708,6 +733,17 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
     if (isEmbedServer(s)) badges.push(<ItemTag key='embed'>embed</ItemTag>);
     if ((s?.downloads ?? []).length > 0)
       badges.push(<ItemTag key='dl' $variant='dl'>dl</ItemTag>);
+    // Quality of the row's best direct source (e.g. "1080p") when the
+    // backend reports one.
+    const quality = (s?.sources ?? [])
+      .map((x: any) => (typeof x?.quality === 'string' ? x.quality : ''))
+      .find((q: string) => /^\d{3,4}p?$/i.test(q));
+    if (quality)
+      badges.push(
+        <ItemTag key='q' $variant='ssub'>
+          {quality.toLowerCase()}
+        </ItemTag>,
+      );
     // Soft-sub = subtitle files ship with the source; hard-sub = burned-in
     // subs on a sub-track server without files.
     if ((s?.sources ?? []).some((x: any) => (x?.subtitles ?? []).length > 0))
@@ -758,6 +794,79 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
       ? selectedServer
       : serverKey(currentLang, langServers[0]?.name ?? '');
   const displayServerKey = activeServerKey ?? fallbackServerKey;
+
+  // The download follows playback: the direct HLS URL of the server the
+  // user is actually watching (first non-embed source of the active row),
+  // per language so the dialog's Sub/Dub radio can offer both pools.
+  const activeRowFor = (l: 'sub' | 'dub'): any => {
+    const poolRows = l === 'dub' ? serversDub : serversSub;
+    const directRows = poolRows.filter((s: any) => !isEmbedServer(s));
+    return (
+      poolRows.find(
+        (s: any) => serverKey(l, s?.name) === displayServerKey,
+      ) ?? directRows[0]
+    );
+  };
+  const watchedSourceFor = (l: 'sub' | 'dub'): string | null => {
+    return (
+      (activeRowFor(l)?.sources ?? []).find(
+        (x: any) => x?.url && x?.type !== 'embed',
+      )?.url ?? null
+    );
+  };
+  const qualityOptionsFor = (l: 'sub' | 'dub'): { url: string; label: string }[] => {
+    const byQuality = new Map<string, string>();
+    for (const x of activeRowFor(l)?.sources ?? []) {
+      if (!x?.url || x?.type === 'embed') continue;
+      const label = String(x?.quality || '').toLowerCase();
+      if (!/^\d{3,4}p?$/.test(label)) continue;
+      if (!byQuality.has(label)) byQuality.set(label, x.url);
+    }
+    return [...byQuality.entries()].map(([label, url]) => ({ url, label }));
+  };
+  // Same subtitle list the player mounts — these are the files that actually
+  // resolve for the watched server.
+  const subtitlesFor = (
+    l: 'sub' | 'dub',
+  ): { label: string; language?: string; url: string }[] => {
+    const seen = new Set<string>();
+    const out: { label: string; language?: string; url: string }[] = [];
+    for (const x of activeRowFor(l)?.sources ?? []) {
+      for (const sub of x?.subtitles ?? []) {
+        if (!sub?.url || /thumbnail|preview/i.test(sub.url)) continue;
+        if (seen.has(sub.url)) continue;
+        seen.add(sub.url);
+        out.push({
+          label: sub.label || sub.lang || 'Subtitles',
+          language:
+            typeof sub.lang === 'string' && sub.lang.length <= 3
+              ? sub.lang
+              : undefined,
+          url: sub.url,
+        });
+      }
+    }
+    return out;
+  };
+  const headersFor = (
+    l: 'sub' | 'dub',
+  ): Record<string, string> | null => activeRowFor(l)?.headers ?? null;
+  const preferredSource = {
+    sub: watchedSourceFor('sub'),
+    dub: watchedSourceFor('dub'),
+  };
+  const qualitySources = {
+    sub: qualityOptionsFor('sub'),
+    dub: qualityOptionsFor('dub'),
+  };
+  const downloadHeaders = {
+    sub: headersFor('sub'),
+    dub: headersFor('dub'),
+  };
+  const downloadSubtitles = {
+    sub: subtitlesFor('sub'),
+    dub: subtitlesFor('dub'),
+  };
 
   const handleLanguageChange = (value: string) => {
     const next = value === 'dub' ? 'dub' : 'sub';
@@ -873,14 +982,16 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
                 <LangCountGroup>
                   <LangCountPill
                     $unavailable={subCount <= 0}
-                    aria-label={`${subCount} episodes`}
+                    aria-label={`${subCount} subbed episodes`}
+                    title={`${subCount} episodes with sub`}
                   >
                     <FaClosedCaptioning aria-hidden='true' />
                     <span>{subCount}</span>
                   </LangCountPill>
                   <LangCountPill
                     $unavailable={dubCount <= 0}
-                    aria-label={`${dubCount} episodes`}
+                    aria-label={`${dubCount} dubbed episodes`}
+                    title={`${dubCount} episodes with dub`}
                   >
                     <FaMicrophone aria-hidden='true' />
                     <span>{dubCount}</span>
@@ -915,12 +1026,10 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
                   Report
                 </LinkButton>
                 <LinkButton
-                  as='a'
-                  href={downloadLink || undefined}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  disabled={!downloadLink}
-                  title='Download'
+                  type='button'
+                  onClick={() => setDownloadOpen(true)}
+                  disabled={!anilistId || !episodeId}
+                  title='Download this episode'
                 >
                   <FaDownload aria-hidden='true' />
                   Download
@@ -962,6 +1071,19 @@ export const MediaSource: React.FC<MediaSourceProps> = ({
         providers={providerKeys}
         downloadProviders={downloadProviderKeys}
         anilistId={anilistId}
+      />
+      <DownloadDialog
+        isVisible={downloadOpen}
+        onClose={() => setDownloadOpen(false)}
+        anilistId={anilistId}
+        episodeNumber={episodeId ? Number(episodeId) : undefined}
+        titleSlug={titleSlug || 'anime'}
+        seriesTitle={seriesTitle}
+        currentLang={currentLang}
+        preferredSource={preferredSource}
+        headers={downloadHeaders}
+        subtitles={downloadSubtitles}
+        qualitySources={qualitySources}
       />
     </UpdatedContainer>
   );

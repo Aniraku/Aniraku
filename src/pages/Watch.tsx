@@ -15,8 +15,8 @@ import {
   fetchAnimeEpisodes,
   fetchAnimeData,
   fetchAnimeInfo,
-  pickHighestDownload,
   useCountdown,
+  ANIRAKU_API_BASE,
 } from '../index';
 import { EpisodeList } from '../components/Watch/EpisodeList';
 import { Player } from '../components/Watch/Video/Player';
@@ -56,6 +56,14 @@ import {
 import { syncAverageScore } from '../lib/providerSync';
 import { resolveDisplayTitle } from '../lib/displayLanguage';
 import { recordWatchEvent } from '../lib/watchEvents';
+// Whole-anime sub/dub counts: the backend's fast /track endpoint (cached
+// locally) plus the pool observations made below — zero extra fan-out calls.
+import {
+  ensureTrackCounts,
+  recordAudioTrackEpisode,
+  isDubProvenAbsent,
+  useTrackCountsOrDefault,
+} from '../lib/audioTracks';
 import { isNsfw, useNsfw } from '../hooks/useNsfw';
 // Runtime SEO through the shared helper.
 import { SITE_URL, useSeo } from '../utils/seo';
@@ -754,6 +762,11 @@ const WatchInner: React.FC = () => {
   // sub/dub, so a bare name could never distinguish the two pools.
   const [serversSub, setServersSub] = useState<any[]>([]);
   const [serversDub, setServersDub] = useState<any[]>([]);
+  // Whole-anime sub/dub counts (lib/audioTracks): the backend's fast /track
+  // endpoint cached locally + the pool observations recorded below. The
+  // counts feed the Sub/Dub pills and the episode list; the /track fetch is
+  // fired in loadServers so its answer also gates the slow dub fan-out.
+  const trackCounts = useTrackCountsOrDefault(animeId ?? '');
   const [selectedServer, setSelectedServer] = useState('');
   // Actually-playing server display (fallback tracking): the picker
   // highlights this key when set, falling back to selectedServer when
@@ -782,7 +795,6 @@ const WatchInner: React.FC = () => {
   // the persist effect below skips it — a sub-only episode must not
   // overwrite the user's saved Dub preference (and vice versa).
   const autoLangFallbackRef = useRef(false);
-  const [downloadLink, setDownloadLink] = useState('');
   // Theater + lights state (toggled ONLY through the single
   // `aniraku:shortcut` listener below, plus the player menu Lights button
   // which dispatches the same contract event).
@@ -864,7 +876,6 @@ const WatchInner: React.FC = () => {
     () => (Array.isArray(animeInfo?.genres) ? animeInfo.genres.join(',') : ''),
     [animeInfo?.genres],
   );
-  // TODO FETCH EMBED URL FROM ANIRAKU SERVERS
   // Aniraku returns direct HLS servers + 1-2 embed servers (FlixCloud
   // Yuta/Syota/Mike, type:"embed"). Embed is kept as fallback, never dropped.
   // The full server list also feeds the provider picker (multiple providers).
@@ -894,9 +905,24 @@ const WatchInner: React.FC = () => {
       return;
     }
     const loadServers = async () => {
+      // Ground-truth observations for lib/audioTracks: did each language's
+      // pool actually return servers for this episode? The counts NEVER
+      // invent rows — an unobserved language simply stays unknown.
+      let observedSub = false;
+      let observedDub = false;
       try {
         const ep = Number(currentEpisode.number);
         const id = Number(animeId);
+        // Whole-anime track counts first (fast endpoint, locally cached).
+        // Their answer gates whether the SLOW dub /servers fan-out runs at
+        // all: a dub proven lower than this episode is never called.
+        // priority=true bypasses the card-rail queue — the boot path
+        // must never wait behind grid prefetches.
+        if (animeId) {
+          await ensureTrackCounts(String(animeId), ANIRAKU_API_BASE, {
+            priority: true,
+          });
+        }
         // Current lang first (fast path for playback), other lang after so a
         // slow provider on one side never blocks the visible player.
         const first = await fetchAnirakuServers(
@@ -910,23 +936,44 @@ const WatchInner: React.FC = () => {
         });
         if (!cancelled && Array.isArray(first)) {
           const clean = sanitizeServers(first);
-          if (language === 'dub') setServersDub(clean);
-          else setServersSub(clean);
+          if (language === 'dub') {
+            setServersDub(clean);
+            observedDub = clean.length > 0;
+          } else {
+            setServersSub(clean);
+            observedSub = clean.length > 0;
+          }
         }
         const other = language === 'dub' ? 'sub' : 'dub';
-        const second = await fetchAnirakuServers(
-          id,
-          ep,
-          other,
-          genreKey || undefined,
-        ).catch((e) => {
-          console.error('Error fetching Aniraku servers:', e);
-          return [];
-        });
-        if (!cancelled && Array.isArray(second)) {
-          const clean = sanitizeServers(second);
-          if (other === 'dub') setServersDub(clean);
-          else setServersSub(clean);
+        // A language with no proven releases must not be called at all: when
+        // this device has a recent pool observation proving the dub track is
+        // absent through this episode, the second (slowest) /servers fan-out
+        // is skipped entirely. The 7-day TTL in lib/audioTracks re-checks so
+        // a later dub release is still picked up.
+        const dubProvenAbsent =
+          other === 'dub' && animeId
+            ? isDubProvenAbsent(String(animeId), ep)
+            : false;
+        if (!dubProvenAbsent) {
+          const second = await fetchAnirakuServers(
+            id,
+            ep,
+            other,
+            genreKey || undefined,
+          ).catch((e) => {
+            console.error('Error fetching Aniraku servers:', e);
+            return [];
+          });
+          if (!cancelled && Array.isArray(second)) {
+            const clean = sanitizeServers(second);
+            if (other === 'dub') {
+              setServersDub(clean);
+              observedDub = clean.length > 0;
+            } else {
+              setServersSub(clean);
+              observedSub = clean.length > 0;
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching Aniraku servers:', error);
@@ -936,6 +983,17 @@ const WatchInner: React.FC = () => {
       if (!cancelled) {
         setPoolEpKey(serverEpKey);
         setServersSettled(true);
+        // Record what the pools actually proved for this episode — the
+        // whole-anime counts on this page, the episode list and the cards
+        // all read from this store.
+        if (animeId && currentEpisode.number) {
+          recordAudioTrackEpisode(
+            String(animeId),
+            Number(currentEpisode.number),
+            observedSub,
+            observedDub,
+          );
+        }
       }
     };
     loadServers();
@@ -1012,8 +1070,6 @@ const WatchInner: React.FC = () => {
     if (first?.name) {
       setSelectedServer(keyOf(language, first));
       setSourceType(serverIsEmbed(first) ? 'embed' : 'default');
-      const dl = pickHighestDownload(first?.downloads);
-      if (dl) setDownloadLink(dl);
     }
   }, [serversSub, serversDub, language, selectedServer, sourceType]);
 
@@ -1063,6 +1119,9 @@ const WatchInner: React.FC = () => {
     if (!hls?.url) return null;
     return {
       url: hls.url as string,
+      // Keep the declared kind: proxied HLS URLs may carry no ".m3u8"
+      // anywhere in the path, so URL sniffing alone misclassifies them.
+      type: typeof hls.type === 'string' ? hls.type : undefined,
       subs: Array.isArray(hls.subtitles) ? hls.subtitles : EMPTY_SUBS,
       headers: selectedServerObj.headers ?? EMPTY_HEADERS,
     };
@@ -1088,8 +1147,6 @@ const WatchInner: React.FC = () => {
         setSourceType('embed');
       } else {
         setSourceType('default');
-        const dl = pickHighestDownload(srv?.downloads);
-        if (dl) setDownloadLink(dl);
       }
     },
     [serversSub, serversDub],
@@ -1196,11 +1253,6 @@ const WatchInner: React.FC = () => {
     },
     [animeId, animeInfo, navigate],
   );
-
-  // TODO UPDATE DOWNLOAD LINK WHEN EPISODE ID CHANGES
-  const updateDownloadLink = useCallback((link: string) => {
-    setDownloadLink(link);
-  }, []);
 
   // TODO AUTOPLAY BUTTON TOGGLE PROPS
   const handleEpisodeEnd = async () => {
@@ -1347,7 +1399,7 @@ const WatchInner: React.FC = () => {
     );
   }, [animeId]);
 
-  // TODO: persist the language preference to localStorage (current + legacy
+  // Persist the language preference to localStorage (current + legacy
   // keys). Skipped once after an automatic fallback flip (see above) so a
   // single-language episode never rewrites the saved preference.
   useEffect(() => {
@@ -1802,6 +1854,34 @@ const WatchInner: React.FC = () => {
     );
   }
 
+  // Whole-anime audio-track counts shown on the Sub/Dub pills and episode
+  // list. Primary: the backend's /track endpoint (exact counts, cached by
+  // lib/audioTracks — e.g. One Piece: sub 1180 / dub 1157, the real lag).
+  // Fallback when the endpoint has no entry (missing): the AniList aired
+  // count for subs once any pool proved subs exist, and pool observations
+  // for dub. Local pool marks always raise the numbers — a fresher player
+  // observation outranks a stale snapshot. A language that has not released
+  // stays at 0 and its servers are never called (dub skip in loadServers).
+  const airedEpisodeCount = (() => {
+    const total = Math.floor(Number(animeInfo?.totalEpisodes) || 0);
+    const next = animeInfo?.nextAiringEpisode;
+    if (next && (next.airingAt ?? 0) > Math.floor(Date.now() / 1000)) {
+      return Math.max((next.episode ?? 1) - 1, 0);
+    }
+    return total;
+  })();
+  const currentEpNumber = Number(currentEpisode.number) || 0;
+  const subEpisodeCount = Math.max(
+    trackCounts.missing ? 0 : trackCounts.sub,
+    serversSub.length > 0
+      ? Math.max(airedEpisodeCount, currentEpNumber)
+      : 0,
+  );
+  const dubEpisodeCount = Math.max(
+    trackCounts.missing ? 0 : trackCounts.dub,
+    serversDub.length > 0 ? currentEpNumber : 0,
+  );
+
   const mediaSourceEl =
     animeInfo && animeInfo.status !== 'Not yet aired' ? (
       <MediaSource
@@ -1809,7 +1889,6 @@ const WatchInner: React.FC = () => {
         setSourceType={setSourceType}
         language={language}
         setLanguage={setLanguage}
-        downloadLink={downloadLink}
         episodeId={currentEpisode.number.toString()}
         episodeTitle={currentEpisode.title}
         episodeAirDate={currentEpisode.airDate}
@@ -1823,8 +1902,14 @@ const WatchInner: React.FC = () => {
         }
         nextEpisodenumber={nextEpisodenumber}
         totalEpisodes={episodes.length}
+        subEpisodeCount={subEpisodeCount}
+        dubEpisodeCount={dubEpisodeCount}
         episodeFiller={(currentEpisode as any)?.filler === true}
         anilistId={animeInfo?.id}
+        titleSlug={slugify(pickSlugTitle(animeInfo?.title, animeId ?? 'anime'))}
+        seriesTitle={
+          animeInfo ? resolveDisplayTitle(animeInfo.title) : undefined
+        }
         serversReady={poolEpKey === serverEpKey && serversSettled}
         activeServerKey={activeServerKey}
         autoPlaying={autoPlaying}
@@ -1915,6 +2000,7 @@ const WatchInner: React.FC = () => {
               ? Math.floor(Number(animeInfo.totalEpisodes))
               : null
           }
+          dubEpisodeCount={dubEpisodeCount}
           onEpisodeSelect={(episodeId: string) => {
             const episode = episodes.find((e) => e.id === episodeId);
             if (episode) {
@@ -2019,9 +2105,9 @@ const WatchInner: React.FC = () => {
           malId={animeInfo?.malId}
           banner={selectedBackgroundImage}
           srcOverride={directOverride?.url ?? null}
+          srcOverrideType={directOverride?.type ?? null}
           subsOverride={directOverride?.subs ?? null}
           headersOverride={directOverride?.headers ?? null}
-          updateDownloadLink={updateDownloadLink}
           onEpisodeEnd={handleEpisodeEnd}
           onPrevEpisode={onPrevEpisode}
           onNextEpisode={onNextEpisode}

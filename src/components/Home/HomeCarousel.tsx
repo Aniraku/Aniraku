@@ -11,6 +11,7 @@ import { Autoplay, EffectFade, Keyboard } from 'swiper/modules';
 import 'swiper/swiper-bundle.css';
 import type { Anime } from '../../hooks/animeInterface';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
+import { useTitleLogo } from '../../lib/titleLogo';
 import { infoPathFor, watchPathFor } from '../../utils/animePaths';
 
 // Hero carousel — fade crossfade swiper with the action
@@ -147,6 +148,24 @@ const TitleText = styled.div`
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+`;
+
+// TVDB clearlogo wordmark — replaces the text title when the artwork exists
+// (like the big hero banners). Left-aligned, height-capped, with the plain
+// text title restored on load failure.
+const TitleImage = styled.img`
+  display: block;
+  align-self: flex-start;
+  max-height: clamp(3rem, 7vw, 5.5rem);
+  max-width: min(24rem, 100%);
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.55));
+  animation: fadeIn 0.4s ease-in-out;
+
+  @media (max-width: 500px) {
+    max-height: 2.75rem;
+  }
 `;
 
 const DescriptionText = styled.p`
@@ -349,6 +368,12 @@ function formatCountdown(ms: number): string {
 
 const SlideDetails: FC<{ anime: Anime }> = ({ anime }) => {
   const slide = useSwiperSlide();
+  // Title wordmark (backend /logo endpoint, AniZip fallback — lib/titleLogo)
+  // falls back to the gradient text title when the artwork is missing.
+  const clearlogo = useTitleLogo(anime.id);
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => setLogoFailed(false), [clearlogo]);
+  const showLogo = !!clearlogo && !logoFailed;
 
   const transform = !slide
     ? 'scale(1)'
@@ -371,6 +396,18 @@ const SlideDetails: FC<{ anime: Anime }> = ({ anime }) => {
 
   return (
     <ContentDetails style={{ transform, opacity }}>
+      {/* Logo wordmark first, the small info row directly BELOW it */}
+      {showLogo ? (
+        <TitleImage
+          src={clearlogo ?? undefined}
+          alt={name}
+          loading='lazy'
+          decoding='async'
+          onError={() => setLogoFailed(true)}
+        />
+      ) : (
+        <TitleText style={colorVars}>{name}</TitleText>
+      )}
       <DetailsRow>
         {anime.type && <InfoItem>{anime.type}</InfoItem>}
         {!!anime.totalEpisodes && (
@@ -392,16 +429,15 @@ const SlideDetails: FC<{ anime: Anime }> = ({ anime }) => {
           </InfoItem>
         )}
       </DetailsRow>
-      <TitleText style={colorVars}>{name}</TitleText>
+      {anime.description && (
+        <DescriptionText>{stripHtml(anime.description)}</DescriptionText>
+      )}
       <DetailsRow>
         {!!anime.genres?.length && (
           <InfoItem>{anime.genres.slice(0, 3).join(' · ')}</InfoItem>
         )}
         {!!anime.studios?.length && <InfoItem>{anime.studios[0]}</InfoItem>}
       </DetailsRow>
-      {anime.description && (
-        <DescriptionText>{stripHtml(anime.description)}</DescriptionText>
-      )}
     </ContentDetails>
   );
 };

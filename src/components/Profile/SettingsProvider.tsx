@@ -260,6 +260,18 @@ function toStoredPatch(
     stored.langTitle = toLangTitle(patch.titleLanguage);
   if ('characterNameLanguage' in patch)
     stored.langCharacter = toLangCharacter(patch.characterNameLanguage);
+  if ('hideSpoiler' in patch)
+    stored.hideSpoiler = normBool(patch.hideSpoiler, LIVE_DEFAULTS.hideSpoiler);
+  if ('comments' in patch)
+    stored.comments = normBool(patch.comments, LIVE_DEFAULTS.comments);
+  if ('autoSync' in patch)
+    stored.autoSync = normBool(patch.autoSync, LIVE_DEFAULTS.autoSync);
+  if ('syncThreshold' in patch) {
+    const n = Number(patch.syncThreshold);
+    stored.syncThreshold = Number.isFinite(n)
+      ? Math.max(0, Math.min(100, Math.round(n)))
+      : LIVE_DEFAULTS.syncThreshold;
+  }
   return stored;
 }
 
@@ -288,6 +300,10 @@ interface SettingsContextType {
     defaultServers: string;
     titleLanguage: string;
     characterNameLanguage: string;
+    hideSpoiler: boolean;
+    comments: boolean;
+    autoSync: boolean;
+    syncThreshold: number;
   };
   setSettings: (settings: Partial<SettingsContextType['settings']>) => void;
 }
@@ -352,6 +368,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({
     defaultServers: stored.defaultServers,
     titleLanguage: stored.langTitle,
     characterNameLanguage: stored.langCharacter,
+    hideSpoiler: stored.hideSpoiler,
+    comments: stored.comments,
+    autoSync: stored.autoSync,
+    syncThreshold: stored.syncThreshold,
   };
 
   return (

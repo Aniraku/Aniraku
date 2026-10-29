@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -15,6 +15,15 @@ import { SkeletonBox } from '../Skeletons/Skeletons';
 import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { useBookmarks } from '../../hooks/useBookmarks';
+// Whole-anime sub/dub chips: the backend's fast /track endpoint cached
+// locally (lib/audioTracks) — one cheap request per visible card, deduped.
+import {
+  ensureTrackCounts,
+  useTrackCounts,
+  type TrackCounts,
+} from '../../lib/audioTracks';
+import { ANIRAKU_API_BASE } from '../../hooks/useApi';
+import { showToast } from '../Toaster';
 
 // Card corner bookmark control. Styled to fit the card chrome: hover reveal
 // plus CSS variables, sitting top-left. Guests toggle in localStorage;
@@ -73,6 +82,28 @@ interface CardItemProps {
   anime: Anime;
 }
 
+// Miruro-style audio chips: rounded pills with the CC/mic icon + the exact
+// whole-anime episode count. Bordered, translucent, theme-aware.
+const AudioChip = styled.span`
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--global-text);
+  background-color: var(--global-div-tr);
+  border: 1px solid var(--global-border-color);
+  border-radius: 999px;
+  white-space: nowrap;
+
+  svg {
+    font-size: 0.72rem;
+    color: var(--global-text-muted);
+  }
+`;
+
 const CardItem: React.FC<CardItemProps> = ({ anime }) => {
   const displayTitle = resolveDisplayTitle(anime.title);
 
@@ -97,7 +128,27 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
     return Y > 0 ? `${Y}` : '?';
   }, [anime.nextAiringEpisode, anime.totalEpisodes]);
 
-  const isDub = anime.subOrDub && /dub/i.test(anime.subOrDub);
+  // Numeric aired count — the sub fallback when the /track endpoint has no
+  // entry for this title (providers subtitle every aired episode).
+  const airedCount = useMemo(() => {
+    const Y = Math.floor(Number(anime.totalEpisodes) || 0);
+    const next = anime.nextAiringEpisode;
+    if (next?.airingAt && next.airingAt > Math.floor(Date.now() / 1000)) {
+      return Math.max((next.episode ?? 1) - 1, 0);
+    }
+    return Y;
+  }, [anime.totalEpisodes, anime.nextAiringEpisode]);
+
+  // Fire the (cached, deduped) /track fetch once per card mount.
+  useEffect(() => {
+    if (anime.id) void ensureTrackCounts(String(anime.id), ANIRAKU_API_BASE);
+  }, [anime.id]);
+  const trackCounts: TrackCounts | null = useTrackCounts(String(anime.id));
+
+  const subCount = trackCounts && !trackCounts.missing
+    ? Math.max(trackCounts.sub, 0)
+    : airedCount;
+  const dubCount = trackCounts && !trackCounts.missing ? trackCounts.dub : 0;
 
   const hoverColor = anime.color
     ? ({ '--card-title-hover-color': anime.color } as React.CSSProperties)
@@ -125,6 +176,9 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
           <div className="playIcon" aria-label="Play">
             <FaPlay />
           </div>
+          <div className="statusBadge">
+            <StatusIndicator status={anime.status} />
+          </div>
         </div>
         <div className="titleContainer">
           <div className="titleWrapper">
@@ -134,17 +188,21 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
             <div className="cardDetail">{year}</div>
             <div className="cardDetail">{format}</div>
             <div className="cardDetail">
-              {isDub && <MdRecordVoiceOver aria-label="Dub" />}
-              <FaClosedCaptioning aria-label="Sub" />
-              {currentEpisode}
+              <AudioChip title={`${subCount} episodes with sub`}>
+                <FaClosedCaptioning aria-hidden='true' />
+                {subCount > 0 ? subCount : currentEpisode}
+              </AudioChip>
+              {dubCount > 0 && (
+                <AudioChip title={`${dubCount} episodes with dub`}>
+                  <MdRecordVoiceOver aria-hidden='true' />
+                  {dubCount}
+                </AudioChip>
+              )}
             </div>
             <div className="cardDetail score">
               <FaStar aria-label="Score" />
               {score}
             </div>
-          </div>
-          <div className="statusBadge">
-            <StatusIndicator status={anime.status} />
           </div>
         </div>
       </Link>
@@ -161,11 +219,27 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          const willBeBookmarked = !bookmarked;
           void toggleBookmark({
             id: anime.id,
             title: displayTitle,
             image: anime.thumbnail || anime.image,
-          });
+          })
+            .then(() => {
+              showToast(
+                willBeBookmarked
+                  ? `Bookmarked ${displayTitle}`
+                  : `Removed ${displayTitle} from bookmarks`,
+                { type: 'success' },
+              );
+            })
+            .catch((err: unknown) => {
+              showToast('Could not update bookmark', {
+                description:
+                  err instanceof Error ? err.message : 'Please try again.',
+                type: 'error',
+              });
+            });
         }}
       >
         {bookmarked ? (

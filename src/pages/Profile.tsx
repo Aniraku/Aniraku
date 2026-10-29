@@ -781,7 +781,7 @@ const ModalBody = styled.div`
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  padding: 3rem 1rem 1rem;
+  padding: 2.75rem 1.25rem 1.25rem;
   overflow-y: auto;
   background-color: var(--global-primary-bg);
 `;

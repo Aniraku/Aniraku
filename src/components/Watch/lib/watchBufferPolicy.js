@@ -125,3 +125,65 @@ export function getDashBufferPolicy(_connection = {}) {
     fastSwitchEnabled: true,
   }
 }
+
+/**
+ * Bandwidth-saver preference (the "Limit video caching" toggle in the player
+ * menu). ON by default: the forward buffer is capped at 90s, the back buffer
+ * at 60s and the byte reserve at 128 MiB, so an idle tab stops pulling
+ * segments long before it used to. OFF restores the legacy unlimited-cache
+ * behavior (whole-title forward buffer, no back-buffer eviction) that makes
+ * every seek replay from cache instead of re-downloading — at the cost of
+ * real bandwidth and memory.
+ */
+const BANDWIDTH_SAVER_KEY = 'aniraku:data-saver'
+
+export function getBandwidthSaverPref() {
+  try {
+    const raw = localStorage.getItem(BANDWIDTH_SAVER_KEY)
+    // Absent = default ON. Only an explicit '0' disables it.
+    return raw !== '0'
+  } catch {
+    return true
+  }
+}
+
+export function setBandwidthSaverPref(enabled) {
+  try {
+    localStorage.setItem(BANDWIDTH_SAVER_KEY, enabled ? '1' : '0')
+  } catch {
+    // Storage unavailable — the toggle still applies for this session.
+  }
+}
+
+const SAVER_FORWARD_BUFFER_SECONDS = 90
+const SAVER_MAX_BUFFER_SECONDS = 180
+const SAVER_BACK_BUFFER_SECONDS = 60
+const SAVER_MAX_BUFFER_BYTES = 128 * MEBIBYTE
+
+/**
+ * Merge the bandwidth-saver caps into an hls.js config fragment. Kiwi
+ * (proxied) sources keep their larger reserve even in saver mode — the
+ * proxy's buffering quirk makes a tight cap stall visibly.
+ */
+export function applyBandwidthSaverPolicy(config, { kiwi = false } = {}) {
+  if (!getBandwidthSaverPref() || kiwi) return config
+  return {
+    ...config,
+    maxBufferLength: Math.min(
+      config.maxBufferLength ?? SAVER_FORWARD_BUFFER_SECONDS,
+      SAVER_FORWARD_BUFFER_SECONDS,
+    ),
+    maxMaxBufferLength: Math.min(
+      config.maxMaxBufferLength ?? SAVER_MAX_BUFFER_SECONDS,
+      SAVER_MAX_BUFFER_SECONDS,
+    ),
+    backBufferLength: Math.min(
+      config.backBufferLength ?? SAVER_BACK_BUFFER_SECONDS,
+      SAVER_BACK_BUFFER_SECONDS,
+    ),
+    maxBufferSize: Math.min(
+      config.maxBufferSize ?? SAVER_MAX_BUFFER_BYTES,
+      SAVER_MAX_BUFFER_BYTES,
+    ),
+  }
+}
