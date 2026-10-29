@@ -158,9 +158,12 @@ export const AnimeDataList: React.FC<{ animeData: Anime }> = ({
                       alt={resolveDisplayTitle(relation.title)}
                       loading='lazy'
                     />
+                    <StatusIndicator
+                      status={relation.status}
+                      className='statusBadge'
+                    />
                     <Info>
                       <TitleWithDot>
-                        <StatusIndicator status={relation.status} />
                         <Title>
                           {resolveDisplayTitle(relation.title)}
                         </Title>

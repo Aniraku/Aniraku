@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
+import { FiGrid, FiSettings, FiSliders, FiUser, FiYoutube } from 'react-icons/fi';
+import { MdOutlineKeyboard } from 'react-icons/md';
 import { FaCat, FaDesktop, FaLeaf, FaMoon, FaSun } from 'react-icons/fa6';
 import {
   FaBookmark,
@@ -73,6 +75,10 @@ interface Preferences {
   titleLanguage: string;
   characterNameLanguage: string;
   openKeyboardShortcuts: string;
+  spoilerProtection: string;
+  comments: string;
+  autoSync: string;
+  syncThreshold: string;
   autoskipIntroOutro: string;
   autoPlay: string;
   autoNext: string;
@@ -113,26 +119,204 @@ const Goback = styled.div`
   }
 `;
 
-const SettingsDiv = styled.div`
-  gap: 1rem;
-  max-width: 45rem;
+const SettingsLayout = styled.div`
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  gap: 1.75rem;
+  align-items: start;
+
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+`;
+
+const NavRail = styled.nav`
+  position: sticky;
+  top: 0;
+  z-index: var(--z-index-above);
   display: flex;
   flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.25rem;
+  margin: -0.25rem;
+
+  /* Mobile + modal: one horizontal, scrollable chip strip that stays
+     reachable while the panes scroll under it. */
+  @media (max-width: 860px) {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    overflow-x: auto;
+    padding: 0.4rem 0.5rem;
+    margin: 0 0 0.25rem;
+    background-color: var(--global-primary-bg);
+    border-bottom: 1px solid var(--global-border-color);
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    &:last-child {
+      margin-left: auto;
+    }
+  }
+`;
+
+const NavGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+
+  @media (max-width: 860px) {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+  }
+`;
+
+const NavGroupLabel = styled.span`
+  padding: 0 0.6rem 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--global-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+`;
+
+const NavIcon = styled.span<{ $active: boolean }>`
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  margin: auto;
+  font-size: 1rem;
+  color: ${({ $active }) =>
+    $active ? 'var(--primary-accent)' : 'var(--global-text-muted)'};
+  transition: color 0.15s ease;
+`;
+
+const NavItem = styled.button<{ $active: boolean }>`
+  position: relative;
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.92rem;
+  font-weight: ${({ $active }) => ($active ? 600 : 500)};
+  color: ${({ $active }) =>
+    $active ? 'var(--primary-accent)' : 'var(--global-text)'};
+  text-align: left;
+  background-color: ${({ $active }) =>
+    $active ? 'var(--primary-accent-tr)' : 'transparent'};
+  border: none;
+  border-radius: var(--global-border-radius);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+
+  /* Desktop: active accent bar down the left edge */
+  @media (min-width: 861px) {
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 20%;
+      bottom: 20%;
+      width: 3px;
+      border-radius: 999px;
+      background-color: var(--primary-accent);
+      opacity: ${({ $active }) => ($active ? 1 : 0)};
+      transition: opacity 0.15s ease;
+    }
+  }
+
+  /* Mobile: pill chips with 44px touch targets */
+  @media (max-width: 860px) {
+    white-space: nowrap;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid
+      ${({ $active }) =>
+        $active ? 'var(--primary-accent)' : 'var(--global-border-color)'};
+    border-radius: 999px;
+  }
+
+  &:hover {
+    background-color: var(--global-button-hover-bg);
+  }
+`;
+
+const VersionChip = styled.span`
+  margin-top: auto;
+  padding: 0 0.6rem;
+  font-size: 0.72rem;
+  color: var(--global-text-muted);
+
+  @media (max-width: 860px) {
+    display: none;
+  }
+`;
+
+const ShortcutList = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const ShortcutRow = styled.div`
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.25rem;
+  border-bottom: 1px solid var(--global-border-color);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  span {
+    font-size: 0.9rem;
+  }
+`;
+
+const KbdGroup = styled.span`
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--global-text-muted);
+`;
+
+const Kbd = styled.kbd`
+  padding: 0.2rem 0.45rem;
+  font-family: var(--app-font-family);
+  font-size: 0.72rem;
+  color: var(--global-text);
+  background-color: var(--global-div);
+  border: 1px solid var(--global-border-color);
+  border-radius: 0.35rem;
+`;
+
+const SettingsDiv = styled.div`
+  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
+  text-align: left;
 `;
 
 const Title = styled.h2`
   display: flex;
   align-items: center;
-  color: var(--global-text-muted);
-  font-size: 1.5rem;
+  gap: 0.5rem;
+  color: var(--global-text);
+  font-size: 1.4rem;
   font-weight: 700;
-  margin: 0rem;
-  margin-top: 1rem;
+  margin: 0;
 `;
+
 
 const PreferencesTable = styled.div`
   background-color: var(--global-div);
@@ -398,41 +582,63 @@ const DISPLAY_LANGUAGE_ROWS: RowConfig[] = [
 const MEDIA_ROWS: RowConfig[] = [
   {
     key: 'defaultLanguage',
-    label: 'Default Language',
-    description: 'Set the default language for media playback.',
+    label: 'Default audio',
+    description: 'Preferred audio when both sub and dub exist.',
     options: [
-      { value: 'sub', label: 'Subtitles' },
-      { value: 'dub', label: 'Dubbing' },
+      { value: 'sub', label: 'Sub' },
+      { value: 'dub', label: 'Dub' },
+    ],
+  },
+  {
+    key: 'spoilerProtection',
+    label: 'Spoiler protection',
+    description:
+      'Replace episode thumbnails with anime covers and hide episode titles and descriptions.',
+    options: YES_NO,
+  },
+  {
+    key: 'comments',
+    label: 'Comments',
+    description: 'Show TheAnimeCommunity comments on watch pages.',
+    options: YES_NO,
+  },
+  {
+    key: 'autoSync',
+    label: 'Auto Sync with AniList',
+    description:
+      'Automatically sync progress for Watching entries. Embedded players are not supported.',
+    options: YES_NO,
+  },
+  {
+    key: 'syncThreshold',
+    label: 'Sync threshold',
+    description: 'Minimum episode progress to update AniList. Default: 80%.',
+    options: [
+      { value: '50', label: '50%' },
+      { value: '60', label: '60%' },
+      { value: '70', label: '70%' },
+      { value: '80', label: '80%' },
+      { value: '90', label: '90%' },
+      { value: '100', label: '100%' },
     ],
   },
   {
     key: 'autoskipIntroOutro',
-    label: 'Auto Skip Intro/Outro',
-    description: 'Automatically skip intros and outros.',
+    label: 'Auto-skip intro & outro',
+    description: 'Skip intros and outros when timestamps are available.',
     options: YES_NO,
   },
   {
     key: 'autoPlay',
-    label: 'Auto Play',
-    description: 'Enable auto play for media.',
+    label: 'Autoplay',
+    description: 'Start playing as soon as an episode opens.',
     options: YES_NO,
   },
   {
     key: 'autoNext',
-    label: 'Auto Next Episode',
-    description:
-      'Automatically advance to the next episode when the current one ends.',
+    label: 'Autoplay next',
+    description: 'Continue to the next episode when one ends.',
     options: YES_NO,
-  },
-];
-
-const OTHER_ROWS: RowConfig[] = [
-  {
-    key: 'openKeyboardShortcuts',
-    label: 'Keyboard Shortcuts',
-    description: 'Configure keyboard shortcuts for the application.',
-    action: 'shortcuts',
-    options: [{ value: 'Open', label: 'Open' }],
   },
 ];
 
@@ -445,8 +651,81 @@ type UndoSnapshot =
   | { kind: 'bookmarks'; entries: BookmarkEntry[]; count: number }
   | { kind: 'history'; rows: HistoryRow[]; raw: Record<string, string | null>; count: number };
 
+// — Settings navigation (matches the redesigned modal: two preference
+// groups, three shortcut groups, account panes) —
+type PaneId =
+  | 'general'
+  | 'watch'
+  | 'shortcuts-general'
+  | 'shortcuts-watching'
+  | 'shortcuts-player'
+  | 'account';
+
+const NAV_GROUPS: {
+  group: string;
+  items: { id: PaneId; label: string; icon: React.ReactNode }[];
+}[] = [
+  {
+    group: 'Preferences',
+    items: [
+      { id: 'general', label: 'General', icon: <FiSettings /> },
+      { id: 'watch', label: 'Watch', icon: <FiYoutube /> },
+    ],
+  },
+  {
+    group: 'Shortcuts',
+    items: [
+      { id: 'shortcuts-general', label: 'General', icon: <MdOutlineKeyboard /> },
+      { id: 'shortcuts-watching', label: 'Watching', icon: <FiGrid /> },
+      { id: 'shortcuts-player', label: 'Player', icon: <FiSliders /> },
+    ],
+  },
+  {
+    group: 'Account',
+    items: [{ id: 'account', label: 'Account & Data', icon: <FiUser /> }],
+  },
+];
+
+// Big pane heading shown above the section cards.
+const PaneTitle = styled.h2`
+  margin: 0 0 1rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--global-text);
+`;
+
+// Static shortcut reference rows (display-only — bindings live in
+// useGlobalShortcuts).
+const SHORTCUT_GENERAL = [
+  { label: 'Open Shortcuts', keys: ['Shift+?'] },
+  { label: 'Open Settings', keys: ['Shift+,', 'Ctrl+,'] },
+  { label: 'Search', keys: ['/'] },
+  { label: 'Toggle Theme', keys: ['Shift+D'] },
+  { label: 'Toggle Notifications', keys: ['Shift+M'] },
+];
+const SHORTCUT_WATCHING = [
+  { label: 'Previous Episode', keys: ['Shift+P or B'] },
+  { label: 'Next Episode', keys: ['Shift+N'] },
+];
+const SHORTCUT_PLAYER = [
+  { label: 'Play/Pause Toggle', keys: ['K', 'Space'] },
+  { label: 'Seek Backward 10s / 5s', keys: ['J', '\u2190'] },
+  { label: 'Seek Forward 10s / 5s', keys: ['L', '\u2192'] },
+  { label: 'Toggle Fullscreen', keys: ['F'] },
+  { label: 'Toggle Theater Mode', keys: ['T'] },
+  { label: 'Toggle Mute', keys: ['M'] },
+  { label: 'Screenshot Player', keys: ['Shift+S'] },
+  { label: 'Skip Intro/Outro', keys: ['Shift+Enter'] },
+  { label: 'Volume Up', keys: ['\u2191'] },
+  { label: 'Volume Down', keys: ['\u2193'] },
+];
+
+// Bumped with each release (package.json version).
+const APP_VERSION = '0.5.2';
+
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
+  const [activePane, setActivePane] = useState<PaneId>('general');
   const { settings, setSettings } = useSettings();
   const { theme: themeMode, setTheme } = useTheme();
 
@@ -599,6 +878,10 @@ export const Settings: React.FC = () => {
     titleLanguage: titleLabelFor(settings.titleLanguage),
     characterNameLanguage: characterLabelFor(settings.characterNameLanguage),
     openKeyboardShortcuts: 'Open',
+    spoilerProtection: settings.hideSpoiler ? 'Enabled' : 'Disabled',
+    comments: settings.comments ? 'Enabled' : 'Disabled',
+    autoSync: settings.autoSync ? 'Enabled' : 'Disabled',
+    syncThreshold: String(settings.syncThreshold ?? 80),
     autoskipIntroOutro: settings.autoSkip ? 'Enabled' : 'Disabled',
     autoPlay: settings.autoPlay ? 'Enabled' : 'Disabled',
     autoNext: settings.autoNext ? 'Enabled' : 'Disabled',
@@ -613,6 +896,10 @@ export const Settings: React.FC = () => {
       defaultLanguage: settings.defaultLanguage,
       titleLanguage: titleLabelFor(settings.titleLanguage),
       characterNameLanguage: characterLabelFor(settings.characterNameLanguage),
+      spoilerProtection: settings.hideSpoiler ? 'Enabled' : 'Disabled',
+      comments: settings.comments ? 'Enabled' : 'Disabled',
+      autoSync: settings.autoSync ? 'Enabled' : 'Disabled',
+      syncThreshold: String(settings.syncThreshold ?? 80),
       autoskipIntroOutro: settings.autoSkip ? 'Enabled' : 'Disabled',
       autoPlay: settings.autoPlay ? 'Enabled' : 'Disabled',
       autoNext: settings.autoNext ? 'Enabled' : 'Disabled',
@@ -629,6 +916,18 @@ export const Settings: React.FC = () => {
     }));
 
     switch (preferenceName) {
+      case 'spoilerProtection':
+        setSettings({ hideSpoiler: value === 'Enabled' });
+        break;
+      case 'comments':
+        setSettings({ comments: value === 'Enabled' });
+        break;
+      case 'autoSync':
+        setSettings({ autoSync: value === 'Enabled' });
+        break;
+      case 'syncThreshold':
+        setSettings({ syncThreshold: Math.max(0, Math.min(100, Number(value) || 80)) });
+        break;
       case 'autoskipIntroOutro':
         setSettings({ autoSkip: value === 'Enabled' });
         break;
@@ -679,6 +978,10 @@ export const Settings: React.FC = () => {
       titleLanguage: 'English (Attack on Titan)',
       characterNameLanguage: 'Romaji (Zoldyck Killua)',
       openKeyboardShortcuts: 'Open',
+      spoilerProtection: 'Disabled',
+      comments: 'Enabled',
+      autoSync: 'Enabled',
+      syncThreshold: '80',
       autoskipIntroOutro: 'Enabled',
       autoPlay: 'Disabled',
       autoNext: 'Enabled',
@@ -1488,6 +1791,30 @@ export const Settings: React.FC = () => {
     );
   };
 
+  const renderShortcutsPane = (
+    rows: { label: string; keys: string[] }[],
+    title: string,
+  ) => (
+    <PreferencesTable>
+      <SectionTitle>{title}</SectionTitle>
+      <ShortcutList>
+        {rows.map((row) => (
+          <ShortcutRow key={row.label}>
+            <span>{row.label}</span>
+            <KbdGroup>
+              {row.keys.map((key, i) => (
+                <React.Fragment key={key}>
+                  {i > 0 && <span>or</span>}
+                  <Kbd>{key}</Kbd>
+                </React.Fragment>
+              ))}
+            </KbdGroup>
+          </ShortcutRow>
+        ))}
+      </ShortcutList>
+    </PreferencesTable>
+  );
+
   return (
     <SettingsDiv>
       <Title>
@@ -1497,61 +1824,121 @@ export const Settings: React.FC = () => {
         Settings
       </Title>
 
-      <PreferencesTable>
-        <SectionTitle>Appearance</SectionTitle>
-        <Row>
-          <RowLabel>
-            <RowTitle>Theme</RowTitle>
-            <RowDescription>Choose your preferred color scheme.</RowDescription>
-          </RowLabel>
-        </Row>
-        <ThemeGrid>
-          {THEME_CARDS.map(({ mode, icon, label }) => (
-            <ThemeCard
-              key={mode}
-              $active={themeMode === mode}
-              onClick={() => setTheme(mode)}
-              aria-pressed={themeMode === mode}
-            >
-              {icon}
-              {label}
-            </ThemeCard>
+      <SettingsLayout>
+        <NavRail aria-label='Settings sections'>
+          {NAV_GROUPS.map((group) => (
+            <NavGroup key={group.group}>
+              <NavGroupLabel>{group.group}</NavGroupLabel>
+              {group.items.map((item) => (
+                <NavItem
+                  key={item.id}
+                  $active={activePane === item.id}
+                  onClick={() => setActivePane(item.id)}
+                  aria-current={activePane === item.id ? 'page' : undefined}
+                >
+                  <NavIcon $active={activePane === item.id}>{item.icon}</NavIcon>
+                  {item.label}
+                </NavItem>
+              ))}
+            </NavGroup>
           ))}
-        </ThemeGrid>
-      </PreferencesTable>
+          <VersionChip>v{APP_VERSION}</VersionChip>
+        </NavRail>
 
-      <PreferencesTable>
-        <SectionTitle>Display Language</SectionTitle>
-        {DISPLAY_LANGUAGE_ROWS.map(renderRow)}
-      </PreferencesTable>
+        <div>
+          {activePane === 'general' && (
+            <>
+              <PaneTitle>General</PaneTitle>
+              <PreferencesTable>
+                <SectionTitle>Appearance</SectionTitle>
+                <Row>
+                  <RowLabel>
+                    <RowTitle>Theme</RowTitle>
+                    <RowDescription>
+                      Choose your preferred color scheme.
+                    </RowDescription>
+                  </RowLabel>
+                </Row>
+                <ThemeGrid>
+                  {THEME_CARDS.map(({ mode, icon, label }) => (
+                    <ThemeCard
+                      key={mode}
+                      $active={themeMode === mode}
+                      onClick={() => setTheme(mode)}
+                      aria-pressed={themeMode === mode}
+                    >
+                      {icon}
+                      {label}
+                    </ThemeCard>
+                  ))}
+                </ThemeGrid>
+              </PreferencesTable>
 
-      <PreferencesTable>
-        <SectionTitle>Media Settings</SectionTitle>
-        {MEDIA_ROWS.map(renderRow)}
-      </PreferencesTable>
+              <PreferencesTable>
+                <SectionTitle>Display Language</SectionTitle>
+                {DISPLAY_LANGUAGE_ROWS.map(renderRow)}
+              </PreferencesTable>
 
-      {renderContentCard()}
-      {renderSyncCard()}
-      {renderAccountCard()}
-      {renderDataCard()}
+              <PreferencesTable>
+                <SectionTitle>Other Settings</SectionTitle>
+                <Row>
+                  <RowLabel>
+                    <RowTitle>Restore Default Settings</RowTitle>
+                    <RowDescription>
+                      Restore all settings to their default values.
+                    </RowDescription>
+                  </RowLabel>
+                  <StyledButton $danger onClick={handleRestoreDefaults}>
+                    Restore
+                  </StyledButton>
+                </Row>
+              </PreferencesTable>
+            </>
+          )}
 
-      <PreferencesTable>
-        <SectionTitle>Other Settings</SectionTitle>
-        {OTHER_ROWS.map(renderRow)}
-        <Row>
-          <RowLabel>
-            <RowTitle>Restore Default Settings</RowTitle>
-            <RowDescription>
-              Restore all settings to their default values.
-            </RowDescription>
-          </RowLabel>
-          <StyledButton $danger onClick={handleRestoreDefaults}>
-            Restore
-          </StyledButton>
-        </Row>
-      </PreferencesTable>
+          {activePane === 'watch' && (
+            <>
+              <PaneTitle>Watch</PaneTitle>
+              <PreferencesTable>
+                <SectionTitle>Watch</SectionTitle>
+                {MEDIA_ROWS.map(renderRow)}
+              </PreferencesTable>
+            </>
+          )}
 
-      {renderDangerCard()}
+          {activePane === 'shortcuts-general' && (
+            <>
+              <PaneTitle>Shortcuts</PaneTitle>
+              {renderShortcutsPane(SHORTCUT_GENERAL, 'Shortcuts')}
+            </>
+          )}
+
+          {activePane === 'shortcuts-watching' && (
+            <>
+              <PaneTitle>Shortcuts</PaneTitle>
+              {renderShortcutsPane(SHORTCUT_WATCHING, 'Shortcuts')}
+            </>
+          )}
+
+          {activePane === 'shortcuts-player' && (
+            <>
+              <PaneTitle>Shortcuts</PaneTitle>
+              {renderShortcutsPane(SHORTCUT_PLAYER, 'Shortcuts')}
+            </>
+          )}
+
+          {activePane === 'account' && (
+            <>
+              <PaneTitle>Account & Data</PaneTitle>
+              {renderContentCard()}
+              {renderSyncCard()}
+              {renderAccountCard()}
+              {renderDataCard()}
+              {renderDangerCard()}
+            </>
+          )}
+        </div>
+      </SettingsLayout>
     </SettingsDiv>
   );
 };

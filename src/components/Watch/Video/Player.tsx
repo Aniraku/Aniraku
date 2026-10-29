@@ -13,9 +13,12 @@ import {
 } from '../lib/watchEmbedFallback';
 import { infoPathFor, type LinkableTitle } from '../../../utils/animePaths';
 import {
+  applyBandwidthSaverPolicy,
+  getBandwidthSaverPref,
   getHlsBufferPolicy,
   getHlsLoadPolicies,
   getHlsRequestCacheMode,
+  setBandwidthSaverPref,
 } from '../lib/watchBufferPolicy';
 import {
   attemptSkipSegment,
@@ -39,7 +42,6 @@ import {
   fetchSkipTimes,
   fetchAnirakuStream,
   proxiedMediaUrl,
-  pickHighestDownload,
 } from '../../../hooks/useApi';
 import { useSettings } from '../../../components/Profile/SettingsProvider';
 import { TbPlayerTrackPrev, TbPlayerTrackNext } from 'react-icons/tb';
@@ -176,9 +178,11 @@ type PlayerProps = {
   // Optional server-picker override: direct HLS URL (+ subs + headers) from
   // the user-selected Aniraku server. When set, /stream is not called.
   srcOverride?: string | null;
+  // Source kind from the server pool. Proxied URLs carry no file extension,
+  // so the player cannot infer HLS from the URL alone.
+  srcOverrideType?: string | null;
   subsOverride?: { url: string; lang: string; label: string }[] | null;
   headersOverride?: Record<string, string> | null;
-  updateDownloadLink: (link: string) => void;
   onEpisodeEnd: () => Promise<void>;
   onPrevEpisode: () => void;
   onNextEpisode: () => void;
@@ -974,7 +978,9 @@ const UNLIMITED_CACHE_SECONDS = 21600;
 const UNLIMITED_CACHE_MAX_BYTES = 8 * 1024 * 1024 * 1024;
 // hls.js engines: unlimited forward/backward cache — the forward buffer may
 // grow for the whole title and nothing behind the playhead is evicted, so
-// every seek plays from cache instead of re-downloading.
+// every seek plays from cache instead of re-downloading. This is the
+// "Bandwidth Saver OFF" profile; the ON profile caps it via
+// applyBandwidthSaverPolicy (buffer policy lib) right below.
 const UNLIMITED_HLS_CACHE = {
   maxBufferLength: UNLIMITED_CACHE_SECONDS,
   maxMaxBufferLength: UNLIMITED_CACHE_SECONDS,
@@ -1196,9 +1202,9 @@ export function Player({
   banner,
   malId,
   srcOverride,
+  srcOverrideType,
   subsOverride,
   headersOverride,
-  updateDownloadLink,
   onEpisodeEnd,
   onPrevEpisode,
   onNextEpisode,
@@ -1280,6 +1286,7 @@ export function Player({
       type?: string;
       subs: { url: string; lang: string; label: string }[];
       headers: Record<string, string>;
+      quality?: string;
     }[]
   >([]);
   const candidateIndexRef = useRef(-1);
@@ -1511,6 +1518,10 @@ export function Player({
     }
   }, []);
   const [forceMse, setForceMse] = useState(false);
+  // Bumped by the Bandwidth Saver menu toggle so the hls.js engine rebuilds
+  // with the new buffer caps (same rebuild path the quality menu uses; the
+  // resume position survives via pendingResumeRef).
+  const [bufferPolicyNonce, setBufferPolicyNonce] = useState(0);
   const [posterHidden, setPosterHidden] = useState(false);
   // Auto-skip attempt machine: per-segment handled/failed flags so
   // the manual overlay only appears as a fallback (or after seeking back).
@@ -1718,10 +1729,10 @@ export function Player({
     lang,
     malId,
     srcOverride,
+    srcOverrideType,
     subsOverride,
     headersOverride,
-    updateDownloadLink,
-    embedded,
+      embedded,
     embedMissing,
     streamRetry,
   ]);
@@ -2009,24 +2020,70 @@ export function Player({
     // always re-reports, even if the URL matches the previous stamp.
     lastPlayReportRef.current = '';
     try {
+      // The /stream quality ladder is needed on EVERY path (the quality
+      // menu lists per-quality sources when the manifest has no
+      // renditions), so fetch it first — it is session-cached, so this is
+      // instant after the player booted.
+      let streamData: any = null;
+      try {
+        streamData = await fetchAnirakuStream({ animeId, episode, lang });
+      } catch {
+        // Playback can still proceed via the override below.
+      }
+      // Build the full quality candidate list from /stream: every
+      // non-embed source, tagged with its provider quality label.
+      const streamSources = Array.isArray(streamData?.sources)
+        ? streamData.sources
+        : [];
+      const streamHeaders = streamData?.headers ?? {};
+      const streamCandidates = streamSources
+        .filter((s: any) => s?.url && s?.type !== 'embed')
+        .map((s: any) => ({
+          url: s.url as string,
+          type: s.type as string | undefined,
+          subs: Array.isArray(s.subtitles) ? s.subtitles : [],
+          headers: streamHeaders,
+          quality: typeof s?.quality === 'string' ? s.quality : undefined,
+        }));
+
       // Server-picker override: play the selected server's HLS directly
       // (unless that override already errored — then fall through to /stream).
       if (srcOverride && !overrideFailedRef.current) {
+        // Tag the override with its quality label (matched against /stream's
+        // list when possible) so the quality menu can mark it active.
+        const overrideQuality =
+          streamCandidates.find((c: any) => c.url === srcOverride)?.quality ??
+          streamCandidates.find(
+            (c: any) =>
+              typeof c.quality === 'string' &&
+              srcOverride.includes(String(c.quality)),
+          )?.quality;
         const candidate = {
           url: srcOverride,
-          type: detectHls(srcOverride) ? 'hls' : undefined,
+          type: srcOverrideType ?? (detectHls(srcOverride) ? 'hls' : undefined),
           subs: Array.isArray(subsOverride) ? subsOverride : [],
-          headers: headersOverride ?? {},
+          headers: headersOverride ?? streamHeaders,
+          quality: overrideQuality ?? 'current',
         };
-        candidatesRef.current = [candidate];
+        // Quality menu data: the override PLUS the full /stream ladder, so
+        // the user can switch renditions that ship as separate URLs.
+        const seen = new Set<string>([srcOverride]);
+        candidatesRef.current = [
+          candidate,
+          ...streamCandidates.filter((c: any) => {
+            if (!c?.url || seen.has(c.url)) return false;
+            seen.add(c.url);
+            return true;
+          }),
+        ];
         candidateIndexRef.current = 0;
         applyCandidate(candidate);
         return;
       }
       // Directly-playable HLS via Aniraku. Embed-only servers are handled by
       // Watch.tsx + EmbedPlayer (FlixCloud Yuta/Syota/Mike), never here.
-      const res = await fetchAnirakuStream({ animeId, episode, lang });
-      const sources = res?.sources ?? [];
+      const res = streamData;
+      const sources = streamSources;
       const pickRank = (s: any) => {
         if (s?.type === 'hls') return 3;
         if (s?.verification === 'proxy') return 2;
@@ -2044,7 +2101,11 @@ export function Player({
           url: s.url as string,
           type: s.type as string | undefined,
           subs: Array.isArray(s.subtitles) ? s.subtitles : [],
-          headers: res?.headers ?? {},
+          headers: streamHeaders,
+          // Provider quality label (e.g. "1080p") — drives the quality
+          // menu when a source ships per-quality URLs instead of a
+          // multi-rendition master playlist.
+          quality: typeof s?.quality === 'string' ? s.quality : undefined,
         }));
       candidateIndexRef.current = candidatesRef.current.length > 0 ? 0 : -1;
       const chosen = candidatesRef.current[0] ?? sources.find((s: any) => s?.url);
@@ -2058,8 +2119,6 @@ export function Player({
           intro: res?.intro ?? prev.intro,
           outro: res?.outro ?? prev.outro,
         }));
-        // Always the highest-quality download the backend offers.
-        updateDownloadLink(pickHighestDownload(res?.downloads));
       } else {
         console.error('No directly-playable source (all embed-only?)', res);
         setSourceFailed(true);
@@ -2360,6 +2419,17 @@ export function Player({
     };
 
     const handleMessage = (event: MessageEvent) => {
+      // SECURITY: only messages posted by an <iframe> embedded in THIS
+      // document may drive the bridge. Without this check any co-framed
+      // page (or a hostile top-level window when the site is framed) could
+      // forge "episode ended" / arbitrary progress — corrupting watch
+      // history and autoplay. Window-reference comparison works across
+      // origins (identity check, no document access).
+      const sourceFrame = Array.from(
+        document.querySelectorAll('iframe'),
+      ).some((frame) => frame.contentWindow === event.source);
+      if (!sourceFrame) return;
+
       let data: any = event.data;
       if (typeof data === 'string') {
         if (data.trim().toLowerCase() === 'ended') {
@@ -2987,6 +3057,50 @@ export function Player({
               return item.html;
             },
           },
+          {
+            name: 'bandwidthSaver',
+            width: 232,
+            html: 'Bandwidth Saver',
+            icon: SETTING_ICON_TUNE,
+            tooltip: getBandwidthSaverPref() ? 'On' : 'Off',
+            selector: [
+              {
+                default: getBandwidthSaverPref(),
+                html: 'On — limit buffering',
+                value: 'on',
+              },
+              {
+                default: !getBandwidthSaverPref(),
+                html: 'Off — cache whole episode',
+                value: 'off',
+              },
+            ],
+            onSelect: (item: any) => {
+              const on = String(item.value) !== 'off';
+              const changed = on !== getBandwidthSaverPref();
+              setBandwidthSaverPref(on);
+              if (changed) {
+                // Rebuild the engine so the new caps apply immediately; the
+                // resume position survives the rebuild like quality switches.
+                try {
+                  const video = artInstanceRef.current?.video;
+                  if (video && pendingResumeRef.current == null) {
+                    pendingResumeRef.current = Number(video.currentTime) || null;
+                  }
+                } catch {
+                  // position capture is best-effort
+                }
+                setBufferPolicyNonce((n) => n + 1);
+              }
+              showToast(
+                on
+                  ? 'Bandwidth saver on — buffering capped to save data'
+                  : 'Unlimited cache — episodes buffer fully for instant seeks',
+                { type: 'success' },
+              );
+              return item.html;
+            },
+          },
           ...(subtitleSetting ? [subtitleSetting] : []),
           buildSubtitleSettingsSetting(
             () => subtitlePreferencesRef.current,
@@ -3182,16 +3296,24 @@ export function Player({
               );
               const hlsConfig: any = {
                 enableWorker: false,
+                // Subtitles are rendered by ArtPlayer. Native rendering would
+                // also show the manifest's DEFAULT=YES rendition (duplicate).
+                renderTextTracksNatively: false,
                 // User-selected bandwidth caps must not be replaced by the
                 // viewport-size cap. The quality menu owns this policy.
                 capLevelToPlayerSize: false,
                 minAutoBitrate: 0,
-                // Shared buffer policy first, then the unlimited overrides —
-                // they always win: forward cache may grow for the whole
-                // title, nothing behind the playhead is evicted, so every
-                // seek replays from cache instead of re-downloading.
+                // Shared buffer policy, then the unlimited overrides — the
+                // "cache whole episode" profile. When Bandwidth Saver is on
+                // (the default) the saver caps are applied LAST so forward/
+                // back buffering stays bounded and idle tabs stop pulling
+                // segments. Kiwi keeps its larger reserve either way.
                 ...bufferPolicy,
                 ...UNLIMITED_HLS_CACHE,
+                ...applyBandwidthSaverPolicy(
+                  { ...UNLIMITED_HLS_CACHE },
+                  { kiwi: shouldPreferNativeHls(url) },
+                ),
                 startFragPrefetch: true,
                 lowLatencyMode: false,
                 appendInSequenceGaps: true,
@@ -3288,8 +3410,14 @@ export function Player({
                 }
                 fail();
               });
-              hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
-                if (disposed || buildIdRef.current !== myBuildId) return;
+              // Quality menu setup — runs on MANIFEST_PARSED and again on
+              // LEVELS_UPDATED so late/updated ladders populate the menu
+              // instead of leaving it stuck on Auto forever. Rendition
+              // options are keyed by LEVEL INDEX (not height): manifests
+              // without RESOLUTION attributes only carry bitrates, and the
+              // old height-keyed lookup silently failed to pin those.
+              let hlsQualitySyncRef: (() => void) | null = null;
+              const setupHlsQualityMenu = () => {
                 const levels = (hls.levels || [])
                   .map((level: any, index: number) => ({
                     index,
@@ -3301,205 +3429,323 @@ export function Player({
                         0,
                     ),
                   }))
-                  .filter((level: any, index: number, list: any[]) => {
-                    if (level.height <= 0 && level.bitrate <= 0) return false;
-                    const key =
-                      level.height > 0
-                        ? `height:${level.height}`
-                        : `bitrate:${level.bitrate}`;
-                    return (
-                      list.findIndex((item: any) => {
-                        const itemKey =
-                          item.height > 0
-                            ? `height:${item.height}`
-                            : `bitrate:${item.bitrate}`;
-                        return itemKey === key;
-                      }) === index
-                    );
-                  })
+                  .filter((level: any) => level.height > 0 || level.bitrate > 0)
+                  .map((level: any) => ({
+                    ...level,
+                    label: getHlsLevelLabel(level),
+                  }))
+                  .filter(
+                    (level: any, index: number, list: any[]) =>
+                      list.findIndex(
+                        (item: any) => item.label === level.label,
+                      ) === index,
+                  )
                   .sort(
                     (a: any, b: any) =>
                       b.height - a.height || b.bitrate - a.bitrate,
                   );
-                if (levels.length > 0 && art?.setting?.update) {
-                  const auto = getQualityPresentation('auto');
-                  // Real renditions from the manifest, highest first — no
-                  // phantom options.
-                  const renditionHeights = [
-                    ...new Set(
-                      levels
-                        .map((level: any) => Number(level.height))
-                        .filter((height: number) => height > 0),
-                    ),
-                  ].sort((a: number, b: number) => b - a);
-                  const sessionQualityTarget =
-                    Number(sessionQualityTargetRef.current) || null;
-                  if (sessionQualityTarget) {
-                    const startupLevel = selectLevelForQualityTarget(
-                      levels,
-                      sessionQualityTarget,
-                    );
-                    if (startupLevel) {
-                      forcedLevel = startupLevel.index;
-                      forcedQualityLabel = `${startupLevel.height}P`;
-                      hls.autoLevelCapping = -1;
-                      hls.startLevel = forcedLevel;
-                      hls.loadLevel = forcedLevel;
-                      hls.currentLevel = forcedLevel;
-                      hls.nextLevel = forcedLevel;
-                    } else {
-                      forcedLevel = null;
-                      forcedQualityLabel = null;
-                      hls.autoLevelCapping = -1;
+                if (levels.length === 0 || !art?.setting?.update) {
+                  // No manifest renditions (single-URL sources): fall back to
+                  // the /stream per-quality sources. Each quality is its own
+                  // URL on these providers, so "switching quality" means
+                  // applying that candidate — same headers/subs path as
+                  // playback. Without this, multi-quality providers showed a
+                  // permanently "Auto"-only menu.
+                  if (levels.length !== 0 || !art?.setting?.update) return;
+                  const appliedUrl =
+                    candidatesRef.current[candidateIndexRef.current]?.url;
+                  const qualityCandidates = (candidatesRef.current ?? []).filter(
+                    (c: any) => c?.url && c?.quality,
+                  );
+                  const deduped: any[] = [];
+                  for (const c of qualityCandidates) {
+                    if (
+                      !deduped.some(
+                        (d: any) =>
+                          String(d.quality).toLowerCase() ===
+                          String(c.quality).toLowerCase(),
+                      )
+                    ) {
+                      deduped.push(c);
                     }
+                  }
+                  if (deduped.length === 0) return;
+                  const auto = getQualityPresentation('auto');
+                  art.setting.update({
+                    name: 'quality',
+                    width: 232,
+                    icon: SETTING_ICON_TUNE,
+                    html: 'Quality',
+                    tooltip: forcedQualityLabel ?? 'Auto',
+                    selector: [
+                      {
+                        default: !forcedQualityLabel,
+                        html: qualityOptionHtml(auto),
+                        value: 'auto',
+                      },
+                      ...deduped.map((c: any) => ({
+                        default: c.url === appliedUrl,
+                        html: qualityOptionHtml(
+                          getQualityPresentation(c.quality),
+                        ),
+                        value: `src:${c.url}`,
+                      })),
+                    ],
+                    onSelect: (item: any) => {
+                      if (String(item.value) === 'auto') {
+                        // Auto = current source, adaptive (single-URL
+                        // sources have nothing to adapt between, so this
+                        // just resets the label).
+                        forcedQualityLabel = null;
+                        return 'Auto';
+                      }
+                      const targetUrl = String(item.value).replace(
+                        'src:',
+                        '',
+                      );
+                      const candidate = deduped.find(
+                        (c: any) => c.url === targetUrl,
+                      );
+                      if (!candidate) return forcedQualityLabel ?? 'Auto';
+                      applyCandidate(candidate);
+                      forcedLevel = null;
+                      forcedQualityLabel = qualitySettingLabel({
+                        label: getQualityPresentation(candidate.quality).label,
+                      });
+                      return forcedQualityLabel;
+                    },
+                  });
+                  hlsQualitySyncRef = null;
+                  return;
+                }
+                const auto = getQualityPresentation('auto');
+                const sessionQualityTarget =
+                  Number(sessionQualityTargetRef.current) || null;
+                if (sessionQualityTarget) {
+                  const startupLevel = selectLevelForQualityTarget(
+                    levels,
+                    sessionQualityTarget,
+                  );
+                  if (startupLevel) {
+                    forcedLevel = startupLevel.index;
+                    forcedQualityLabel = `${startupLevel.height}P`;
+                    hls.autoLevelCapping = -1;
+                    hls.startLevel = forcedLevel;
+                    hls.loadLevel = forcedLevel;
+                    hls.currentLevel = forcedLevel;
+                    hls.nextLevel = forcedLevel;
                   } else {
-                    // ADAPTATION: no session pick — start from the top of
-                    // the ladder but stay ADAPTIVE (currentLevel = -1)
-                    // instead of hard-pinning rendition 0 like the reference
-                    // build.
                     forcedLevel = null;
                     forcedQualityLabel = null;
                     hls.autoLevelCapping = -1;
-                    hls.startLevel = 0;
-                    hls.currentLevel = -1;
-                    hls.nextLevel = -1;
                   }
-                  const getSpeedCappedDisplay = (level: number) => {
-                    const rawLabel = forcedQualityLabel
-                      ? forcedQualityLabel
-                      : Number(level) === -1
-                        ? 'Auto'
-                        : getHlsLevelLabel(
-                            levels.find(
-                              (candidate: any) =>
-                                Number(candidate.index) === Number(level),
-                            ),
-                          );
-                    return {
-                      label: qualitySettingLabel({ label: rawLabel }),
-                      title: 'Quality',
-                    };
-                  };
-                  const syncHlsQualitySetting = (
-                    level: number = hls.currentLevel,
-                  ) => {
-                    const display = getSpeedCappedDisplay(level);
-                    const qualitySetting = art.setting.find('quality');
-                    if (qualitySetting) {
-                      qualitySetting.html = display.title;
-                      qualitySetting.tooltip = display.label;
-                      const selectedValue = forcedQualityLabel
-                        ? `target:${String(forcedQualityLabel).replace(
-                            'P',
-                            '',
-                          )}`
-                        : 'auto';
-                      if (Array.isArray(qualitySetting.selector)) {
-                        qualitySetting.selector.forEach((option) => {
-                          const selected = option.value === selectedValue;
-                          option.default = selected;
-                          const controlItem =
-                            option.$control_item || option.$item;
-                          if (controlItem) {
-                            controlItem.classList.toggle(
-                              'art-current',
-                              selected,
-                            );
-                          }
-                        });
-                        const selectedOption = qualitySetting.selector.find(
-                          (option) => option.value === selectedValue,
+                } else if (forcedLevel != null && Number(forcedLevel) >= 0) {
+                  // Rebuild after LEVELS_UPDATED: re-pin the session's
+                  // manually picked rendition by index.
+                  hls.autoLevelCapping = -1;
+                  hls.currentLevel = forcedLevel;
+                  hls.nextLevel = forcedLevel;
+                } else {
+                  // ADAPTATION: no session pick — start from the top of
+                  // the ladder but stay ADAPTIVE (currentLevel = -1)
+                  // instead of hard-pinning rendition 0 like the reference
+                  // build.
+                  forcedLevel = null;
+                  forcedQualityLabel = null;
+                  hls.autoLevelCapping = -1;
+                  hls.startLevel = 0;
+                  hls.currentLevel = -1;
+                  hls.nextLevel = -1;
+                }
+                const selectedKey = () =>
+                  forcedLevel != null && Number(forcedLevel) >= 0
+                    ? `idx:${forcedLevel}`
+                    : 'auto';
+                const getSpeedCappedDisplay = (level: number) => {
+                  const rawLabel = forcedQualityLabel
+                    ? forcedQualityLabel
+                    : Number(level) === -1
+                      ? 'Auto'
+                      : getHlsLevelLabel(
+                          levels.find(
+                            (candidate: any) =>
+                              Number(candidate.index) === Number(level),
+                          ),
                         );
-                        if (selectedOption) {
-                          try {
-                            (art.setting as any).check?.(selectedOption);
-                          } catch {
-                            // check() is best-effort
-                          }
+                  return {
+                    label: qualitySettingLabel({ label: rawLabel }),
+                    title: 'Quality',
+                  };
+                };
+                const syncHlsQualitySetting = (
+                  level: number = hls.currentLevel,
+                ) => {
+                  const display = getSpeedCappedDisplay(level);
+                  const qualitySetting = art.setting.find('quality');
+                  if (qualitySetting) {
+                    qualitySetting.html = display.title;
+                    qualitySetting.tooltip = display.label;
+                    const selectedValue = selectedKey();
+                    if (Array.isArray(qualitySetting.selector)) {
+                      qualitySetting.selector.forEach((option) => {
+                        const selected = option.value === selectedValue;
+                        option.default = selected;
+                        const controlItem =
+                          option.$control_item || option.$item;
+                        if (controlItem) {
+                          controlItem.classList.toggle(
+                            'art-current',
+                            selected,
+                          );
+                        }
+                      });
+                      const selectedOption = qualitySetting.selector.find(
+                        (option) => option.value === selectedValue,
+                      );
+                      if (selectedOption) {
+                        try {
+                          (art.setting as any).check?.(selectedOption);
+                        } catch {
+                          // check() is best-effort
                         }
                       }
                     }
-                    return display;
-                  };
-                  const buildHlsQualitySetting = (activeLevel: number) => {
-                    const activeDisplay = getSpeedCappedDisplay(activeLevel);
-                    return {
-                      name: 'quality',
-                      width: 232,
-                      icon: SETTING_ICON_TUNE,
-                      html: activeDisplay.title,
-                      tooltip: activeDisplay.label,
-                      selector: [
-                        {
-                          default:
-                            !forcedQualityLabel && Number(activeLevel) === -1,
-                          html: qualityOptionHtml(auto),
-                          value: 'auto',
-                        },
-                        ...renditionHeights.map((height: number) => ({
-                          default: forcedQualityLabel === `${height}P`,
-                          html: qualityOptionHtml(
-                            getHeightPresentation(height),
-                          ),
-                          value: `target:${height}`,
-                        })),
-                      ],
-                      onSelect: (item: any) => {
-                        const targetHeight = String(item.value).startsWith(
-                          'target:',
-                        )
-                          ? Number(String(item.value).replace('target:', ''))
-                          : null;
-                        const selectedTarget = targetHeight
-                          ? selectLevelForQualityTarget(levels, targetHeight)
-                          : null;
-                        const nextLevel = selectedTarget
-                          ? selectedTarget.index
-                          : -1;
-                        forcedQualityLabel =
-                          targetHeight && selectedTarget
-                            ? `${selectedTarget.height}P`
-                            : null;
-                        // Session-scoped: a fresh episode or reload starts
-                        // back on Auto (adaptive).
-                        sessionQualityTargetRef.current = selectedTarget
-                          ? selectedTarget.height
-                          : null;
+                  }
+                  return display;
+                };
+                const buildHlsQualitySetting = (activeLevel: number) => {
+                  const activeDisplay = getSpeedCappedDisplay(activeLevel);
+                  return {
+                    name: 'quality',
+                    width: 232,
+                    icon: SETTING_ICON_TUNE,
+                    html: activeDisplay.title,
+                    tooltip: activeDisplay.label,
+                    selector: [
+                      {
+                        default:
+                          !forcedQualityLabel && Number(activeLevel) === -1,
+                        html: qualityOptionHtml(auto),
+                        value: 'auto',
+                      },
+                      ...levels.map((entry: any) => ({
+                        default: Number(forcedLevel) === Number(entry.index),
+                        html: qualityOptionHtml(
+                          entry.height > 0
+                            ? getHeightPresentation(entry.height)
+                            : {
+                                label: entry.label,
+                                badge: '',
+                                rank: 0,
+                                key: entry.label,
+                                isAuto: false,
+                              },
+                        ),
+                        value: `idx:${entry.index}`,
+                      })),
+                    ],
+                    onSelect: (item: any) => {
+                      if (String(item.value) === 'auto') {
+                        forcedLevel = null;
+                        forcedQualityLabel = null;
+                        sessionQualityTargetRef.current = null;
                         playerPreferencesRef.current = {
                           ...playerPreferencesRef.current,
                           qualityMode: 'auto',
-                          qualityTarget: selectedTarget
-                            ? selectedTarget.height
-                            : null,
+                          qualityTarget: null,
                         };
                         persistPlayerPreferences(playerPreferencesRef.current);
-                        forcedLevel = targetHeight ? nextLevel : null;
                         hls.autoLevelCapping = -1;
-                        hls.startLevel = nextLevel;
-                        hls.loadLevel = nextLevel;
-                        // The currentLevel assignment makes hls.js switch
-                        // now — no player rebuild (adaptation: the reference
-                        // build re-created the whole player here).
-                        hls.currentLevel = nextLevel;
-                        hls.nextLevel = nextLevel;
+                        hls.currentLevel = -1;
+                        hls.nextLevel = -1;
                         return syncHlsQualitySetting().label;
-                      },
-                    };
+                      }
+                      const targetIndex = Number(
+                        String(item.value).replace('idx:', ''),
+                      );
+                      const entry = levels.find(
+                        (candidate: any) =>
+                          Number(candidate.index) === targetIndex,
+                      );
+                      if (!entry) return syncHlsQualitySetting().label;
+                      forcedLevel = entry.index;
+                      forcedQualityLabel = entry.height > 0 ? `${entry.height}P` : null;
+                      // Session-scoped: a fresh episode or reload starts
+                      // back on Auto (adaptive). Height targets survive the
+                      // startup-selection path; index pins live for the
+                      // session only.
+                      sessionQualityTargetRef.current =
+                        entry.height > 0 ? entry.height : null;
+                      playerPreferencesRef.current = {
+                        ...playerPreferencesRef.current,
+                        qualityMode: 'auto',
+                        qualityTarget:
+                          entry.height > 0 ? entry.height : null,
+                      };
+                      persistPlayerPreferences(playerPreferencesRef.current);
+                      hls.autoLevelCapping = -1;
+                      hls.startLevel = entry.index;
+                      hls.loadLevel = entry.index;
+                      // The currentLevel assignment makes hls.js switch
+                      // now — no player rebuild (adaptation: the reference
+                      // build re-created the whole player here).
+                      hls.currentLevel = entry.index;
+                      hls.nextLevel = entry.index;
+                      return syncHlsQualitySetting().label;
+                    },
                   };
-                  art.setting.update(buildHlsQualitySetting(hls.currentLevel));
-                  hls.on(HlsCtor.Events.LEVEL_SWITCHED, () => {
-                    if (disposed || buildIdRef.current !== myBuildId) return;
-                    syncHlsQualitySetting();
-                  });
+                };
+                art.setting.update(buildHlsQualitySetting(hls.currentLevel));
+                hlsQualitySyncRef = () => syncHlsQualitySetting();
+              };
+              hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+                if (disposed || buildIdRef.current !== myBuildId) return;
+                try {
+                  setupHlsQualityMenu();
+                } catch (err) {
+                  console.error('[aniraku] quality menu setup failed:', err);
                 }
-                const played = video.play() as unknown;
-                if (
-                  played &&
-                  typeof (played as Promise<void>).catch === 'function'
-                ) {
-                  (played as Promise<void>).catch(() => {});
+                console.debug(
+                  '[aniraku] MANIFEST_PARSED — levels:',
+                  (hls.levels || []).map((l: any) => `${l?.height}p/${Math.round((l?.bitrate || 0) / 1000)}k`),
+                  'sourceQualityOptions:',
+                  (candidatesRef.current ?? []).filter((c: any) => c?.quality).length,
+                );
+              });
+              hls.on(HlsCtor.Events.LEVELS_UPDATED, () => {
+                if (disposed || buildIdRef.current !== myBuildId) return;
+                try {
+                  setupHlsQualityMenu();
+                } catch (err) {
+                  console.error('[aniraku] quality menu setup failed:', err);
                 }
               });
+              // Safety re-run: if the manifest parsed before ArtPlayer's
+              // settings were mounted, the earlier update() silently no-ops.
+              const qualityRetryTimer = setTimeout(() => {
+                if (disposed || buildIdRef.current !== myBuildId) return;
+                if ((hls.levels || []).length > 0) {
+                  try {
+                    setupHlsQualityMenu();
+                  } catch {
+                    // retry is best-effort
+                  }
+                }
+              }, 2500);
+              void qualityRetryTimer;
+              hls.on(HlsCtor.Events.LEVEL_SWITCHED, () => {
+                if (disposed || buildIdRef.current !== myBuildId) return;
+                // Tooltip-only sync — the selector rebuild happens through
+                // hlsQualitySyncRef (assigned by the latest menu setup).
+                hlsQualitySyncRef?.();
+              });
+              const played = video.play() as unknown;
+              if (
+                played &&
+                typeof (played as Promise<void>).catch === 'function'
+              ) {
+                (played as Promise<void>).catch(() => {});
+              }
               try {
                 hls.loadSource(hlsTransportPlan[hlsTransportIndex]);
                 hls.attachMedia(video);
@@ -4186,6 +4432,7 @@ export function Player({
     hasNext,
     hasPrev,
     forceMse,
+    bufferPolicyNonce,
     episode,
     animeId,
     destroyPlayer,
