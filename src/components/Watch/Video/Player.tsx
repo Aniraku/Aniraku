@@ -1233,6 +1233,7 @@ export function Player({
     duration: 0,
     hasTriggeredEnd: false,
   });
+  const { settings, setSettings } = useSettings();
   // Provider progress sync bridge (restored Aniraku syncWatchProgress):
   // video ended → `completed`, 60% threshold → `watching`. Fire-and-forget
   // with aggregated toasts; history-paused freezes provider pushes too.
@@ -1243,6 +1244,8 @@ export function Player({
       positionSeconds: number,
       durationSeconds: number,
     ) => {
+      // The Auto Sync with AniList setting owns this bridge (default ON).
+      if (!settings.autoSync) return;
       if (isHistoryPaused()) return;
       if (!animeId || !episode) return;
       const dur = Math.floor(Number(durationSeconds) || 0);
@@ -1264,7 +1267,7 @@ export function Player({
         })
         .catch(() => {});
     },
-    [animeId, episode],
+    [animeId, episode, settings.autoSync],
   );
   const { isLoggedIn } = useAuth();
   const [src, setSrc] = useState<string>('');
@@ -1321,7 +1324,6 @@ export function Player({
   const episodeKey = `${animeId}-episode-${episode}`;
   const animeVideoTitle = animeTitle;
 
-  const { settings, setSettings } = useSettings();
   const { autoPlay } = settings;
   // Settings-page AUTHORITY for auto-skip/auto-next (mission rule)
   // The `aniraku:settings` record (written by SettingsProvider + the Settings
@@ -2391,9 +2393,9 @@ export function Player({
         try {
           const dur = Math.floor(Number(iframeProgressRef.current.duration) || 0);
           const pos = Math.floor(Number(time) || 0);
-          // 60% threshold → `watching` (HLS and embedded); the lib throttles
-          // repeat pushes at 60s/episode.
-          if (dur > 0 && pos >= dur * 0.6) {
+          // Sync-threshold setting (%) gates the `watching` push (HLS and
+          // embedded); the lib throttles repeat pushes at 60s/episode.
+          if (dur > 0 && pos >= dur * ((settings.syncThreshold || 80) / 100)) {
             pushProviderProgress('watching', pos, dur);
           }
         } catch {
@@ -4096,8 +4098,11 @@ export function Player({
           'all_episode_times',
           JSON.stringify(allPlaybackInfo),
         );
-        // 60% threshold → `watching` provider push.
-        if (savedDuration > 0 && savedPosition >= savedDuration * 0.6) {
+        // Sync-threshold setting (%) gates the `watching` provider push.
+        if (
+          savedDuration > 0 &&
+          savedPosition >= savedDuration * ((settings.syncThreshold || 80) / 100)
+        ) {
           pushProviderProgress('watching', savedPosition, savedDuration);
         }
       });
