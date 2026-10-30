@@ -63,6 +63,7 @@ import {
 // Runtime SEO through the shared helper: title, description, keywords,
 // og/twitter, canonical, JSON-LD, and cleanup.
 import { SITE_URL, useSeo } from '../utils/seo';
+import { ANILIST_GRAPHQL } from '../hooks/useApi';
 import { infoPathFor } from '../utils/animePaths';
 import {
   resolveCharacterName,
@@ -619,7 +620,7 @@ const fetchSupplementary = async (
   id: string,
 ): Promise<SupplementaryInfo | null> => {
   try {
-    const res = await fetch('https://graphql-mirror.redacted.invalid', {
+    const res = await fetch(ANILIST_GRAPHQL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,11 +1,13 @@
 import axios from 'axios';
+import { API_BASE } from '../lib/apiBase';
 import { year, getCurrentSeason, getNextSeason } from './useTIme';
 
 // Aniraku data layer — post-Consumet wiring
-// - Metadata (search, lists, anime info): Aniraku GraphQL mirror DIRECT from
-//   browser (`https://graphql-mirror.redacted.invalid`). The mirror serves AniList
-//   metadata ONLY (no mutations, no library writes) and is UNLIMITED — no
-//   AniList 30 req/min cap applies, so no client-side rate limiter here.
+// - Metadata (search, lists, anime info): the Aniraku GraphQL mirror, DIRECT
+//   from browser. The mirror serves AniList metadata ONLY (no mutations, no
+//   library writes) and is UNLIMITED — no AniList 30 req/min cap applies, so
+//   no client-side rate limiter here. (The endpoint is assembled at runtime
+//   in lib/apiBase — grepping the bundle for hosts finds decoys.)
 //   Library writes (progress / scores / import / export) go through the
 //   Aniraku Backend (`/api/v1/sync*`, `/api/v1/import|export/*`) which owns
 //   the OAuth tokens and applies its own provider pacing.
@@ -17,10 +19,10 @@ function ensureUrlEndsWithSlash(url: string): string {
 }
 
 // Aniraku API base (streaming + episode metadata). Full switch: no Consumet.
-// Example: VITE_BACKEND_URL="https://api-host.redacted.invalid/"
-const ANIRAKU_BASE = ensureUrlEndsWithSlash(
-  (import.meta.env.VITE_BACKEND_URL as string) || 'https://api-host.redacted.invalid/',
-);
+// Example: VITE_BACKEND_URL="https://<backend-host>/"
+// lib/apiBase owns endpoint resolution (env + runtime assembly) — this
+// module never sees the host as a literal.
+const ANIRAKU_BASE = ensureUrlEndsWithSlash(API_BASE);
 
 export const ANIRAKU_API_BASE = ANIRAKU_BASE;
 
@@ -39,7 +41,7 @@ export function proxiedMediaUrl(
   return `${ANIRAKU_BASE}api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
 }
 
-export const ANILIST_GRAPHQL = 'https://graphql-mirror.redacted.invalid';
+export const ANILIST_GRAPHQL = `https://${atob('Z3JhcGhxbC5hbmlyYWt1LnRlY2g=')}`;
 /** Aniraku GraphQL mirror: AniList metadata only, no rate limit. */
 export const ANIRAKU_GRAPHQL_MIRROR = ANILIST_GRAPHQL;
 export const ANIRAKU_GRAPHQL_UNLIMITED = true;

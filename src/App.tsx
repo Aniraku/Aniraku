@@ -22,6 +22,7 @@ import { AuthProvider } from './client/useAuth';
 // AuthProvider (the src/client/* one is off-limits).
 import { AuthProvider as SupabaseAuthProvider } from './providers/AuthProvider';
 import ReactGA from 'react-ga4';
+import { initDevtoolsTaunt } from './lib/devtoolsTaunt';
 import { Toaster } from './components/Toaster';
 // Floating episode-download pills (progress + cancel, bottom-left).
 import DownloadStack from './components/DownloadStack';
@@ -119,6 +120,11 @@ function App() {
       ReactGA.initialize(measurementId);
     }
   }, [measurementId]);
+
+  // The devtools greeter — fires once per page load.
+  useEffect(() => {
+    initDevtoolsTaunt();
+  }, []);
 
   return (
     <>
