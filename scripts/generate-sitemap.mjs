@@ -56,6 +56,7 @@ import path from 'node:path'
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
+// MAIN: the official AniList API (preview keeps the mirror endpoint).
 const ANILIST_ENDPOINT = 'https://graphql.anilist.co'
 const SITE = 'https://www.aniraku.tech'
 const OUT_DIR = path.resolve('public')
