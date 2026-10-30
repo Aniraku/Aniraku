@@ -1,16 +1,10 @@
 // Backend API base resolution.
-//   - primary: `VITE_BACKEND_URL` (trailing slash stripped) — .env.local
-//     ships `https://api-host.redacted.invalid/`, so API_BASE resolves to
-//     `https://api-host.redacted.invalid` and endpoints mount at
-//     `${API_BASE}/api/v1/...`. `VITE_API_URL` (vercel.json's name for the
-//     same value) is accepted as a fallback — without either, production
-//     builds silently degrade to same-origin URLs, routing every stream
-//     through Vercel rewrites and burning Fluid Active CPU.
+//   - primary: `VITE_BACKEND_HOST_B64` — the backend host, base64-encoded,
+//     decoded at runtime (the plain domain never lands in the bundle).
 //   - fallback: in development, `window.location.origin` (same-origin
-//     proxying); in production without config, `https://api-host.redacted.invalid`
-//     directly. Never relative in production: same-origin URLs route every
-//     stream through Vercel rewrites and burn Fluid Active CPU (Oct 2026
-//     pause).
+//     proxying); in production without config, the runtime-assembled
+//     production host. Never relative in production: same-origin URLs route
+//     every stream through Vercel rewrites and burn Fluid Active CPU.
 //   - https: production pages are served over HTTPS, so a mistakenly
 //     configured `http://` API URL is upgraded before fetch() sees it;
 //     otherwise CSP / mixed-content rules reject every backend request.
@@ -34,18 +28,19 @@ const DEFAULT_API_BASE = `https://${REAL_HOST}`;
 const developmentApiBase =
   typeof window !== 'undefined' ? window.location.origin : '';
 
-// Preferred on production: base64-encoded host (no literal in the bundle).
-// Plain-URL overrides (VITE_BACKEND_URL / legacy VITE_API_URL) win when
-// present — local setups and legacy configs.
+// The ONLY env knob: base64-encoded host (VITE_BACKEND_HOST_B64). The
+// plain-URL vars (VITE_BACKEND_URL / legacy VITE_API_URL) are deliberately
+// NOT read — a dashboard env var set to the plain URL would otherwise be
+// baked into the bundle verbatim by Vite and re-leak the endpoint. Local
+// setups: set VITE_BACKEND_HOST_B64 in .env.local instead.
 const envOverride =
-  (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
-  (import.meta.env.VITE_API_URL as string | undefined) ||
-  (import.meta.env.VITE_BACKEND_HOST_B64 as string | undefined
-    ? `https://${b64(import.meta.env.VITE_BACKEND_HOST_B64 as string)}`
-    : undefined) ||
-  '';
+  import.meta.env.VITE_BACKEND_HOST_B64 as string | undefined;
 const configuredApiBase =
-  envOverride.replace(/\/+$/, '') ||
+  (
+    envOverride
+      ? `https://${b64(envOverride)}`
+      : ''
+  ).replace(/\/+$/, '') ||
   (import.meta.env.DEV ? developmentApiBase : DEFAULT_API_BASE);
 
 const secureApiBase =

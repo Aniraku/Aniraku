@@ -23,7 +23,7 @@ If you're also running the streaming backend locally, point to it:
 VITE_BACKEND_URL=http://127.0.0.1:43211/
 ```
 
-Otherwise it'll use the production backend (`https://api-host.redacted.invalid/`) automatically.
+Otherwise it'll use the production backend automatically (host is configured base64-encoded in `.env.example` — it never appears as a literal in the bundle).
 
 ## How the code is organized
 
