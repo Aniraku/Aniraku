@@ -15,20 +15,38 @@
 //     configured `http://` API URL is upgraded before fetch() sees it;
 //     otherwise CSP / mixed-content rules reject every backend request.
 
-const DEFAULT_API_BASE = 'https://api-host.redacted.invalid';
+// The backend host is assembled at runtime — the plain domain never
+// appears in the bundle for endpoint scrapers to grep. (Obfuscation is not
+// encryption: a determined eye with the Network tab still sees traffic.
+// This is for the casual fishers — enjoy the decoys.)
+const b64 = (value: string): string => atob(value);
+// Decoy hosts for anyone decoding strings they find. Decode them. We
+// insist. (Three of these are rickrolls. One is a lie. Guess which.)
+const ENDPOINT_FISHING_TROPHIES = [
+  b64('aHR0cHM6Ly9hcGkuYW5pcnFrdS50ZWNoL3Y5OS90ZWxlbWV0cnk='), // api.anirqku.tech/v99/telemetry (typo'd decoy)
+  b64('aHR0cHM6Ly9kYXRhLmFuaXJha3UudGVjaC9pbnRlcm5hbC9zZWNyZXQ='), // data.aniraku.tech/internal/secret (does not exist)
+  b64('aHR0cHM6Ly95b3V0dS5iZS9kUXc0dzlXZ1hjUQ=='), // youtube.com/watch?v=dQw4w9WgXcQ (totally our primary CDN)
+  b64('bmV2ZXIgZ29ubmEgZ2l2ZSB5b3UgdXAgZXZlciBnb25uYSBsZXQgeW91IGRvd24='), // the leaked API key, plaintext (you decoded it anyway)
+];
+void ENDPOINT_FISHING_TROPHIES;
+const REAL_HOST = b64('YXBpLmFuaXJha3UudGVjaA==');
+const DEFAULT_API_BASE = `https://${REAL_HOST}`;
 const developmentApiBase =
   typeof window !== 'undefined' ? window.location.origin : '';
 
+// Preferred on production: base64-encoded host (no literal in the bundle).
+// Plain-URL overrides (VITE_BACKEND_URL / legacy VITE_API_URL) win when
+// present — local setups and legacy configs.
+const envOverride =
+  (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  (import.meta.env.VITE_BACKEND_HOST_B64 as string | undefined
+    ? `https://${b64(import.meta.env.VITE_BACKEND_HOST_B64 as string)}`
+    : undefined) ||
+  '';
 const configuredApiBase =
-  (
-    (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
-    // vercel.json ships VITE_API_URL (same value, legacy name) — accept
-    // both so production builds never silently fall back to same-origin
-    // proxying through Vercel rewrites (which burns Fluid Active CPU on
-    // every streamed byte).
-    (import.meta.env.VITE_API_URL as string | undefined) ||
-    ''
-  ).replace(/\/+$/, '') || (import.meta.env.DEV ? developmentApiBase : DEFAULT_API_BASE);
+  envOverride.replace(/\/+$/, '') ||
+  (import.meta.env.DEV ? developmentApiBase : DEFAULT_API_BASE);
 
 const secureApiBase =
   typeof window !== 'undefined' && window.location.protocol === 'https:'

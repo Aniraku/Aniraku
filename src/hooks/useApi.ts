@@ -1,10 +1,11 @@
 import axios from 'axios';
+import { API_BASE } from '../lib/apiBase';
 import { year, getCurrentSeason, getNextSeason } from './useTIme';
 
 // Aniraku data layer — post-Consumet wiring
 // - Metadata (search, lists, anime info): AniList GraphQL DIRECT from browser
-//   (official public API `https://graphql.anilist.co` on main — 30 req/min
-//   cap applies; backend provider writes pace themselves).
+//   (MAIN: official public API `graphql.anilist.co` — 30 req/min cap, limiter
+//   below. PREVIEW: the Aniraku mirror — unlimited metadata-only.)
 //   Library writes (progress / scores / import / export) go through the
 //   Aniraku Backend (`/api/v1/sync*`, `/api/v1/import|export/*`) which owns
 //   the OAuth tokens and applies its own provider pacing.
@@ -16,10 +17,10 @@ function ensureUrlEndsWithSlash(url: string): string {
 }
 
 // Aniraku API base (streaming + episode metadata). Full switch: no Consumet.
-// Example: VITE_BACKEND_URL="https://api-host.redacted.invalid/"
-const ANIRAKU_BASE = ensureUrlEndsWithSlash(
-  (import.meta.env.VITE_BACKEND_URL as string) || 'https://api-host.redacted.invalid/',
-);
+// Example: VITE_BACKEND_URL="https://<backend-host>/"
+// lib/apiBase owns endpoint resolution (env + runtime assembly) — this
+// module never sees the host as a literal.
+const ANIRAKU_BASE = ensureUrlEndsWithSlash(API_BASE);
 
 export const ANIRAKU_API_BASE = ANIRAKU_BASE;
 
@@ -69,7 +70,6 @@ async function acquireOfficialSlot(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, Math.max(waitMs, 200)));
   }
 }
-
 // Module-level AniList availability signal for the global outage banner.
 // Only TRUE outages (network failure, 5xx, 429) flip the banner — ordinary
 // GraphQL errors (validation, not-found) and 4xx must not flap it.
