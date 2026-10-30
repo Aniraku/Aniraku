@@ -18,9 +18,10 @@ import {
   getHlsRequestCacheMode,
 } from '../lib/watchBufferPolicy';
 import {
-  configurePrefetch,
-  resetPrefetch,
-  warmSegments,
+  configureSegmentPool,
+  createPooledFragLoader,
+  prefetchSegments,
+  resetSegmentPool,
 } from '../../../lib/hlsPrefetch';
 import {
   attemptSkipSegment,
@@ -1973,7 +1974,7 @@ export function Player({
     // 502 CDN_BLOCKED without them.
     setStreamHeaders(c.headers ?? {});
     // The prefetch pool fetches with the same CDN headers as the player.
-    configurePrefetch(c.headers ?? null);
+    configureSegmentPool(c.headers ?? null);
     reportPlayingSource(c.url, auto);
   }
 
@@ -3254,6 +3255,10 @@ export function Player({
               );
               const hlsConfig: any = {
                 enableWorker: false,
+                // Fragment loader backed by the prefetch pool: pooled
+                // segments are served from memory; every miss delegates to
+                // the default network loader.
+                fLoader: createPooledFragLoader(HlsCtor),
                 // Subtitles are rendered by ArtPlayer. Native rendering would
                 // also show the manifest's DEFAULT=YES rendition (duplicate).
                 renderTextTracksNatively: false,
@@ -3650,11 +3655,11 @@ export function Player({
                 art.setting.update(buildHlsQualitySetting(hls.currentLevel));
                 hlsQualitySyncRef = () => syncHlsQualitySetting();
               };
-              // Segment prefetch pool: keep the next few fragments in
-              // flight together (hls.js loads them one-by-one) so the HTTP
-              // cache answers hls.js's own requests instantly — the buffer
-              // fills several segments at a time. Zero-risk: hls.js itself
-              // is never overridden (lib/hlsPrefetch).
+              // Segment pool: keep the next ~8 fragments in flight together
+              // (hls.js loads them one-by-one) and serve them to the demuxer
+              // from memory via the pooled fLoader — the buffer fills
+              // several segments at a time. Pool misses fall straight back
+              // to hls.js's normal network loader (lib/hlsPrefetch).
               const warmUpcomingSegments = () => {
                 try {
                   const details =
@@ -3662,20 +3667,32 @@ export function Player({
                     hls.levels?.[hls.loadLevel]?.details;
                   if (!details?.fragments?.length) return;
                   const t = Number(video.currentTime) || 0;
-                  const upcoming: string[] = [];
+                  const upcoming: {
+                    url: string;
+                    byteRange?: [number, number];
+                  }[] = [];
                   for (const frag of details.fragments) {
-                    if (upcoming.length >= 6) break;
+                    if (upcoming.length >= 8) break;
                     const start = Number(frag.start) || 0;
                     const end = start + (Number(frag.duration) || 0);
                     // Only fragments at/after the playhead.
                     if (end <= t) continue;
-                    // Byte-range fragments share one resource — warming the
-                    // full URL is wrong for them.
-                    if (frag.byteRange && Number(frag.byteRange[1]) > 0)
-                      continue;
-                    if (frag.url) upcoming.push(frag.url);
+                    if (!frag.url) continue;
+                    const br = frag.byteRange as [number, number] | null;
+                    upcoming.push({
+                      url: frag.url,
+                      byteRange:
+                        br && Number(br[1]) > 0 ? [Number(br[0]), Number(br[1])] : undefined,
+                    });
                   }
-                  if (upcoming.length > 0) warmSegments(upcoming);
+                  // The init segment (EXT-X-MAP) rides the same pool.
+                  const initSegment = (
+                    details as unknown as { initSegment?: { url?: string } }
+                  ).initSegment;
+                  if (initSegment?.url) {
+                    upcoming.unshift({ url: initSegment.url });
+                  }
+                  prefetchSegments(upcoming);
                 } catch {
                   // prefetch is best-effort — never disturb playback
                 }
@@ -3739,7 +3756,7 @@ export function Player({
               ) {
                 (played as Promise<void>).catch(() => {});
               }
-              resetPrefetch();
+              resetSegmentPool();
               try {
                 hls.loadSource(hlsTransportPlan[hlsTransportIndex]);
                 hls.attachMedia(video);

@@ -1,29 +1,77 @@
-// Segment prefetch pool — "call multiple segments per segment".
+// Segment pool — parallel prefetch + a fragment loader that serves hls.js
+// from memory, for buffer-free playback.
 //
-// hls.js fetches fragments strictly one after another; on a cold cache the
-// buffer only grows at network latency speed. This pool runs ahead of the
-// playhead: it issues plain fetch()es for the NEXT few segment URLs with a
-// small worker pool so several segments are always in flight together. The
-// responses land in the browser's HTTP cache, so when hls.js gets to those
-// fragments its own request resolves from cache instead of the network —
-// the buffer fills several segments at a time instead of dribbling.
+// hls.js loads fragments strictly one-by-one; on a cold cache the buffer
+// only grows at network latency speed. This module changes the economics:
 //
-// Deliberately ZERO-RISK by design: hls.js is never overridden. If a
-// prefetch fails, or the CDN serves segments with no-store cache headers,
-// hls.js simply downloads that segment as it always did.
+//   1. A prefetch driver runs ahead of the playhead over hls.js's own
+//      fragment list, fetching the next segments with a bounded worker
+//      pool — several requests in flight at once instead of one.
+//   2. A custom fragment loader (hls.js `fLoader`, created via
+//      createPooledFragLoader) serves those pooled bytes to hls.js
+//      instantly. Requests with no pooled copy fall through to hls.js's
+//      normal network loader, so worst case equals stock playback.
+//
+// Safety properties (learned from the buffer-cap revert — playback must
+// never be hostage to an experiment):
+//   - hls.js internals are untouched; the loader delegates to
+//     Hls.DefaultConfig.loader for every pool miss, abort and destroy.
+//   - Pool entries that fail are dropped — the loader transparently falls
+//     back to the network for that fragment.
+//   - Byte-range fragments (EXT-X-BYTERANGE) are pooled per exact range.
+//   - ABR stays honest: pool hits report the REAL prefetch timings as
+//     stats, not instant-zero, so the bandwidth estimator isn't poisoned.
+//   - Memory is capped: delivered entries are evicted FIFO once the pool
+//     exceeds the byte budget.
 
-const MAX_IN_FLIGHT = 3;
-const MAX_WARM_PER_CALL = 6;
+const MAX_POOL_BYTES = 48 * 1024 * 1024; // ~48 MiB of pooled segments
+const DEFAULT_AHEAD_COUNT = 8;
 
+interface PoolEntry {
+  promise: Promise<ArrayBuffer>;
+  bytes: number;
+  createdAt: number;
+  /** True once hls.js has consumed this entry (evict first). */
+  delivered: boolean;
+  /** Stats captured at fetch time — replayed to hls.js on delivery. */
+  trequest: number;
+  tfirst: number;
+  tload: number;
+}
+
+let pool = new Map<string, PoolEntry>();
+let poolBytes = 0;
+let generation = 0; // bumped on reset — stale completions ignore themselves
 let inFlight = 0;
-const queued: (() => void)[] = [];
-const warmed = new Set<string>();
-const failed = new Set<string>();
+const queue: (() => void)[] = [];
+let maxInFlight = 3;
 let activeHeaders: Record<string, string> | null = null;
 
+function rangeKey(
+  url: string,
+  rangeStart?: number,
+  rangeEnd?: number,
+): string {
+  if (rangeStart == null) return url;
+  return `${url}::${rangeStart}-${rangeEnd ?? ''}`;
+}
+
+function evictIfNeeded(): void {
+  if (poolBytes <= MAX_POOL_BYTES) return;
+  // Delivered entries first (hls.js already consumed them), then oldest.
+  for (const pass of [true, false]) {
+    for (const [key, entry] of pool) {
+      if (poolBytes <= MAX_POOL_BYTES) return;
+      if (pass !== entry.delivered) continue;
+      poolBytes -= entry.bytes;
+      pool.delete(key);
+    }
+  }
+}
+
 function pump(): void {
-  while (inFlight < MAX_IN_FLIGHT && queued.length > 0) {
-    const job = queued.shift();
+  while (inFlight < maxInFlight && queue.length > 0) {
+    const job = queue.shift();
     if (!job) return;
     inFlight += 1;
     void job();
@@ -31,50 +79,222 @@ function pump(): void {
 }
 
 /** Update the request headers used by prefetch fetches (CDN Referer etc). */
-export function configurePrefetch(
+export function configureSegmentPool(
   headers: Record<string, string> | null | undefined,
 ): void {
   activeHeaders = headers && Object.keys(headers).length > 0 ? headers : null;
 }
 
-/** Forget per-source state (signed URLs rotate per episode). */
-export function resetPrefetch(): void {
-  warmed.clear();
-  failed.clear();
-  queued.length = 0;
+/** Forget all pooled state (signed URLs rotate per source/episode). */
+export function resetSegmentPool(): void {
+  generation += 1;
+  pool = new Map();
+  poolBytes = 0;
+  inFlight = 0;
+  queue.length = 0;
+}
+
+/** Look up a pooled fragment promise (does not consume it). */
+export function peekSegment(
+  url: string,
+  rangeStart?: number,
+  rangeEnd?: number,
+): Promise<ArrayBuffer> | undefined {
+  return pool.get(rangeKey(url, rangeStart, rangeEnd))?.promise;
+}
+
+function fetchIntoPool(
+  key: string,
+  url: string,
+  rangeStart?: number,
+  rangeEnd?: number,
+): void {
+  if (pool.has(key)) return;
+  const gen = generation;
+  const headers: Record<string, string> = { ...(activeHeaders ?? {}) };
+  if (rangeStart != null) {
+    // hls.js byteRange is [start, end) — the end is EXCLUSIVE (its own
+    // loader sends `bytes=start-(end-1)`). Match it byte-for-byte.
+    headers['Range'] =
+      rangeEnd != null
+        ? `bytes=${rangeStart}-${rangeEnd - 1}`
+        : `bytes=${rangeStart}-`;
+  }
+  const trequest = performance.now();
+  const promise = (async () => {
+    const res = await fetch(url, {
+      headers,
+      cache: 'default',
+      priority: 'high',
+    } as RequestInit);
+    if (!res.ok) throw new Error(`segment prefetch ${res.status}`);
+    const buf = await res.arrayBuffer();
+    // Server ignored the Range header → slice to the exact window.
+    if (rangeStart != null && rangeEnd != null) {
+      return buf.slice(rangeStart, rangeEnd);
+    }
+    return buf;
+  })();
+
+  const entry: PoolEntry = {
+    promise: promise.then((buf) => buf),
+    bytes: 0,
+    createdAt: Date.now(),
+    delivered: false,
+    trequest,
+    tfirst: 0,
+    tload: 0,
+  };
+  pool.set(key, entry);
+  void promise
+    .then((buf) => {
+      if (gen !== generation) return;
+      const now = performance.now();
+      const e = pool.get(key);
+      if (e && e.promise === promise) {
+        e.bytes = buf.byteLength;
+        // Honest ABR stats: the timings of the actual prefetch, not zeros.
+        e.tfirst = now;
+        e.tload = now;
+      }
+      poolBytes += buf.byteLength;
+      evictIfNeeded();
+    })
+    .catch(() => {
+      if (gen === generation) {
+        const e = pool.get(key);
+        poolBytes -= e?.bytes ?? 0;
+        pool.delete(key);
+      }
+    })
+    .finally(() => {
+      inFlight -= 1;
+      pump();
+    });
+}
+
+export interface PrefetchFragment {
+  url: string;
+  /** hls.js byteRange tuple [start, end] for EXT-X-BYTERANGE fragments. */
+  byteRange?: [number, number];
 }
 
 /**
- * Warm the HTTP cache for the given segment URLs (absolute, in play order).
- * Safe to call repeatedly: already-warmed and known-failed URLs are skipped,
- * and at most MAX_WARM_PER_CALL new fetches are queued per call so a seek
- * storm can't enqueue the whole episode.
+ * Prefetch the given fragments (absolute URLs, in play order). Skips
+ * anything already pooled or in flight; at most `count` NEW fetches are
+ * queued per call so a seek storm can't enqueue the whole episode.
  */
-export function warmSegments(urls: string[]): void {
-  const targets = urls
-    .filter((url) => url && !warmed.has(url) && !failed.has(url))
-    .slice(0, MAX_WARM_PER_CALL);
-  for (const url of targets) {
-    warmed.add(url);
-    queued.push(() => {
-      fetch(url, {
-        headers: activeHeaders ?? undefined,
-        cache: 'default',
-        // Prefetches must never race the player into a Priority=Low queue —
-        // they are the point.
-        priority: 'high',
-      } as RequestInit)
-        .then((res) => {
-          if (!res.ok) failed.add(url);
-          // Body intentionally left unconsumed: the response is served from
-          // the HTTP cache to hls.js's own request later.
-        })
-        .catch(() => failed.add(url))
-        .finally(() => {
-          inFlight -= 1;
-          pump();
-        });
-    });
+export function prefetchSegments(
+  fragments: PrefetchFragment[],
+  count: number = DEFAULT_AHEAD_COUNT,
+): void {
+  let queuedCount = 0;
+  for (const frag of fragments) {
+    if (queuedCount >= count) break;
+    const key = rangeKey(frag.url, frag.byteRange?.[0], frag.byteRange?.[1]);
+    if (pool.has(key)) continue;
+    fetchIntoPool(key, frag.url, frag.byteRange?.[0], frag.byteRange?.[1]);
+    queuedCount += 1;
   }
   pump();
+}
+
+/**
+ * Fragment loader that serves pooled segments to hls.js from memory and
+ * delegates everything else to hls.js's default network loader.
+ * `HlsCtor` is injected (not imported) to keep hls.js out of this chunk.
+ */
+export function createPooledFragLoader(HlsCtor: any): any {
+  const Base = HlsCtor.DefaultConfig.loader;
+
+  return class PooledFragLoader {
+    private impl: any;
+    private aborted = false;
+    private destroyed = false;
+    private stats: any;
+
+    constructor(config: any) {
+      this.impl = new Base(config);
+      this.stats = {
+        aborted: false,
+        loaded: 0,
+        retry: 0,
+        total: 0,
+        chunkCount: 0,
+        bwEstimate: 0,
+        trequest: 0,
+        tfirst: 0,
+        tload: 0,
+        loading: { start: 0, first: 0, end: 0 },
+        parsing: { start: 0, end: 0 },
+        buffering: { start: 0, end: 0 },
+      };
+    }
+
+    load(
+      context: any,
+      loaderConfig: any,
+      callbacks: {
+        onSuccess: (
+          response: { url: string; data: ArrayBuffer },
+          stats: any,
+          ctx: any,
+          networkDetails: unknown,
+        ) => void;
+        onError: (err: any, ctx: any, networkDetails: unknown) => void;
+        onTimeout: (stats: any, ctx: any, networkDetails: unknown) => void;
+      },
+    ): void {
+      const key = rangeKey(context.url, context.rangeStart, context.rangeEnd);
+      const entry = pool.get(key);
+      if (!entry) {
+        // Pool miss → stock network loading path.
+        this.impl.load(context, loaderConfig, callbacks);
+        return;
+      }
+
+      void entry.promise
+        .then((data) => {
+          if (this.aborted || this.destroyed) return;
+          const e = pool.get(key);
+          const trequest = e?.trequest ?? entry.trequest;
+          const tfirst = e?.tfirst ?? entry.tfirst;
+          const tload = performance.now();
+          this.stats = {
+            ...this.stats,
+            trequest,
+            tfirst,
+            tload,
+            loaded: data.byteLength,
+            total: data.byteLength,
+            loading: { start: trequest, first: tfirst, end: tload },
+          };
+          // Mark delivered so eviction prefers this entry first.
+          if (e && e.promise === entry.promise) e.delivered = true;
+          callbacks.onSuccess(
+            { url: context.url, data },
+            this.stats,
+            context,
+            null,
+          );
+        })
+        .catch((err) => {
+          if (this.aborted || this.destroyed) return;
+          // Pooled fetch failed → transparent network fallback.
+          this.impl.load(context, loaderConfig, callbacks);
+          void err;
+        });
+    }
+
+    abort(): void {
+      this.aborted = true;
+      this.impl.abort();
+    }
+
+    destroy(): void {
+      this.destroyed = true;
+      this.abort();
+      this.impl.destroy();
+    }
+  };
 }
