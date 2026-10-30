@@ -13,13 +13,13 @@ const DIST_DIR = path.join(__dirname, '../dist');
 const INDEX_FILE = path.join(DIST_DIR, 'index.html');
 
 // Middleware for static assets and JSON parsing
-// CORS for Aniraku API usage: Local dev (:3000) calls https://api-host.redacted.invalid
+// CORS for Aniraku API usage: Local dev (:3000) calls the production backend
 // cross-origin, so the *backend* allowlists local dev. Here we set our own
 // serving headers + security headers for the local dev origin.
 const ANIRAKU_ALLOWED_ORIGINS = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  'https://api-host.redacted.invalid',
+  'https://backend-host.invalid' # placeholder — real host lives in env,
 ]);
 app.use((req, res, next) => {
   const origin = req.headers.origin as string | undefined;

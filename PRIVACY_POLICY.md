@@ -35,7 +35,7 @@ Comments are posted through TheAnimeCommunity's comment widget — see Third par
 ## Third parties
 
 - **AniList** — we fetch anime metadata (titles, artwork, descriptions, relations, schedule) from their public GraphQL API. Your search terms and the titles you open are sent to them.
-- **Streaming backend and video hosts (Anikoto, FlixCloud and similar video hosts)** — video streams are resolved by our backend (`api-host.redacted.invalid`) and are played through its proxy where possible, but some connections are made directly from your browser to the video CDN — in those cases the CDN operator can see your IP address. These third-party hosts may display ads inside their players.
+- **Streaming backend and video hosts (Anikoto, FlixCloud and similar video hosts)** — video streams are resolved by our backend service and are played through its proxy where possible, but some connections are made directly from your browser to the video CDN — in those cases the CDN operator can see your IP address. These third-party hosts may display ads inside their players.
 - **TheAnimeCommunity** — powers the comment widget on title and watch pages. The comments you post and your interactions with the widget are handled by their service under their own policy.
 - **AniSkip** — receives the anime's MAL ID and episode number to fetch opening/ending skip timestamps.
 - **Supabase** — authentication and database. Your password never touches our servers.
