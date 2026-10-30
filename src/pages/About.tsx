@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FaCheckCircle, FaCopy } from 'react-icons/fa';
 import {
   BINANCE_PAY_LABEL,
@@ -8,6 +8,7 @@ import {
   BINANCE_QR_SRC,
   PATREON_URL,
 } from '../lib/support';
+import { useSeo, breadcrumbLd } from '../utils/seo';
 const SplashContainer = styled.div`
   margin-top: -2rem;
 `;
@@ -208,12 +209,15 @@ const sections = [
 ];
 
 function About() {
-  // NOTE: the live site has removed the /about route (unknown paths render
-  // NotFoundRoute). Title follows the app's page-title convention
-  // (e.g. "Search · Aniraku", "Trending · Aniraku").
-  useEffect(() => {
-    document.title = 'About · Aniraku';
-  }, []);
+  // Canonical + social tags via the shared SEO helper (replaces the old
+  // document.title-only effect).
+  useSeo({
+    title: 'About Aniraku — Open-Source Anime Streaming',
+    description:
+      'What Aniraku is, how it works, and the open-source project behind it. A free anime streaming client powered by AniList metadata.',
+    canonicalPath: '/about',
+    jsonLd: breadcrumbLd('About', '/about'),
+  });
 
   return (
     <SplashContainer>

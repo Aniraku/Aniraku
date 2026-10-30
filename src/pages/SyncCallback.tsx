@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import { completeSyncCallback, PROVIDER_LABELS } from '../lib/sync';
 import ProviderIcon from '../components/ProviderIcon';
+import { useSeo } from '../utils/seo';
 
 // OAuth callback landing page for MAL / AniList. The providers append only
 // ?code=&state= to the registered redirect URI, so the provider is resolved
@@ -67,6 +68,9 @@ const BackLink = styled(Link)`
 const SYNC_CONNECTED_KEY = 'aniraku-sync-connected';
 
 const SyncCallback: React.FC = () => {
+  // User-specific / transient route — keep crawlers out so the index
+  // stays free of per-account duplicates.
+  useSeo({ title: 'Connecting… — Aniraku', noindex: true });
   const [params] = useSearchParams();
   const code = params.get('code');
   const state = params.get('state');

@@ -14,6 +14,7 @@ import { CgProfile } from 'react-icons/cg';
 import { FiSettings } from 'react-icons/fi';
 import { FaLock } from 'react-icons/fa';
 import { Settings } from './Settings';
+import { useSeo } from '../utils/seo';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import {
@@ -846,6 +847,9 @@ const TABS: Array<{ id: ProfileTab; label: string; authedOnly?: boolean }> = [
 
 // Profile component
 export const Profile: React.FC = () => {
+  // User-specific / transient route — keep crawlers out so the index
+  // stays free of per-account duplicates.
+  useSeo({ title: 'Profile — Aniraku', noindex: true });
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuth();

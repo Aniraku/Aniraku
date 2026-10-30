@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { useSeo } from '../utils/seo';
 
 const Wrapper = styled.main`
   min-height: 100vh;
@@ -145,6 +146,9 @@ interface AuthErrorLike {
 }
 
 const NewPassword = () => {
+  // User-specific / transient route — keep crawlers out so the index
+  // stays free of per-account duplicates.
+  useSeo({ title: 'Reset Password — Aniraku', noindex: true });
   const navigate = useNavigate();
   const [phase, setPhase] = useState<'verifying' | 'ready' | 'invalid' | 'complete'>('verifying');
   const [password, setPassword] = useState('');

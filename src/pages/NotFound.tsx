@@ -8,6 +8,7 @@ import {
   FaHome,
   FaSearch,
 } from 'react-icons/fa';
+import { useSeo } from '../utils/seo';
 
 // Rich 404: ambient mark, "Route unavailable" status chip, big code, card,
 // path row, actions, and bottom note. Copy uses "This story is off the map."
@@ -253,6 +254,9 @@ const Note = styled.p`
 `;
 
 const NotFound = () => {
+  // User-specific / transient route — keep crawlers out so the index
+  // stays free of per-account duplicates.
+  useSeo({ title: 'Page Not Found — Aniraku', noindex: true });
   const location = useLocation();
 
   useEffect(() => {

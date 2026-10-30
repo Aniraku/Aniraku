@@ -17,6 +17,7 @@ import {
   publishHistoryNow,
 } from '../lib/sync';
 import ThemedSelect from '../components/ThemedSelect';
+import { useSeo } from '../utils/seo';
 
 /* Constants and helpers. */
 
@@ -941,6 +942,9 @@ const HistoryCard = ({
   selected,
   onToggleSelect,
 }: HistoryCardProps) => {
+  // User-specific / transient route — keep crawlers out so the index
+  // stays free of per-account duplicates.
+  useSeo({ title: 'Watch History — Aniraku', noindex: true });
   const [expanded, setExpanded] = useState(false);
   const handleRemove = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
