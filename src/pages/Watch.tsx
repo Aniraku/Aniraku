@@ -921,19 +921,20 @@ const WatchInner: React.FC = () => {
       try {
         const ep = Number(currentEpisode.number);
         const id = Number(animeId);
-        // Whole-anime track counts first (fast endpoint, locally cached).
-        // Their answer gates whether the SLOW dub /servers fan-out runs at
-        // all: a dub proven lower than this episode is never called.
-        // priority=true bypasses the card-rail queue — the boot path
-        // must never wait behind grid prefetches.
-        if (animeId) {
-          await ensureTrackCounts(String(animeId), ANIRAKU_API_BASE, {
-            priority: true,
-          });
-        }
-        // Current lang first (fast path for playback), other lang after so a
-        // slow provider on one side never blocks the visible player.
-        const first = await fetchAnirakuServers(
+        // Track counts (fast endpoint, locally cached) leave together with
+        // the current-language fan-out; their answer gates whether the dub
+        // call happens at all. priority=true bypasses the card-rail queue.
+        const trackTask = animeId
+          ? ensureTrackCounts(String(animeId), ANIRAKU_API_BASE, {
+              priority: true,
+            }).catch(() => null)
+          : Promise.resolve(null);
+
+        // BOTH language fan-outs leave at once (no waiting for the sub
+        // result): the visible player applies the current language's pool
+        // the moment it settles, and the other pool applies whenever it
+        // lands. A slow provider on one side never delays the other.
+        const firstPromise = fetchAnirakuServers(
           id,
           ep,
           language,
@@ -942,6 +943,32 @@ const WatchInner: React.FC = () => {
           console.error('Error fetching Aniraku servers:', e);
           return [];
         });
+
+        // The dub-skip decision needs only the /track answer (fast) — not
+        // the sub result. A language with no proven releases is never
+        // called: when this device has a recent pool observation proving
+        // the dub track is absent through this episode, the slowest
+        // /servers fan-out is skipped entirely. The 7-day TTL in
+        // lib/audioTracks re-checks so a later dub release is picked up.
+        await trackTask;
+        const other = language === 'dub' ? 'sub' : 'dub';
+        const dubProvenAbsent =
+          other === 'dub' && animeId
+            ? isDubProvenAbsent(String(animeId), ep)
+            : false;
+        const secondPromise = dubProvenAbsent
+          ? Promise.resolve([])
+          : fetchAnirakuServers(
+              id,
+              ep,
+              other,
+              genreKey || undefined,
+            ).catch((e) => {
+              console.error('Error fetching Aniraku servers:', e);
+              return [];
+            });
+
+        const first = await firstPromise;
         if (!cancelled && Array.isArray(first)) {
           const clean = sanitizeServers(first);
           if (language === 'dub') {
@@ -952,35 +979,15 @@ const WatchInner: React.FC = () => {
             observedSub = clean.length > 0;
           }
         }
-        const other = language === 'dub' ? 'sub' : 'dub';
-        // A language with no proven releases must not be called at all: when
-        // this device has a recent pool observation proving the dub track is
-        // absent through this episode, the second (slowest) /servers fan-out
-        // is skipped entirely. The 7-day TTL in lib/audioTracks re-checks so
-        // a later dub release is still picked up.
-        const dubProvenAbsent =
-          other === 'dub' && animeId
-            ? isDubProvenAbsent(String(animeId), ep)
-            : false;
-        if (!dubProvenAbsent) {
-          const second = await fetchAnirakuServers(
-            id,
-            ep,
-            other,
-            genreKey || undefined,
-          ).catch((e) => {
-            console.error('Error fetching Aniraku servers:', e);
-            return [];
-          });
-          if (!cancelled && Array.isArray(second)) {
-            const clean = sanitizeServers(second);
-            if (other === 'dub') {
-              setServersDub(clean);
-              observedDub = clean.length > 0;
-            } else {
-              setServersSub(clean);
-              observedSub = clean.length > 0;
-            }
+        const second = await secondPromise;
+        if (!cancelled && Array.isArray(second)) {
+          const clean = sanitizeServers(second);
+          if (other === 'dub') {
+            setServersDub(clean);
+            observedDub = clean.length > 0;
+          } else {
+            setServersSub(clean);
+            observedSub = clean.length > 0;
           }
         }
       } catch (error) {
