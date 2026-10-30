@@ -728,6 +728,12 @@ const WatchInner: React.FC = () => {
   });
   const [animeInfo, setAnimeInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // The initial `currentEpisode` is a PLACEHOLDER (id '0', number 1) — the
+  // real episode only exists once the episode list has resolved and ?ep
+  // matched. Gating the /servers fan-out and the player's /stream discovery
+  // on this flag stops the boot path from fetching EPISODE 1 and throwing
+  // it away when the user asked for episode 13.
+  const episodeResolved = currentEpisode.id !== '0';
   // NSFW gate guard: true once the title-detail fetch has SETTLED (success
   // or failure). The player slot stays on the skeleton until then, so a
   // Hentai title can never boot <Player> in the window where episodes have
@@ -899,7 +905,9 @@ const WatchInner: React.FC = () => {
       setServersSettled(false);
       setPoolEpKey('');
     }
-    if (!animeId || !currentEpisode.number) {
+    // Placeholder episode (list not resolved yet) — the /servers fan-out is
+    // the slowest call in the app; never spend it on the wrong episode.
+    if (!animeId || !currentEpisode.number || !episodeResolved) {
       setPoolEpKey(serverEpKey);
       setServersSettled(true);
       return;
@@ -2100,7 +2108,7 @@ const WatchInner: React.FC = () => {
         // chosen inside the player from `embedded`/`embeddedUrl`.
         <Player
           animeId={Number(animeId)}
-          episode={Number(currentEpisode.number)}
+          episode={episodeResolved ? Number(currentEpisode.number) : 0}
           lang={(language as 'sub' | 'dub') || 'sub'}
           malId={animeInfo?.malId}
           banner={selectedBackgroundImage}
