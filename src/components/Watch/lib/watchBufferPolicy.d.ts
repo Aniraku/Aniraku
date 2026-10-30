@@ -8,9 +8,3 @@ export function getHlsLoadPolicies(): Record<string, unknown>;
 export function getDashBufferPolicy(
   connection?: Record<string, unknown>,
 ): Record<string, unknown>;
-export function getBandwidthSaverPref(): boolean;
-export function setBandwidthSaverPref(enabled: boolean): void;
-export function applyBandwidthSaverPolicy(
-  config: Record<string, unknown>,
-  options?: { kiwi?: boolean },
-): Record<string, unknown>;

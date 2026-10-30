@@ -13,13 +13,15 @@ import {
 } from '../lib/watchEmbedFallback';
 import { infoPathFor, type LinkableTitle } from '../../../utils/animePaths';
 import {
-  applyBandwidthSaverPolicy,
-  getBandwidthSaverPref,
   getHlsBufferPolicy,
   getHlsLoadPolicies,
   getHlsRequestCacheMode,
-  setBandwidthSaverPref,
 } from '../lib/watchBufferPolicy';
+import {
+  configurePrefetch,
+  resetPrefetch,
+  warmSegments,
+} from '../../../lib/hlsPrefetch';
 import {
   attemptSkipSegment,
   shouldShowManualSkipOverlay,
@@ -978,9 +980,9 @@ const UNLIMITED_CACHE_SECONDS = 21600;
 const UNLIMITED_CACHE_MAX_BYTES = 8 * 1024 * 1024 * 1024;
 // hls.js engines: unlimited forward/backward cache — the forward buffer may
 // grow for the whole title and nothing behind the playhead is evicted, so
-// every seek plays from cache instead of re-downloading. This is the
-// "Bandwidth Saver OFF" profile; the ON profile caps it via
-// applyBandwidthSaverPolicy (buffer policy lib) right below.
+// every seek plays from cache instead of re-downloading. Playback smoothness
+// outranks data usage here (user decision — the buffer-cap experiment was
+// reverted).
 const UNLIMITED_HLS_CACHE = {
   maxBufferLength: UNLIMITED_CACHE_SECONDS,
   maxMaxBufferLength: UNLIMITED_CACHE_SECONDS,
@@ -1520,10 +1522,6 @@ export function Player({
     }
   }, []);
   const [forceMse, setForceMse] = useState(false);
-  // Bumped by the Bandwidth Saver menu toggle so the hls.js engine rebuilds
-  // with the new buffer caps (same rebuild path the quality menu uses; the
-  // resume position survives via pendingResumeRef).
-  const [bufferPolicyNonce, setBufferPolicyNonce] = useState(0);
   const [posterHidden, setPosterHidden] = useState(false);
   // Auto-skip attempt machine: per-segment handled/failed flags so
   // the manual overlay only appears as a fallback (or after seeking back).
@@ -1974,6 +1972,8 @@ export function Player({
     // Headers MUST survive every path — the subtitle proxy answers
     // 502 CDN_BLOCKED without them.
     setStreamHeaders(c.headers ?? {});
+    // The prefetch pool fetches with the same CDN headers as the player.
+    configurePrefetch(c.headers ?? null);
     reportPlayingSource(c.url, auto);
   }
 
@@ -3059,50 +3059,6 @@ export function Player({
               return item.html;
             },
           },
-          {
-            name: 'bandwidthSaver',
-            width: 232,
-            html: 'Bandwidth Saver',
-            icon: SETTING_ICON_TUNE,
-            tooltip: getBandwidthSaverPref() ? 'On' : 'Off',
-            selector: [
-              {
-                default: getBandwidthSaverPref(),
-                html: 'On — limit buffering',
-                value: 'on',
-              },
-              {
-                default: !getBandwidthSaverPref(),
-                html: 'Off — cache whole episode',
-                value: 'off',
-              },
-            ],
-            onSelect: (item: any) => {
-              const on = String(item.value) !== 'off';
-              const changed = on !== getBandwidthSaverPref();
-              setBandwidthSaverPref(on);
-              if (changed) {
-                // Rebuild the engine so the new caps apply immediately; the
-                // resume position survives the rebuild like quality switches.
-                try {
-                  const video = artInstanceRef.current?.video;
-                  if (video && pendingResumeRef.current == null) {
-                    pendingResumeRef.current = Number(video.currentTime) || null;
-                  }
-                } catch {
-                  // position capture is best-effort
-                }
-                setBufferPolicyNonce((n) => n + 1);
-              }
-              showToast(
-                on
-                  ? 'Bandwidth saver on — buffering capped to save data'
-                  : 'Unlimited cache — episodes buffer fully for instant seeks',
-                { type: 'success' },
-              );
-              return item.html;
-            },
-          },
           ...(subtitleSetting ? [subtitleSetting] : []),
           buildSubtitleSettingsSetting(
             () => subtitlePreferencesRef.current,
@@ -3305,17 +3261,11 @@ export function Player({
                 // viewport-size cap. The quality menu owns this policy.
                 capLevelToPlayerSize: false,
                 minAutoBitrate: 0,
-                // Shared buffer policy, then the unlimited overrides — the
-                // "cache whole episode" profile. When Bandwidth Saver is on
-                // (the default) the saver caps are applied LAST so forward/
-                // back buffering stays bounded and idle tabs stop pulling
-                // segments. Kiwi keeps its larger reserve either way.
+                // Unlimited cache profile: the forward buffer may grow for
+                // the whole title and nothing behind the playhead is evicted,
+                // so every seek replays from cache instead of re-downloading.
                 ...bufferPolicy,
                 ...UNLIMITED_HLS_CACHE,
-                ...applyBandwidthSaverPolicy(
-                  { ...UNLIMITED_HLS_CACHE },
-                  { kiwi: shouldPreferNativeHls(url) },
-                ),
                 startFragPrefetch: true,
                 lowLatencyMode: false,
                 appendInSequenceGaps: true,
@@ -3700,6 +3650,46 @@ export function Player({
                 art.setting.update(buildHlsQualitySetting(hls.currentLevel));
                 hlsQualitySyncRef = () => syncHlsQualitySetting();
               };
+              // Segment prefetch pool: keep the next few fragments in
+              // flight together (hls.js loads them one-by-one) so the HTTP
+              // cache answers hls.js's own requests instantly — the buffer
+              // fills several segments at a time. Zero-risk: hls.js itself
+              // is never overridden (lib/hlsPrefetch).
+              const warmUpcomingSegments = () => {
+                try {
+                  const details =
+                    hls.levels?.[hls.currentLevel]?.details ??
+                    hls.levels?.[hls.loadLevel]?.details;
+                  if (!details?.fragments?.length) return;
+                  const t = Number(video.currentTime) || 0;
+                  const upcoming: string[] = [];
+                  for (const frag of details.fragments) {
+                    if (upcoming.length >= 6) break;
+                    const start = Number(frag.start) || 0;
+                    const end = start + (Number(frag.duration) || 0);
+                    // Only fragments at/after the playhead.
+                    if (end <= t) continue;
+                    // Byte-range fragments share one resource — warming the
+                    // full URL is wrong for them.
+                    if (frag.byteRange && Number(frag.byteRange[1]) > 0)
+                      continue;
+                    if (frag.url) upcoming.push(frag.url);
+                  }
+                  if (upcoming.length > 0) warmSegments(upcoming);
+                } catch {
+                  // prefetch is best-effort — never disturb playback
+                }
+              };
+              hls.on(HlsCtor.Events.FRAG_BUFFERED, () => {
+                if (disposed || buildIdRef.current !== myBuildId) return;
+                warmUpcomingSegments();
+              });
+              video.addEventListener('seeked', warmUpcomingSegments);
+              hls.on(HlsCtor.Events.LEVEL_SWITCHED, () => {
+                if (disposed || buildIdRef.current !== myBuildId) return;
+                warmUpcomingSegments();
+              });
+
               hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
                 if (disposed || buildIdRef.current !== myBuildId) return;
                 try {
@@ -3707,6 +3697,7 @@ export function Player({
                 } catch (err) {
                   console.error('[aniraku] quality menu setup failed:', err);
                 }
+                warmUpcomingSegments();
                 console.debug(
                   '[aniraku] MANIFEST_PARSED — levels:',
                   (hls.levels || []).map((l: any) => `${l?.height}p/${Math.round((l?.bitrate || 0) / 1000)}k`),
@@ -3748,6 +3739,7 @@ export function Player({
               ) {
                 (played as Promise<void>).catch(() => {});
               }
+              resetPrefetch();
               try {
                 hls.loadSource(hlsTransportPlan[hlsTransportIndex]);
                 hls.attachMedia(video);
@@ -4437,7 +4429,6 @@ export function Player({
     hasNext,
     hasPrev,
     forceMse,
-    bufferPolicyNonce,
     episode,
     animeId,
     destroyPlayer,

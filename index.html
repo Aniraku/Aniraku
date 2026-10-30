@@ -26,12 +26,12 @@
     <meta name="format-detection" content="telephone=no, email=no, address=no" />
     <meta name="google-site-verification" content="TDZR-G7WY51G5GXyVRg7sJLdrO3mASOSFP7gADbgC90" />
 
-    <!-- Canonical — Aniraku ships no hreflang alternates (legacy mirror-domain list removed) -->
-    <link rel="canonical" href="https://www.aniraku.tech/" />
+    <!-- Canonical: set per-route by src/utils/seo.ts (useSeo). A static
+         homepage canonical on every SPA route made Google flag the site as
+         "Duplicate, Google chose different canonical than user". -->
 
     <!-- Open Graph — ported verbatim from Aniraku (absolute URLs on aniraku.tech) -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.aniraku.tech/" />
     <meta property="og:title" content="Aniraku — Free Anime Streaming | Watch Sub &amp; Dub Online" />
     <meta property="og:description" content="Watch anime online for free on Aniraku. Stream the latest anime episodes in HD with subtitles and dubs. Browse top airing, most popular, and trending anime series and movies." />
     <meta property="og:image" content="https://www.aniraku.tech/og-image.png" />
@@ -44,7 +44,6 @@
 
     <!-- Twitter Card — ported verbatim from Aniraku -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://www.aniraku.tech/" />
     <meta name="twitter:title" content="Aniraku — Free Anime Streaming | Watch Sub &amp; Dub Online" />
     <meta name="twitter:description" content="Watch anime online for free on Aniraku. Stream the latest anime episodes in HD with subtitles and dubs." />
     <meta name="twitter:image" content="https://www.aniraku.tech/og-image.png" />
