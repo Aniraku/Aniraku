@@ -18,7 +18,7 @@ Submitted: https://github.com/fmhy/edit/issues/6568 (OPEN)
 | Mirror 3 | https://aniraku.vercel.app/ |
 | Preview branch | https://test.aniraku.tech/ (uses `graphql-mirror.redacted.invalid` mirror, no rate limits) |
 | Site source | https://github.com/Aniraku/Aniraku |
-| Backend health / status | https://api-host.redacted.invalid/health |
+| Backend health / status | https://aniraku.tech |
 | App site | https://aniraku.github.io/Aniraku-App/ |
 | App source + APK releases | https://github.com/Aniraku/Aniraku-App / https://github.com/Aniraku/Aniraku-App/releases/latest |
 | Community | https://discord.gg/aniraku |
@@ -58,7 +58,7 @@ Risks to disclose to FMHY (staff will find them anyway):
 ### 3a. `docs/video.md` → `## ▷ Anime Streaming` (upstream uses `* ` + named links)
 
 ```md
-* [Aniraku](https://www.aniraku.tech/), [2](https://aniraku.runs-on.dev/), [3](https://aniraku.vercel.app/) - Sub / Dub / Auto-Next / 1080p / No Redirect Ads / Continue Watching / [Preview](https://test.aniraku.tech/) / [Status](https://api-host.redacted.invalid/health) / [Discord](https://discord.gg/aniraku) / [GitHub](https://github.com/Aniraku/Aniraku)
+* [Aniraku](https://www.aniraku.tech/), [2](https://aniraku.runs-on.dev/), [3](https://aniraku.vercel.app/) - Sub / Dub / Auto-Next / 1080p / No Redirect Ads / Continue Watching / [Preview](https://test.aniraku.tech/) / [Status](https://aniraku.tech) / [Discord](https://discord.gg/aniraku) / [GitHub](https://github.com/Aniraku/Aniraku)
 ```
 
 ### 3b. `docs/mobile.md` → `## ▷ Android Anime`
@@ -94,7 +94,7 @@ Site: https://www.aniraku.tech/
 Mirrors: https://aniraku.runs-on.dev/, https://aniraku.vercel.app/
 Preview: https://test.aniraku.tech/
 Site source: https://github.com/Aniraku/Aniraku
-Status: https://api-host.redacted.invalid/health
+Status: https://aniraku.tech
 App site: https://aniraku.github.io/Aniraku-App/
 App source + APK: https://github.com/Aniraku/Aniraku-App
 Discord: https://discord.gg/aniraku
@@ -112,7 +112,7 @@ Tested:
 
 Suggested markdown (matches upstream `* ` + named-link style):
 - docs/video.md Anime Streaming:
-* [Aniraku](https://www.aniraku.tech/), [2](https://aniraku.runs-on.dev/), [3](https://aniraku.vercel.app/) - Sub / Dub / Auto-Next / 1080p / No Redirect Ads / Continue Watching / [Preview](https://test.aniraku.tech/) / [Status](https://api-host.redacted.invalid/health) / [Discord](https://discord.gg/aniraku) / [GitHub](https://github.com/Aniraku/Aniraku)
+* [Aniraku](https://www.aniraku.tech/), [2](https://aniraku.runs-on.dev/), [3](https://aniraku.vercel.app/) - Sub / Dub / Auto-Next / 1080p / No Redirect Ads / Continue Watching / [Preview](https://test.aniraku.tech/) / [Status](https://aniraku.tech) / [Discord](https://discord.gg/aniraku) / [GitHub](https://github.com/Aniraku/Aniraku)
 - docs/mobile.md Android Anime:
 * [Aniraku](https://aniraku.github.io/Aniraku-App/) / [Discord](https://discord.gg/aniraku) / [GitHub](https://github.com/Aniraku/Aniraku-App) - Anime Streaming App / Sub / Dub / Offline Downloads / AniSkip / MAL-AniList Sync
 
