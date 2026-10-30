@@ -200,56 +200,25 @@ export function prefetchSegments(
 }
 
 /**
- * Fragment loader that serves pooled segments to hls.js from memory and
- * delegates everything else to hls.js's default network loader.
+ * Fragment loader that serves pooled segments to hls.js from memory.
+ *
+ * SUBCLASSES hls.js's default loader rather than wrapping it: abort() and
+ * destroy() stay the stock implementations (a wrapping wrapper that
+ * forwards abort re-enters hls.js's resetLoader and blows the call stack).
+ * Only load() is overridden — pool hits are served from memory, everything
+ * else runs the stock network path.
  * `HlsCtor` is injected (not imported) to keep hls.js out of this chunk.
  */
 export function createPooledFragLoader(HlsCtor: any): any {
   const Base = HlsCtor.DefaultConfig.loader;
 
-  return class PooledFragLoader {
-    private impl: any;
-    private aborted = false;
-    private destroyed = false;
-    private stats: any;
-
-    constructor(config: any) {
-      this.impl = new Base(config);
-      this.stats = {
-        aborted: false,
-        loaded: 0,
-        retry: 0,
-        total: 0,
-        chunkCount: 0,
-        bwEstimate: 0,
-        trequest: 0,
-        tfirst: 0,
-        tload: 0,
-        loading: { start: 0, first: 0, end: 0 },
-        parsing: { start: 0, end: 0 },
-        buffering: { start: 0, end: 0 },
-      };
-    }
-
-    load(
-      context: any,
-      loaderConfig: any,
-      callbacks: {
-        onSuccess: (
-          response: { url: string; data: ArrayBuffer },
-          stats: any,
-          ctx: any,
-          networkDetails: unknown,
-        ) => void;
-        onError: (err: any, ctx: any, networkDetails: unknown) => void;
-        onTimeout: (stats: any, ctx: any, networkDetails: unknown) => void;
-      },
-    ): void {
+  return class PooledFragLoader extends Base {
+    load(context: any, loaderConfig: any, callbacks: any): void {
       const key = rangeKey(context.url, context.rangeStart, context.rangeEnd);
       const entry = pool.get(key);
       if (!entry) {
-        // Pool miss → stock network loading path.
-        this.impl.load(context, loaderConfig, callbacks);
+        // Pool miss → stock network loading path (inherited).
+        super.load(context, loaderConfig, callbacks);
         return;
       }
 
@@ -278,23 +247,11 @@ export function createPooledFragLoader(HlsCtor: any): any {
             null,
           );
         })
-        .catch((err) => {
+        .catch(() => {
           if (this.aborted || this.destroyed) return;
           // Pooled fetch failed → transparent network fallback.
-          this.impl.load(context, loaderConfig, callbacks);
-          void err;
+          super.load(context, loaderConfig, callbacks);
         });
-    }
-
-    abort(): void {
-      this.aborted = true;
-      this.impl.abort();
-    }
-
-    destroy(): void {
-      this.destroyed = true;
-      this.abort();
-      this.impl.destroy();
     }
   };
 }
