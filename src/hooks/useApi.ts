@@ -70,6 +70,9 @@ async function acquireOfficialSlot(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, Math.max(waitMs, 200)));
   }
 }
+// MAIN: transport-level fallback (official API is also the primary here —
+// the second attempt is a deliberate retry after limiter/backoff paths).
+const OFFICIAL_FALLBACK_GRAPHQL = 'https://graphql.anilist.co';
 // Module-level AniList availability signal for the global outage banner.
 // Only TRUE outages (network failure, 5xx, 429) flip the banner — ordinary
 // GraphQL errors (validation, not-found) and 4xx must not flap it.
@@ -280,36 +283,47 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
   const key = `${query.length}:${JSON.stringify(variables)}`;
   const inflight = anilistInflight.get(key);
   if (inflight) return inflight;
+  const post = (endpoint: string) =>
+    directAxios.post(
+      endpoint,
+      { query, variables },
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
+    );
+
   const task = (async () => {
-    try {
-      await acquireOfficialSlot();
-      const { data } = await directAxios.post(
-        ANILIST_GRAPHQL,
-        { query, variables },
-        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
-      );
-      if ((data as any)?.errors?.length) {
-        // GraphQL-level error (bad id, validation, not-found) is NOT an
-        // outage — the endpoint is up. Only network/5xx/429 flips the banner.
+    let lastError: unknown;
+    // Endpoints in order: the branch primary (OFFICIAL on main), then the
+    // fallback list — a slow/unreachable primary can no longer take the
+    // site down. GraphQL-level errors do NOT trigger the fallback (the
+    // endpoint is up; the query is the problem).
+    for (const endpoint of [ANILIST_GRAPHQL, OFFICIAL_FALLBACK_GRAPHQL]) {
+      try {
+        if (endpoint !== ANILIST_GRAPHQL) await acquireOfficialSlot();
+        const { data } = await post(endpoint);
+        if ((data as any)?.errors?.length) {
+          // GraphQL-level error (bad id, validation, not-found) is NOT an
+          // outage — only network/5xx/429 flip the banner.
+          reportAnilistStatus(false);
+          throw new Error(
+            `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
+          );
+        }
         reportAnilistStatus(false);
-        throw new Error(
-          `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
-        );
+        return (data as any)?.data;
+      } catch (err) {
+        lastError = err;
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
+        const transportFailure =
+          status === undefined || status === 429 || (status >= 500 && status <= 599);
+        if (!transportFailure) {
+          reportAnilistStatus(false);
+          throw err;
+        }
+        reportAnilistStatus(true);
       }
-      reportAnilistStatus(false);
-      return (data as any)?.data;
-    } catch (err) {
-      // Banner only on real transport outage (network failure, 5xx, 429) —
-      // ordinary GraphQL/4xx errors must not flap it. Provider write pacing
-      // lives in the backend, not here.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const isOutage =
-        status === undefined || status === 429 || (status >= 500 && status <= 599);
-      reportAnilistStatus(isOutage);
-      throw err;
-    } finally {
-      anilistInflight.delete(key);
     }
+    throw lastError;
   })();
   anilistInflight.set(key, task);
   return task;
