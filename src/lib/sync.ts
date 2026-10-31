@@ -869,7 +869,6 @@ const mapApiNotification = (row: unknown): NotificationItem | null => {
   };
 };
 
-const EPISODE_CHECK_COOLDOWN_MS = 21600000; // 6h
 
 /**
  * FETCH: GET the notifications array with the session Bearer; only an
@@ -1135,12 +1134,12 @@ export async function runNewEpisodeNotifications(
       // stale storage is non-fatal
     }
 
+    // NO cooldown gate: the AniList read is ONE batched request for up to
+    // 50 ids — a 6h gate let fresh episodes sit unnoticed for hours. The
+    // episode-number comparison below handles dedupe/ignore logic; the
+    // Supabase unique-violation catch handles double inserts.
     const now = Date.now();
-    const toCheck = bookmarks.filter(
-      (bookmark) =>
-        !lastKnown[bookmark.id] ||
-        now - (lastKnown[bookmark.id].t ?? 0) >= EPISODE_CHECK_COOLDOWN_MS,
-    );
+    const toCheck = bookmarks;
     summary.checked = toCheck.length;
     if (!toCheck.length) return summary;
 

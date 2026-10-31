@@ -23,6 +23,7 @@ import { AuthProvider } from './client/useAuth';
 import { AuthProvider as SupabaseAuthProvider } from './providers/AuthProvider';
 import ReactGA from 'react-ga4';
 import { initDevtoolsTaunt } from './lib/devtoolsTaunt';
+import { runNewEpisodeNotifications, subscribeToSession } from './lib/sync';
 import { Toaster } from './components/Toaster';
 // Floating episode-download pills (progress + cancel, bottom-left).
 import DownloadStack from './components/DownloadStack';
@@ -125,6 +126,43 @@ function App() {
   // The devtools greeter — fires once per page load.
   useEffect(() => {
     initDevtoolsTaunt();
+  }, []);
+
+  // NEW-EPISODE NOTIFICATION CHECK — app-wide (was Home-only: users who
+  // deep-linked straight into an episode page never triggered it and missed
+  // alerts the app delivered). Runs on session sign-in and every time the
+  // tab becomes visible; the per-anime episode-number comparison inside
+  // runNewEpisodeNotifications dedupes, so re-runs are cheap (one batched
+  // AniList call) and never double-insert (Supabase unique violation).
+  useEffect(() => {
+    let cancelled = false;
+    let currentUserId: string | null = null;
+    const run = () => {
+      if (!currentUserId || cancelled) return;
+      runNewEpisodeNotifications(currentUserId).catch(() => {
+        // best-effort: AniList/Supabase unreachable → no notifications
+      });
+    };
+    const unsubscribe = subscribeToSession((userId) => {
+      const changed = userId !== currentUserId;
+      currentUserId = userId;
+      if (userId && changed) run();
+    });
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    // First pass on app boot (deferred past first paint).
+    const deferred = requestIdleCallback
+      ? requestIdleCallback(() => run(), { timeout: 2500 })
+      : window.setTimeout(run, 2500);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      document.removeEventListener('visibilitychange', onVisible);
+      if (typeof deferred !== 'number') cancelAnimationFrame(deferred);
+      else clearTimeout(deferred);
+    };
   }, []);
 
   return (

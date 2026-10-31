@@ -27,7 +27,7 @@ import { HomeBanner } from '../components/Home/HomeBanner';
 import { HomeTabs } from '../components/Home/HomeTabs';
 import { MiniSchedule } from '../components/Home/MiniSchedule';
 import { SidePanel } from '../components/Home/SidePanels';
-import { runNewEpisodeNotifications, subscribeToSession } from '../lib/sync';
+
 import { useSeo } from '../utils/seo';
 // NSFW gate: every browse row and the hero carousel run through filterAdult
 // (Hentai-genre rule, default OFF → hidden). Sync payloads stay unfiltered.
@@ -421,30 +421,6 @@ const Home = () => {
       },
     },
   });
-
-  // NEW-EPISODE NOTIFICATION LOOP (logged-in only, once per session user).
-  // For each bookmarked anime it compares the last-known episode (LS
-  // `aniraku:episode-track`, 6h cooldown), dedupes against the
-  // `notifications` table, then inserts {user_id, type:'new_episode',
-  // message, anime_id}. Session detection goes through lib/sync
-  // (supabase.auth directly — no auth-hook import).
-  useEffect(() => {
-    let cancelled = false;
-    // Background loop — deferred past first paint like the rails.
-    const cancelDeferred = deferNonCritical(() => {
-      const unsubscribe = subscribeToSession((userId) => {
-        if (!userId || cancelled) return;
-        runNewEpisodeNotifications(userId).catch(() => {
-          // best-effort: AniList/Supabase unreachable → no notifications
-        });
-      });
-      if (cancelled) unsubscribe();
-    });
-    return () => {
-      cancelled = true;
-      cancelDeferred();
-    };
-  }, []);
 
   // Toast texts → console (no toast system locally; reported).
   useEffect(() => {
