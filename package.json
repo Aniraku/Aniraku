@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "NODE_OPTIONS=--experimental-global-webcrypto vite build",
+    "build": "NODE_OPTIONS=--experimental-global-webcrypto vite build && node scripts/sync-csp.mjs",
     "preview": "vite preview",
     "start": "NODE_OPTIONS=--experimental-global-webcrypto vite build && bun run ./server/server.ts",
     "lint": "eslint . --ext js,jsx,ts,tsx --report-unused-disable-directives",

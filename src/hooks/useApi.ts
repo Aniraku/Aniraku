@@ -42,6 +42,9 @@ export function proxiedMediaUrl(
 }
 
 export const ANILIST_GRAPHQL = `https://${atob('Z3JhcGhxbC5hbmlyYWt1LnRlY2g=')}`;
+/** Transport-level fallback when the mirror times out / 5xx's (official
+ * public API, rate-limited — fallback hits are rare by design). */
+const OFFICIAL_FALLBACK_GRAPHQL = 'https://graphql.anilist.co';
 /** Aniraku GraphQL mirror: AniList metadata only, no rate limit. */
 export const ANIRAKU_GRAPHQL_MIRROR = ANILIST_GRAPHQL;
 export const ANIRAKU_GRAPHQL_UNLIMITED = true;
@@ -255,34 +258,47 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
   const key = `${query.length}:${JSON.stringify(variables)}`;
   const inflight = anilistInflight.get(key);
   if (inflight) return inflight;
+  const post = (endpoint: string) =>
+    directAxios.post(
+      endpoint,
+      { query, variables },
+      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
+    );
+
   const task = (async () => {
-    try {
-      const { data } = await directAxios.post(
-        ANILIST_GRAPHQL,
-        { query, variables },
-        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
-      );
-      if ((data as any)?.errors?.length) {
-        // GraphQL-level error (bad id, validation, not-found) is NOT an
-        // outage — the mirror is up. Only network/5xx/429 flips the banner.
+    let lastError: unknown;
+    // Endpoints in order: the branch primary (mirror on preview, official on
+    // main), then the official public API as a TRANSPORT-LEVEL fallback — a
+    // slow/unreachable primary (regional mirror outages) can no longer take
+    // the site down. GraphQL-level errors do NOT trigger the fallback (the
+    // endpoint is up; the query is the problem).
+    for (const endpoint of [ANILIST_GRAPHQL, OFFICIAL_FALLBACK_GRAPHQL]) {
+      try {
+        const { data } = await post(endpoint);
+        if ((data as any)?.errors?.length) {
+          // GraphQL-level error (bad id, validation, not-found) is NOT an
+          // outage — only network/5xx/429 flip the banner.
+          reportAnilistStatus(false);
+          throw new Error(
+            `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
+          );
+        }
         reportAnilistStatus(false);
-        throw new Error(
-          `AniList error: ${(data as any).errors[0]?.message || 'unknown'}`,
-        );
+        return (data as any)?.data;
+      } catch (err) {
+        lastError = err;
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
+        const transportFailure =
+          status === undefined || status === 429 || (status >= 500 && status <= 599);
+        if (!transportFailure) {
+          reportAnilistStatus(false);
+          throw err;
+        }
+        reportAnilistStatus(true);
       }
-      reportAnilistStatus(false);
-      return (data as any)?.data;
-    } catch (err) {
-      // Mirror is unlimited metadata-only: throttle signals come from the
-      // backend provider APIs, not here. Banner only on real transport outage.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      const isOutage =
-        status === undefined || status === 429 || (status >= 500 && status <= 599);
-      reportAnilistStatus(isOutage);
-      throw err;
-    } finally {
-      anilistInflight.delete(key);
     }
+    throw lastError;
   })();
   anilistInflight.set(key, task);
   return task;
