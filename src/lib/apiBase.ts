@@ -17,11 +17,13 @@ const developmentApiBase =
 
 const configuredApiBase =
   (
-    (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
-    (import.meta.env.VITE_BACKEND_HOST_B64 as string | undefined
+    // Base64-encoded host only. The plain-URL var (VITE_BACKEND_URL) is
+    // deliberately NOT read anywhere — a dashboard env var set to the plain
+    // URL would otherwise be baked into the bundle verbatim by Vite and
+    // re-leak the endpoint.
+    import.meta.env.VITE_BACKEND_HOST_B64 as string | undefined
       ? `https://${b64(import.meta.env.VITE_BACKEND_HOST_B64 as string)}`
-      : undefined) ||
-    ''
+      : ''
   ).replace(/\/+$/, '');
 
 void developmentApiBase; // dev uses the vite server proxy (same-origin too)
