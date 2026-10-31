@@ -130,12 +130,52 @@ export function initDevtoolsTaunt(): void {
     { once: true },
   );
 
-  // For the copy-paste detectives: watching someone decode our fake key.
-  window.addEventListener(
-    'storage',
-    (event) => {
-      if (event.key === null) return; // clearStorage — not our business
-    },
-    { once: true },
-  );
+  // — NEXT LEVEL: devtools-open detection + bait network requests —
+  // When DevTools opens, their Network tab gets a show: dramatic "leaked
+  // endpoint" requests to hosts that do not exist, so the bait tab fills
+  // up while the real API stays same-origin and anonymous.
+  let baited = false;
+  const checkOpen = () => {
+    const wide =
+      window.outerWidth - window.innerWidth > 160 ||
+      window.outerHeight - window.innerHeight > 160;
+    if (wide && !baited) {
+      baited = true;
+      console.log('%c📡 DevTools detected. Deploying decoy traffic…', accent);
+      console.log('%cEnjoy the Network tab. It is exactly as real as it looks.', muted);
+      const bait = [
+        'https://never-gonna.give/you/up.json',
+        'https://api.anirqku.tech/v99/leaked-sources?token=please',
+        'https://internal.aniraku.tech/definitely/the/real/api',
+      ];
+      bait.forEach((url, i) =>
+        setTimeout(() => fetch(url).catch(() => {}), i * 400),
+      );
+      // Escalating waves.
+      setTimeout(
+        () =>
+          console.log(
+            '%c🎵 30s update: the decoys have reported your position. The real API remains a ghost. (Same-origin, remember?)',
+            muted,
+          ),
+        30_000,
+      );
+      setTimeout(() => {
+        console.log('%c🎵 NEVER GONNA GIVE YOU UP 🎵', accent);
+        console.log('%c🎵 NEVER GONNA LET YOU DOWN 🎵', accent);
+        console.log('%c🎵 NEVER GONNA RUN AROUND AND DE-sert YOU 🎵', accent);
+        console.log('%cYou have been here a full minute. We admire the dedication.', muted);
+      }, 60_000);
+    }
+  };
+  window.addEventListener('resize', checkOpen);
+  // Expose a fake secret API for console typers.
+  (window as any).getSecretEndpoints = (): Promise<string[]> =>
+    new Promise((resolve) => {
+      console.log('%c🔐 Decrypting the secret endpoint vault…', accent);
+      setTimeout(() => {
+        console.log('%c🎵 You know the rules, and so do I 🎵', accent);
+        resolve(['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+      }, 3000);
+    });
 }

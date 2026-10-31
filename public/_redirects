@@ -1,1 +1,3 @@
+/health https://api.aniraku.tech/health 200
+/api/v1/* https://api.aniraku.tech/api/v1/:splat 200
 /* /index.html 200
