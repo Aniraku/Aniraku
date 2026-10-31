@@ -75,7 +75,8 @@ function proxyWrap(
   headers: Record<string, string> | null | undefined,
   proxyBase?: string,
 ): string | null {
-  if (!proxyBase) return null;
+  if (proxyBase === undefined) return null;
+  // '' = same-origin (server rewrite) — must still yield a ROOTED path.
   const base = proxyBase.replace(/\/+$/, '');
   const h =
     headers && Object.keys(headers).length > 0

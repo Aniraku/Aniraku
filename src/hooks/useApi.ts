@@ -20,7 +20,7 @@ function ensureUrlEndsWithSlash(url: string): string {
 // Example: VITE_BACKEND_URL="https://<backend-host>/"
 // lib/apiBase owns endpoint resolution (env + runtime assembly) — this
 // module never sees the host as a literal.
-const ANIRAKU_BASE = ensureUrlEndsWithSlash(API_BASE);
+const ANIRAKU_BASE = API_BASE; // '' = same-origin; templates carry the leading slash
 
 export const ANIRAKU_API_BASE = ANIRAKU_BASE;
 
@@ -36,7 +36,7 @@ export function proxiedMediaUrl(
     headers && Object.keys(headers).length > 0
       ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
       : '';
-  return `${ANIRAKU_BASE}api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
+  return `${ANIRAKU_BASE}/api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
 }
 
 export const ANILIST_GRAPHQL = 'https://graphql.anilist.co';
@@ -684,7 +684,7 @@ export async function fetchAnimeEpisodes(
   const cacheKey = generateCacheKey('animeEpisodes', animeId);
   const cached = animeEpisodesCache.get(cacheKey);
   if (cached) return cached;
-  const url = `${ANIRAKU_BASE}api/v1/anime/${encodeURIComponent(animeId)}/episodes`;
+  const url = `${ANIRAKU_BASE}/api/v1/anime/${encodeURIComponent(animeId)}/episodes`;
   const { data } = await directAxios.get(url);
   const list = Array.isArray(data?.episodes) ? data.episodes : [];
   const mapped = list.map((ep: any) => ({
@@ -732,7 +732,7 @@ export async function fetchAnirakuStream({
   const cached = anirakuStreamCache.get(cacheKey);
   if (cached) return cached;
   const { data } = await directAxios.post(
-    `${ANIRAKU_BASE}api/v1/stream`,
+    `${ANIRAKU_BASE}/api/v1/stream`,
     {
       animeId,
       episode,
@@ -768,7 +768,7 @@ export async function fetchAnirakuServers(
   });
   if (genres) params.set('genres', genres);
   const { data } = await anirakuLongAxios.get(
-    `${ANIRAKU_BASE}api/v1/servers?${params.toString()}`,
+    `${ANIRAKU_BASE}/api/v1/servers?${params.toString()}`,
   );
   anirakuServersCache.set(cacheKey, data);
   return data;

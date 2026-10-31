@@ -77,6 +77,11 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
     },
 
     server: {
+    // Same-origin API in dev: mirrors the production rewrite.
+    proxy: {
+      '/api/v1': { target: 'https://api.aniraku.tech', changeOrigin: true },
+      '/health': { target: 'https://api.aniraku.tech', changeOrigin: true },
+    },
       port: parseInt(process.env.VITE_PORT || '3000'), // Dev on :3000 (Aniraku CORS allowlist)
       open: true, // Automatically open the default browser when starting the server
       cors: true,
