@@ -62,6 +62,7 @@ const ProfilePage = lazy(() => import('./pages/Profile'));
 // Routes are lazy so the auth/legal chunks stay out of the initial bundle.
 const Auth = lazy(() => import('./pages/Auth'));
 const NewPassword = lazy(() => import('./pages/NewPassword'));
+const AuthConfirm = lazy(() => import('./pages/AuthConfirm'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Dmca = lazy(() => import('./pages/Dmca'));
@@ -211,6 +212,7 @@ function App() {
                     element={<Auth mode='forgot' />}
                   />
                   <Route path='/auth/new-password' element={<NewPassword />} />
+                  <Route path='/auth/confirm' element={<AuthConfirm />} />
                   {/* Wave A legal routes */}
                   <Route path='/privacy' element={<Privacy />} />
                   <Route path='/terms' element={<Terms />} />
