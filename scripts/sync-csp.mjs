@@ -17,8 +17,9 @@ const hashes = [];
 for (const match of html.matchAll(/<script(?![^>]*\bsrc=)([^>]*)>([\s\S]*?)<\/script>/g)) {
   const attrs = match[1];
   const body = match[2];
-  // Data blocks (JSON-LD, speculation rules, importmaps) are never executed.
-  if (/ld\+json|speculationrules|importmap/i.test(attrs)) continue;
+  // JSON-LD + importmaps are data blocks (never executed, not CSP-enforced).
+  // Speculation rules ARE CSP-enforced (script-src) — hash them too.
+  if (/ld\+json|importmap/i.test(attrs)) continue;
   if (body.trim() === '') continue;
   hashes.push(
     "'sha256-" + createHash('sha256').update(body).digest('base64') + "'",
