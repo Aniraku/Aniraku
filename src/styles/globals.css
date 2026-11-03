@@ -319,6 +319,26 @@ body {
   transform: scale(0.9);
 }
 
+/* Dice roll while the random fetch runs (navbar button + bottom-nav tab). */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes diceRoll {
+    0% {
+      transform: rotate(0) scale(1);
+    }
+    45% {
+      transform: rotate(-20deg) scale(1.2);
+    }
+    100% {
+      transform: rotate(360deg) scale(1);
+    }
+  }
+
+  .randomBtn.rolling svg,
+  .bottomNavTab.rolling svg {
+    animation: diceRoll 0.55s ease-in-out infinite;
+  }
+}
+
 .slashToggleBtn {
   display: flex;
   align-items: center;

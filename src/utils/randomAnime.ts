@@ -4,7 +4,7 @@
 //   trending fetch → filterAdult NSFW pool → navigate(infoPathFor(pick)).
 // The explicit `filterAdult<Anime>` type arg is required for TypeScript.
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Anime } from '../hooks/animeInterface';
 import { fetchTrendingAnime } from '../hooks/useApi';
@@ -36,13 +36,18 @@ export const runRandomAnime = async (
 };
 
 // Hook wrapper: binds router navigate + the shared NSFW flag (useNsfw is
-// multi-instance safe by design — see useNsfw.ts shared state). Returns a
-// stable callback for onClick.
-export const useRandomAnime = (): (() => void) => {
+// multi-instance safe by design — see useNsfw.ts shared state). Also exposes
+// `rolling` so both call sites can spin the dice icon while the fetch runs.
+export const useRandomAnime = (): {
+  rollRandom: () => void;
+  rolling: boolean;
+} => {
   const navigate = useNavigate();
   const { nsfwEnabled } = useNsfw();
-  return useCallback(
-    () => void runRandomAnime(nsfwEnabled, navigate),
-    [nsfwEnabled, navigate],
-  );
+  const [rolling, setRolling] = useState(false);
+  const rollRandom = useCallback(() => {
+    setRolling(true);
+    void runRandomAnime(nsfwEnabled, navigate).finally(() => setRolling(false));
+  }, [nsfwEnabled, navigate]);
+  return { rollRandom, rolling };
 };

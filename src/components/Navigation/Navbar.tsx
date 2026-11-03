@@ -65,7 +65,7 @@ const Navbar = () => {
   // Mobile wave — shared Random action (utils/randomAnime.ts). The helper
   // Holds the former inline body: trending fetch → filterAdult
   // NSFW pool (explicit <Anime> type arg) → navigate(infoPathFor(pick)).
-  const fetchRandomAnime = useRandomAnime();
+  const { rollRandom, rolling } = useRandomAnime();
 
   // Debounced live search: an AniList POST per keystroke is slow and hammers
   // the API — wait for a 300ms typing pause, and only apply the response of
@@ -165,7 +165,7 @@ const Navbar = () => {
   // stable close handler for the portaled Notifications drawer
   const onCloseNotifications = useCallback(
     () => setShowNotificationsDropdown(false),
-    []
+    [],
   );
 
   useEffect(() => {
@@ -176,7 +176,10 @@ const Navbar = () => {
       ) {
         setShowProfileDropdown(false);
       }
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
         setShowResults(false);
       }
     };
@@ -191,9 +194,15 @@ const Navbar = () => {
     };
 
     // Focus search when the global shortcut fires (/ and ⌃/⌘S).
-    window.addEventListener('global-shortcuts:focus-search', handleGlobalSearch);
+    window.addEventListener(
+      'global-shortcuts:focus-search',
+      handleGlobalSearch,
+    );
     return () =>
-      window.removeEventListener('global-shortcuts:focus-search', handleGlobalSearch);
+      window.removeEventListener(
+        'global-shortcuts:focus-search',
+        handleGlobalSearch,
+      );
   }, []);
 
   useEffect(() => {
@@ -234,15 +243,33 @@ const Navbar = () => {
     const closeNotifications = () => setShowNotificationsDropdown(false);
     const openSideMenu = () => setShowSideMenu((v) => !v);
     const closeSideMenu = () => setShowSideMenu(false);
-    window.addEventListener('global-shortcuts:open-notifications', openNotifications);
-    window.addEventListener('global-shortcuts:close-notifications', closeNotifications);
+    window.addEventListener(
+      'global-shortcuts:open-notifications',
+      openNotifications,
+    );
+    window.addEventListener(
+      'global-shortcuts:close-notifications',
+      closeNotifications,
+    );
     window.addEventListener('global-shortcuts:open-sidemenu', openSideMenu);
     window.addEventListener('global-shortcuts:close-sidemenu', closeSideMenu);
     return () => {
-      window.removeEventListener('global-shortcuts:open-notifications', openNotifications);
-      window.removeEventListener('global-shortcuts:close-notifications', closeNotifications);
-      window.removeEventListener('global-shortcuts:open-sidemenu', openSideMenu);
-      window.removeEventListener('global-shortcuts:close-sidemenu', closeSideMenu);
+      window.removeEventListener(
+        'global-shortcuts:open-notifications',
+        openNotifications,
+      );
+      window.removeEventListener(
+        'global-shortcuts:close-notifications',
+        closeNotifications,
+      );
+      window.removeEventListener(
+        'global-shortcuts:open-sidemenu',
+        openSideMenu,
+      );
+      window.removeEventListener(
+        'global-shortcuts:close-sidemenu',
+        closeSideMenu,
+      );
     };
   }, []);
 
@@ -251,37 +278,37 @@ const Navbar = () => {
   return (
     <>
       <header className={`navbar ${scrolled ? 'scrolled' : ''}`}>
-        <div className="navContainer">
-          <div className="topContainer">
-            <div className="leftGroup">
+        <div className='navContainer'>
+          <div className='topContainer'>
+            <div className='leftGroup'>
               <button
-                className="hamburger"
+                className='hamburger'
                 onClick={toggleSideMenu}
-                aria-label="Toggle menu"
+                aria-label='Toggle menu'
                 aria-expanded={showSideMenu}
               >
                 <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  width='20'
+                  height='20'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
                 >
-                  <line x1="3" y1="12" x2="21" y2="12"></line>
-                  <line x1="3" y1="6" x2="21" y2="6"></line>
-                  <line x1="3" y1="18" x2="21" y2="18"></line>
+                  <line x1='3' y1='12' x2='21' y2='12'></line>
+                  <line x1='3' y1='6' x2='21' y2='6'></line>
+                  <line x1='3' y1='18' x2='21' y2='18'></line>
                 </svg>
               </button>
-              <Link to="/" className="navLogo" title="Aniraku">
+              <Link to='/' className='navLogo' title='Aniraku'>
                 <img
                   src={BRAND_LOGO}
-                  alt="Aniraku"
-                  aria-label="Aniraku"
-                  width="32"
-                  height="32"
+                  alt='Aniraku'
+                  aria-label='Aniraku'
+                  width='32'
+                  height='32'
                 />
               </Link>
             </div>
@@ -289,25 +316,26 @@ const Navbar = () => {
             {/* live `Dv` search section: [input container box, action
                 buttons] as siblings; the slash hint is the last child INSIDE
                 the box (live `Tv`), driven by isSearchFocused */}
-            <div className="searchSection" ref={searchRef}>
+            <div className='searchSection' ref={searchRef}>
               <div
                 className={`navSearchBar ${showMobileSearch ? 'mobileShow' : ''}`}
                 data-has-query={hasQuery}
               >
-                <div className="searchInputContainer">
-                  <FiSearch className="searchIcon" />
+                <div className='searchInputContainer'>
+                  <FiSearch className='searchIcon' />
                   <input
                     ref={inputRef}
-                    type="text"
-                    placeholder="Search Anime"
-                    aria-label="Search Anime"
+                    type='text'
+                    placeholder='Search Anime'
+                    aria-label='Search Anime'
                     value={query}
                     onChange={(e) => handleSearch(e.target.value)}
                     onKeyDown={(e) => {
                       // Enter submits to the full search page (same as the
                       // submit button); isComposing guard keeps IME
                       // confirmations from submitting mid-composition.
-                      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                      if (e.key !== 'Enter' || e.nativeEvent.isComposing)
+                        return;
                       const q = query.trim();
                       if (!q) return;
                       handleCloseResults();
@@ -322,9 +350,9 @@ const Navbar = () => {
                   />
                   {hasQuery && (
                     <button
-                      className="searchClearBtn"
+                      className='searchClearBtn'
                       onClick={handleClear}
-                      aria-label="Clear search"
+                      aria-label='Clear search'
                     >
                       <FiX />
                     </button>
@@ -340,44 +368,45 @@ const Navbar = () => {
                   onClose={handleCloseResults}
                 />
                 <button
-                  type="button"
-                  className="slashToggleBtn"
+                  type='button'
+                  className='slashToggleBtn'
                   data-focused={isSearchFocused ? 'true' : 'false'}
                   onClick={() => inputRef.current?.focus()}
-                  aria-label="Keyboard shortcuts"
-                  title="Keyboard shortcuts"
+                  aria-label='Keyboard shortcuts'
+                  title='Keyboard shortcuts'
                 >
                   <MdOutlineKeyboard />
                 </button>
               </div>
-              <div className="actionButtons">
+              <div className='actionButtons'>
                 <button
-                  type="button"
-                  className="searchSubmitBtn"
+                  type='button'
+                  className='searchSubmitBtn'
                   onClick={() =>
-                    query && navigate(`/search?query=${encodeURIComponent(query)}`)
+                    query &&
+                    navigate(`/search?query=${encodeURIComponent(query)}`)
                   }
-                  aria-label="Submit search"
+                  aria-label='Submit search'
                 >
                   <FiSearch />
                 </button>
                 <button
-                  type="button"
-                  className="randomBtn"
-                  onClick={fetchRandomAnime}
-                  aria-label="Random Anime"
-                  title="Random Anime"
+                  type='button'
+                  className={`randomBtn${rolling ? ' rolling' : ''}`}
+                  onClick={rollRandom}
+                  aria-label='Random Anime'
+                  title='Random Anime'
                 >
                   <GiPerspectiveDiceSixFacesRandom />
                 </button>
               </div>
             </div>
 
-            <div className="rightContent">
+            <div className='rightContent'>
               <button
-                className="toggleSearchBtn"
+                className='toggleSearchBtn'
                 onClick={toggleMobileSearch}
-                aria-label="Toggle search"
+                aria-label='Toggle search'
               >
                 <FiSearch />
               </button>
@@ -385,29 +414,29 @@ const Navbar = () => {
                   the SupportPrompt modal via the app-wide event. Reuses the
                   shared icon-button class so no stylesheet edit is needed. */}
               <button
-                type="button"
-                className="notificationBtn"
+                type='button'
+                className='notificationBtn'
                 onClick={() =>
                   window.dispatchEvent(new Event('aniraku:open-support'))
                 }
-                title="Support Aniraku"
-                aria-label="Support Aniraku"
+                title='Support Aniraku'
+                aria-label='Support Aniraku'
               >
                 <FaHeart size={14} />
               </button>
               {/* live `sv`: bell always visible (default anilist provider);
                   `show` + badge only when unread > 0; drawer replaces the old
                   inline dropdown and portals to document.body */}
-              <div className="notificationContainer">
+              <div className='notificationContainer'>
                 <button
                   className={`notificationBtn ${unreadCount > 0 ? 'show' : ''}`}
                   onClick={toggleNotificationsDropdown}
-                  aria-label="Notifications"
+                  aria-label='Notifications'
                   aria-expanded={showNotificationsDropdown}
                 >
                   <FiBell />
                   {unreadCount > 0 && (
-                    <span className="notificationBadge">{unreadCount}</span>
+                    <span className='notificationBadge'>{unreadCount}</span>
                   )}
                 </button>
                 <Notifications
@@ -415,13 +444,13 @@ const Navbar = () => {
                   onClose={onCloseNotifications}
                 />
               </div>
-              <div className="profileContainer" ref={profileDropdownRef}>
+              <div className='profileContainer' ref={profileDropdownRef}>
                 <button
-                  className="profileBtn"
+                  className='profileBtn'
                   onClick={toggleProfileDropdown}
-                  aria-label="Profile menu"
+                  aria-label='Profile menu'
                   aria-expanded={showProfileDropdown}
-                  aria-controls="rightDropdownMenu"
+                  aria-controls='rightDropdownMenu'
                 >
                   {supabaseAvatar ? (
                     <img
@@ -431,46 +460,46 @@ const Navbar = () => {
                         supabaseProfile?.username ||
                         'Profile'
                       }
-                      className="profileAvatar"
-                      referrerPolicy="no-referrer"
+                      className='profileAvatar'
+                      referrerPolicy='no-referrer'
                     />
                   ) : isLoggedIn && userData?.avatar ? (
                     <img
                       src={userData.avatar.large}
                       alt={userData.name || 'Profile'}
-                      className="profileAvatar"
-                      referrerPolicy="no-referrer"
+                      className='profileAvatar'
+                      referrerPolicy='no-referrer'
                     />
                   ) : (
-                    <span className="profileIcon">
+                    <span className='profileIcon'>
                       <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                        width='20'
+                        height='20'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth='2'
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
                       >
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
+                        <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'></path>
+                        <circle cx='12' cy='7' r='4'></circle>
                       </svg>
                     </span>
                   )}
                 </button>
                 <div
                   className={`profileDropdown ${showProfileDropdown ? 'show' : ''}`}
-                  id="rightDropdownMenu"
-                  role="menu"
+                  id='rightDropdownMenu'
+                  role='menu'
                 >
                   {supabaseUser ? (
                     <Link
-                      to="/profile"
-                      className="profileMenuItem"
-                      role="menuitem"
+                      to='/profile'
+                      className='profileMenuItem'
+                      role='menuitem'
                     >
-                      <span className="menuLabel">
+                      <span className='menuLabel'>
                         {supabaseProfile?.display_name ||
                           supabaseProfile?.username ||
                           'Profile'}
@@ -479,19 +508,19 @@ const Navbar = () => {
                   ) : (
                     <>
                       <Link
-                        to="/login"
-                        className="profileMenuItem login"
-                        role="menuitem"
+                        to='/login'
+                        className='profileMenuItem login'
+                        role='menuitem'
                       >
-                        <FiLogIn aria-hidden="true" />
+                        <FiLogIn aria-hidden='true' />
                         Login
                       </Link>
                       <Link
-                        to="/signup"
-                        className="profileMenuItem login"
-                        role="menuitem"
+                        to='/signup'
+                        className='profileMenuItem login'
+                        role='menuitem'
                       >
-                        <FiUserPlus aria-hidden="true" />
+                        <FiUserPlus aria-hidden='true' />
                         Sign-up
                       </Link>
                     </>
