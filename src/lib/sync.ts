@@ -871,14 +871,18 @@ const mapApiNotification = (row: unknown): NotificationItem | null => {
 
 
 /**
- * FETCH: GET the notifications array with the session Bearer; only an
- * `res.ok` payload replaces the store (failures keep the last-known rows).
+ * FETCH: own Supabase rows always refresh; backend rows come from the
+ * `/api/v1/notifications` GET and fall back to the last-known payload when
+ * that fetch fails — a backend outage must not also freeze episode alerts
+ * and export receipts, which live outside the backend entirely.
  * Returns the rows the store now holds.
  *
  * Export-compat shims (the Navbar badge depends on these names):
  * the legacy `(userId, limit)` parameters are accepted but ignored — the
  * endpoint is session-scoped (Bearer), so callers stay source-compatible.
  */
+let lastKnownBackendRows: NotificationItem[] = [];
+
 export async function fetchNotifications(
   _userId?: string,
   _limit?: number,
@@ -886,15 +890,26 @@ export async function fetchNotifications(
   try {
     const headers = await authHeaders();
     if (!headers.Authorization) return notificationItems; // guest — bridge clears the store
-    const res = await fetch(`${API_BASE}/api/v1/notifications`, { headers });
-    if (!res.ok) return notificationItems;
-    const payload: unknown = await res.json();
-    const backendRows = (Array.isArray(payload) ? payload : [])
-      .map(mapApiNotification)
-      .filter((row): row is NotificationItem => row !== null);
+
     // Own Supabase rows first (episode alerts, export receipts — user-
-    // actionable), then backend rows; id spaces are disjoint, deduped anyway.
-    const rows = [...(await fetchOwnSupabaseNotifications()), ...backendRows];
+    // actionable): refreshed unconditionally, independent of backend health.
+    const ownRows = await fetchOwnSupabaseNotifications();
+
+    let backendRows = lastKnownBackendRows;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/notifications`, { headers });
+      if (!res.ok) throw new Error(`backend ${res.status}`);
+      const payload: unknown = await res.json();
+      backendRows = (Array.isArray(payload) ? payload : [])
+        .map(mapApiNotification)
+        .filter((row): row is NotificationItem => row !== null);
+      lastKnownBackendRows = backendRows;
+    } catch {
+      // backend unreachable / bad payload — keep its last-known rows
+    }
+
+    // Then backend rows; id spaces are disjoint, deduped anyway.
+    const rows = [...ownRows, ...backendRows];
     const seen = new Set<string>();
     const merged = rows.filter((row) => {
       if (seen.has(row.id)) return false;
@@ -1007,8 +1022,21 @@ export function markAllNotificationsRead(ids: string[]): Set<string> {
 
 const NOTIFICATION_POLL_MS = 30000;
 let notificationPollTimer: ReturnType<typeof setInterval> | null = null;
+let pollUserId: string | null = null;
+
+function startNotificationPoll(userId: string): void {
+  pollUserId = userId;
+  notificationPollTimer = setInterval(() => {
+    // Hidden tabs don't poll — the badge catches up on the next visible
+    // tick, so background tabs stop burning 2 auth reads + 2 HTTP requests
+    // every 30s.
+    if (document.hidden) return;
+    void fetchNotifications();
+  }, NOTIFICATION_POLL_MS);
+}
 
 function stopNotificationPoll(): void {
+  pollUserId = null;
   if (notificationPollTimer !== null) {
     clearInterval(notificationPollTimer);
     notificationPollTimer = null;
@@ -1018,17 +1046,22 @@ function stopNotificationPoll(): void {
 // Session-driven poll: immediate fetch plus an interval while the user
 // exists, cleared on cleanup / user change. The bridge fires on module load
 // (via getSession), on sign-in/out and on
-// user switch, so the interval always tracks the live session.
+// user switch, so the interval always tracks the live session. A hidden
+// tab that becomes visible fetches immediately instead of waiting for the
+// next tick.
 subscribeToSession((userId) => {
   stopNotificationPoll();
   if (!userId) {
+    lastKnownBackendRows = [];
     setNotificationItems([]); // sign-out / guest — drawer & badge reset
     return;
   }
   void fetchNotifications();
-  notificationPollTimer = setInterval(() => {
-    void fetchNotifications();
-  }, NOTIFICATION_POLL_MS);
+  startNotificationPoll(userId);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && pollUserId) void fetchNotifications();
 });
 
 /** AniList metadata batch read via the shared `ANILIST_GRAPHQL` endpoint

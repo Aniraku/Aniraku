@@ -154,11 +154,13 @@ const DropSearch = ({
         {isLoading || error ? (
           <li>
             <div className="searchLoadingWrapper">
-              <img
-                className="searchLoadingImage"
-                src="/assets/pikachu-BzF97nTe.gif"
-                alt="pika"
-              />
+              {/* CSS dots (globals.css) instead of the 22KB GIF — the
+                 spinner renders on every keystroke-triggered load. */}
+              <div className="loadingDots" role="status" aria-label="Searching">
+                <span className="loadingDot" />
+                <span className="loadingDot" />
+                <span className="loadingDot" />
+              </div>
             </div>
           </li>
         ) : results.length > 0 ? (

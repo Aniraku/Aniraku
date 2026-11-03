@@ -67,30 +67,63 @@ const Navbar = () => {
   // NSFW pool (explicit <Anime> type arg) → navigate(infoPathFor(pick)).
   const fetchRandomAnime = useRandomAnime();
 
-  const handleSearch = async (searchQuery: string) => {
+  // Debounced live search: an AniList POST per keystroke is slow and hammers
+  // the API — wait for a 300ms typing pause, and only apply the response of
+  // the latest request (a stale in-flight reply must not clobber newer text).
+  const searchTimerRef = useRef<number | null>(null);
+  const searchIdRef = useRef(0);
+
+  const runSearch = useCallback(async (searchQuery: string) => {
+    const requestId = ++searchIdRef.current;
+    setIsSearching(true);
+    setShowResults(true);
+    try {
+      const searchResults = await fetchAdvancedSearch(searchQuery, 1, 15);
+      if (requestId !== searchIdRef.current) return; // stale response
+      setResults(searchResults.results ?? []);
+      setSearchError(false);
+    } catch (error) {
+      if (requestId !== searchIdRef.current) return;
+      console.error('Error searching anime:', error);
+      setResults([]);
+      setSearchError(true);
+    } finally {
+      if (requestId === searchIdRef.current) setIsSearching(false);
+    }
+  }, []);
+
+  const cancelPendingSearch = useCallback(() => {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    searchIdRef.current++; // invalidate any in-flight request
+  }, []);
+
+  useEffect(() => cancelPendingSearch, [cancelPendingSearch]);
+
+  const handleSearch = (searchQuery: string) => {
     setQuery(searchQuery);
-    if (searchQuery.trim()) {
-      setIsSearching(true);
-      setShowResults(true);
-      try {
-        const searchResults = await fetchAdvancedSearch(searchQuery, 1, 15);
-        setResults(searchResults.results ?? []);
-        setSearchError(false);
-      } catch (error) {
-        console.error('Error searching anime:', error);
-        setResults([]);
-        setSearchError(true);
-      } finally {
-        setIsSearching(false);
-      }
-    } else {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    if (!searchQuery.trim()) {
+      cancelPendingSearch();
       setResults([]);
       setShowResults(false);
       setSearchError(false);
+      setIsSearching(false);
+      return;
     }
+    searchTimerRef.current = window.setTimeout(() => {
+      searchTimerRef.current = null;
+      void runSearch(searchQuery);
+    }, 300);
   };
 
   const handleClear = () => {
+    cancelPendingSearch();
     setQuery('');
     setResults([]);
     setShowResults(false);

@@ -107,8 +107,22 @@ const Notifications = ({ isOpen, onClose }: NotificationsProps) => {
   const drawerRef = useRef<HTMLDivElement>(null);
 
   // Server-backed rows (30s poll in lib/sync) + `read` column as authority.
-  const { notifications: items, markRead, refresh } = useNotifications();
+  const { notifications: items, markRead } = useNotifications();
   const unreadCount = items.filter((item) => !item.read).length;
+
+  // Reload motion: `spinAngle` accumulates +360 per revolution and the
+  // inline rotate springs BETWEEN angles, so repeated clicks chain
+  // smoothly and an in-flight refetch just retargets — no animation
+  // restarts, always clockwise (reduced-motion users see no spin at all:
+  // the transitions are gated in notifications.css and +360 is invisible).
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [spinAngle, setSpinAngle] = useState(0);
+
+  useEffect(() => {
+    if (!isRefreshing) return;
+    const timer = setInterval(() => setSpinAngle((angle) => angle + 360), 500);
+    return () => clearInterval(timer);
+  }, [isRefreshing]);
 
   // Overlay stack: Escape closes only the top-most overlay
   useEffect(() => {
@@ -136,8 +150,18 @@ const Notifications = ({ isOpen, onClose }: NotificationsProps) => {
       showToast('Please log in to refresh notifications.', { type: 'warning' });
       return;
     }
-    // logged-in refetch → GET /api/v1/notifications (session poll also runs)
-    refresh();
+    if (isRefreshing) return;
+    setSpinAngle((angle) => angle + 360); // first revolution, immediately
+    setIsRefreshing(true);
+    // logged-in refetch → GET /api/v1/notifications + own Supabase rows
+    // (session poll also runs); held ≥550ms so a fast success still
+    // reads as one full spin
+    const minSpin = new Promise<void>((resolve) => {
+      setTimeout(resolve, 550);
+    });
+    void Promise.allSettled([refreshNotifications(), minSpin]).then(() => {
+      setIsRefreshing(false);
+    });
   };
 
   const handleMarkAll = () => {
@@ -165,7 +189,7 @@ const Notifications = ({ isOpen, onClose }: NotificationsProps) => {
 
   return createPortal(
     <>
-      {/* live `wh` overlay — gh.overlayContainer rules (blur backdrop); the
+      {/* live `wh` overlay — gh.overlayContainer rules (dark scrim); the
           only prop live passes through is the backdrop z-index. Clicking the
           overlay itself closes; mousedown is swallowed there so the drawer's
           document listener cannot double-fire */}
@@ -204,9 +228,18 @@ const Notifications = ({ isOpen, onClose }: NotificationsProps) => {
               className="_iconButton_fb11q_52"
               onClick={handleReload}
               aria-label="Reload Notifications"
+              aria-busy={isRefreshing}
+              data-busy={String(isRefreshing)}
               tabIndex={-1}
             >
-              <ReloadIcon />
+              <span className="notifReloadIcon" aria-hidden="true">
+                <span
+                  className="notifReloadSpin"
+                  style={{ transform: `rotate(${spinAngle}deg)` }}
+                >
+                  <ReloadIcon />
+                </span>
+              </span>
             </button>
             <button
               type="button"

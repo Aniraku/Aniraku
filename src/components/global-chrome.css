@@ -1,6 +1,6 @@
 /* ==========================================================================
  * GLOBAL CHROME parity rules — navbar search micro-parity, footer restructure,
- * DropSearch pikachu loader and the app-icon logo mask.
+ * DropSearch loading wrapper and the app-icon logo mask.
  *
  * src/styles/** is read-only for this mission, so the missing live rules live
  * here. This file is imported from App.tsx, i.e. AFTER the index.html-linked
@@ -53,18 +53,12 @@
   }
 }
 
-/* --- DropSearch pikachu loader (live `_loadingWrapper_9iqh4_34` /
- *      `_loadingImage_9iqh4_40`, declarations verbatim, readable local
- *      class names) -------------------------------------------------------- */
+/* --- DropSearch loading state (the dots themselves live in globals.css:
+ *      .loadingDots/.loadingDot) ------------------------------------------ */
 .searchLoadingWrapper {
   display: flex;
   justify-content: center;
   padding: 1rem;
-}
-
-.searchLoadingImage {
-  width: 9rem;
-  max-width: 9rem;
 }
 
 /* --- footer wrapper (live `_pageWrapper_1yuuo_1`, verbatim) --------------- */
