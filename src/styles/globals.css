@@ -1,5 +1,6 @@
-@import url('animations.css');
-@import url('themes.css');
+/* animations.css, themes.css and interactions.css are <link>ed from
+   index.html alongside this file — @importing them here loaded each
+   stylesheet twice and serialized the requests. */
 
 /* Basic Styles for the App */
 html {
@@ -770,6 +771,11 @@ body {
 
 .themeButtons {
   display: flex;
+  /* five names don't fit one row at drawer width — wrap instead of squeezing
+     the last button into clipped text (e.g. "Catppuccin" → "Cat…").
+     overflow: hidden stays so the striped button bg never pokes past the
+     container's rounded corners. */
+  flex-wrap: wrap;
   overflow: hidden;
   background-color: var(--global-div-tr);
   border: 1px solid var(--global-border-color);
@@ -778,9 +784,10 @@ body {
 
 .themeBtn {
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
   padding: 0.6rem;
   font-size: 1rem;
   color: var(--global-text-muted);
@@ -1135,6 +1142,11 @@ body {
   z-index: var(--z-index-dropdown);
   max-height: 500px;
   opacity: 1;
+  /* Browse all fetched results in place — scroll instead of going to the
+     full search page. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 @media (max-width: 500px) {
@@ -1163,7 +1175,6 @@ body {
   white-space: nowrap;
   border: 1px solid transparent;
   border-radius: var(--global-border-radius);
-  transition: padding 0.3s ease-in-out;
   --animation-duration: 0.4s;
   --animation-easing: ease-in-out;
 }
@@ -1188,7 +1199,6 @@ body {
 .searchItem:hover,
 .searchItem:focus,
 .searchItem.selected {
-  padding-left: 1rem;
   background-color: var(--primary-accent-dk-tr);
   border-color: var(--primary-accent);
 }
@@ -1392,21 +1402,12 @@ body {
   text-align: left;
   background: transparent;
   border-radius: var(--global-border-radius);
-  box-shadow: 5px 5px 10px var(--global-shadow);
-  transition:
-    background-color 0.2s ease-in-out,
-    box-shadow 0.2s ease-in-out 0.25s,
-    transform 0.2s ease-in-out;
+  /* Flat soft shadow — the card lift itself lives on .cardItem
+     (interactions.css), so the poster never moves on its own. */
+  box-shadow: 0 4px 10px var(--global-shadow);
+  transition: background-color 0.2s ease-in-out;
   --animation-duration: 0.5s;
   --animation-easing: ease-in-out;
-}
-
-@media (min-width: 501px) {
-  .cardImgContainer:hover,
-  .cardImgContainer:active,
-  .cardImgContainer:focus {
-    transform: translateY(-5px);
-  }
 }
 
 .cardImg {
@@ -1446,8 +1447,9 @@ body {
 
 .titleContainer {
   display: flex;
-  gap: 0.4rem;
-  align-items: center;
+  /* Column like the reference card: chips strip above, title below. */
+  flex-direction: column;
+  gap: 0.3rem;
   padding: 0.4rem 0.3rem;
   margin-top: 0.35rem;
   border-radius: var(--global-border-radius);
@@ -1468,26 +1470,19 @@ body {
   min-width: 0;
 }
 
+/* 2-line clamped title under the chips, like the reference card. */
 .title {
-  display: block;
+  display: -webkit-box;
   margin: 0;
   overflow: hidden;
-  font-size: 0.83rem;
+  font-size: 0.95rem;
   font-weight: 700;
+  line-height: 1.25;
   color: var(--global-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
   transition: 0.2s ease-in-out;
-  scrollbar-width: none;
-}
-
-.title::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-.title:hover {
-  overflow: auto;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 @media (max-width: 500px) {
@@ -1503,7 +1498,13 @@ body {
 
 .cardDetails {
   display: flex;
-  flex-shrink: 0;
+  /* Shrinkable + min-width 0: the strip must fit the card width so the
+     wrap override below can put chips on extra rows instead of the bar
+     overflowing the card edge and squeezing the title out. */
+  flex-shrink: 1;
+  min-width: 0;
+  /* Chips strip renders above the title in the reference column layout. */
+  order: -1;
   gap: 0.5rem;
   align-items: center;
   overflow: hidden;
@@ -1525,17 +1526,12 @@ body {
   margin-bottom: 0.075rem;
 }
 
+/* Plain muted meta segments — no chip chrome; the row reads as one
+   quiet line under the title. */
 .cardDetail {
   display: flex;
   gap: 0.2rem;
   align-items: center;
-  padding: 0.2rem;
-  background-color: var(--global-div);
-  border-radius: var(--global-border-radius);
-}
-
-.cardDetail:hover {
-  color: #fff;
 }
 
 @media (max-width: 800px) {
@@ -1569,6 +1565,30 @@ body {
     0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
+/* Poster-bottom badge row (aired EP left, next-EP countdown or last-update
+   ago right) over a gradient — reference card look. */
+.posterBadges {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  gap: 0.3rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 1rem 0.35rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72) 55%);
+  border-radius: 0 0 var(--global-border-radius) var(--global-border-radius);
+}
+
+.posterBadge {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
 .listButtonContainer {
   position: absolute;
   top: 0.25rem;
@@ -1592,7 +1612,6 @@ body {
   margin: 0;
   background-color: gray;
   border-radius: 50%;
-  will-change: box-shadow;
 }
 
 /* ---------------------------------------------------------- */
@@ -1922,8 +1941,7 @@ kbd {
   padding: 0.25rem 0.2rem;
   box-sizing: border-box;
   cursor: pointer;
-  background-color: var(--global-div-tr);
-  backdrop-filter: blur(10px);
+  background-color: color-mix(in srgb, var(--global-div) 85%, transparent);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
   opacity: 0;
@@ -2257,7 +2275,8 @@ kbd {
    (layered on top of the base .cardItem rules above)
    ============================================================ */
 
-/* Poster zoom on hover — pairs with the existing brightness dip */
+/* Poster zoom on hover — pairs with the existing brightness dip.
+   The lift lives once, on .cardItem (interactions.css). */
 .cardImg {
   transition:
     filter 0.2s ease-in-out,
@@ -2266,17 +2285,6 @@ kbd {
 
 .cardImgContainer:hover .cardImg {
   transform: scale(1.06);
-}
-
-/* Accent ring + deeper lift when the card is focused/hovered */
-@media (min-width: 501px) {
-  .cardItem:hover .cardImgContainer,
-  .cardItem:focus-within .cardImgContainer {
-    box-shadow:
-      0 10px 26px var(--global-shadow),
-      0 0 0 1px var(--primary-accent);
-    transform: translateY(-6px);
-  }
 }
 
 /* Meta row (year · format · sub/dub chips · score): allow the chip

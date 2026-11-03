@@ -77,7 +77,10 @@ const OFFICIAL_FALLBACK_GRAPHQL = 'https://graphql.anilist.co';
 // Only TRUE outages (network failure, 5xx, 429) flip the banner — ordinary
 // GraphQL errors (validation, not-found) and 4xx must not flap it.
 function reportAnilistStatus(unavailable: boolean): void {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }));
+  if (typeof window !== 'undefined')
+    window.dispatchEvent(
+      new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }),
+    );
 }
 
 const SKIP_TIMES = ensureUrlEndsWithSlash(
@@ -162,8 +165,7 @@ export function mapAnilistMediaToAnime(m: any) {
     currentEpisode: nextAiring
       ? Math.max((nextAiring.episode ?? 1) - 1, 0)
       : (m?.episodes ?? 0),
-    rating:
-      typeof m?.averageScore === 'number' ? m.averageScore / 10 : 0,
+    rating: typeof m?.averageScore === 'number' ? m.averageScore / 10 : 0,
     duration: m?.duration ?? 0,
     genres: m?.genres ?? [],
     studios: Array.isArray(m?.studios?.nodes)
@@ -177,6 +179,8 @@ export function mapAnilistMediaToAnime(m: any) {
     type: m?.format ?? 'TV',
     startDate: m?.startDate ?? { year: 0, month: 0, day: 0 },
     endDate: m?.endDate ?? { year: 0, month: 0, day: 0 },
+    // AniList last-edit unix seconds — powers the card "6h ago" badge.
+    updatedAt: m?.updatedAt ?? 0,
     trailer: m?.trailer ?? { id: '', site: '' },
     nextAiringEpisode: nextAiring,
     // No manga route: drop manga/novel nodes from recommendations.
@@ -185,13 +189,17 @@ export function mapAnilistMediaToAnime(m: any) {
           .map((r: any) => r?.mediaRecommendation ?? r ?? {})
           .filter(
             (media: any) =>
-              media?.id && media?.type !== 'MANGA' && media?.format !== 'MANGA' && media?.format !== 'NOVEL',
+              media?.id &&
+              media?.type !== 'MANGA' &&
+              media?.format !== 'MANGA' &&
+              media?.format !== 'NOVEL',
           )
           .map((media: any) => {
-            const { img: rImg, thumbnail: rThumb, cover: rCover } = pickImage(
-              media?.coverImage,
-              media?.bannerImage,
-            );
+            const {
+              img: rImg,
+              thumbnail: rThumb,
+              cover: rCover,
+            } = pickImage(media?.coverImage, media?.bannerImage);
             return {
               id: String(media?.id ?? ''),
               malId: media?.idMal != null ? String(media.idMal) : '',
@@ -232,35 +240,36 @@ export function mapAnilistMediaToAnime(m: any) {
               e?.node?.format !== 'NOVEL',
           )
           .map((e: any) => {
-          const node = e?.node ?? {};
-          const { img: relImg, thumbnail: relThumb, cover: relCover } = pickImage(
-            node?.coverImage,
-            node?.bannerImage,
-          );
-          return {
-            id: String(node?.id ?? ''),
-            malId: node?.idMal != null ? String(node.idMal) : '',
-            relationType: e?.relationType ?? '',
-            title: {
-              romaji: node?.title?.romaji ?? '',
-              english: node?.title?.english ?? '',
-              native: node?.title?.native ?? '',
-              userPreferred: node?.title?.userPreferred ?? '',
-            },
-            status: mapAnilistStatus(node?.status),
-            episodes: node?.episodes ?? 0,
-            image: relImg,
-            thumbnail: relThumb,
-            imageHash: '',
-            cover: relCover,
-            coverHash: '',
-            rating:
-              typeof node?.averageScore === 'number'
-                ? node.averageScore / 10
-                : 0,
-            type: node?.format ?? node?.type ?? '',
-            genres: Array.isArray(node?.genres) ? node.genres : [],
-          };
+            const node = e?.node ?? {};
+            const {
+              img: relImg,
+              thumbnail: relThumb,
+              cover: relCover,
+            } = pickImage(node?.coverImage, node?.bannerImage);
+            return {
+              id: String(node?.id ?? ''),
+              malId: node?.idMal != null ? String(node.idMal) : '',
+              relationType: e?.relationType ?? '',
+              title: {
+                romaji: node?.title?.romaji ?? '',
+                english: node?.title?.english ?? '',
+                native: node?.title?.native ?? '',
+                userPreferred: node?.title?.userPreferred ?? '',
+              },
+              status: mapAnilistStatus(node?.status),
+              episodes: node?.episodes ?? 0,
+              image: relImg,
+              thumbnail: relThumb,
+              imageHash: '',
+              cover: relCover,
+              coverHash: '',
+              rating:
+                typeof node?.averageScore === 'number'
+                  ? node.averageScore / 10
+                  : 0,
+              type: node?.format ?? node?.type ?? '',
+              genres: Array.isArray(node?.genres) ? node.genres : [],
+            };
           })
       : [],
     mappings: [],
@@ -287,7 +296,12 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
     directAxios.post(
       endpoint,
       { query, variables },
-      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
     );
 
   const task = (async () => {
@@ -315,7 +329,9 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
         const status = (err as { response?: { status?: number } })?.response
           ?.status;
         const transportFailure =
-          status === undefined || status === 429 || (status >= 500 && status <= 599);
+          status === undefined ||
+          status === 429 ||
+          (status >= 500 && status <= 599);
         if (!transportFailure) {
           reportAnilistStatus(false);
           throw err;
@@ -400,7 +416,7 @@ function createOptimizedSessionStorageCache(
   };
 }
 
-const CACHE_SIZE = 20;
+const CACHE_SIZE = 50;
 const CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 function createCache(cacheKey: string) {
@@ -436,7 +452,7 @@ const MEDIA_LIST_FIELDS = `
   title { romaji english native userPreferred }
   coverImage { extraLarge large medium color }
   bannerImage format status episodes duration
-  genres averageScore popularity
+  genres averageScore popularity updatedAt
   season seasonYear isAdult
   nextAiringEpisode { episode airingAt timeUntilAiring }
   startDate { year month day }
@@ -523,7 +539,15 @@ function toAnilistSort(sort?: string[]): string[] {
 function toAnilistStatus(status?: string): string | undefined {
   if (!status) return undefined;
   const s = status.toUpperCase();
-  if (['RELEASING', 'FINISHED', 'NOT_YET_RELEASED', 'CANCELLED', 'HIATUS'].includes(s))
+  if (
+    [
+      'RELEASING',
+      'FINISHED',
+      'NOT_YET_RELEASED',
+      'CANCELLED',
+      'HIATUS',
+    ].includes(s)
+  )
     return s;
   // Consumet-style compat
   if (s === 'ONGOING') return 'RELEASING';
@@ -652,7 +676,11 @@ export const fetchUpcomingSeasons = (page: number, perPage: number) => {
   // calendar year (FALL 2026 -> WINTER 2027), otherwise AniList returns
   // nothing.
   const season = getNextSeason().toUpperCase();
-  const y = Number(year) + (season === 'WINTER' && getCurrentSeason().toUpperCase() === 'FALL' ? 1 : 0);
+  const y =
+    Number(year) +
+    (season === 'WINTER' && getCurrentSeason().toUpperCase() === 'FALL'
+      ? 1
+      : 0);
   return fetchListViaAnilist('Upcoming v3', {
     page,
     perPage,
@@ -838,9 +866,7 @@ export async function fetchSkipTimes({
     return data;
   } catch (err) {
     // 404 = AniSkip has no data for this episode — not an error.
-    if (
-      (err as { response?: { status?: number } })?.response?.status === 404
-    )
+    if ((err as { response?: { status?: number } })?.response?.status === 404)
       return { results: [] };
     throw err;
   }
@@ -866,12 +892,21 @@ export function infoPath(
   return `/info/${id}/${animeSlug(title)}`;
 }
 
-// Airing schedule for one day window (AniList direct, no cache — always fresh).
+// Airing schedule for one day window (AniList direct). 15-minute
+// sessionStorage cache: a day window only changes when an episode airs
+// inside it, so MiniSchedule/Schedule remounts shouldn't re-query every
+// time. Module-level cache — one parse per session, not per call.
 export interface AiringEntry {
   airingAt: number;
   episode: number;
   anime: any;
 }
+
+const airingDayCache = createOptimizedSessionStorageCache(
+  CACHE_SIZE,
+  15 * 60 * 1000,
+  'aniraku-airing-day-cache',
+);
 
 export async function fetchAiringDay(
   greater: number,
@@ -879,6 +914,9 @@ export async function fetchAiringDay(
   page: number = 1,
   perPage: number = 25,
 ): Promise<{ entries: AiringEntry[]; hasNextPage: boolean }> {
+  const cacheKey = `${greater}:${lesser}:${page}:${perPage}`;
+  const cached = airingDayCache.get(cacheKey);
+  if (cached) return cached;
   const query = `
 query ($page: Int, $perPage: Int, $greater: Int, $lesser: Int) {
   Page(page: $page, perPage: $perPage) {
@@ -898,7 +936,7 @@ query ($page: Int, $perPage: Int, $greater: Int, $lesser: Int) {
     lesser,
   });
   const schedules = data?.Page?.airingSchedules ?? [];
-  return {
+  const result = {
     entries: schedules.map((s: any) => ({
       airingAt: s?.airingAt ?? 0,
       episode: s?.episode ?? 0,
@@ -906,6 +944,8 @@ query ($page: Int, $perPage: Int, $greater: Int, $lesser: Int) {
     })),
     hasNextPage: !!data?.Page?.pageInfo?.hasNextPage,
   };
+  airingDayCache.set(cacheKey, result);
+  return result;
 }
 
 // Recent / airing schedule via AniList (direct)

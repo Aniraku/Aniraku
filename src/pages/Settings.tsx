@@ -2,7 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { IoArrowBack } from 'react-icons/io5';
-import { FiGrid, FiSettings, FiSliders, FiUser, FiYoutube } from 'react-icons/fi';
+import {
+  FiGrid,
+  FiSettings,
+  FiSliders,
+  FiUser,
+  FiYoutube,
+} from 'react-icons/fi';
 import { MdOutlineKeyboard } from 'react-icons/md';
 import { FaCat, FaDesktop, FaLeaf, FaMoon, FaSun } from 'react-icons/fa6';
 import {
@@ -300,11 +306,22 @@ const Kbd = styled.kbd`
 const SettingsDiv = styled.div`
   gap: 1rem;
   display: flex;
+  /* Fill the modal body so PaneScroll below can own the scrolling while the
+     "Settings" header (and the panel ✕) stay put. */
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
   width: 100%;
   text-align: left;
+`;
+
+// Scroll pane under the fixed header: cards scroll inside this box.
+const PaneScroll = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 `;
 
 const Title = styled.h2`
@@ -317,8 +334,11 @@ const Title = styled.h2`
   margin: 0;
 `;
 
-
 const PreferencesTable = styled.div`
+  /* content-box would stack the padding + border on top of width: 100%,
+     overflowing the grid column by ~34px — the horizontal scrollbar and
+     the clipped right edge in the settings modal. */
+  box-sizing: border-box;
   background-color: var(--global-div);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
@@ -557,7 +577,10 @@ const DISPLAY_LANGUAGE_ROWS: RowConfig[] = [
     label: 'Title Language',
     description: 'Choose the language format for titles.',
     options: [
-      { value: 'English (Attack on Titan)', label: 'English (Attack on Titan)' },
+      {
+        value: 'English (Attack on Titan)',
+        label: 'English (Attack on Titan)',
+      },
       {
         value: 'Romaji (Shingeki no Kyojin)',
         label: 'Romaji (Shingeki no Kyojin)',
@@ -649,7 +672,12 @@ const UNDO_WINDOW_MS = 8000;
 
 type UndoSnapshot =
   | { kind: 'bookmarks'; entries: BookmarkEntry[]; count: number }
-  | { kind: 'history'; rows: HistoryRow[]; raw: Record<string, string | null>; count: number };
+  | {
+      kind: 'history';
+      rows: HistoryRow[];
+      raw: Record<string, string | null>;
+      count: number;
+    };
 
 // — Settings navigation (matches the redesigned modal: two preference
 // groups, three shortcut groups, account panes) —
@@ -675,7 +703,11 @@ const NAV_GROUPS: {
   {
     group: 'Shortcuts',
     items: [
-      { id: 'shortcuts-general', label: 'General', icon: <MdOutlineKeyboard /> },
+      {
+        id: 'shortcuts-general',
+        label: 'General',
+        icon: <MdOutlineKeyboard />,
+      },
       { id: 'shortcuts-watching', label: 'Watching', icon: <FiGrid /> },
       { id: 'shortcuts-player', label: 'Player', icon: <FiSliders /> },
     ],
@@ -926,7 +958,9 @@ export const Settings: React.FC = () => {
         setSettings({ autoSync: value === 'Enabled' });
         break;
       case 'syncThreshold':
-        setSettings({ syncThreshold: Math.max(0, Math.min(100, Number(value) || 80)) });
+        setSettings({
+          syncThreshold: Math.max(0, Math.min(100, Number(value) || 80)),
+        });
         break;
       case 'autoskipIntroOutro':
         setSettings({ autoSkip: value === 'Enabled' });
@@ -1304,7 +1338,8 @@ export const Settings: React.FC = () => {
           if (failure) failures.push(failure);
         });
         wipedClean = failures.length === 0;
-        if (failures.length) console.error('Delete account fallback:', failures);
+        if (failures.length)
+          console.error('Delete account fallback:', failures);
       }
 
       wipeAppLocalStorage();
@@ -1345,9 +1380,7 @@ export const Settings: React.FC = () => {
     <Row key={row.key}>
       <RowLabel>
         <RowTitle>{row.label}</RowTitle>
-        {row.description && (
-          <RowDescription>{row.description}</RowDescription>
-        )}
+        {row.description && <RowDescription>{row.description}</RowDescription>}
       </RowLabel>
       {row.action === 'shortcuts' ? (
         <StyledButton
@@ -1386,8 +1419,8 @@ export const Settings: React.FC = () => {
             Show adult-rated titles in browsing, search and recommendations.
           </RowDescription>
           <RowDescription>
-            When disabled, adult titles are filtered from lists and their
-            pages show a block screen. You can change this at any time.
+            When disabled, adult titles are filtered from lists and their pages
+            show a block screen. You can change this at any time.
           </RowDescription>
         </RowLabel>
         <ThemedSelect
@@ -1431,9 +1464,7 @@ export const Settings: React.FC = () => {
               automatically.
             </RowDescription>
           </RowLabel>
-          <StyledButton onClick={() => navigate('/login')}>
-            Log in
-          </StyledButton>
+          <StyledButton onClick={() => navigate('/login')}>Log in</StyledButton>
         </Row>
       ) : (
         <>
@@ -1501,7 +1532,9 @@ export const Settings: React.FC = () => {
                   : 'Checking status…'}
               </RowDescription>
             </RowLabel>
-            <StyledButton onClick={() => setSyncVersion((version) => version + 1)}>
+            <StyledButton
+              onClick={() => setSyncVersion((version) => version + 1)}
+            >
               <FaSync size={11} aria-hidden='true' /> Refresh
             </StyledButton>
           </Row>
@@ -1510,9 +1543,9 @@ export const Settings: React.FC = () => {
       <Row>
         <RowLabel>
           <RowDescription>
-            Connecting opens {PROVIDER_LABELS.mal} /{' '}
-            {PROVIDER_LABELS.anilist} and asks only for permission to update
-            your library list — no password is ever shared with Aniraku.
+            Connecting opens {PROVIDER_LABELS.mal} / {PROVIDER_LABELS.anilist}{' '}
+            and asks only for permission to update your library list — no
+            password is ever shared with Aniraku.
           </RowDescription>
         </RowLabel>
       </Row>
@@ -1687,9 +1720,7 @@ export const Settings: React.FC = () => {
           <RowTitle>
             <FaBookmark size={11} aria-hidden='true' /> Bookmarks
           </RowTitle>
-          <RowDescription>
-            Anime you have saved to your library.
-          </RowDescription>
+          <RowDescription>Anime you have saved to your library.</RowDescription>
         </RowLabel>
         {clearArm !== 'bookmarks' ? (
           <StyledButton
@@ -1713,18 +1744,18 @@ export const Settings: React.FC = () => {
       <Row>
         <RowLabel>
           <RowDescription>
-            Clearing takes effect immediately. An inline Undo appears below
-            for {UNDO_WINDOW_MS / 1000} seconds afterwards; after that the
-            removal is final.
+            Clearing takes effect immediately. An inline Undo appears below for{' '}
+            {UNDO_WINDOW_MS / 1000} seconds afterwards; after that the removal
+            is final.
           </RowDescription>
         </RowLabel>
       </Row>
       {undo && (
         <UndoBar role='status' aria-live='polite'>
           <UndoText>
-            {undo.kind === 'bookmarks' ? 'Bookmarks' : 'Watch history'}{' '}
-            cleared — {undo.count} item{undo.count === 1 ? '' : 's'} removed.
-            Changed your mind?
+            {undo.kind === 'bookmarks' ? 'Bookmarks' : 'Watch history'} cleared
+            — {undo.count} item{undo.count === 1 ? '' : 's'} removed. Changed
+            your mind?
           </UndoText>
           <StyledButton onClick={() => void handleUndo()}>
             Undo — restore {undo.count} item{undo.count === 1 ? '' : 's'}
@@ -1751,9 +1782,8 @@ export const Settings: React.FC = () => {
             <RowDescription>
               Deleting runs from your browser: if the server&apos;s
               account-deletion function is unavailable, every row this app can
-              write is removed and you are signed out — the login record
-              itself, and any uploaded avatars, may then need to be removed by
-              support.
+              write is removed and you are signed out — the login record itself,
+              and any uploaded avatars, may then need to be removed by support.
             </RowDescription>
           </RowLabel>
           {!confirmArmed ? (
@@ -1824,121 +1854,125 @@ export const Settings: React.FC = () => {
         Settings
       </Title>
 
-      <SettingsLayout>
-        <NavRail aria-label='Settings sections'>
-          {NAV_GROUPS.map((group) => (
-            <NavGroup key={group.group}>
-              <NavGroupLabel>{group.group}</NavGroupLabel>
-              {group.items.map((item) => (
-                <NavItem
-                  key={item.id}
-                  $active={activePane === item.id}
-                  onClick={() => setActivePane(item.id)}
-                  aria-current={activePane === item.id ? 'page' : undefined}
-                >
-                  <NavIcon $active={activePane === item.id}>{item.icon}</NavIcon>
-                  {item.label}
-                </NavItem>
-              ))}
-            </NavGroup>
-          ))}
-          <VersionChip>v{APP_VERSION}</VersionChip>
-        </NavRail>
+      <PaneScroll>
+        <SettingsLayout>
+          <NavRail aria-label='Settings sections'>
+            {NAV_GROUPS.map((group) => (
+              <NavGroup key={group.group}>
+                <NavGroupLabel>{group.group}</NavGroupLabel>
+                {group.items.map((item) => (
+                  <NavItem
+                    key={item.id}
+                    $active={activePane === item.id}
+                    onClick={() => setActivePane(item.id)}
+                    aria-current={activePane === item.id ? 'page' : undefined}
+                  >
+                    <NavIcon $active={activePane === item.id}>
+                      {item.icon}
+                    </NavIcon>
+                    {item.label}
+                  </NavItem>
+                ))}
+              </NavGroup>
+            ))}
+            <VersionChip>v{APP_VERSION}</VersionChip>
+          </NavRail>
 
-        <div>
-          {activePane === 'general' && (
-            <>
-              <PaneTitle>General</PaneTitle>
-              <PreferencesTable>
-                <SectionTitle>Appearance</SectionTitle>
-                <Row>
-                  <RowLabel>
-                    <RowTitle>Theme</RowTitle>
-                    <RowDescription>
-                      Choose your preferred color scheme.
-                    </RowDescription>
-                  </RowLabel>
-                </Row>
-                <ThemeGrid>
-                  {THEME_CARDS.map(({ mode, icon, label }) => (
-                    <ThemeCard
-                      key={mode}
-                      $active={themeMode === mode}
-                      onClick={() => setTheme(mode)}
-                      aria-pressed={themeMode === mode}
-                    >
-                      {icon}
-                      {label}
-                    </ThemeCard>
-                  ))}
-                </ThemeGrid>
-              </PreferencesTable>
+          <div>
+            {activePane === 'general' && (
+              <>
+                <PaneTitle>General</PaneTitle>
+                <PreferencesTable>
+                  <SectionTitle>Appearance</SectionTitle>
+                  <Row>
+                    <RowLabel>
+                      <RowTitle>Theme</RowTitle>
+                      <RowDescription>
+                        Choose your preferred color scheme.
+                      </RowDescription>
+                    </RowLabel>
+                  </Row>
+                  <ThemeGrid>
+                    {THEME_CARDS.map(({ mode, icon, label }) => (
+                      <ThemeCard
+                        key={mode}
+                        $active={themeMode === mode}
+                        onClick={() => setTheme(mode)}
+                        aria-pressed={themeMode === mode}
+                      >
+                        {icon}
+                        {label}
+                      </ThemeCard>
+                    ))}
+                  </ThemeGrid>
+                </PreferencesTable>
 
-              <PreferencesTable>
-                <SectionTitle>Display Language</SectionTitle>
-                {DISPLAY_LANGUAGE_ROWS.map(renderRow)}
-              </PreferencesTable>
+                <PreferencesTable>
+                  <SectionTitle>Display Language</SectionTitle>
+                  {DISPLAY_LANGUAGE_ROWS.map(renderRow)}
+                </PreferencesTable>
 
-              <PreferencesTable>
-                <SectionTitle>Other Settings</SectionTitle>
-                <Row>
-                  <RowLabel>
-                    <RowTitle>Restore Default Settings</RowTitle>
-                    <RowDescription>
-                      Restore all settings to their default values.
-                    </RowDescription>
-                  </RowLabel>
-                  <StyledButton $danger onClick={handleRestoreDefaults}>
-                    Restore
-                  </StyledButton>
-                </Row>
-              </PreferencesTable>
-            </>
-          )}
+                <PreferencesTable>
+                  <SectionTitle>Other Settings</SectionTitle>
+                  <Row>
+                    <RowLabel>
+                      <RowTitle>Restore Default Settings</RowTitle>
+                      <RowDescription>
+                        Restore all settings to their default values.
+                      </RowDescription>
+                    </RowLabel>
+                    <StyledButton $danger onClick={handleRestoreDefaults}>
+                      Restore
+                    </StyledButton>
+                  </Row>
+                </PreferencesTable>
+              </>
+            )}
 
-          {activePane === 'watch' && (
-            <>
-              <PaneTitle>Watch</PaneTitle>
-              <PreferencesTable>
-                <SectionTitle>Watch</SectionTitle>
-                {MEDIA_ROWS.map(renderRow)}
-              </PreferencesTable>
-            </>
-          )}
+            {activePane === 'watch' && (
+              <>
+                <PaneTitle>Watch</PaneTitle>
+                <PreferencesTable>
+                  <SectionTitle>Watch</SectionTitle>
+                  {MEDIA_ROWS.map(renderRow)}
+                </PreferencesTable>
+              </>
+            )}
 
-          {activePane === 'shortcuts-general' && (
-            <>
-              <PaneTitle>Shortcuts</PaneTitle>
-              {renderShortcutsPane(SHORTCUT_GENERAL, 'Shortcuts')}
-            </>
-          )}
+            {activePane === 'shortcuts-general' && (
+              <>
+                <PaneTitle>Shortcuts</PaneTitle>
+                {renderShortcutsPane(SHORTCUT_GENERAL, 'Shortcuts')}
+              </>
+            )}
 
-          {activePane === 'shortcuts-watching' && (
-            <>
-              <PaneTitle>Shortcuts</PaneTitle>
-              {renderShortcutsPane(SHORTCUT_WATCHING, 'Shortcuts')}
-            </>
-          )}
+            {activePane === 'shortcuts-watching' && (
+              <>
+                <PaneTitle>Shortcuts</PaneTitle>
+                {renderShortcutsPane(SHORTCUT_WATCHING, 'Shortcuts')}
+              </>
+            )}
 
-          {activePane === 'shortcuts-player' && (
-            <>
-              <PaneTitle>Shortcuts</PaneTitle>
-              {renderShortcutsPane(SHORTCUT_PLAYER, 'Shortcuts')}
-            </>
-          )}
+            {activePane === 'shortcuts-player' && (
+              <>
+                <PaneTitle>Shortcuts</PaneTitle>
+                {renderShortcutsPane(SHORTCUT_PLAYER, 'Shortcuts')}
+              </>
+            )}
 
-          {activePane === 'account' && (
-            <>
-              <PaneTitle>Account & Data</PaneTitle>
-              {renderContentCard()}
-              {renderSyncCard()}
-              {renderAccountCard()}
-              {renderDataCard()}
-              {renderDangerCard()}
-            </>
-          )}
-        </div>
-      </SettingsLayout>
+            {activePane === 'account' && (
+              <>
+                <PaneTitle>Account & Data</PaneTitle>
+                {renderContentCard()}
+                {renderSyncCard()}
+                {renderAccountCard()}
+                {renderDataCard()}
+                {renderDangerCard()}
+              </>
+            )}
+          </div>
+        </SettingsLayout>
+      </PaneScroll>
     </SettingsDiv>
   );
 };
