@@ -86,7 +86,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       setAuthLoading(false); // If no token, ensure loading state is set to false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async () => {
