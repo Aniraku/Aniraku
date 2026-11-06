@@ -36,8 +36,27 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
         filename: 'sw.js', // live registers '/sw.js' with scope '/'
         manifest: false, // public/manifest.json is hand-maintained (Aniraku branding)
         workbox: {
-          globPatterns: ['**/*.{js,css,html,woff2,svg}'],
+          // Precache the SHELL only (html/css/fonts/svg). Precaching every
+          // JS chunk made a first visit download ~2.5MB of lazy player code
+          // in the background, competing with the page's own API calls and
+          // images on slow connections. Lazy chunks are runtime-cached
+          // CacheFirst instead — they're content-hashed immutable URLs, so
+          // a cache hit is always correct.
+          globPatterns: ['**/*.{css,html,woff2,svg}'],
           navigateFallback: 'index.html', // SPA offline shell
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }: { url: URL }) =>
+                url.pathname.startsWith('/assets/') ||
+                url.pathname === '/registerSW.js',
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'aniraku-assets',
+                expiration: { maxEntries: 80, maxAgeSeconds: 365 * 24 * 60 * 60 },
+                cacheableResponse: { statuses: [200] },
+              },
+            },
+          ],
           // Take control ASAP: without clientsClaim, tabs opened before a
           // deploy keep running the old bundle for hours (SPA navigation
           // never reloads), so stale code keeps reading/writing stale

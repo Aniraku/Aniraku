@@ -718,6 +718,12 @@ export async function fetchAnimeInfo(animeId: string) {
 // GET {base}api/v1/anime/{id}/episodes -> { episodes: [{number,title,thumbnail,description,airdate}] }
 // Mapped to Aniraku Episode[] so EpisodeList/Watch keep working.
 
+// Cold-cache scrapes routinely exceed 15s server-side (the backend waits on
+// AniZip/TMDB), so this endpoint gets its own patient client — the 15s
+// directAxios timeout was exactly what produced the false "No episodes
+// found" state on the Watch page while the list was still loading.
+const episodesAxios = axios.create({ timeout: 30000 });
+
 export async function fetchAnimeEpisodes(
   animeId: string,
   _provider?: string,
@@ -727,19 +733,34 @@ export async function fetchAnimeEpisodes(
   const cached = animeEpisodesCache.get(cacheKey);
   if (cached) return cached;
   const url = `${ANIRAKU_BASE}/api/v1/anime/${encodeURIComponent(animeId)}/episodes`;
-  const { data } = await directAxios.get(url);
-  const list = Array.isArray(data?.episodes) ? data.episodes : [];
-  const mapped = list.map((ep: any) => ({
-    id: `${animeId}-episode-${ep?.number}`,
-    number: ep?.number,
-    title: ep?.title ?? `Episode ${ep?.number}`,
-    description: ep?.description ?? null,
-    image: ep?.thumbnail ?? '',
-    imageHash: '',
-    airDate: ep?.airdate ?? ep?.airedAt ?? null,
-  }));
-  animeEpisodesCache.set(cacheKey, mapped);
-  return mapped;
+  // Retry timeouts/network errors with backoff — a slow scrape is normal,
+  // not a dead end. 4xx (except 429) is definitive; retrying can't help.
+  const retryDelaysMs = [0, 3000, 8000];
+  let lastError: unknown;
+  for (const delay of retryDelaysMs) {
+    if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      const { data } = await episodesAxios.get(url);
+      const list = Array.isArray(data?.episodes) ? data.episodes : [];
+      const mapped = list.map((ep: any) => ({
+        id: `${animeId}-episode-${ep?.number}`,
+        number: ep?.number,
+        title: ep?.title ?? `Episode ${ep?.number}`,
+        description: ep?.description ?? null,
+        image: ep?.thumbnail ?? '',
+        imageHash: '',
+        airDate: ep?.airdate ?? ep?.airedAt ?? null,
+      }));
+      animeEpisodesCache.set(cacheKey, mapped);
+      return mapped;
+    } catch (err) {
+      lastError = err;
+      const status = (err as { response?: { status?: number } })?.response
+        ?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) throw err;
+    }
+  }
+  throw lastError;
 }
 
 // Streaming via Aniraku Backend (NEW — numeric AniList IDs)
@@ -964,19 +985,15 @@ export async function fetchRecentEpisodes(
   // "NEWEST" = shows with the freshest episodes. A single short schedule
   // window empties overnight (few airings at once) — and half the entries
   // are adult/RELEASING shorts that get filtered. Sweep BACKWARD from now
-  // across up to 7 days per page (2 AniList pages of 50) until perPage
-  // unique shows are collected; page N continues where page N-1 stopped.
+  // across up to 8 days (4 windows of 50) until perPage unique shows are
+  // collected; page N continues where page N-1 stopped.
   const WINDOW = 48 * 60 * 60;
   const now = Math.floor(Date.now() / 1000);
   const seen = new Set<string>();
   const results: any[] = [];
-  let cursor = now - (page - 1) * 4 * WINDOW; // pages advance ~4 days
+  const base = now - (page - 1) * 4 * WINDOW; // pages advance ~4 days
   const BATCH = 50;
-  for (let sweep = 0; sweep < 4 && results.length < perPage; sweep++) {
-    const greater = cursor - WINDOW;
-    const lesser = cursor;
-    cursor = greater;
-    const query = `
+  const query = `
 query ($perPage: Int, $greater: Int, $lesser: Int) {
   Page(page: 1, perPage: $perPage) {
     pageInfo { total }
@@ -988,12 +1005,21 @@ query ($perPage: Int, $greater: Int, $lesser: Int) {
     }
   }
 }`;
-    const data = await anilistQuery(query, {
+  // All window bounds are known upfront. Fire window 1 first (it usually
+  // fills perPage); if it comes up short, sweep the remaining windows in
+  // PARALLEL and merge in window order — a sparse day used to cost 4
+  // sequential ~600ms+ round trips before the Home rail could render.
+  const windows = [0, 1, 2, 3].map((k) => ({
+    greater: base - (k + 1) * WINDOW,
+    lesser: base - k * WINDOW,
+  }));
+  const runWindow = (w: { greater: number; lesser: number }) =>
+    anilistQuery(query, {
       perPage: BATCH,
-      greater,
-      lesser,
-    });
-    const schedules = data?.Page?.airingSchedules ?? [];
+      greater: w.greater,
+      lesser: w.lesser,
+    }).then((data) => data?.Page?.airingSchedules ?? []);
+  const collect = (schedules: any[]) => {
     for (const s of schedules) {
       const media = s?.media;
       const id = String(media?.id ?? '');
@@ -1004,7 +1030,16 @@ query ($perPage: Int, $greater: Int, $lesser: Int) {
       results.push(mapAnilistMediaToAnime(media));
       if (results.length >= perPage) break;
     }
-    if (schedules.length < BATCH) break; // ran past all scheduled airings
+  };
+  const firstSchedules = await runWindow(windows[0]);
+  collect(firstSchedules);
+  const firstExhausted = firstSchedules.length < BATCH; // ran past all airings
+  if (results.length < perPage && !firstExhausted) {
+    const rest = await Promise.all(windows.slice(1).map(runWindow));
+    for (const schedules of rest) {
+      collect(schedules);
+      if (results.length >= perPage) break;
+    }
   }
   const result = {
     results,

@@ -19,7 +19,7 @@ const INDEX_FILE = path.join(DIST_DIR, 'index.html');
 const ANIRAKU_ALLOWED_ORIGINS = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  'https://backend-host.invalid' # placeholder — real host lives in env,
+  'https://backend-host.invalid', // placeholder — real host lives in env
 ]);
 app.use((req, res, next) => {
   const origin = req.headers.origin as string | undefined;

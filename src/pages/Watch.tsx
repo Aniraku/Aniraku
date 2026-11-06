@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FaBell, FaSpinner, FaStar } from 'react-icons/fa';
+import { FaBell, FaRedo, FaSpinner, FaStar } from 'react-icons/fa';
 import styled, { createGlobalStyle, keyframes } from 'styled-components';
 // 404 art loads ONLY on the no-episodes error branch (dynamic import keeps
 // ~170KB of animated webp out of the Watch chunk for normal playback).
@@ -365,6 +365,33 @@ const NoEpsMessage = styled.p`
   line-height: 1.6;
 `;
 
+// Retry button for the "couldn't load episodes" state (fetch failed after
+// retries) — accent outline style matching the dialog action buttons.
+const NoEpsRetryButton = styled.button`
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.5rem;
+  margin: 0 0.35rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--global-text);
+  cursor: pointer;
+  background: var(--global-div);
+  border: 1px solid var(--global-border-color);
+  border-radius: var(--global-border-radius);
+  transition:
+    background-color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out;
+
+  &:hover {
+    color: var(--primary-accent);
+    background-color: var(--primary-accent-dk-tr);
+    border-color: var(--primary-accent);
+  }
+`;
+
 // In-player upcoming notice — a black 16:9 stage with the no-source icon
 // and message (no action buttons for upcoming: there is nothing to retry,
 // the episode simply is not out).
@@ -717,6 +744,12 @@ const WatchInner: React.FC = () => {
   const [selectedBackgroundImage, setSelectedBackgroundImage] =
     useState<string>('');
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  // Episode-list fetch failure (after the hook's own retries). A FAILED
+  // fetch must never render as "No episodes found" — that panel is for a
+  // definitive empty list; this state drives the retry UI instead.
+  const [episodesFailed, setEpisodesFailed] = useState(false);
+  // Bumped by the retry button to re-run the episodes fetch effect.
+  const [episodeRetryTick, setEpisodeRetryTick] = useState(0);
   const [currentEpisode, setCurrentEpisode] = useState<Episode>({
     id: '0',
     number: 1,
@@ -1487,6 +1520,7 @@ const WatchInner: React.FC = () => {
       }
       try {
         const animeData = await fetchAnimeEpisodes(animeId);
+        if (isMounted) setEpisodesFailed(false);
         if (isMounted && animeData) {
           const transformedEpisodes = animeData
             .filter((ep: any) => String(ep.id).includes('-episode-'))
@@ -1568,6 +1602,9 @@ const WatchInner: React.FC = () => {
         }
       } catch (error) {
         console.error('Failed to fetch episodes:', error);
+        // Definitive failure (the hook already retried timeouts/network
+        // errors with backoff) — drive the retry UI, not "No episodes".
+        if (isMounted) setEpisodesFailed(true);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -1617,6 +1654,8 @@ const WatchInner: React.FC = () => {
     // Re-normalizes the URL once the media title loads so the slug in the
     // `?ep=N` writes matches the URL builder.
     animeInfo?.title,
+    // Retry button: bumping the tick re-runs the whole fetch.
+    episodeRetryTick,
   ]);
 
   // TODO UPDATE BACKGROUND IMAGE TO ANIME BANNER IF WIDTH IS UNDER 500PX / OR USE ANIME COVER IF NO BANNER FOUND
@@ -1766,24 +1805,20 @@ const WatchInner: React.FC = () => {
       : undefined,
   });
 
-  // TODO SHOW NO EPISODES DIV IF NO RESPONSE AFTER 10 SECONDS
+  // "No episodes found" is reserved for a DEFINITIVE empty list — the fetch
+  // succeeded but the anime genuinely has no episodes (unreleased content,
+  // bare movies). The old 10s timer flagged the message while the fetch was
+  // still in flight and the 15s axios timeout made any slow backend scrape
+  // land here as a fake "No episodes found"; timeouts now surface through
+  // `episodesFailed` (retry UI) instead. While `loading` is true the page
+  // simply keeps its skeletons — however long the backend takes.
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (!episodes || episodes.length === 0) {
-        setShowNoEpisodesMessage(true);
-      }
-    }, 10000);
-    return () => clearTimeout(timeoutId);
-  }, [loading, episodes]);
-
-  // TODO SHOW NO EPISODES DIV IF NOT LOADING AND NO EPISODES FOUND
-  useEffect(() => {
-    if (!loading && episodes.length === 0) {
+    if (!loading && !episodesFailed && episodes.length === 0) {
       setShowNoEpisodesMessage(true);
     } else {
       setShowNoEpisodesMessage(false);
     }
-  }, [loading, episodes]);
+  }, [loading, episodes, episodesFailed]);
 
   // Save an episode rating.
   // authed → saveEpisodeRating (server); guest → LS `…-{animeId}`.
@@ -2182,6 +2217,26 @@ const WatchInner: React.FC = () => {
             />
           )}
         </div>
+      ) : episodesFailed ? (
+        <NoEpsFoundDiv>
+          <h2>Couldn't load episodes</h2>
+          <NoEpsMessage>
+            The episode list took too long to load or failed — the backend may
+            still be preparing it. Check your connection and try again.
+          </NoEpsMessage>
+          <div>
+            <NoEpsRetryButton
+              type='button'
+              onClick={() => {
+                setEpisodesFailed(false);
+                setEpisodeRetryTick((tick) => tick + 1);
+              }}
+            >
+              <FaRedo aria-hidden='true' /> Try again
+            </NoEpsRetryButton>
+          </div>
+          <GoToHomePageButton />
+        </NoEpsFoundDiv>
       ) : showNoEpisodesMessage ? (
         <NoEpsFoundDiv>
           <h2>

@@ -49,7 +49,7 @@
       "destination": "/sw.js"
     },
     {
-      "source": "/((?!api/|assets/|fonts/|favicon\\.svg|favicon\\.ico|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.png|google0e4c03928112e656\\.html|icons/|sw\\.js|registerSW\\.js|workbox-.*\\.js|random-pool\\.json|Duzn7\\.jpg).*)",
+      "source": "/((?!api/|\\.well-known/|assets/|fonts/|favicon\\.svg|favicon\\.ico|manifest\\.json|sitemap\\.xml|sitemaps/|robots\\.txt|og-image\\.png|google0e4c03928112e656\\.html|icons/|sw\\.js|registerSW\\.js|workbox-.*\\.js|random-pool\\.json|Duzn7\\.jpg).*)",
       "destination": "/index.html"
     }
   ],

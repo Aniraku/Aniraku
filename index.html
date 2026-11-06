@@ -68,10 +68,6 @@
     <!-- Apple splash screens: none (Aniraku ships none; legacy splash PNGs orphaned on disk) -->
 
     <!-- Performance hints (streaming server config — provenance: live site) -->
-    <link rel="dns-prefetch" href="https://graphql.anilist.co" />
-    <link rel="preconnect" href="https://graphql.anilist.co" crossorigin />
-
-    <link rel="dns-prefetch" href="https://graphql.anilist.co" />
     <link rel="preconnect" href="https://graphql.anilist.co" crossorigin />
     <link rel="dns-prefetch" href="https://sbjdrjaovcgvttfnpfsz.supabase.co" />
     <link rel="preconnect" href="https://sbjdrjaovcgvttfnpfsz.supabase.co" crossorigin />
@@ -82,13 +78,22 @@
     <link rel="preconnect" href="https://image.tmdb.org" crossorigin />
     <link rel="dns-prefetch" href="https://artworks.thetvdb.com" />
     <link rel="preconnect" href="https://artworks.thetvdb.com" crossorigin />
-    <!-- Fonts (Google Fonts stack, matching Aniraku: Rubik body, Agbalumo brand, Orbitron display) -->
+    <!-- Fonts: Rubik is the only family actually used (the Agbalumo/Orbitron
+         tokens are defined but never referenced — they were 4 dead font
+         downloads). The stylesheet loads ASYNC via a tiny inline loader so
+         the render is never blocked on fonts.googleapis.com; sync-csp.mjs
+         hashes this script automatically. font-display:swap hides the swap. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Agbalumo&family=Rubik:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <script>
+      (function () {
+        var l = document.createElement('link');
+        l.rel = 'stylesheet';
+        l.href =
+          'https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap';
+        document.head.appendChild(l);
+      })();
+    </script>
 
     <!-- Font tokens -->
     <link rel="stylesheet" href="/src/styles/fonts.css" />

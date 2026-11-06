@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "aniraku.anime.app",
+    "sha256_cert_fingerprints": [
+      "1E:B1:18:D0:7F:A7:2A:B7:DB:74:46:3B:E8:5E:92:EB:12:E0:FB:59:C7:8D:34:45:09:93:FA:ED:C2:4D:49:F7"
+    ]
+  }
+}]
