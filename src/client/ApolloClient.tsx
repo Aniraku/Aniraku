@@ -1,11 +1,14 @@
 // apolloClient.ts
+// Apollo 4 layout: React exports (ApolloProvider/useQuery) moved to the
+// `/react` entry, error classes to `/errors`.
 import {
   ApolloClient,
   InMemoryCache,
   createHttpLink,
-  ApolloProvider,
   makeVar,
 } from '@apollo/client';
+import { ApolloProvider } from '@apollo/client/react';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import {
@@ -37,16 +40,19 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
-const errorLink = onError(({ graphQLErrors, networkError }) => {
-  if (graphQLErrors) {
-    graphQLErrors.forEach(({ message, locations, path }) =>
+const errorLink = onError(({ error }) => {
+  // Apollo 4 unified the callback: GraphQL errors arrive as a
+  // CombinedGraphQLErrors instance (its array is `.errors`), everything
+  // else is network-ish.
+  if (CombinedGraphQLErrors.is(error)) {
+    error.errors.forEach(({ message, locations, path }) =>
       console.error(
         `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`,
       ),
     );
+  } else {
+    console.error(`[Network error]: ${error}`);
   }
-
-  if (networkError) console.error(`[Network error]: ${networkError}`);
 });
 
 const client = new ApolloClient({

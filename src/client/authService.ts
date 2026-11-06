@@ -2,7 +2,9 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid'; // Ensure uuid is installed via npm or yarn
 import type { UserData, MediaListStatus } from './userInfoTypes'; // Adjust the path as necessary
-import { useQuery, gql } from '@apollo/client';
+// Apollo 4: React hooks moved to the /react entry; gql stays on the main one.
+import { useQuery } from '@apollo/client/react';
+import { gql } from '@apollo/client';
 
 // Constants for AniList OAuth — backend-owned flow.
 // Library sync OAuth is owned by the Aniraku Backend
@@ -141,14 +143,28 @@ const GET_USER_ANIME_LIST = gql`
   }
 `;
 
+// Apollo 4's useQuery no longer defaults TData to `any`; the single
+// consumer (WatchingAnilist, currently unmounted) maps raw entries through
+// its own annotations, so the generic stays deliberately loose.
+interface UserAnimeListData {
+  MediaListCollection?: {
+    lists: { entries: any[] }[];
+  } | null;
+}
+
 export const useUserAnimeList = (username: string, status: MediaListStatus) => {
-  const { data, loading, error } = useQuery(GET_USER_ANIME_LIST, {
-    variables: { username, status },
-    skip: !username || !status, // Ensuring not to proceed without necessary variables
-  });
+  const { data, loading, error } = useQuery<UserAnimeListData>(
+    GET_USER_ANIME_LIST,
+    {
+      variables: { username, status },
+      skip: !username || !status, // Ensuring not to proceed without necessary variables
+    },
+  );
 
   return {
-    animeList: data?.MediaListCollection,
+    // `any` cast keeps the loose shape the single consumer (WatchingAnilist)
+    // maps over through its own annotations.
+    animeList: data?.MediaListCollection as any,
     loading,
     error,
   };
