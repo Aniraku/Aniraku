@@ -63,7 +63,7 @@ import {
 // Runtime SEO through the shared helper: title, description, keywords,
 // og/twitter, canonical, JSON-LD, and cleanup.
 import { SITE_URL, useSeo } from '../utils/seo';
-import { ANILIST_GRAPHQL } from '../hooks/useApi';
+import { ANILIST_GRAPHQL, infoPath } from '../hooks/useApi';
 import { infoPathFor } from '../utils/animePaths';
 import {
   resolveCharacterName,
@@ -3112,7 +3112,12 @@ const Info: React.FC = () => {
   const seoImage = animeInfo
     ? `https://img.anili.st/media/${animeInfo.id}`
     : undefined;
-  const seoPath = animeId ? `/info/${animeId}` : undefined;
+  // Canonical must equal the sitemap URL form (useApi animeSlug —
+  // english||romaji, [^a-z0-9]+→'-'). The old no-slug /info/{id} form is
+  // what GSC flagged as "Alternate page with proper canonical tag";
+  // wrong-slug variants consolidate via functions/info 301s.
+  const seoPath =
+    animeId && animeInfo ? infoPath(animeId, animeInfo.title) : undefined;
   const seoPlot = animeInfo
     ? metaDescription(animeInfo.description || '')
     : undefined;
@@ -3138,6 +3143,9 @@ const Info: React.FC = () => {
       ? `${seoTitle}, watch ${seoTitle}, ${seoTitle} streaming, ${seoTitle} online free, ${seoTitle} sub, ${seoTitle} dub, ${seoFormat} anime, ${seoGenres}, anime streaming, aniraku`
       : undefined,
     canonicalPath: seoPath,
+    // Soft-404 backstop (server function 404s first) + noindex while the
+    // mature-content gate is showing (server function noindexes too).
+    noindex: !!error || (!!animeInfo && isNsfw(animeInfo) && !nsfwEnabled),
     image: seoImage,
     ogType: 'video.tv_show',
     jsonLd:
