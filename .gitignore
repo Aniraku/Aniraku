@@ -74,3 +74,12 @@ lerna-debug.log*
 
 # Vercel CLI state
 .vercel
+
+# Wrangler / Cloudflare Pages local secrets
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+
+# Local agent/session state
+.zcode/

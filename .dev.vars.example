@@ -1,0 +1,20 @@
+# Local development secrets for Cloudflare Pages Functions (wrangler pages
+# dev) — copy to `.dev.vars` (gitignored) and fill in. These values are
+# deployment-time secrets and must never be committed. See
+# docs/backend-api-lockdown.md.
+
+# Where the same-origin proxy forwards /api/v1/* and /health.
+BACKEND_ORIGIN=https://api.example.invalid
+
+# Shared proof-of-provenance secret the BACKEND verifies
+# (x-aniraku-internal). Generate: openssl rand -hex 32
+BACKEND_INTERNAL_TOKEN=
+
+# Media shield: 32-byte hex key for opaque /api/v1/proxy?k= media links
+# (AES-GCM). Same value on Production and Preview. Generate: openssl rand -hex 32
+# Unset = shield disabled, raw URLs flow as before (site keeps working).
+PROXY_LINK_KEY=
+
+# Dev-only: lets the Vite dev-server proxy reach the same backend with the
+# same token (vite reads these via process.env, e.g. through .env).
+VITE_BACKEND_ORIGIN=https://api.example.invalid

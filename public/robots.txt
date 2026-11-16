@@ -34,6 +34,88 @@ Disallow: /api/
 Crawl-delay: 2
 
 # =============================================================
+# AI / LLM agents (BLA: keep the site blind to training & data-
+# collection crawlers). User-initiated AI SEARCH agents
+# (OAI-SearchBot, ChatGPT-User, Perplexity-User, Claude-User,
+# Claude-SearchBot) intentionally fall under the User-agent: *
+# rules above so AI-search citations still link back to
+# Aniraku. Flip these to full blocks if you also want to
+# exclude AI search.
+# =============================================================
+
+# OpenAI — model training
+User-agent: GPTBot
+Disallow: /
+
+# Anthropic — model training
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+# Common Crawl — corpus building
+User-agent: CCBot
+Disallow: /
+
+# Google — Gemini training data
+User-agent: Google-Extended
+Disallow: /
+
+# Apple — training data
+User-agent: Applebot-Extended
+Disallow: /
+
+# ByteDance
+User-agent: Bytespider
+Disallow: /
+
+# Amazon — training data
+User-agent: Amazonbot
+Disallow: /
+
+# Meta — training & external fetch agents
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: Meta-ExternalFetcher
+Disallow: /
+
+# Other AI/scraper corpora
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Imagesift
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+User-agent: Omgili
+Disallow: /
+
+User-agent: YouBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: PanguBot
+Disallow: /
+
+User-agent: Kangaroo Bot
+Disallow: /
+
+User-agent: Timpibot
+Disallow: /
+
+# =============================================================
 # Sitemaps
 # =============================================================
 Sitemap: https://www.aniraku.tech/sitemap.xml

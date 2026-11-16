@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import {
-  fetchAdvancedSearch,
-} from '../index';
+import { fetchAdvancedSearch } from '../index';
 import CardGrid, { StyledCardGrid } from '../components/Cards/CardGrid';
 import { SkeletonCard } from '../components/Skeletons/Skeletons';
 import { Anime } from '../index';
@@ -361,7 +359,12 @@ const Pagination: React.FC<PagerProps> = ({
               onChange={handleInputChange}
               onBlur={commitInput}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') commitInput();
+                if (e.key === 'Enter') {
+                  // IME safety: don't commit while a CJK composition is being
+                  // confirmed (keyCode 229 covers Safari's ordering quirk).
+                  if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                  commitInput();
+                }
               }}
               title='Go to page'
               aria-label='Go to page'
@@ -407,9 +410,7 @@ const Trending = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const seasonButtonsRef = useRef<Record<string, HTMLButtonElement | null>>(
-    {},
-  );
+  const seasonButtonsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const yearButtonsRef = useRef<Record<number, HTMLButtonElement | null>>({});
   const seasonRailRef = useRef<HTMLDivElement | null>(null);
   const yearRailRef = useRef<HTMLDivElement | null>(null);
@@ -484,10 +485,7 @@ const Trending = () => {
   // Keep the selected season button in view on first load.
   useEffect(() => {
     if (didScrollToSeason.current) {
-      centerRailItem(
-        seasonRailRef.current,
-        seasonButtonsRef.current[season],
-      );
+      centerRailItem(seasonRailRef.current, seasonButtonsRef.current[season]);
       didScrollToSeason.current = false;
     }
   }, [season]);
@@ -523,9 +521,7 @@ const Trending = () => {
 
   const showLoading = isLoading && anime.length === 0;
   const lastPage =
-    pageInfo.totalPages ||
-    (pageInfo.hasNextPage ? page + 1 : page) ||
-    1;
+    pageInfo.totalPages || (pageInfo.hasNextPage ? page + 1 : page) || 1;
   const total = pageInfo.totalResults || 0;
   const rangeStart = total ? (page - 1) * PER_PAGE + 1 : 0;
   const rangeEnd = total ? Math.min(page * PER_PAGE, total) : anime.length;
@@ -602,9 +598,8 @@ const Trending = () => {
       <PaginationContainer>
         {total > 0 ? (
           <PaginationInfo>
-            Showing <strong>{rangeStart}</strong> to{' '}
-            <strong>{rangeEnd}</strong> out of <strong>{total}</strong>{' '}
-            results
+            Showing <strong>{rangeStart}</strong> to <strong>{rangeEnd}</strong>{' '}
+            out of <strong>{total}</strong> results
           </PaginationInfo>
         ) : (
           <PaginationInfo>&nbsp;</PaginationInfo>

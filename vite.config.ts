@@ -96,10 +96,24 @@ export default ({ mode }: ConfigEnv): UserConfigExport => {
     },
 
     server: {
-    // Same-origin API in dev: mirrors the production rewrite.
+    // Same-origin API in dev: mirrors the production rewrite. The backend
+    // origin is a local secret (.env — gitignored), never a repo literal
+    // (see docs/backend-api-lockdown.md). Default targets a local
+    // `wrangler pages dev` backend on :8787. When the backend enforces the
+    // shared internal token, dev forwards it from the same .env so dev
+    // traffic keeps passing.
     proxy: {
-      '/api/v1': { target: 'https://api.aniraku.tech', changeOrigin: true },
-      '/health': { target: 'https://api.aniraku.tech', changeOrigin: true },
+      '/api/v1': {
+        target: process.env.VITE_BACKEND_ORIGIN || 'http://127.0.0.1:8787',
+        changeOrigin: true,
+        ...(process.env.BACKEND_INTERNAL_TOKEN
+          ? { headers: { 'x-aniraku-internal': process.env.BACKEND_INTERNAL_TOKEN } }
+          : {}),
+      },
+      '/health': {
+        target: process.env.VITE_BACKEND_ORIGIN || 'http://127.0.0.1:8787',
+        changeOrigin: true,
+      },
     },
       port: parseInt(process.env.VITE_PORT || '3000'), // Dev on :3000 (Aniraku CORS allowlist)
       open: true, // Automatically open the default browser when starting the server

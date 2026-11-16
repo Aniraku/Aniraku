@@ -1140,6 +1140,15 @@ body {
 /* ---------------------------------------------------------- */
 /* DROP SEARCH                                                 */
 /* ---------------------------------------------------------- */
+/* Keyword interpolation is opt-in (off by default for compat): with it,
+   Chrome/Edge 129+ can transition height 0 → auto for a true intrinsic-
+   size animation. Without it (Firefox/Safari) height jumps instantly and
+   the legacy max-height clip transition below still animates — same
+   behavior as before, so nothing regresses on those engines. */
+html {
+  interpolate-size: allow-keywords;
+}
+
 .dropSearchContainer {
   position: absolute;
   top: calc(100% + 0.5rem);
@@ -1147,6 +1156,7 @@ body {
   left: 0;
   z-index: var(--z-index-base);
   max-height: 0;
+  height: 0;
   overflow: hidden;
   background-color: var(--global-div);
   border: 1px solid var(--global-border-color);
@@ -1154,6 +1164,7 @@ body {
   box-shadow: 0 8px 16px 0 rgb(0 0 0 / 30%);
   opacity: 0;
   transition:
+    height 0.5s ease-in-out,
     max-height 0.5s ease-in-out,
     opacity 0.2s ease-in-out;
 }
@@ -1161,12 +1172,20 @@ body {
 .dropSearchContainer.visible {
   z-index: var(--z-index-dropdown);
   max-height: 500px;
+  height: auto;
   opacity: 1;
   /* Browse all fetched results in place — scroll instead of going to the
      full search page. */
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+}
+
+/* Sizing motion is decoration — drop it for users who opt out of motion. */
+@media (prefers-reduced-motion: reduce) {
+  .dropSearchContainer {
+    transition: none;
+  }
 }
 
 @media (max-width: 500px) {

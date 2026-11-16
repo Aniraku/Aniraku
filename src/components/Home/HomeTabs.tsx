@@ -192,7 +192,13 @@ export const HomeTabs: React.FC<{
               setInputValue(v);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') commitPage();
+              if (e.key === 'Enter') {
+                // IME safety: the Enter that confirms a CJK composition must
+                // not commit the page (isComposing is false in Safari by the
+                // time the confirming keydown lands — keyCode 229 catches it).
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                commitPage();
+              }
             }}
             onBlur={commitPage}
           />
