@@ -101,8 +101,39 @@ async function serveK(token, suffix, request, env, origin) {
   // backend's k-route accepts the SAME token format (shared key), fetches
   // from its own IP, unwraps and rewrites, and this function then shields
   // the result like any other playlist.
-  if (!suffix && /(^|\.)flixcloud\.cc$/i.test(safeHostname(target))) {
-    return serveKViaBackend(token, request, env, origin, target, opened);
+  const targetHost = safeHostname(target);
+  // FlixCloud masters are fetched by the BACKEND, never from the edge.
+  // Two hard reasons: their master URLs embed a JWT bound to the backend's
+  // egress IP (an edge fetch fails the CDN's client_ip check with 403), and
+  // every flixcloud m3u8 body is wrapped in base64(XOR(_, pk)) which only
+  // the backend unwraps — served raw, the player cannot even parse it.
+  if (!suffix && /(^|\.)flixcloud\.cc$/i.test(targetHost)) {
+    return serveKViaBackend(
+      token,
+      request,
+      env,
+      origin,
+      target,
+      opened,
+      `/api/v1/proxy?k=${encodeURIComponent(token)}`,
+    );
+  }
+  // Backend-rewritten child URIs (playlist variants, segments, keys) name
+  // the backend host itself. Fetching them THROUGH the backend with the
+  // internal header keeps one authenticated path; a bare edge fetch would
+  // die at the backend's gate with 403 unauthorized client.
+  const backendHost = safeHostname(env.BACKEND_ORIGIN || '');
+  if (!suffix && backendHost && targetHost === backendHost) {
+    const childUrl = new URL(target);
+    return serveKViaBackend(
+      token,
+      request,
+      env,
+      origin,
+      target,
+      opened,
+      `${childUrl.pathname}${childUrl.search}`,
+    );
   }
 
 
@@ -152,17 +183,19 @@ async function serveK(token, suffix, request, env, origin) {
 // from its own IP and runs its provider-side unwraps), then shield the
 // playlist exactly like a direct fetch. There is no working direct-edge
 // fallback for these hosts, so a backend failure answers 502 cleanly.
-async function serveKViaBackend(token, request, env, origin, target, opened) {
+async function serveKViaBackend(token, request, env, origin, target, opened, backendPathAndQuery) {
   const backendOrigin = (env.BACKEND_ORIGIN || '').replace(/\/+$/, '');
-  if (backendOrigin) {
+  if (backendOrigin && backendPathAndQuery) {
     try {
       const headers = { 'x-aniraku-internal': env.BACKEND_INTERNAL_TOKEN || '' };
-      const range = request.headers.get('range');
-      if (range) headers['range'] = range;
-      const backend = await fetch(
-        `${backendOrigin}/api/v1/proxy?k=${encodeURIComponent(token)}`,
-        { headers, redirect: 'follow' },
-      );
+      for (const name of ['range', 'if-range', 'accept', 'accept-language']) {
+        const value = request.headers.get(name);
+        if (value) headers[name] = value;
+      }
+      const backend = await fetch(`${backendOrigin}${backendPathAndQuery}`, {
+        headers,
+        redirect: 'follow',
+      });
       const contentType = (
         backend.headers.get('content-type') || ''
       ).toLowerCase();
