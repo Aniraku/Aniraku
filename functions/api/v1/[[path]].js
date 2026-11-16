@@ -82,7 +82,22 @@ function rewrittenHeaders(upstream) {
 // exposing that path to the client.
 async function serveK(token, suffix, request, env, origin) {
   const opened = await openK(token, env);
-  if (!opened) return jsonResponse(404, 'link_expired');
+  // A decryption failure means this token was minted on the other side of
+  // the shared-key boundary (the backend's PROXY_LINK_KEY differs from
+  // ours). The backend can still open its own token: hand the k-link to
+  // the backend's k-route and shield whatever comes back, so playback
+  // survives a key mismatch instead of dying with link_expired.
+  if (!opened) {
+    return serveKViaBackend(
+      token,
+      request,
+      env,
+      origin,
+      null,
+      { headers: null },
+      `/api/v1/proxy?k=${encodeURIComponent(token)}`,
+    );
+  }
 
   let target = opened.url;
   if (suffix) {
@@ -199,17 +214,27 @@ async function serveKViaBackend(token, request, env, origin, target, opened, bac
       const contentType = (
         backend.headers.get('content-type') || ''
       ).toLowerCase();
-      if (
+      const looksPlaylist =
         contentType.includes('mpegurl') ||
-        target.split(/[?#]/)[0].toLowerCase().endsWith('.m3u8')
-      ) {
+        (target && target.split(/[?#]/)[0].toLowerCase().endsWith('.m3u8'));
+      if (looksPlaylist) {
         const text = await backend.text();
+        if (!text.trimStart().startsWith('#EXTM3U')) {
+          // Not a playlist (backend error page etc.) — stream it as-is so
+          // the client sees the real status instead of a mangled body.
+          const out = new Response(text, {
+            status: backend.status,
+            headers: rewrittenHeaders(backend),
+          });
+          scrubUpstreamHeaders(out.headers);
+          return out;
+        }
         try {
           const shielded = await shieldM3u8Text(
             text,
             env,
             origin,
-            target,
+            target || 'https://localhost/',
             opened.headers,
           );
           return new Response(shielded, {
