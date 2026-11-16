@@ -202,7 +202,13 @@ async function serveKViaBackend(token, request, env, origin, target, opened, bac
   const backendOrigin = (env.BACKEND_ORIGIN || '').replace(/\/+$/, '');
   if (backendOrigin && backendPathAndQuery) {
     try {
-      const headers = { 'x-aniraku-internal': env.BACKEND_INTERNAL_TOKEN || '' };
+      const headers = {
+        'x-aniraku-internal': env.BACKEND_INTERNAL_TOKEN || '',
+        // A non-empty UA the zone's "API Accessing" WAF rule can allowlist:
+        // with no UA at all the subrequest looks like empty-UA bot traffic
+        // and the rule blocks the function's own backend hop.
+        'user-agent': 'Aniraku-PagesFunction/1.0',
+      };
       for (const name of ['range', 'if-range', 'accept', 'accept-language']) {
         const value = request.headers.get(name);
         if (value) headers[name] = value;
