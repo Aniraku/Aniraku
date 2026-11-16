@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { API_BASE } from '../lib/apiBase';
+import {
+  playbackUrl, API_BASE } from '../lib/apiBase';
 import { year, getCurrentSeason, getNextSeason } from './useTIme';
 
 // Aniraku data layer — post-Consumet wiring
@@ -31,12 +32,14 @@ export function proxiedMediaUrl(
   url: string,
   headers?: Record<string, string> | null,
 ) {
-  if (!url || url.includes('/api/v1/proxy?')) return url;
+  if (!url || url.includes('/api/v1/proxy?')) return playbackUrl(url);
   const h =
     headers && Object.keys(headers).length > 0
       ? `&headers=${encodeURIComponent(JSON.stringify(headers))}`
       : '';
-  return `${ANIRAKU_BASE}/api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
+  // Media bytes ride the PLAYBACK base (the backend directly on deployments
+  // that bypass the function) — metadata stays on the function.
+  return `${playbackUrl(`${ANIRAKU_BASE}/api/v1/proxy`)}?url=${encodeURIComponent(url)}${h}`;
 }
 
 export const ANILIST_GRAPHQL = 'https://graphql.anilist.co';

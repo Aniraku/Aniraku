@@ -46,6 +46,7 @@ import {
   fetchAnirakuStream,
   proxiedMediaUrl,
 } from '../../../hooks/useApi';
+import { playbackUrl } from '../../../lib/apiBase';
 import { detectSubtitleType } from '../../../lib/subtitleType';
 import { useSettings } from '../../../components/Profile/SettingsProvider';
 import { TbPlayerTrackPrev, TbPlayerTrackNext } from 'react-icons/tb';
@@ -2010,9 +2011,16 @@ export function Player({
     },
     auto = false,
   ) {
-    setSrc(c.url);
+    // Playback URLs resolve against the PLAYBACK base (same-origin by
+    // default; the backend directly on function-bypassing deployments).
+    setSrc(playbackUrl(c.url));
     setSrcType(detectHls(c.url, c.type) ? 'hls' : 'mp4');
-    setSubTracks(dedupeSubtitles(Array.isArray(c.subs) ? c.subs : []));
+    setSubTracks(
+      dedupeSubtitles(Array.isArray(c.subs) ? c.subs : []).map((t) => ({
+        ...t,
+        url: playbackUrl(t.url),
+      })),
+    );
     // Headers MUST survive every path — the subtitle proxy answers
     // 502 CDN_BLOCKED without them.
     setStreamHeaders(c.headers ?? {});
