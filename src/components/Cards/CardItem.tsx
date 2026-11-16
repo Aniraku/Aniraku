@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import {
@@ -9,14 +9,15 @@ import {
   FaRegBookmark,
 } from 'react-icons/fa';
 import { MdRecordVoiceOver } from 'react-icons/md';
-import StatusIndicator from '../shared/StatusIndicator';
 import type { Anime } from '../../hooks/animeInterface';
 import { SkeletonBox } from '../Skeletons/Skeletons';
+import PosterBadges from './PosterBadges';
 import { infoPathFor } from '../../utils/animePaths';
 import { resolveDisplayTitle } from '../../lib/displayLanguage';
 import { useBookmarks } from '../../hooks/useBookmarks';
-// Whole-anime sub/dub chips: the backend's fast /track endpoint cached
-// locally (lib/audioTracks) — one cheap request per visible card, deduped.
+// Whole-anime sub/dub counts: the backend's fast /track endpoint cached
+// locally (lib/audioTracks) — one cheap request per card, deduped, fired
+// only once the card scrolls near the viewport.
 import {
   ensureTrackCounts,
   useTrackCounts,
@@ -28,7 +29,8 @@ import { showToast } from '../Toaster';
 // Card corner bookmark control. Styled to fit the card chrome: hover reveal
 // plus CSS variables, sitting top-left. Guests toggle in localStorage;
 // signed-in users get an optimistic local update plus a server
-// upsert/delete through useBookmarks.
+// upsert/delete through useBookmarks. Solid near-opaque fill — no
+// backdrop-filter, so an 18-card grid doesn't mount 18 GPU blur surfaces.
 const CardBookmarkBtn = styled.button`
   position: absolute;
   top: 0.25rem;
@@ -38,8 +40,7 @@ const CardBookmarkBtn = styled.button`
   padding: 0.25rem 0.2rem;
   box-sizing: border-box;
   cursor: pointer;
-  background-color: var(--global-div-tr);
-  backdrop-filter: blur(10px);
+  background-color: color-mix(in srgb, var(--global-div) 85%, transparent);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
   opacity: 0;
@@ -82,28 +83,6 @@ interface CardItemProps {
   anime: Anime;
 }
 
-// Miruro-style audio chips: rounded pills with the CC/mic icon + the exact
-// whole-anime episode count. Bordered, translucent, theme-aware.
-const AudioChip = styled.span`
-  display: inline-flex;
-  gap: 0.25rem;
-  align-items: center;
-  padding: 0.1rem 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--global-text);
-  background-color: var(--global-div-tr);
-  border: 1px solid var(--global-border-color);
-  border-radius: 999px;
-  white-space: nowrap;
-
-  svg {
-    font-size: 0.72rem;
-    color: var(--global-text-muted);
-  }
-`;
-
 const CardItem: React.FC<CardItemProps> = ({ anime }) => {
   const displayTitle = resolveDisplayTitle(anime.title);
 
@@ -139,15 +118,38 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
     return Y;
   }, [anime.totalEpisodes, anime.nextAiringEpisode]);
 
-  // Fire the (cached, deduped) /track fetch once per card mount.
+  // Fire the (cached, deduped) /track fetch only once the card scrolls near
+  // the viewport — a grid mount shouldn't open a request per card for tiles
+  // nobody has scrolled to. Falls back to fetch-on-mount without IO.
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (anime.id) void ensureTrackCounts(String(anime.id), ANIRAKU_API_BASE);
+    if (!anime.id) return;
+    const id = String(anime.id);
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      void ensureTrackCounts(id, ANIRAKU_API_BASE);
+      return;
+    }
+    let fired = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!fired && entries.some((entry) => entry.isIntersecting)) {
+          fired = true;
+          io.disconnect();
+          void ensureTrackCounts(id, ANIRAKU_API_BASE);
+        }
+      },
+      { rootMargin: '400px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, [anime.id]);
   const trackCounts: TrackCounts | null = useTrackCounts(String(anime.id));
 
-  const subCount = trackCounts && !trackCounts.missing
-    ? Math.max(trackCounts.sub, 0)
-    : airedCount;
+  const subCount =
+    trackCounts && !trackCounts.missing
+      ? Math.max(trackCounts.sub, 0)
+      : airedCount;
   const dubCount = trackCounts && !trackCounts.missing ? trackCounts.dub : 0;
 
   const hoverColor = anime.color
@@ -155,59 +157,62 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
     : undefined;
 
   return (
-    <div className="cardItem">
+    <div className='cardItem' ref={rootRef}>
       <Link
         to={infoPathFor(anime)}
-        className="card"
+        className='card'
         aria-label={`Play ${displayTitle}`}
         style={hoverColor}
       >
         <div
-          className="cardImgContainer"
+          className='cardImgContainer'
           style={{ '--img-ratio': '184 / 133' } as React.CSSProperties}
         >
           <img
             src={anime.thumbnail || anime.image}
             alt={`Play ${displayTitle}`}
-            loading="lazy"
-            decoding="async"
-            className="cardImg"
+            loading='lazy'
+            decoding='async'
+            className='cardImg'
           />
-          <div className="playIcon" aria-label="Play">
+          <div className='playIcon' aria-label='Play'>
             <FaPlay />
           </div>
-          <div className="statusBadge">
-            <StatusIndicator status={anime.status} />
-          </div>
+          <PosterBadges anime={anime} ep={airedCount || undefined} />
         </div>
-        <div className="titleContainer">
-          <div className="titleWrapper">
-            <span className="title">{displayTitle}</span>
+        <div className='titleContainer'>
+          <div className='titleWrapper'>
+            <span className='title'>{displayTitle}</span>
           </div>
-          <div className="cardDetails">
-            <div className="cardDetail">{year}</div>
-            <div className="cardDetail">{format}</div>
-            <div className="cardDetail">
-              <AudioChip title={`${subCount} episodes with sub`}>
-                <FaClosedCaptioning aria-hidden='true' />
-                {subCount > 0 ? subCount : currentEpisode}
-              </AudioChip>
-              {dubCount > 0 && (
-                <AudioChip title={`${dubCount} episodes with dub`}>
-                  <MdRecordVoiceOver aria-hidden='true' />
-                  {dubCount}
-                </AudioChip>
-              )}
-            </div>
-            <div className="cardDetail score">
-              <FaStar aria-label="Score" />
+          <div className='cardDetails'>
+            <span className='cardDetail'>
+              {format} · {year}
+            </span>
+            <span
+              className='cardDetail'
+              title={`${subCount} episodes with sub`}
+            >
+              <FaClosedCaptioning aria-hidden='true' />
+              {subCount > 0 ? subCount : currentEpisode}
+            </span>
+            {dubCount > 0 && (
+              <span
+                className='cardDetail'
+                title={`${dubCount} episodes with dub`}
+              >
+                <MdRecordVoiceOver aria-hidden='true' />
+                {dubCount}
+              </span>
+            )}
+            <span className='cardDetail score'>
+              <FaStar aria-label='Score' />
               {score}
-            </div>
+            </span>
           </div>
         </div>
       </Link>
       <CardBookmarkBtn
-        type="button"
+        type='button'
         data-bookmarked={String(bookmarked)}
         aria-pressed={bookmarked}
         aria-label={
@@ -243,9 +248,9 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
         }}
       >
         {bookmarked ? (
-          <FaBookmark aria-hidden="true" />
+          <FaBookmark aria-hidden='true' />
         ) : (
-          <FaRegBookmark aria-hidden="true" />
+          <FaRegBookmark aria-hidden='true' />
         )}
       </CardBookmarkBtn>
     </div>
@@ -254,19 +259,19 @@ const CardItem: React.FC<CardItemProps> = ({ anime }) => {
 
 export const CardItemSkeleton: React.FC = () => {
   return (
-    <div className="cardItem">
-      <div className="card">
+    <div className='cardItem'>
+      <div className='card'>
         <div
-          className="cardImgContainer"
+          className='cardImgContainer'
           style={{ '--img-ratio': '184 / 133' } as React.CSSProperties}
         >
           <SkeletonBox style={{ width: '100%', height: '100%' }} />
         </div>
-        <div className="titleContainer">
-          <div className="titleWrapper">
+        <div className='titleContainer'>
+          <div className='titleWrapper'>
             <SkeletonBox style={{ width: '80%', height: '1rem' }} />
           </div>
-          <div className="cardDetails">
+          <div className='cardDetails'>
             <SkeletonBox style={{ width: '2rem', height: '1rem' }} />
             <SkeletonBox style={{ width: '3rem', height: '1rem' }} />
             <SkeletonBox style={{ width: '4rem', height: '1rem' }} />

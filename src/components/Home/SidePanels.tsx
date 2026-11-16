@@ -11,9 +11,9 @@ import { infoPathFor } from '../../utils/animePaths';
 
 // SidePanels — side-list sections: TOP AIRING, UPCOMING, JUST FINISHED, TOP
 // MOVIES. Bordered wrapper contains the header, the 6rem cards (poster +
-// optional grayscale banner + title/status + detail chips), and a boxed
-// chevron-down link at the bottom that navigates to the full list page
-// (`listPath`) rather than expanding in place. Renders nothing when empty.
+// title/status + a plain meta line), and a boxed chevron-down link at the
+// bottom that navigates to the full list page (`listPath`) rather than
+// expanding in place. Renders nothing when empty.
 
 // Same format whitelist as the side list (matched case-insensitively
 // because the API may report "Movie" rather than "MOVIE").
@@ -91,36 +91,6 @@ const Card = styled(Link)`
   }
 `;
 
-const BannerWrap = styled.div`
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-index-base, 0);
-  width: 60%;
-  overflow: hidden;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    filter: grayscale(100%);
-    transition: filter 0.3s ease-in-out;
-  }
-
-  ${Card}:hover & img,
-  ${Card}:focus & img {
-    filter: grayscale(0);
-  }
-`;
-
-const GradientOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(-70deg, transparent -200%, var(--global-div) 80%);
-`;
-
 const CardImage = styled.div`
   position: relative;
   z-index: var(--z-index-above, 1);
@@ -130,7 +100,6 @@ const CardImage = styled.div`
   overflow: hidden;
   background-color: var(--global-primary-skeleton);
   border-radius: var(--global-border-radius);
-  box-shadow: 0 0 10px var(--global-shadow);
 
   img {
     width: 4.25rem;
@@ -180,9 +149,7 @@ const RankNumeral = styled.span`
   line-height: 1;
   color: #fff;
   pointer-events: none;
-  text-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.85),
-    0 0 12px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
 `;
 
 const Details = styled.div`
@@ -198,15 +165,14 @@ const Details = styled.div`
   }
 `;
 
+// Plain muted meta segments — no chip chrome; the row reads as one quiet
+// "★ 85 · TV · 12" line.
 const Detail = styled.span`
   display: flex;
   flex-shrink: 0;
   gap: 0.15rem;
   align-items: center;
-  padding: 0.1rem 0.2rem;
   font-weight: 500;
-  background-color: var(--global-primary-skeleton);
-  border-radius: var(--global-border-radius);
 
   svg {
     color: var(--global-text-muted);
@@ -304,8 +270,7 @@ export const SidePanel: React.FC<{
                 </SkeletonRow>
               ))
             : visible.map((anime, index) => {
-                const name =
-                  resolveDisplayTitle(anime.title) || 'Untitled';
+                const name = resolveDisplayTitle(anime.title) || 'Untitled';
                 const eps =
                   anime.totalEpisodes || Number(anime.episodes) || null;
                 const isPartial =
@@ -321,17 +286,12 @@ export const SidePanel: React.FC<{
                     aria-label={`Watch ${name}`}
                     style={
                       {
-                        ['--side-list-accent' as string]: anime.color || undefined,
+                        ['--side-list-accent' as string]:
+                          anime.color || undefined,
                         animationDelay: `${index * 0.1}s`,
                       } as React.CSSProperties
                     }
                   >
-                    {anime.cover && anime.cover !== anime.image && (
-                      <BannerWrap>
-                        <img src={anime.cover} alt='' loading='lazy' />
-                        <GradientOverlay />
-                      </BannerWrap>
-                    )}
                     <CardImage>
                       <img
                         src={anime.thumbnail || anime.image}

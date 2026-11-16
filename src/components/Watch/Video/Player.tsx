@@ -46,6 +46,7 @@ import {
   fetchAnirakuStream,
   proxiedMediaUrl,
 } from '../../../hooks/useApi';
+import { detectSubtitleType } from '../../../lib/subtitleType';
 import { useSettings } from '../../../components/Profile/SettingsProvider';
 import { TbPlayerTrackPrev, TbPlayerTrackNext } from 'react-icons/tb';
 import { FaCheck } from 'react-icons/fa6';
@@ -252,8 +253,8 @@ type FetchSkipTimesResponse = {
 // often returns the same track twice, and Vidstack builds track ids from
 // lang (`:subtitles-english`) so duplicates collide.
 function dedupeSubtitles(
-  tracks: { url: string; lang: string; label?: string }[],
-): { url: string; lang: string; label: string }[] {
+  tracks: { url: string; lang: string; label?: string; type?: string }[],
+): { url: string; lang: string; label: string; type?: string }[] {
   const seen = new Set<string>();
   return tracks
     .filter((t) => {
@@ -266,7 +267,12 @@ function dedupeSubtitles(
       seen.add(langKey);
       return true;
     })
-    .map((t) => ({ url: t.url, lang: t.lang, label: t.label ?? '' }));
+    .map((t) => ({
+      url: t.url,
+      lang: t.lang,
+      label: t.label ?? '',
+      type: t.type,
+    }));
 }
 
 // size              → percent scale of the 20px base (50%–200%)
@@ -464,6 +470,38 @@ export function normalizeSubtitleType(url: string): string {
   return extension === 'srt' || extension === 'ass' || extension === 'vtt' ? extension : 'vtt';
 }
 
+const subtitleTypeCache = new Map<string, string>();
+
+/**
+ * A proxied subtitle URL hides the extension, so the default is always
+ * `vtt`. For those links, read the body once and detect the real format;
+ * Artplayer trusts the declared type and will not convert a mislabeled
+ * SRT/ASS file.
+ */
+async function resolveSubtitleType(url: string, fallback: string): Promise<string> {
+  if (fallback !== 'vtt' || !url.includes('/api/v1/proxy')) return fallback;
+  const cached = subtitleTypeCache.get(url);
+  if (cached) return cached;
+  try {
+    const response = await fetch(url, {
+      credentials: 'same-origin',
+      // The proxy forwards Range; a small window is enough to identify the
+      // format without pulling the whole file just to label it.
+      headers: { range: 'bytes=0-255' },
+    });
+    if (response.ok) {
+      const detected = detectSubtitleType(await response.text());
+      if (detected) {
+        subtitleTypeCache.set(url, detected);
+        return detected;
+      }
+    }
+  } catch {
+    // Unreadable subtitle — keep the default and let the player try.
+  }
+  return fallback;
+}
+
 export interface SubtitleTrack {
   id: string;
   url: string;
@@ -495,7 +533,12 @@ export function normalizeSubtitleTracks(subtitles: any): SubtitleTrack[] {
                 : lang
                   ? lang.toUpperCase()
                   : `Subtitle ${index + 1}`);
-      return { id: `${index}:${url}`, url, lang, label, type: normalizeSubtitleType(url) };
+      const declared = String(track?.type || '').trim().toLowerCase();
+      const type =
+        declared === 'srt' || declared === 'ass' || declared === 'vtt'
+          ? declared
+          : normalizeSubtitleType(url);
+      return { id: `${index}:${url}`, url, lang, label, type };
     })
     .filter(Boolean) as SubtitleTrack[];
 }
@@ -1276,7 +1319,7 @@ export function Player({
   const [src, setSrc] = useState<string>('');
   const [srcType, setSrcType] = useState<'hls' | 'mp4'>('hls');
   const [subTracks, setSubTracks] = useState<
-    { url: string; lang: string; label: string }[]
+    { url: string; lang: string; label: string; type?: string }[]
   >([]);
   const [streamHeaders, setStreamHeaders] = useState<Record<string, string>>(
     {},
@@ -2736,7 +2779,7 @@ export function Player({
         // Two same-language tracks become `English 1` / `English 2`.
         const base = prettySubLabel(t, i);
         const label = dupTotal > 1 ? `${base} ${dupBefore + 1}` : base;
-        return { url: proxied(t.url), lang: language, label };
+        return { url: proxied(t.url), lang: language, label, type: t.type };
       });
       const subtitleTracks = normalizeSubtitleTracks(numberedTracks);
       const savedSubtitleTrack = subtitlePreferencesRef.current.track;
@@ -2749,6 +2792,13 @@ export function Player({
       const captionsDisabled = savedSubtitleTrack === 'off';
       const initialSubtitleTrack =
         preferredSubtitleTrack || subtitleTracks[0] || null;
+      // Kick off format detection now so it overlaps player setup.
+      const initialSubtitleTypePromise = initialSubtitleTrack
+        ? resolveSubtitleType(
+            initialSubtitleTrack.url,
+            initialSubtitleTrack.type,
+          )
+        : null;
 
       const switchSubtitleTrack = async (
         track: SubtitleTrack | null,
@@ -2791,9 +2841,16 @@ export function Player({
         const flagsOn = art as unknown as Record<string, unknown>;
         flagsOn._anirakuSubtitleEnabled = true;
         if (art.template.$subtitle) art.template.$subtitle.style.display = '';
+        const subtitleUrl = proxied(nextTrack.url);
+        const subtitleType = await resolveSubtitleType(
+          subtitleUrl,
+          nextTrack.type,
+        );
+        // A slower format lookup must not mount over a newer selection.
+        if (switchGeneration !== subtitleSwitchGenerationRef.current) return null;
         const result = await art.subtitle
-          .switch(proxied(nextTrack.url), {
-            type: nextTrack.type,
+          .switch(subtitleUrl, {
+            type: subtitleType,
             name: nextTrack.label,
             encoding: 'utf-8',
             style: getSubtitleStyle(subtitlePreferencesRef.current),
@@ -3800,10 +3857,10 @@ export function Player({
           },
         },
       };
-      if (initialSubtitleTrack) {
+      if (initialSubtitleTrack && initialSubtitleTypePromise) {
         playerConfig.subtitle = {
           url: proxied(initialSubtitleTrack.url),
-          type: initialSubtitleTrack.type,
+          type: await initialSubtitleTypePromise,
           name: initialSubtitleTrack.label,
           encoding: 'utf-8',
           style: getSubtitleStyle(subtitlePreferencesRef.current),

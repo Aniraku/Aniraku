@@ -44,7 +44,7 @@ let poolBytes = 0;
 let generation = 0; // bumped on reset — stale completions ignore themselves
 let inFlight = 0;
 const queue: (() => void)[] = [];
-let maxInFlight = 3;
+const maxInFlight = 3;
 let activeHeaders: Record<string, string> | null = null;
 
 function rangeKey(

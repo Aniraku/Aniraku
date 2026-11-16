@@ -154,9 +154,6 @@ const Row = styled(Link)<{ $aired: boolean }>`
   --title-color: ${({ $aired }) =>
     $aired ? 'var(--global-text)' : 'var(--global-text-muted)'};
 
-  &:nth-child(2n) {
-    background-color: var(--global-div);
-  }
   &:first-child {
     border-radius: var(--global-border-radius) var(--global-border-radius) 0 0;
   }
@@ -189,14 +186,12 @@ const RowTitle = styled.span`
   white-space: nowrap;
 `;
 
+// Plain "EP n" text — no boxed chip.
 const RowEpisode = styled.span`
   flex-shrink: 0;
-  padding: 0.2rem 0.5rem;
   font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
   color: var(--title-color, var(--global-text-muted));
-  background-color: var(--global-div);
-  border: 1px solid var(--global-border-color);
-  border-radius: var(--global-border-radius);
 `;
 
 const HoverCard = styled.img`

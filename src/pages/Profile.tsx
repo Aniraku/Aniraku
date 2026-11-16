@@ -711,9 +711,7 @@ const Overlay = styled.div`
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background-color: #0000007f;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background-color: rgba(0, 0, 0, 0.6);
   animation: fadeIn 0.4s ease-in-out;
   scrollbar-width: none;
 
@@ -735,6 +733,9 @@ const ModalPanel = styled.div`
   position: relative;
   display: flex;
   flex-direction: column;
+  /* border-box: the 1px border must sit INSIDE min(64rem, 100vw - 2rem),
+     not push the panel past the overlay's fit. */
+  box-sizing: border-box;
   width: min(64rem, calc(100vw - 2rem));
   height: min(44rem, calc(100vh - 2rem));
   overflow: hidden;

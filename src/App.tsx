@@ -238,7 +238,6 @@ function App() {
                     path='/settings'
                     element={<Navigate to='/profile?settings=1' replace />}
                   />
-                  {/* the live site 1:1: /about and /pptos do not exist — they 404 */}
                   {/* Wave C — Library Sync OAuth return (Aniraku
                       /sync/callback, App.jsx:187) */}
                   <Route path='/sync/callback' element={<SyncCallback />} />

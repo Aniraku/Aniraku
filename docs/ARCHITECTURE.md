@@ -28,7 +28,7 @@ Siblings: `Aniraku-Backend` (Go — streaming, sync, import/export),
   stop and inspect.
 - Authenticated AniList traffic (Apollo `Viewer`, OAuth) stays on the
   official API on both branches; only unauthenticated public reads differ.
-- Never commit `.env.production` or `.freebuff/` — both are git-ignored
+- Never commit `.env.production` or `Any Hidden Folder` — both are git-ignored
   local-only files (see `2f9b9c0`). They were once purged from history;
   keep it that way.
 

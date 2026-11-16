@@ -3,11 +3,9 @@ import { API_BASE } from '../lib/apiBase';
 import { year, getCurrentSeason, getNextSeason } from './useTIme';
 
 // Aniraku data layer — post-Consumet wiring
-// - Metadata (search, lists, anime info): the Aniraku GraphQL mirror, DIRECT
-//   from browser. The mirror serves AniList metadata ONLY (no mutations, no
-//   library writes) and is UNLIMITED — no AniList 30 req/min cap applies, so
-//   no client-side rate limiter here. (The endpoint is assembled at runtime
-//   in lib/apiBase — grepping the bundle for hosts finds decoys.)
+// - Metadata (search, lists, anime info): AniList GraphQL DIRECT from browser
+//   (MAIN: official public API `graphql.anilist.co` — 30 req/min cap, limiter
+//   below. PREVIEW: the Aniraku mirror — unlimited metadata-only.)
 //   Library writes (progress / scores / import / export) go through the
 //   Aniraku Backend (`/api/v1/sync*`, `/api/v1/import|export/*`) which owns
 //   the OAuth tokens and applies its own provider pacing.
@@ -41,18 +39,48 @@ export function proxiedMediaUrl(
   return `${ANIRAKU_BASE}/api/v1/proxy?url=${encodeURIComponent(url)}${h}`;
 }
 
+// PREVIEW BRANCH: the Aniraku mirror (AniList metadata only, unlimited).
+// The official-API limiter below is inert for this endpoint.
 export const ANILIST_GRAPHQL = `https://${atob('Z3JhcGhxbC5hbmlyYWt1LnRlY2g=')}`;
-/** Transport-level fallback when the mirror times out / 5xx's (official
- * public API, rate-limited — fallback hits are rare by design). */
-const OFFICIAL_FALLBACK_GRAPHQL = 'https://graphql.anilist.co';
-/** Aniraku GraphQL mirror: AniList metadata only, no rate limit. */
 export const ANIRAKU_GRAPHQL_MIRROR = ANILIST_GRAPHQL;
 export const ANIRAKU_GRAPHQL_UNLIMITED = true;
+
+// Minimal client-side rate limiter for the official API: at most 80
+// requests per rolling 60s window; extra requests wait their turn instead
+// of hammering AniList into 429s.
+const OFFICIAL_RATE_LIMIT = 80;
+const OFFICIAL_WINDOW_MS = 60_000;
+const officialRequestTimes: number[] = [];
+
+async function acquireOfficialSlot(): Promise<void> {
+  if (!ANILIST_GRAPHQL.includes('graphql.anilist.co')) return;
+  for (;;) {
+    const now = Date.now();
+    while (
+      officialRequestTimes.length > 0 &&
+      now - officialRequestTimes[0] > OFFICIAL_WINDOW_MS
+    ) {
+      officialRequestTimes.shift();
+    }
+    if (officialRequestTimes.length < OFFICIAL_RATE_LIMIT) {
+      officialRequestTimes.push(now);
+      return;
+    }
+    const waitMs = OFFICIAL_WINDOW_MS - (now - officialRequestTimes[0]) + 50;
+    await new Promise((resolve) => setTimeout(resolve, Math.max(waitMs, 200)));
+  }
+}
+// MAIN: transport-level fallback (official API is also the primary here —
+// the second attempt is a deliberate retry after limiter/backoff paths).
+const OFFICIAL_FALLBACK_GRAPHQL = 'https://graphql.anilist.co';
 // Module-level AniList availability signal for the global outage banner.
 // Only TRUE outages (network failure, 5xx, 429) flip the banner — ordinary
 // GraphQL errors (validation, not-found) and 4xx must not flap it.
 function reportAnilistStatus(unavailable: boolean): void {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }));
+  if (typeof window !== 'undefined')
+    window.dispatchEvent(
+      new CustomEvent('aniraku:anilist-status', { detail: { unavailable } }),
+    );
 }
 
 const SKIP_TIMES = ensureUrlEndsWithSlash(
@@ -137,8 +165,7 @@ export function mapAnilistMediaToAnime(m: any) {
     currentEpisode: nextAiring
       ? Math.max((nextAiring.episode ?? 1) - 1, 0)
       : (m?.episodes ?? 0),
-    rating:
-      typeof m?.averageScore === 'number' ? m.averageScore / 10 : 0,
+    rating: typeof m?.averageScore === 'number' ? m.averageScore / 10 : 0,
     duration: m?.duration ?? 0,
     genres: m?.genres ?? [],
     studios: Array.isArray(m?.studios?.nodes)
@@ -152,6 +179,8 @@ export function mapAnilistMediaToAnime(m: any) {
     type: m?.format ?? 'TV',
     startDate: m?.startDate ?? { year: 0, month: 0, day: 0 },
     endDate: m?.endDate ?? { year: 0, month: 0, day: 0 },
+    // AniList last-edit unix seconds — powers the card "6h ago" badge.
+    updatedAt: m?.updatedAt ?? 0,
     trailer: m?.trailer ?? { id: '', site: '' },
     nextAiringEpisode: nextAiring,
     // No manga route: drop manga/novel nodes from recommendations.
@@ -160,13 +189,17 @@ export function mapAnilistMediaToAnime(m: any) {
           .map((r: any) => r?.mediaRecommendation ?? r ?? {})
           .filter(
             (media: any) =>
-              media?.id && media?.type !== 'MANGA' && media?.format !== 'MANGA' && media?.format !== 'NOVEL',
+              media?.id &&
+              media?.type !== 'MANGA' &&
+              media?.format !== 'MANGA' &&
+              media?.format !== 'NOVEL',
           )
           .map((media: any) => {
-            const { img: rImg, thumbnail: rThumb, cover: rCover } = pickImage(
-              media?.coverImage,
-              media?.bannerImage,
-            );
+            const {
+              img: rImg,
+              thumbnail: rThumb,
+              cover: rCover,
+            } = pickImage(media?.coverImage, media?.bannerImage);
             return {
               id: String(media?.id ?? ''),
               malId: media?.idMal != null ? String(media.idMal) : '',
@@ -207,35 +240,36 @@ export function mapAnilistMediaToAnime(m: any) {
               e?.node?.format !== 'NOVEL',
           )
           .map((e: any) => {
-          const node = e?.node ?? {};
-          const { img: relImg, thumbnail: relThumb, cover: relCover } = pickImage(
-            node?.coverImage,
-            node?.bannerImage,
-          );
-          return {
-            id: String(node?.id ?? ''),
-            malId: node?.idMal != null ? String(node.idMal) : '',
-            relationType: e?.relationType ?? '',
-            title: {
-              romaji: node?.title?.romaji ?? '',
-              english: node?.title?.english ?? '',
-              native: node?.title?.native ?? '',
-              userPreferred: node?.title?.userPreferred ?? '',
-            },
-            status: mapAnilistStatus(node?.status),
-            episodes: node?.episodes ?? 0,
-            image: relImg,
-            thumbnail: relThumb,
-            imageHash: '',
-            cover: relCover,
-            coverHash: '',
-            rating:
-              typeof node?.averageScore === 'number'
-                ? node.averageScore / 10
-                : 0,
-            type: node?.format ?? node?.type ?? '',
-            genres: Array.isArray(node?.genres) ? node.genres : [],
-          };
+            const node = e?.node ?? {};
+            const {
+              img: relImg,
+              thumbnail: relThumb,
+              cover: relCover,
+            } = pickImage(node?.coverImage, node?.bannerImage);
+            return {
+              id: String(node?.id ?? ''),
+              malId: node?.idMal != null ? String(node.idMal) : '',
+              relationType: e?.relationType ?? '',
+              title: {
+                romaji: node?.title?.romaji ?? '',
+                english: node?.title?.english ?? '',
+                native: node?.title?.native ?? '',
+                userPreferred: node?.title?.userPreferred ?? '',
+              },
+              status: mapAnilistStatus(node?.status),
+              episodes: node?.episodes ?? 0,
+              image: relImg,
+              thumbnail: relThumb,
+              imageHash: '',
+              cover: relCover,
+              coverHash: '',
+              rating:
+                typeof node?.averageScore === 'number'
+                  ? node.averageScore / 10
+                  : 0,
+              type: node?.format ?? node?.type ?? '',
+              genres: Array.isArray(node?.genres) ? node.genres : [],
+            };
           })
       : [],
     mappings: [],
@@ -262,18 +296,23 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
     directAxios.post(
       endpoint,
       { query, variables },
-      { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
     );
 
   const task = (async () => {
     let lastError: unknown;
-    // Endpoints in order: the branch primary (mirror on preview, official on
-    // main), then the official public API as a TRANSPORT-LEVEL fallback — a
-    // slow/unreachable primary (regional mirror outages) can no longer take
-    // the site down. GraphQL-level errors do NOT trigger the fallback (the
+    // Endpoints in order: the branch primary (OFFICIAL on main), then the
+    // fallback list — a slow/unreachable primary can no longer take the
+    // site down. GraphQL-level errors do NOT trigger the fallback (the
     // endpoint is up; the query is the problem).
     for (const endpoint of [ANILIST_GRAPHQL, OFFICIAL_FALLBACK_GRAPHQL]) {
       try {
+        if (endpoint !== ANILIST_GRAPHQL) await acquireOfficialSlot();
         const { data } = await post(endpoint);
         if ((data as any)?.errors?.length) {
           // GraphQL-level error (bad id, validation, not-found) is NOT an
@@ -290,7 +329,9 @@ async function anilistQuery(query: string, variables: Record<string, any>) {
         const status = (err as { response?: { status?: number } })?.response
           ?.status;
         const transportFailure =
-          status === undefined || status === 429 || (status >= 500 && status <= 599);
+          status === undefined ||
+          status === 429 ||
+          (status >= 500 && status <= 599);
         if (!transportFailure) {
           reportAnilistStatus(false);
           throw err;
@@ -375,7 +416,7 @@ function createOptimizedSessionStorageCache(
   };
 }
 
-const CACHE_SIZE = 20;
+const CACHE_SIZE = 50;
 const CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 
 function createCache(cacheKey: string) {
@@ -411,7 +452,7 @@ const MEDIA_LIST_FIELDS = `
   title { romaji english native userPreferred }
   coverImage { extraLarge large medium color }
   bannerImage format status episodes duration
-  genres averageScore popularity
+  genres averageScore popularity updatedAt
   season seasonYear isAdult
   nextAiringEpisode { episode airingAt timeUntilAiring }
   startDate { year month day }
@@ -498,7 +539,15 @@ function toAnilistSort(sort?: string[]): string[] {
 function toAnilistStatus(status?: string): string | undefined {
   if (!status) return undefined;
   const s = status.toUpperCase();
-  if (['RELEASING', 'FINISHED', 'NOT_YET_RELEASED', 'CANCELLED', 'HIATUS'].includes(s))
+  if (
+    [
+      'RELEASING',
+      'FINISHED',
+      'NOT_YET_RELEASED',
+      'CANCELLED',
+      'HIATUS',
+    ].includes(s)
+  )
     return s;
   // Consumet-style compat
   if (s === 'ONGOING') return 'RELEASING';
@@ -627,7 +676,11 @@ export const fetchUpcomingSeasons = (page: number, perPage: number) => {
   // calendar year (FALL 2026 -> WINTER 2027), otherwise AniList returns
   // nothing.
   const season = getNextSeason().toUpperCase();
-  const y = Number(year) + (season === 'WINTER' && getCurrentSeason().toUpperCase() === 'FALL' ? 1 : 0);
+  const y =
+    Number(year) +
+    (season === 'WINTER' && getCurrentSeason().toUpperCase() === 'FALL'
+      ? 1
+      : 0);
   return fetchListViaAnilist('Upcoming v3', {
     page,
     perPage,
@@ -665,6 +718,12 @@ export async function fetchAnimeInfo(animeId: string) {
 // GET {base}api/v1/anime/{id}/episodes -> { episodes: [{number,title,thumbnail,description,airdate}] }
 // Mapped to Aniraku Episode[] so EpisodeList/Watch keep working.
 
+// Cold-cache scrapes routinely exceed 15s server-side (the backend waits on
+// AniZip/TMDB), so this endpoint gets its own patient client — the 15s
+// directAxios timeout was exactly what produced the false "No episodes
+// found" state on the Watch page while the list was still loading.
+const episodesAxios = axios.create({ timeout: 30000 });
+
 export async function fetchAnimeEpisodes(
   animeId: string,
   _provider?: string,
@@ -674,19 +733,34 @@ export async function fetchAnimeEpisodes(
   const cached = animeEpisodesCache.get(cacheKey);
   if (cached) return cached;
   const url = `${ANIRAKU_BASE}/api/v1/anime/${encodeURIComponent(animeId)}/episodes`;
-  const { data } = await directAxios.get(url);
-  const list = Array.isArray(data?.episodes) ? data.episodes : [];
-  const mapped = list.map((ep: any) => ({
-    id: `${animeId}-episode-${ep?.number}`,
-    number: ep?.number,
-    title: ep?.title ?? `Episode ${ep?.number}`,
-    description: ep?.description ?? null,
-    image: ep?.thumbnail ?? '',
-    imageHash: '',
-    airDate: ep?.airdate ?? ep?.airedAt ?? null,
-  }));
-  animeEpisodesCache.set(cacheKey, mapped);
-  return mapped;
+  // Retry timeouts/network errors with backoff — a slow scrape is normal,
+  // not a dead end. 4xx (except 429) is definitive; retrying can't help.
+  const retryDelaysMs = [0, 3000, 8000];
+  let lastError: unknown;
+  for (const delay of retryDelaysMs) {
+    if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      const { data } = await episodesAxios.get(url);
+      const list = Array.isArray(data?.episodes) ? data.episodes : [];
+      const mapped = list.map((ep: any) => ({
+        id: `${animeId}-episode-${ep?.number}`,
+        number: ep?.number,
+        title: ep?.title ?? `Episode ${ep?.number}`,
+        description: ep?.description ?? null,
+        image: ep?.thumbnail ?? '',
+        imageHash: '',
+        airDate: ep?.airdate ?? ep?.airedAt ?? null,
+      }));
+      animeEpisodesCache.set(cacheKey, mapped);
+      return mapped;
+    } catch (err) {
+      lastError = err;
+      const status = (err as { response?: { status?: number } })?.response
+        ?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) throw err;
+    }
+  }
+  throw lastError;
 }
 
 // Streaming via Aniraku Backend (NEW — numeric AniList IDs)
@@ -813,9 +887,7 @@ export async function fetchSkipTimes({
     return data;
   } catch (err) {
     // 404 = AniSkip has no data for this episode — not an error.
-    if (
-      (err as { response?: { status?: number } })?.response?.status === 404
-    )
+    if ((err as { response?: { status?: number } })?.response?.status === 404)
       return { results: [] };
     throw err;
   }
@@ -841,12 +913,21 @@ export function infoPath(
   return `/info/${id}/${animeSlug(title)}`;
 }
 
-// Airing schedule for one day window (AniList direct, no cache — always fresh).
+// Airing schedule for one day window (AniList direct). 15-minute
+// sessionStorage cache: a day window only changes when an episode airs
+// inside it, so MiniSchedule/Schedule remounts shouldn't re-query every
+// time. Module-level cache — one parse per session, not per call.
 export interface AiringEntry {
   airingAt: number;
   episode: number;
   anime: any;
 }
+
+const airingDayCache = createOptimizedSessionStorageCache(
+  CACHE_SIZE,
+  15 * 60 * 1000,
+  'aniraku-airing-day-cache',
+);
 
 export async function fetchAiringDay(
   greater: number,
@@ -854,6 +935,9 @@ export async function fetchAiringDay(
   page: number = 1,
   perPage: number = 25,
 ): Promise<{ entries: AiringEntry[]; hasNextPage: boolean }> {
+  const cacheKey = `${greater}:${lesser}:${page}:${perPage}`;
+  const cached = airingDayCache.get(cacheKey);
+  if (cached) return cached;
   const query = `
 query ($page: Int, $perPage: Int, $greater: Int, $lesser: Int) {
   Page(page: $page, perPage: $perPage) {
@@ -873,7 +957,7 @@ query ($page: Int, $perPage: Int, $greater: Int, $lesser: Int) {
     lesser,
   });
   const schedules = data?.Page?.airingSchedules ?? [];
-  return {
+  const result = {
     entries: schedules.map((s: any) => ({
       airingAt: s?.airingAt ?? 0,
       episode: s?.episode ?? 0,
@@ -881,6 +965,8 @@ query ($page: Int, $perPage: Int, $greater: Int, $lesser: Int) {
     })),
     hasNextPage: !!data?.Page?.pageInfo?.hasNextPage,
   };
+  airingDayCache.set(cacheKey, result);
+  return result;
 }
 
 // Recent / airing schedule via AniList (direct)
@@ -899,19 +985,15 @@ export async function fetchRecentEpisodes(
   // "NEWEST" = shows with the freshest episodes. A single short schedule
   // window empties overnight (few airings at once) — and half the entries
   // are adult/RELEASING shorts that get filtered. Sweep BACKWARD from now
-  // across up to 7 days per page (2 AniList pages of 50) until perPage
-  // unique shows are collected; page N continues where page N-1 stopped.
+  // across up to 8 days (4 windows of 50) until perPage unique shows are
+  // collected; page N continues where page N-1 stopped.
   const WINDOW = 48 * 60 * 60;
   const now = Math.floor(Date.now() / 1000);
   const seen = new Set<string>();
   const results: any[] = [];
-  let cursor = now - (page - 1) * 4 * WINDOW; // pages advance ~4 days
+  const base = now - (page - 1) * 4 * WINDOW; // pages advance ~4 days
   const BATCH = 50;
-  for (let sweep = 0; sweep < 4 && results.length < perPage; sweep++) {
-    const greater = cursor - WINDOW;
-    const lesser = cursor;
-    cursor = greater;
-    const query = `
+  const query = `
 query ($perPage: Int, $greater: Int, $lesser: Int) {
   Page(page: 1, perPage: $perPage) {
     pageInfo { total }
@@ -923,12 +1005,21 @@ query ($perPage: Int, $greater: Int, $lesser: Int) {
     }
   }
 }`;
-    const data = await anilistQuery(query, {
+  // All window bounds are known upfront. Fire window 1 first (it usually
+  // fills perPage); if it comes up short, sweep the remaining windows in
+  // PARALLEL and merge in window order — a sparse day used to cost 4
+  // sequential ~600ms+ round trips before the Home rail could render.
+  const windows = [0, 1, 2, 3].map((k) => ({
+    greater: base - (k + 1) * WINDOW,
+    lesser: base - k * WINDOW,
+  }));
+  const runWindow = (w: { greater: number; lesser: number }) =>
+    anilistQuery(query, {
       perPage: BATCH,
-      greater,
-      lesser,
-    });
-    const schedules = data?.Page?.airingSchedules ?? [];
+      greater: w.greater,
+      lesser: w.lesser,
+    }).then((data) => data?.Page?.airingSchedules ?? []);
+  const collect = (schedules: any[]) => {
     for (const s of schedules) {
       const media = s?.media;
       const id = String(media?.id ?? '');
@@ -939,7 +1030,16 @@ query ($perPage: Int, $greater: Int, $lesser: Int) {
       results.push(mapAnilistMediaToAnime(media));
       if (results.length >= perPage) break;
     }
-    if (schedules.length < BATCH) break; // ran past all scheduled airings
+  };
+  const firstSchedules = await runWindow(windows[0]);
+  collect(firstSchedules);
+  const firstExhausted = firstSchedules.length < BATCH; // ran past all airings
+  if (results.length < perPage && !firstExhausted) {
+    const rest = await Promise.all(windows.slice(1).map(runWindow));
+    for (const schedules of rest) {
+      collect(schedules);
+      if (results.length >= perPage) break;
+    }
   }
   const result = {
     results,

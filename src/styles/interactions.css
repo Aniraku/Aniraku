@@ -1,0 +1,96 @@
+/* ============================================================
+ * Interaction layer — one motion language for every clickable
+ * surface, layered OVER the per-class styles instead of
+ * replacing them:
+ *   1) press-and-release on buttons/anchors/rows — :where()
+ *      keeps specificity at zero, so any existing :active rule
+ *      (scale .95, bottomNavTab, …) keeps winning and this only
+ *      fills the gaps;
+ *   2) keyboard focus rings (not motion — always on);
+ *   3) one gentle card lift; side-menu items slide;
+ *   4) every motion rule is gated on prefers-reduced-motion.
+ * Transform/opacity only — nothing here triggers layout, and
+ * hover is signaled by the per-class color/background swaps
+ * (see globals.css), not by extra lift/glow layers. The video
+ * player and sonner toast subtrees are opted out entirely
+ * (they position via transform; a press-scale would displace
+ * them).
+ * ============================================================ */
+
+:root {
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snap: cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+
+/* Keyboard focus — visible ring in the accent, never removed. */
+:where(
+    button,
+    a,
+    [role='button'],
+    [role='link'],
+    summary,
+    input,
+    select,
+    textarea
+  ):focus-visible {
+  outline: 2px solid var(--primary-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 1) Press + release. Small controls squish a little more than
+        big surfaces. The longhand transition-duration/timing only
+        lands where the element has no transition of its own. */
+  :where(button, [role='button']) {
+    transition-property: transform, opacity;
+    transition-duration: 0.3s;
+    transition-timing-function: var(--ease-spring);
+  }
+  :where(button, [role='button']):active {
+    transform: scale(0.96);
+    transition-duration: 0.09s;
+    transition-timing-function: var(--ease-snap);
+  }
+  :where(a, [role='link']) {
+    transition-property: transform, opacity;
+    transition-duration: 0.3s;
+    transition-timing-function: var(--ease-spring);
+  }
+  :where(a, [role='link']):active {
+    transform: scale(0.97);
+    transition-duration: 0.09s;
+    transition-timing-function: var(--ease-snap);
+  }
+
+  /* 2) Cards: one gentle lift (the image zoom already exists
+        upstream in globals.css). */
+  :where(.cardItem, .card):hover {
+    transform: translateY(-4px);
+  }
+
+  /* 3) Side-menu items slide toward their content. */
+  :where(.navItem) {
+    transition-property: transform, color, background-color;
+    transition-duration: 0.3s;
+    transition-timing-function: var(--ease-spring);
+  }
+  :where(.navItem):hover {
+    transform: translateX(4px);
+  }
+
+  /* Opt-outs: subtrees that position via transform or manage their
+     own interaction physics — a press-scale would displace them. */
+  .art-video-player :where(button, a, [role='button']),
+  .art-video-player :where(button, a, [role='button'] svg) {
+    transition-property: none;
+  }
+  .art-video-player :where(button, a, [role='button']):active {
+    transform: none;
+  }
+  [data-sonner-toaster] :where(button, a, [role='button']) {
+    transition-property: none;
+  }
+  [data-sonner-toaster] :where(button, a, [role='button']):active {
+    transform: none;
+  }
+}

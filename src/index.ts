@@ -26,7 +26,9 @@ export {
   SettingsProvider,
   useSettings,
 } from './components/Profile/SettingsProvider';
-export { WatchingAnilist } from './components/Profile/WatchingAnilist';
+// WatchingAnilist is NOT re-exported here: its tree pulls @apollo/client
+// into the eager bundle (see Client note below), and no eager module uses
+// it. Import it directly by path if it ever remounts.
 
 // * ==== Hooks ====
 // API and other functionality

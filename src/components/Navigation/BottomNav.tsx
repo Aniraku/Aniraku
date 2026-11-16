@@ -1,12 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  FiHome,
-  FiSearch,
-  FiBell,
-  FiClock,
-  FiUser,
-} from 'react-icons/fi';
+import { FiHome, FiSearch, FiBell, FiClock, FiUser } from 'react-icons/fi';
 // IconType lives on the react-icons root (re-exported from ./lib/iconBase);
 // react-icons/fi only imports it — not re-exported (fi/index.d.ts:2).
 import type { IconType } from 'react-icons';
@@ -43,9 +37,7 @@ const FOCUSED_ROUTES = new Set([
 
 const isHiddenRoute = (path: string): boolean =>
   // Never over the player.
-  path === '/watch' ||
-  path.startsWith('/watch/') ||
-  FOCUSED_ROUTES.has(path);
+  path === '/watch' || path.startsWith('/watch/') || FOCUSED_ROUTES.has(path);
 
 interface BottomTab {
   key: string;
@@ -63,8 +55,8 @@ const BottomNav = () => {
 
   // Badge hook — shares the same store subscriber as the navbar.
   const { unreadCount } = useNotifications();
-  // Shared dice logic with the navbar.
-  const randomAnime = useRandomAnime();
+  // Shared dice logic with the navbar (rolling drives the icon spin).
+  const { rollRandom, rolling } = useRandomAnime();
 
   const hidden = isHiddenRoute(path);
 
@@ -87,16 +79,14 @@ const BottomNav = () => {
       icon: FiBell,
       // Existing bus: the navbar listener toggles the drawer state.
       action: () =>
-        window.dispatchEvent(
-          new Event('global-shortcuts:open-notifications'),
-        ),
+        window.dispatchEvent(new Event('global-shortcuts:open-notifications')),
       badge: unreadCount,
     },
     {
       key: 'random',
       label: 'Random',
       icon: GiPerspectiveDiceSixFacesRandom,
-      action: randomAnime,
+      action: rollRandom,
     },
     { key: 'history', label: 'History', icon: FiClock, to: '/history' },
     { key: 'profile', label: 'Profile', icon: FiUser, to: '/profile' },
@@ -116,7 +106,7 @@ const BottomNav = () => {
           <button
             key={key}
             type='button'
-            className='bottomNavTab'
+            className={`bottomNavTab${key === 'random' && rolling ? ' rolling' : ''}`}
             data-active={active}
             onClick={action || (() => navigate(to!))}
             aria-label={ariaLabel}

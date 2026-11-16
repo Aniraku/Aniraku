@@ -78,10 +78,9 @@ const DarkOverlay = styled.div`
   inset: 0;
   z-index: var(--z-index-above, 2);
   pointer-events: none;
-  background:
-    linear-gradient(45deg, var(--global-primary-bg) 5%, transparent 60%),
-    linear-gradient(0deg, var(--global-primary-bg) 1%, transparent 60%),
-    linear-gradient(-45deg, var(--global-primary-bg) 5%, transparent 60%);
+  /* One bottom-up fade into the page background — enough for the text
+     block, and far quieter than the old triple-gradient wash. */
+  background: linear-gradient(0deg, var(--global-primary-bg) 5%, transparent 60%);
   border-radius: var(--global-border-radius);
 `;
 
@@ -100,7 +99,6 @@ const ContentDetails = styled.div`
   transition:
     transform 0.4s ease-in-out,
     opacity 0.4s ease-in-out;
-  will-change: transform;
 
   @media (max-width: 1000px) {
     right: 1rem;
@@ -144,10 +142,6 @@ const TitleText = styled.div`
   font-weight: 700;
   color: var(--home-carousel-title-color, white);
   text-align: center;
-  background: var(--home-carousel-title-gradient, linear-gradient(45deg, var(--global-text), gray));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 `;
 
 // TVDB clearlogo wordmark — replaces the text title when the artwork exists
@@ -225,13 +219,10 @@ const ActionButton = styled(Link)`
   text-decoration: none;
   pointer-events: auto;
   cursor: pointer;
-  background: var(--global-div-tr-2);
-  backdrop-filter: blur(10px) contrast(125%);
-  -webkit-backdrop-filter: blur(10px) contrast(125%);
+  background: color-mix(in srgb, var(--global-div) 85%, transparent);
   border: 1px solid var(--global-border-color);
   border-radius: 2rem;
   transition: transform 0.2s ease-in-out;
-  will-change: transform;
 
   &:hover,
   &:active,
@@ -271,9 +262,7 @@ const Badge = styled.div`
   padding: 0.5rem 0.6rem;
   font-weight: 600;
   color: var(--global-text);
-  background: var(--global-div-tr-2);
-  backdrop-filter: blur(10px) contrast(125%);
-  -webkit-backdrop-filter: blur(10px) contrast(125%);
+  background: color-mix(in srgb, var(--global-div) 85%, transparent);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
 `;
@@ -294,9 +283,7 @@ const NavButton = styled.div`
   padding: 0.5rem;
   color: var(--global-text);
   cursor: pointer;
-  background: var(--global-div-tr-2);
-  backdrop-filter: blur(10px) contrast(125%);
-  -webkit-backdrop-filter: blur(10px) contrast(125%);
+  background: color-mix(in srgb, var(--global-div) 85%, transparent);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
 
@@ -320,9 +307,7 @@ const Fraction = styled.div`
   color: var(--global-text);
   text-align: center;
   pointer-events: none;
-  background: var(--global-div-tr-2);
-  backdrop-filter: blur(10px) contrast(125%);
-  -webkit-backdrop-filter: blur(10px) contrast(125%);
+  background: color-mix(in srgb, var(--global-div) 85%, transparent);
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
 
@@ -390,7 +375,6 @@ const SlideDetails: FC<{ anime: Anime }> = ({ anime }) => {
   const colorVars = anime.color
     ? ({
         ['--home-carousel-title-color' as string]: anime.color,
-        ['--home-carousel-title-gradient' as string]: `linear-gradient(45deg, ${anime.color}, white)`,
       } as React.CSSProperties)
     : undefined;
 

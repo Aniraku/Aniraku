@@ -75,7 +75,7 @@ const AnnouncementModal = () => {
 
 const Backdrop = styled.div`
   position: fixed; z-index: 1450; inset: 0; display: grid; align-items: end; justify-items: center; padding: 16px;
-  background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); animation: announcementFadeIn 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  background: rgba(0, 0, 0, 0.8); animation: announcementFadeIn 180ms cubic-bezier(0.23, 1, 0.32, 1);
   @keyframes announcementFadeIn { from { opacity: 0; } to { opacity: 1; } }
 `;
 
