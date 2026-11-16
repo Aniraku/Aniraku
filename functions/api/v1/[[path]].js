@@ -93,6 +93,19 @@ async function serveK(token, suffix, request, env, origin) {
     }
   }
 
+  // FlixCloud masters are fetched by the BACKEND, never from the edge.
+  // Two hard reasons: their master URLs embed a JWT bound to the backend's
+  // egress IP (an edge fetch fails the CDN's client_ip check with 403), and
+  // every flixcloud m3u8 body is wrapped in base64(XOR(_, pk)) which only
+  // the backend unwraps — served raw, ExoPlayer cannot even parse it. The
+  // backend's k-route accepts the SAME token format (shared key), fetches
+  // from its own IP, unwraps and rewrites, and this function then shields
+  // the result like any other playlist.
+  if (!suffix && /(^|\.)flixcloud\.cc$/i.test(safeHostname(target))) {
+    return serveKViaBackend(token, request, env, origin, target, opened);
+  }
+
+
   // Range/I-Range keep video seeking working; sealed provider headers
   // (Referer / User-Agent / …) are required by the upstream host.
   const headers = {};
@@ -133,6 +146,69 @@ async function serveK(token, suffix, request, env, origin) {
   const out = new Response(upstream.body, upstream);
   scrubUpstreamHeaders(out.headers);
   return out;
+}
+
+// Fetch a k-token through the backend's own k-route (the backend egresses
+// from its own IP and runs its provider-side unwraps), then shield the
+// playlist exactly like a direct fetch. There is no working direct-edge
+// fallback for these hosts, so a backend failure answers 502 cleanly.
+async function serveKViaBackend(token, request, env, origin, target, opened) {
+  const backendOrigin = (env.BACKEND_ORIGIN || '').replace(/\/+$/, '');
+  if (backendOrigin) {
+    try {
+      const headers = { 'x-aniraku-internal': env.BACKEND_INTERNAL_TOKEN || '' };
+      const range = request.headers.get('range');
+      if (range) headers['range'] = range;
+      const backend = await fetch(
+        `${backendOrigin}/api/v1/proxy?k=${encodeURIComponent(token)}`,
+        { headers, redirect: 'follow' },
+      );
+      const contentType = (
+        backend.headers.get('content-type') || ''
+      ).toLowerCase();
+      if (
+        contentType.includes('mpegurl') ||
+        target.split(/[?#]/)[0].toLowerCase().endsWith('.m3u8')
+      ) {
+        const text = await backend.text();
+        try {
+          const shielded = await shieldM3u8Text(
+            text,
+            env,
+            origin,
+            target,
+            opened.headers,
+          );
+          return new Response(shielded, {
+            status: backend.status,
+            headers: rewrittenHeaders(backend),
+          });
+        } catch {
+          return new Response(text, {
+            status: backend.status,
+            headers: rewrittenHeaders(backend),
+          });
+        }
+      }
+      // Non-playlist (unexpected for flixcloud masters): stream it back.
+      const out = new Response(backend.body, backend);
+      scrubUpstreamHeaders(out.headers);
+      return out;
+    } catch {
+      // fall through to nothing — the caller has no direct path left that
+      // could succeed for flixcloud, so answer cleanly.
+      return jsonResponse(502, 'upstream_rejected');
+    }
+  }
+  return null;
+}
+
+function safeHostname(u) {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return '';
+  }
 }
 
 export async function onRequest(context) {
