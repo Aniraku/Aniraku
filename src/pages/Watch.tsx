@@ -823,6 +823,10 @@ const WatchInner: React.FC = () => {
   // EMPTY (backend hasn't scraped it yet). Bumping this re-runs the fetch
   // effect below so the user can poll without a full reload.
   const [serverRetry, setServerRetry] = useState(0);
+  // Empty-pool auto-retry: a direct Watch load can beat the backend's scrape.
+  // Hold the skeleton through two delayed retries before the panel.
+  const [emptyPoolsAttempt, setEmptyPoolsAttempt] = useState(0);
+  const [emptyPoolsWaiting, setEmptyPoolsWaiting] = useState(false);
   const [language, setLanguage] = useState(
     () =>
       readStoredPref(getLanguageKey(animeId), legacyLanguageKey(animeId)) ||
@@ -922,6 +926,11 @@ const WatchInner: React.FC = () => {
   // Identity of the episode the pools below belong to — stamped on settle;
   // the player gate below refuses to boot off a different episode's list.
   const serverEpKey = `${animeId}:${Number(currentEpisode.number) || 0}`;
+  const poolsEmptyForEpisode =
+    poolEpKey === serverEpKey &&
+    serversSettled &&
+    serversSub.length === 0 &&
+    serversDub.length === 0;
   useEffect(() => {
     // GATED on infoResolved: by the time this runs, animeInfo (→ genreKey)
     // is final, so the ONE fetch already carries the genres. The old ungated
@@ -960,6 +969,7 @@ const WatchInner: React.FC = () => {
         const trackTask = animeId
           ? ensureTrackCounts(String(animeId), ANIRAKU_API_BASE, {
               priority: true,
+              force: serverRetry > 0 && poolsEmptyForEpisode,
             }).catch(() => null)
           : Promise.resolve(null);
 
@@ -1054,6 +1064,29 @@ const WatchInner: React.FC = () => {
     // fresh release) — the key guard above keeps the pools, it just refetches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animeId, currentEpisode.number, genreKey, language, infoResolved, serverRetry]);
+
+  // Both pools settled empty for this episode. Wait for the fast /track call
+  // (now force-refreshed on retry) and re-run the server fan-out twice before
+  // declaring the episode unavailable. A direct Watch load often arrives just
+  // before the backend has finished scraping a fresh release.
+  useEffect(() => {
+    if (!poolsEmptyForEpisode) {
+      setEmptyPoolsWaiting(false);
+      setEmptyPoolsAttempt(0);
+      return;
+    }
+    if (emptyPoolsAttempt >= 2) {
+      setEmptyPoolsWaiting(false);
+      return;
+    }
+    setEmptyPoolsWaiting(true);
+    const timer = window.setTimeout(() => {
+      setEmptyPoolsWaiting(false);
+      setEmptyPoolsAttempt((n) => n + 1);
+      setServerRetry((n) => n + 1);
+    }, 1200 * (emptyPoolsAttempt + 1));
+    return () => window.clearTimeout(timer);
+  }, [poolsEmptyForEpisode, emptyPoolsAttempt]);
 
   const servers = language === 'dub' ? serversDub : serversSub;
   const allServers = [...serversSub, ...serversDub];
@@ -2078,11 +2111,7 @@ const WatchInner: React.FC = () => {
   // here (empty pool ⇒ `!some(...)` is true) and its own /stream fallback
   // then served a WRONG episode the backend had lying around. Block the
   // player and show a re-checkable "not available yet" panel instead.
-  const serversEmptyForEpisode =
-    poolEpKey === serverEpKey &&
-    serversSettled &&
-    serversSub.length === 0 &&
-    serversDub.length === 0;
+  const serversEmptyForEpisode = poolsEmptyForEpisode;
 
   const playerEl = (
     <VideoPlayerContainer
@@ -2097,7 +2126,7 @@ const WatchInner: React.FC = () => {
           selection (serverGateOpen). Without that third gate the player
           started on its own /stream discovery and the arriving Sub/Dub list
           then forced srcOverride onto it — the reported restart bug. */}
-      {loading || !infoResolved || !serverGateOpen ? (
+      {loading || !infoResolved || !serverGateOpen || emptyPoolsWaiting ? (
         <SkeletonPlayer />
       ) : futureEpisodeRequested ? (
         <UpcomingPanel role='status'>

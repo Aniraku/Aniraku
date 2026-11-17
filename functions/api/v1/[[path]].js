@@ -82,7 +82,22 @@ function rewrittenHeaders(upstream) {
 // exposing that path to the client.
 async function serveK(token, suffix, request, env, origin) {
   const opened = await openK(token, env);
-  if (!opened) return jsonResponse(404, 'link_expired');
+  // A decryption failure means this token was minted on the other side of
+  // the shared-key boundary (the backend's PROXY_LINK_KEY differs from
+  // ours). The backend can still open its own token: hand the k-link to
+  // the backend's k-route and shield whatever comes back, so playback
+  // survives a key mismatch instead of dying with link_expired.
+  if (!opened) {
+    return serveKViaBackend(
+      token,
+      request,
+      env,
+      origin,
+      null,
+      { headers: null },
+      `/api/v1/proxy?k=${encodeURIComponent(token)}`,
+    );
+  }
 
   let target = opened.url;
   if (suffix) {
@@ -92,6 +107,50 @@ async function serveK(token, suffix, request, env, origin) {
       // fall back to the sealed URL itself
     }
   }
+
+  // FlixCloud masters are fetched by the BACKEND, never from the edge.
+  // Two hard reasons: their master URLs embed a JWT bound to the backend's
+  // egress IP (an edge fetch fails the CDN's client_ip check with 403), and
+  // every flixcloud m3u8 body is wrapped in base64(XOR(_, pk)) which only
+  // the backend unwraps — served raw, ExoPlayer cannot even parse it. The
+  // backend's k-route accepts the SAME token format (shared key), fetches
+  // from its own IP, unwraps and rewrites, and this function then shields
+  // the result like any other playlist.
+  const targetHost = safeHostname(target);
+  // FlixCloud masters are fetched by the BACKEND, never from the edge.
+  // Two hard reasons: their master URLs embed a JWT bound to the backend's
+  // egress IP (an edge fetch fails the CDN's client_ip check with 403), and
+  // every flixcloud m3u8 body is wrapped in base64(XOR(_, pk)) which only
+  // the backend unwraps — served raw, the player cannot even parse it.
+  if (!suffix && /(^|\.)flixcloud\.cc$/i.test(targetHost)) {
+    return serveKViaBackend(
+      token,
+      request,
+      env,
+      origin,
+      target,
+      opened,
+      `/api/v1/proxy?k=${encodeURIComponent(token)}`,
+    );
+  }
+  // Backend-rewritten child URIs (playlist variants, segments, keys) name
+  // the backend host itself. Fetching them THROUGH the backend with the
+  // internal header keeps one authenticated path; a bare edge fetch would
+  // die at the backend's gate with 403 unauthorized client.
+  const backendHost = safeHostname(env.BACKEND_ORIGIN || '');
+  if (!suffix && backendHost && targetHost === backendHost) {
+    const childUrl = new URL(target);
+    return serveKViaBackend(
+      token,
+      request,
+      env,
+      origin,
+      target,
+      opened,
+      `${childUrl.pathname}${childUrl.search}`,
+    );
+  }
+
 
   // Range/I-Range keep video seeking working; sealed provider headers
   // (Referer / User-Agent / …) are required by the upstream host.
@@ -133,6 +192,87 @@ async function serveK(token, suffix, request, env, origin) {
   const out = new Response(upstream.body, upstream);
   scrubUpstreamHeaders(out.headers);
   return out;
+}
+
+// Fetch a k-token through the backend's own k-route (the backend egresses
+// from its own IP and runs its provider-side unwraps), then shield the
+// playlist exactly like a direct fetch. There is no working direct-edge
+// fallback for these hosts, so a backend failure answers 502 cleanly.
+async function serveKViaBackend(token, request, env, origin, target, opened, backendPathAndQuery) {
+  const backendOrigin = (env.BACKEND_ORIGIN || '').replace(/\/+$/, '');
+  if (backendOrigin && backendPathAndQuery) {
+    try {
+      const headers = {
+        'x-aniraku-internal': env.BACKEND_INTERNAL_TOKEN || '',
+        // A non-empty UA the zone's "API Accessing" WAF rule can allowlist:
+        // with no UA at all the subrequest looks like empty-UA bot traffic
+        // and the rule blocks the function's own backend hop.
+        'user-agent': 'Aniraku-PagesFunction/1.0',
+      };
+      for (const name of ['range', 'if-range', 'accept', 'accept-language']) {
+        const value = request.headers.get(name);
+        if (value) headers[name] = value;
+      }
+      const backend = await fetch(`${backendOrigin}${backendPathAndQuery}`, {
+        headers,
+        redirect: 'follow',
+      });
+      const contentType = (
+        backend.headers.get('content-type') || ''
+      ).toLowerCase();
+      const looksPlaylist =
+        contentType.includes('mpegurl') ||
+        (target && target.split(/[?#]/)[0].toLowerCase().endsWith('.m3u8'));
+      if (looksPlaylist) {
+        const text = await backend.text();
+        if (!text.trimStart().startsWith('#EXTM3U')) {
+          // Not a playlist (backend error page etc.) — stream it as-is so
+          // the client sees the real status instead of a mangled body.
+          const out = new Response(text, {
+            status: backend.status,
+            headers: rewrittenHeaders(backend),
+          });
+          scrubUpstreamHeaders(out.headers);
+          return out;
+        }
+        try {
+          const shielded = await shieldM3u8Text(
+            text,
+            env,
+            origin,
+            target || 'https://localhost/',
+            opened.headers,
+          );
+          return new Response(shielded, {
+            status: backend.status,
+            headers: rewrittenHeaders(backend),
+          });
+        } catch {
+          return new Response(text, {
+            status: backend.status,
+            headers: rewrittenHeaders(backend),
+          });
+        }
+      }
+      // Non-playlist (unexpected for flixcloud masters): stream it back.
+      const out = new Response(backend.body, backend);
+      scrubUpstreamHeaders(out.headers);
+      return out;
+    } catch {
+      // fall through to nothing — the caller has no direct path left that
+      // could succeed for flixcloud, so answer cleanly.
+      return jsonResponse(502, 'upstream_rejected');
+    }
+  }
+  return null;
+}
+
+function safeHostname(u) {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return '';
+  }
 }
 
 export async function onRequest(context) {

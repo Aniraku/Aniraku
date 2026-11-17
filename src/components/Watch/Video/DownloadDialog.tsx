@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PLAYBACK_BASE } from '../../../lib/apiBase';
 import styled from 'styled-components';
 import {
   FaClosedCaptioning,
@@ -329,7 +330,7 @@ const DownloadDialog: React.FC<DownloadDialogProps> = ({
                 headers: headers[lang],
                 subtitles: subtitles[lang],
                 qualityHeight: selectedHeight,
-                apiBase: ANIRAKU_API_BASE,
+                apiBase: PLAYBACK_BASE || ANIRAKU_API_BASE,
               });
               onClose();
             }}
