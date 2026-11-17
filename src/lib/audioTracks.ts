@@ -92,6 +92,8 @@ function isStale(entry: TrackCounts): boolean {
  * `priority` (Watch page) fetches immediately; the default (card rails)
  * goes through a small FIFO so a grid of ~20 visible cards can't fire 20
  * simultaneous requests and stall the page. Default concurrency: 3.
+ * `force` skips a fresh cache entry (used by the Watch page's empty-pool
+ * retry so a stale 404/missing snapshot can be re-checked).
  */
 const CARD_QUEUE_LIMIT = 3;
 const cardQueue: (() => void)[] = [];
@@ -117,15 +119,16 @@ function runQueued<T>(task: () => Promise<T>): Promise<T> {
 export function ensureTrackCounts(
   animeId: string,
   apiBase: string,
-  options: { priority?: boolean } = {},
+  options: { priority?: boolean; force?: boolean } = {},
 ): Promise<TrackCounts | null> {
   const id = String(animeId || '');
   if (!id || typeof window === 'undefined') return Promise.resolve(null);
   const record = ensureCache();
   const cached = record[id];
-  if (cached && !isStale(cached)) return Promise.resolve(cached);
   const existing = inflight.get(id);
   if (existing) return existing;
+  if (!options.force && cached && !isStale(cached))
+    return Promise.resolve(cached);
 
   const task = (async () => {
     try {
