@@ -738,6 +738,7 @@ const ModalPanel = styled.div`
   box-sizing: border-box;
   width: min(64rem, calc(100vw - 2rem));
   height: min(44rem, calc(100vh - 2rem));
+  height: min(44rem, calc(100dvh - 2rem)); /* mobile pass: no URL-bar jump */
   overflow: hidden;
   background-color: var(--global-div-tr);
   border: 1px solid var(--global-border-color);

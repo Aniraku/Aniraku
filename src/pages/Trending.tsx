@@ -133,6 +133,34 @@ const SeasonWrapper = styled.div`
   &::-webkit-scrollbar {
     display: none;
   }
+
+  /* Scroll affordance for the hidden scrollbar: fade the edge(s) that hold
+     unfetched content — data-fade tracks scroll position, so a rail resting
+     at its origin never fakes a fade. */
+  &[data-fade='right'] {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+  &[data-fade='left'] {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  }
+  &[data-fade='both'] {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+  }
 `;
 
 const SeasonButton = styled.button`
@@ -182,6 +210,31 @@ const YearRail = styled.div`
   text-align: center;
   user-select: none;
   scrollbar-width: none;
+
+  &[data-fade='right'] {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+  &[data-fade='left'] {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  }
+  &[data-fade='both'] {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+  }
 
   &::-webkit-scrollbar {
     display: none;
@@ -417,6 +470,43 @@ const Trending = () => {
   const didScrollToSeason = useRef(true);
   const fetchSeq = useRef(0);
 
+  // Edge-fade scroll affordance: the rails hide their scrollbars, so clipped
+  // big-text edges read as broken layout. data-fade names which side(s) hold
+  // unfetched content ("left", "right", "both", "none") — measured on resize
+  // AND scroll, so a rail at its scroll origin never fakes a left fade.
+  const [railsFade, setRailsFade] = useState({ season: 'none', year: 'none' });
+  useEffect(() => {
+    const fadeOf = (el: HTMLDivElement | null): 'left' | 'right' | 'both' | 'none' => {
+      if (!el) return 'none';
+      const overflow = el.scrollWidth - el.clientWidth > 1;
+      if (!overflow) return 'none';
+      const atStart = el.scrollLeft < 1;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      if (atStart && atEnd) return 'none';
+      if (atStart) return 'right';
+      if (atEnd) return 'left';
+      return 'both';
+    };
+    const measure = () => {
+      const season = fadeOf(seasonRailRef.current);
+      const year = fadeOf(yearRailRef.current);
+      setRailsFade((prev) => (prev.season === season && prev.year === year ? prev : { season, year }));
+    };
+    const ro = new ResizeObserver(measure);
+    if (seasonRailRef.current) ro.observe(seasonRailRef.current);
+    if (yearRailRef.current) ro.observe(yearRailRef.current);
+    measure();
+    const season = seasonRailRef.current;
+    const year = yearRailRef.current;
+    season?.addEventListener('scroll', measure, { passive: true });
+    year?.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      ro.disconnect();
+      season?.removeEventListener('scroll', measure);
+      year?.removeEventListener('scroll', measure);
+    };
+  }, []);
+
   // NSFW: filter at render derivation.
   const { nsfwEnabled } = useNsfw();
   const visibleAnime = useMemo(
@@ -533,7 +623,7 @@ const Trending = () => {
       </VisuallyHiddenH1>
 
       <TrendingFilters>
-        <SeasonWrapper ref={seasonRailRef}>
+        <SeasonWrapper ref={seasonRailRef} data-fade={railsFade.season}>
           {SEASONS.map((s, index) => (
             <span key={s} style={{ display: 'contents' }}>
               <SeasonButton
@@ -555,7 +645,7 @@ const Trending = () => {
         </SeasonWrapper>
         {/* Year rail — same treatment as the season rail: big text options
             with "/" dividers, horizontal scroll, selected highlighted. */}
-        <YearRail ref={yearRailRef} role='group' aria-label='Choose year'>
+        <YearRail ref={yearRailRef} data-fade={railsFade.year} role='group' aria-label='Choose year'>
           {YEAR_OPTIONS.map((y, index) => (
             <span key={y} style={{ display: 'contents' }}>
               <SeasonButton

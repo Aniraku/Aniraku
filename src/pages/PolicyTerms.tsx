@@ -6,12 +6,11 @@ const colors = {
   buttonText: 'var(--global-button-text)',
   buttonHoverBackground: 'var(--global-button-hover-bg)',
   adBackground: 'var(--global-div)',
-  customColor: 'var(--your-custom-color)',
   paddingSize: '1rem',
 };
 
 const StyledLink = styled.a`
-  color: #744aff;
+  color: var(--primary-accent);
   text-decoration: none;
   font-weight: bold;
   &:hover,

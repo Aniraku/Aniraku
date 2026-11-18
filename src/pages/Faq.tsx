@@ -131,6 +131,16 @@ const HeaderCard = styled.header`
     color: var(--global-text-muted-strong);
     font-size: 14px;
     line-height: 1.7;
+
+    /* Bare anchors otherwise fall back to browser-blue, off every theme. */
+    a {
+      color: var(--primary-accent);
+      font-weight: 600;
+      text-decoration: none;
+      &:hover {
+        text-decoration: underline;
+      }
+    }
   }
 
   @media (max-width: 480px) {

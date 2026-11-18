@@ -1,0 +1,45 @@
+# Aniraku
+
+> Aniraku (https://www.aniraku.tech) is a free, open-source anime streaming
+> web app. It streams anime episodes in HD with subtitles (soft-subs) and
+> dubs, and builds its catalog on AniList data. No account is required to
+> watch; an optional free account syncs bookmarks, watch history, and ratings
+> across devices.
+
+Aniraku is an AGPL-3.0 open-source project (github.com/Aniraku/Aniraku).
+It is a media client: video files are served by third-party providers and
+the catalog is metadata from AniList (graphql.anilist.co).
+
+## Key pages
+
+- Home: anime discovery hub — featured banner, latest episodes, top airing, upcoming: https://www.aniraku.tech/
+- Trending: what is being watched right now: https://www.aniraku.tech/trending
+- Schedule: weekly airing schedule with per-day grouping: https://www.aniraku.tech/schedule
+- Anime detail pages: synopsis, episodes, characters, related anime at /info/{anilist-id}/{slug} (e.g. https://www.aniraku.tech/info/16498/attack-on-titan)
+- Watch pages: the streaming player for an episode at /watch/{anilist-id} (e.g. https://www.aniraku.tech/watch/16498)
+- Search: /search?query={term} — text search across the AniList catalog
+- FAQ: how the site works: https://www.aniraku.tech/faq
+- About: project background and contacts: https://www.aniraku.tech/about
+- Terms: https://www.aniraku.tech/terms
+- Privacy: https://www.aniraku.tech/privacy
+- DMCA / takedown policy: https://www.aniraku.tech/dmca
+- License (AGPL-3.0): https://www.aniraku.tech/license
+- Community guidelines: https://www.aniraku.tech/community-guidelines
+
+## Content facts
+
+- Streaming is free; no paid tier exists and no payment is accepted.
+- Accounts are optional and exist only for cross-device sync of bookmarks,
+  watch history, and ratings.
+- Sub and dub sources are listed per episode when available.
+- Themes: dark (default), light, AniList, Catppuccin.
+- Installable as a PWA on Android, iOS, and desktop Chrome.
+
+## For machines
+
+- Sitemap index: https://www.aniraku.tech/sitemap.xml
+- 23K+ anime detail URLs live under /info/{id}/{slug}; use the sitemap
+  rather than enumerating ids.
+- Anime detail and watch pages ship server-rendered head tags (title,
+  description, canonical, JSON-LD: TVSeries/Movie/VideoObject/BreadcrumbList)
+  so they are readable without executing JavaScript.

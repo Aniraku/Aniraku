@@ -3139,9 +3139,6 @@ const Info: React.FC = () => {
         }${seoGenres ? ` · ${seoGenres}` : ''}. Stream in HD with subtitles and dub.`
       : undefined,
     ogDescription: seoPlot,
-    keywords: animeInfo
-      ? `${seoTitle}, watch ${seoTitle}, ${seoTitle} streaming, ${seoTitle} online free, ${seoTitle} sub, ${seoTitle} dub, ${seoFormat} anime, ${seoGenres}, anime streaming, aniraku`
-      : undefined,
     canonicalPath: seoPath,
     // Soft-404 backstop (server function 404s first) + noindex while the
     // mature-content gate is showing (server function noindexes too).
@@ -3189,12 +3186,6 @@ const Info: React.FC = () => {
                 {
                   '@type': 'ListItem',
                   position: 2,
-                  name: 'Search',
-                  item: `${SITE_URL}/search`,
-                },
-                {
-                  '@type': 'ListItem',
-                  position: 3,
                   name: seoTitle,
                   item: `${SITE_URL}${seoPath}`,
                 },

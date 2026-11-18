@@ -224,11 +224,18 @@ const ActionButton = styled(Link)`
   border-radius: 2rem;
   transition: transform 0.2s ease-in-out;
 
-  &:hover,
   &:active,
   &:focus {
     border-color: var(--global-text);
     transform: scale(1.05);
+  }
+  /* Touch has no hover — gate the hover scale behind a capability query so
+     a tap never leaves the chip stuck at 1.05 (mobile-native). */
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--global-text);
+      transform: scale(1.05);
+    }
   }
 
   @media (max-width: 1000px) {
@@ -287,9 +294,11 @@ const NavButton = styled.div`
   border: 1px solid var(--global-border-color);
   border-radius: var(--global-border-radius);
 
-  &:hover {
-    border-color: var(--global-text);
-    transform: scale(1.05);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      border-color: var(--global-text);
+      transform: scale(1.05);
+    }
   }
   &:active {
     transform: scale(1);

@@ -97,6 +97,34 @@ const DayStripScroll = styled.div`
   text-align: center;
   scrollbar-width: none;
 
+  /* Scroll affordance for the hidden scrollbar: fade the edge(s) that hold
+     unreachable days — data-fade tracks scroll position, so a strip resting
+     at its origin never fakes a fade. */
+  &[data-fade='right'] {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+  &[data-fade='left'] {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  }
+  &[data-fade='both'] {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
+  }
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -674,6 +702,33 @@ const Schedule = () => {
   const dayRefs = useRef<Array<HTMLParagraphElement | null>>([]);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchActiveRef = useRef(false);
+  const dayStripRef = useRef<HTMLDivElement | null>(null);
+
+  // Edge-fade scroll affordance for the hidden-scrollbar day strip:
+  // data-fade names which side(s) hold unreachable days, measured on resize
+  // AND scroll, so a strip resting at its origin never fakes a left fade.
+  const [dayStripFade, setDayStripFade] = useState<'left' | 'right' | 'both' | 'none'>('none');
+  useEffect(() => {
+    const measure = () => {
+      const el = dayStripRef.current;
+      if (!el || el.scrollWidth - el.clientWidth <= 1) {
+        setDayStripFade('none');
+        return;
+      }
+      const atStart = el.scrollLeft < 1;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      setDayStripFade(atStart && atEnd ? 'none' : atStart ? 'right' : atEnd ? 'left' : 'both');
+    };
+    const ro = new ResizeObserver(measure);
+    const el = dayStripRef.current;
+    if (el) ro.observe(el);
+    measure();
+    el?.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      ro.disconnect();
+      el?.removeEventListener('scroll', measure);
+    };
+  }, []);
 
   // NSFW gate: Hentai-genre titles are dropped
   // from the visible week while NSFW is off; flips live with the setting.
@@ -1015,7 +1070,7 @@ const Schedule = () => {
         </QuickNavGroup>
       </QuickNav>
 
-      <DayStripScroll>
+      <DayStripScroll ref={dayStripRef} data-fade={dayStripFade}>
         <DayStripWrapper>
           {weekDays.map((day, index) => {
             const selected = day.toDateString() === selectedDay.toDateString();

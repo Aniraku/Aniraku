@@ -43,10 +43,10 @@ const HeaderLink = styled(Link)`
   color: var(--global-text);
   text-decoration: none;
   border-radius: var(--global-border-radius);
-  transition: all 0.2s ease-out;
+  transition: color 0.2s ease-out, transform 0.2s ease-out;
 
   &:hover {
-    padding-left: 0.25rem;
+    transform: translateX(0.25rem);
     color: var(--primary-accent);
   }
 `;
