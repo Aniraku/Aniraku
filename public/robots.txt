@@ -1,6 +1,6 @@
 # =============================================================
 # robots.txt for Aniraku — https://www.aniraku.tech
-# Last updated: 2026-09-24
+# Last updated: 2026-11-18
 # =============================================================
 
 User-agent: *
@@ -39,8 +39,11 @@ Crawl-delay: 2
 # (OAI-SearchBot, ChatGPT-User, Perplexity-User, Claude-User,
 # Claude-SearchBot) intentionally fall under the User-agent: *
 # rules above so AI-search citations still link back to
-# Aniraku. Flip these to full blocks if you also want to
-# exclude AI search.
+# Aniraku. Search-INDEX crawlers (PerplexityBot, YouBot,
+# Diffbot) are also intentionally allowed — they are what puts
+# Aniraku pages into AI-search results; blocking them removes
+# citations without blocking any training use. Flip these to
+# full blocks if you also want to exclude AI search.
 # =============================================================
 
 # OpenAI — model training
@@ -85,9 +88,6 @@ User-agent: Meta-ExternalFetcher
 Disallow: /
 
 # Other AI/scraper corpora
-User-agent: PerplexityBot
-Disallow: /
-
 User-agent: Imagesift
 Disallow: /
 
@@ -97,13 +97,7 @@ Disallow: /
 User-agent: Omgili
 Disallow: /
 
-User-agent: YouBot
-Disallow: /
-
 User-agent: cohere-ai
-Disallow: /
-
-User-agent: Diffbot
 Disallow: /
 
 User-agent: PanguBot

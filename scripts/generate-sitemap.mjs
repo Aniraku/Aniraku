@@ -90,7 +90,9 @@ const STATIC_URLS = [
   { loc: '/', freq: 'daily', priority: '1.0' },
   { loc: '/trending', freq: 'daily', priority: '0.8' },
   { loc: '/schedule', freq: 'weekly', priority: '0.7' },
-  { loc: '/search', freq: 'daily', priority: '0.7' },
+  // /search intentionally omitted: query-less utility page (thin content in
+  // Search Console terms); crawlers reach it via the SearchAction target and
+  // internal links instead.
   // SEO/GEO entity + Q/A surfaces (routed in App.tsx; added so crawlers can
   // discover the two pages answer engines are most likely to cite).
   { loc: '/about', freq: 'monthly', priority: '0.5' },

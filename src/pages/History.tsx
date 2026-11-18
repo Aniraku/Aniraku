@@ -390,6 +390,10 @@ const HelpSection = styled.details`
 `;
 
 const HelpToggle = styled.summary`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.7rem;
   font-size: 0.8rem;
   font-weight: 600;
@@ -409,10 +413,18 @@ const HelpToggle = styled.summary`
   }
 
   &::after {
-    float: right;
+    flex-shrink: 0;
     font-weight: 400;
     color: var(--global-text-muted);
     content: '+';
+    @media (prefers-reduced-motion: no-preference) {
+      transition: transform 0.15s ease;
+    }
+  }
+
+  /* Open state: + rotates into × (decorative — text order never changes). */
+  details[open] &::after {
+    transform: rotate(45deg);
   }
 `;
 
@@ -545,6 +557,21 @@ const EmptyState = styled.div`
 
 const EmptyLabel = styled.span`
   padding: 0.5rem;
+`;
+
+/* Empty-state CTA: the old empty state was a dead end — give the way back. */
+const EmptyCta = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin: 0.5rem 0 1.25rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--global-primary-bg);
+  background: var(--primary-accent);
+  border-radius: 10px;
 `;
 
 /* Image fades in via `data-loaded`. */
@@ -1557,6 +1584,7 @@ const History = () => {
                       data-loaded={emptyImageLoaded ? 'true' : 'false'}
                       onLoad={() => setEmptyImageLoaded(true)}
                     />
+                    <EmptyCta to='/'>Browse anime</EmptyCta>
                   </EmptyState>
                 </PromptWrapper>
               </LoadingContainer>

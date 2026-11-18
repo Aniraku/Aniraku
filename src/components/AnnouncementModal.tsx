@@ -50,7 +50,7 @@ const AnnouncementModal = () => {
             <i />
             <i />
           </Signal>
-          <span>ANIRAKU / ANNOUNCEMENT</span>
+          <span>Aniraku announcement</span>
           <CloseButton type='button' onClick={close} aria-label='Dismiss announcement'>
             <FaTimes />
           </CloseButton>
@@ -90,7 +90,7 @@ const Sheet = styled.section`
 `;
 
 const Top = styled.div`
-  display: flex; align-items: center; gap: 8px; color: var(--global-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .61rem; letter-spacing: .08em;
+  display: flex; align-items: center; gap: 8px; color: var(--global-text-muted); font-size: .78rem;
   > span { flex: 1; }
 `;
 

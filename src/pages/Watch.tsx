@@ -1772,9 +1772,6 @@ const WatchInner: React.FC = () => {
     description: animeInfo
       ? `Watch ${watchSeoTitle} Episode ${watchEpNum} online for free on Aniraku. Stream in HD with subtitles and dub support.`
       : undefined,
-    keywords: animeInfo
-      ? `${watchSeoTitle}, ${watchSeoTitle} episode ${watchEpNum}, watch ${watchSeoTitle} episode ${watchEpNum} online, ${watchSeoTitle} streaming, anime streaming, watch anime free, aniraku`
-      : undefined,
     canonicalPath: seoPathname,
     image: watchImage,
     ogType: 'video.episode',
@@ -1817,18 +1814,12 @@ const WatchInner: React.FC = () => {
               {
                 '@type': 'ListItem',
                 position: 2,
-                name: 'Search',
-                item: `${SITE_URL}/search`,
-              },
-              {
-                '@type': 'ListItem',
-                position: 3,
                 name: watchSeoTitle,
                 item: `${SITE_URL}/info/${animeId}`,
               },
               {
                 '@type': 'ListItem',
-                position: 4,
+                position: 3,
                 name: `Episode ${watchEpNum}`,
                 item: `${SITE_URL}${seoPathname}`,
               },

@@ -53,12 +53,12 @@ const AuthConfirm: React.FC = () => {
 
   return (
     <div style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center', padding: 24 }}>
-      <h1 style={{ fontSize: 26, fontWeight: 900 }}>
+      <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--global-text)' }}>
         {state === 'verifying' && 'Verifying your email…'}
         {state === 'verified' && 'Email verified ✓'}
         {state === 'error' && 'We could not verify this link'}
       </h1>
-      <p style={{ color: '#9a9a9a', maxWidth: 480, lineHeight: 1.5 }}>
+      <p style={{ color: 'var(--global-text-muted-strong)', maxWidth: 480, lineHeight: 1.5 }}>
         {state === 'verifying' && 'One moment — confirming your account with the server.'}
         {state === 'verified' && 'Your account is confirmed on the server. You can sign in on the web right now, or open the Aniraku app and sign in with your email and password.'}
         {state === 'error' && 'This confirmation link is invalid or has expired. Open the latest email from Aniraku and try again, or request a new verification email from the app.'}
@@ -66,11 +66,11 @@ const AuthConfirm: React.FC = () => {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
         <button
           onClick={openApp}
-          style={{ padding: '12px 22px', borderRadius: 8, background: '#FF4D4D', color: '#fff', fontWeight: 900, border: 'none', cursor: 'pointer' }}
+          style={{ padding: '12px 22px', borderRadius: 10, background: 'var(--primary-accent)', color: 'var(--global-primary-bg)', fontWeight: 700, border: 'none', cursor: 'pointer' }}
         >
           Open in the Aniraku app
         </button>
-        <Link to='/login' style={{ padding: '12px 22px', borderRadius: 8, border: '1px solid #333', color: '#fff', fontWeight: 800, textDecoration: 'none' }}>
+        <Link to='/login' style={{ padding: '12px 22px', borderRadius: 10, border: '1px solid var(--global-border-color)', color: 'var(--global-text)', fontWeight: 700, textDecoration: 'none' }}>
           Go to sign in
         </Link>
       </div>

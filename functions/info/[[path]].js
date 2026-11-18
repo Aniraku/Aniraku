@@ -78,9 +78,32 @@ const dateFmt = (d) =>
 // deployed template lacks it (template may drift from this repo's copy).
 // The () => tag form avoids $-pattern interpretation in user titles.
 const upsert = (html, pattern, tag) =>
-  pattern.test(html) ? html.replace(pattern, () => tag) : html.replace('</head>', `  ${tag}\n  </head>`);
+  pattern.test(html) ? html.replace(pattern, () => tag) : html.replace('</head>', () => `  ${tag}\n  </head>`);
 
-const HTML = { 'content-type': 'text/html;charset=UTF-8' };
+const SECURITY_HEADERS = [
+  'content-security-policy',
+  'x-frame-options',
+  'x-content-type-options',
+  'referrer-policy',
+];
+
+// Pages does not apply `_headers` to a Pages Function response, so copy the
+// template's security headers onto the constructed HTML response.
+function htmlHeaders(source) {
+  const h = new Headers();
+  for (const name of SECURITY_HEADERS) {
+    const value = source?.get(name);
+    if (value) h.set(name, value);
+  }
+  if (!h.has('content-security-policy'))
+    h.set('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+  if (!h.has('x-content-type-options')) h.set('x-content-type-options', 'nosniff');
+  if (!h.has('x-frame-options')) h.set('x-frame-options', 'DENY');
+  if (!h.has('referrer-policy')) h.set('referrer-policy', 'strict-origin-when-cross-origin');
+  h.set('content-type', 'text/html;charset=UTF-8');
+  h.set('cache-control', 'public, max-age=3600');
+  return h;
+}
 
 function notFoundPage() {
   return new Response(
@@ -88,21 +111,18 @@ function notFoundPage() {
       `<title>Not Found — Aniraku</title>` +
       `<meta name="robots" content="noindex, nofollow">` +
       `</head><body><p>Page not found. <a href="https://www.aniraku.tech/">Go to Aniraku</a></p></body></html>`,
-    { status: 404, headers: { ...HTML, 'cache-control': 'public, max-age=3600' } },
+    { status: 404, headers: htmlHeaders() },
   );
 }
 
-function htmlPage(html, status = 200) {
-  return new Response(html, {
-    status,
-    headers: { ...HTML, 'cache-control': 'public, max-age=3600' },
-  });
+function htmlPage(html, status = 200, source = null) {
+  return new Response(html, { status, headers: htmlHeaders(source) });
 }
 
 async function getTemplate(env, url) {
   try {
     const res = await env.ASSETS.fetch(new URL('/index.html', url.origin));
-    if (res.ok) return await res.text();
+    if (res.ok) return { html: await res.text(), headers: res.headers };
   } catch {
     // fall through to the minimal page below
   }
@@ -138,9 +158,9 @@ export async function onRequest(context) {
   // AniList outage → degrade to the old behavior: serve the SPA shell.
   // Google renders the client app; indexing waits for a healthy re-crawl.
   if (failed) {
-    const html = await getTemplate(env, url);
-    return html
-      ? htmlPage(html)
+    const template = await getTemplate(env, url);
+    return template
+      ? htmlPage(template.html, 200, template.headers)
       : htmlPage(
           `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Aniraku</title></head><body><p>Loading…</p></body></html>`,
         );
@@ -199,19 +219,18 @@ export async function onRequest(context) {
       '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
-        { '@type': 'ListItem', position: 2, name: 'Search', item: `${SITE_URL}/search` },
-        { '@type': 'ListItem', position: 3, name: title, item: canonical },
+        { '@type': 'ListItem', position: 2, name: title, item: canonical },
       ],
     },
   ];
 
-  let html = await getTemplate(env, url);
-  if (!html) return notFoundPage(); // broken deployment — don't fake 200
+  const template = await getTemplate(env, url);
+  if (!template) return notFoundPage(); // broken deployment — don't fake 200
+  let html = template.html;
 
   html = upsert(html, /<title>[\s\S]*?<\/title>/, `<title>${esc(docTitle)}</title>`);
   html = upsert(html, /<meta\s+name="title"\s+content="[^"]*"\s*\/?>/, `<meta name="title" content="${esc(docTitle)}" />`);
   html = upsert(html, /<meta\s+name="description"[\s\S]*?\/>/, `<meta name="description" content="${esc(desc)}" />`);
-  html = upsert(html, /<meta\s+name="keywords"[\s\S]*?\/>/, `<meta name="keywords" content="${esc(`${title}, watch ${title}, ${title} streaming, ${title} online free, ${title} sub, ${title} dub, ${format} anime, ${media.genres?.join(', ') || ''}, anime streaming, aniraku`)}" />`);
 
   if (nsfw) {
     html = upsert(html, /<meta\s+name="robots"[\s\S]*?\/>/, `<meta name="robots" content="noindex, nofollow" />`);
@@ -233,7 +252,7 @@ export async function onRequest(context) {
       .map((j) => `  <script type="application/ld+json">\n  ${ld(j)}\n  </script>`)
       .join('\n') +
     `\n  </head>`;
-  html = html.replace('</head>', inject);
+  html = html.replace('</head>', () => inject);
 
-  return htmlPage(html);
+  return htmlPage(html, 200, template.headers);
 }

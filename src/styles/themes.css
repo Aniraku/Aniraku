@@ -61,7 +61,8 @@
   --global-div-tr-2: rgba(14, 14, 14, 0.3);
   --global-border-color: rgba(245, 245, 245, 0.1);
   --global-text: #e8e8e8;
-  --global-text-muted: #696969;
+  /* #8a8a8a = 5.7:1 on #080808 (WCAG AA for body text); #696969 was 3.5:1 */
+  --global-text-muted: #8a8a8a;
   --global-text-muted-strong: #a8a8a8;
   --global-card-bg: #181818;
   --global-card-title-bg: #151515;
@@ -99,7 +100,8 @@
   --global-div-tr-2: rgba(234, 234, 234, 0.3);
   --global-border-color: rgba(8, 8, 8, 0.1);
   --global-text: #333;
-  --global-text-muted: #888;
+  /* #707070 = 4.5:1 on #f5f5f5 (WCAG AA for body text); #888 was 3.3:1 */
+  --global-text-muted: #707070;
   --global-text-muted-strong: #5d5d5d;
   --global-card-bg: #eee;
   --global-card-title-bg: #e8e8e8;

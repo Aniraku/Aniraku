@@ -15,18 +15,8 @@ const SplashContainer = styled.div`
 
 const Keyword = styled.span`
   font-weight: bold;
-  color: var(--your-custom-color);
-  position: relative;
+  color: var(--primary-accent);
   margin-right: 0.2rem;
-
-  ::before {
-    content: '\u25A0';
-    font-size: 0.8rem;
-    position: absolute;
-    top: 0;
-    left: -0.5rem;
-    color: var(--your-custom-color);
-  }
 `;
 
 const Paragraph = styled.p`
