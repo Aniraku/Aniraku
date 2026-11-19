@@ -6,11 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "npm run sitemap:fast && NODE_OPTIONS=--experimental-global-webcrypto vite build && node scripts/sync-csp.mjs",
-    "build:pages": "NODE_OPTIONS=--experimental-global-webcrypto vite build && node scripts/sync-csp.mjs",
+    "build": "npm run sitemap:fast && NODE_OPTIONS=--experimental-global-webcrypto vite build && node scripts/sync-csp.mjs && node scripts/check-public-dist.mjs",
+    "build:pages": "NODE_OPTIONS=--experimental-global-webcrypto vite build && node scripts/sync-csp.mjs && node scripts/check-public-dist.mjs",
     "preview": "vite preview",
     "start": "NODE_OPTIONS=--experimental-global-webcrypto vite build && bun run ./server/server.ts",
     "lint": "eslint . --ext js,jsx,ts,tsx --report-unused-disable-directives",
+    "check:secrets": "node scripts/check-public-dist.mjs",
     "format": "prettier --write .",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "sitemap:fast": "node scripts/generate-sitemap.mjs --fast"
