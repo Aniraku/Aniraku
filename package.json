@@ -17,7 +17,7 @@
     "sitemap:fast": "node scripts/generate-sitemap.mjs --fast"
   },
   "dependencies": {
-    "@apollo/client": "^4.3.5",
+    "@apollo/client": "^4.3.8",
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
     "@fortawesome/free-solid-svg-icons": "^7.3.1",
     "@fortawesome/react-fontawesome": "^3.5.0",
