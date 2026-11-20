@@ -673,8 +673,8 @@ export function escapeHtml(value: any): string {
 // every glyph renders identically crisp at any DPI. Auto Skip / Auto Next /
 // Subtitle Settings / Quality share the classic "tune" sliders icon from the
 // reference build.
-export const SETTING_ICON_PLAY_SPEED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.1 8.2v7.6l6.1-3.8z" fill="currentColor"/></svg>`;
-export const SETTING_ICON_ASPECT_RATIO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16.01H3V4.99h18v14.02z" fill="currentColor"/></svg>`;
+export const SETTING_ICON_PLAY_SPEED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`;
+export const SETTING_ICON_ASPECT_RATIO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 9 15"/><rect width="12" height="12" x="3" y="3" rx="1"/><rect width="9" height="9" x="12" y="12" rx="2"/></svg>`;
 export const SETTING_ICON_CAPTIONS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="width:100%;height:100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></svg>`;
 export const SETTING_ICON_TUNE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="width:100%;height:100%" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19v-4"/><path d="M12 19v-9"/><path d="M19 19V5"/></svg>`;
 // Invisible spacer that keeps slider rows on the same label grid as every
@@ -1166,7 +1166,7 @@ export function makeSubtitleSelectorSetting(
 ) {
   return {
     name,
-    width: 232,
+    width: 280,
     html: label,
     tooltip: findOptionLabel(options, getPrefs()[key]) || options[0]?.label || '',
     selector: options.map((option) => ({
@@ -1197,7 +1197,7 @@ export function makeSubtitleRangeSetting(
   };
   return {
     name,
-    width: 232,
+    width: 280,
     html: label,
     icon: SETTING_ICON_BLANK,
     range: [current(), range[1], range[2], range[3]],
@@ -1236,7 +1236,7 @@ export function buildSubtitleSettingsSetting(
 ) {
   return {
     name: 'subtitleSettings',
-    width: 232,
+    width: 280,
     html: 'Subtitle Settings',
     icon: SETTING_ICON_TUNE,
     selector: buildSubtitleStyleSettings(getPrefs, setPref),
@@ -3128,7 +3128,7 @@ export function Player({
         subtitleTracks.length > 0
           ? {
               name: 'subtitleTrack',
-              width: 232,
+              width: 280,
               html: 'Captions',
               icon: SETTING_ICON_CAPTIONS,
               tooltip: captionsDisabled
@@ -3393,7 +3393,7 @@ export function Player({
         settings: [
           {
             name: 'playSpeed',
-            width: 232,
+            width: 280,
             html: 'Play Speed',
             icon: SETTING_ICON_PLAY_SPEED,
             tooltip: playSpeedSettingLabel(
@@ -3422,7 +3422,7 @@ export function Player({
           },
           {
             name: 'aspectRatio',
-            width: 232,
+            width: 280,
             html: 'Aspect Ratio',
             icon: SETTING_ICON_ASPECT_RATIO,
             tooltip: 'Default',
@@ -3450,7 +3450,7 @@ export function Player({
           ),
           {
             name: 'quality',
-            width: 232,
+            width: 280,
             html: 'Quality',
             icon: SETTING_ICON_TUNE,
             tooltip: 'Auto',
@@ -3526,7 +3526,7 @@ export function Player({
                   Number(sessionQualityTargetRef.current) || null;
                 art.setting.update({
                   name: 'quality',
-                  width: 232,
+                  width: 280,
                   icon: SETTING_ICON_TUNE,
                   html: 'Quality',
                   tooltip: qualitySettingLabel(
@@ -3813,7 +3813,7 @@ export function Player({
                   const auto = getQualityPresentation('auto');
                   art.setting.update({
                     name: 'quality',
-                    width: 232,
+                    width: 280,
                     icon: SETTING_ICON_TUNE,
                     html: 'Quality',
                     tooltip: forcedQualityLabel ?? 'Auto',
@@ -3957,7 +3957,7 @@ export function Player({
                   const activeDisplay = getSpeedCappedDisplay(activeLevel);
                   return {
                     name: 'quality',
-                    width: 232,
+                    width: 280,
                     icon: SETTING_ICON_TUNE,
                     html: activeDisplay.title,
                     tooltip: activeDisplay.label,
