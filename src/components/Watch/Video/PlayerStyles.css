@@ -865,8 +865,10 @@
 }
 .watch-art-mount .art-video-player .art-settings .art-setting-panel:has(.art-setting-item-back) .art-setting-item:not(.art-setting-item-back) .art-setting-item-left {
   gap: 0 !important;
+  /* flex-grow only — a forced width:100% here starved the value column
+     (Font Family showed "H…"), so drill-down rows keep the normal
+     label/value split. */
   flex: 1 1 auto !important;
-  width: 100% !important;
   justify-content: flex-start !important;
 }
 .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item.art-current {
