@@ -64,6 +64,9 @@
   border-radius: 0.5rem;
   padding: 0.6rem 0.7rem 0.7rem;
   box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.6);
+  /* Panel opens above a right-aligned player button — scale from that
+     corner, not from center. */
+  transform-origin: bottom right;
   animation: popIn 0.18s ease-in-out;
 }
 .cc-panel-title {
@@ -207,9 +210,10 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ArtPlayer layer (ported): player typography, settings panel, quality menu,
-   custom transport/cast controls, mobile control sizing, fullscreen scroll
-   lock and intro/outro timeline markers.
+   ArtPlayer layer: watch player re-skinned to the reference embed design
+   (measured spec: docs/player-replica-spec.md). Floating control pills,
+   thin bottom seek bar with skip-chapter highlights, dark glass settings
+   panel, hover-expand volume, center play disc, mobile scattered buttons.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Fullscreen scroll lock (also iOS native fullscreen) */
@@ -221,719 +225,1324 @@
   top: 0; bottom: 0; right: 0; left: 0;
 }
 
-/* ArtPlayer base overrides (mobile polish + desktop radius) */
-@media (max-width: 768px) {
-  .art-settings .art-settings-build {
-    max-height: 50vh;
-    overflow-y: auto;
-  }
-}
-/* Artplayer mobile overrides */
+/* Artplayer container radius (inline player only; fullscreen is edge-to-edge) */
 @media (max-width: 768px) {
   .art-video-player {
     border-radius: 0 !important;
   }
-  .art-bottom {
-    padding: 0 8px 4px !important;
-  }
-  .art-setting-panel {
-    border-radius: 8px !important;
-    max-height: 60vh !important;
-    overflow-y: auto !important;
-  }
-  .art-contextmenus {
-    border-radius: 8px !important;
-    max-height: 60vh !important;
-    overflow-y: auto !important;
-  }
-  .art-subtitle-wrap span {
-    font-size: 18px !important;
-  }
 }
-/* Artplayer desktop tweaks */
 @media (min-width: 769px) {
   .art-video-player {
     border-radius: 4px !important;
   }
 }
 
-/* ══ ArtPlayer core: typography, quality menu, settings, transport ══ */
-        .watch-art-mount video {
-          background: #000;
-        }
-        /* ── Player typography ────────────────────────────
-           One crisp UI font stack for every layer (controls, tooltips,
-           settings), with subpixel smoothing and tabular values so
-           timestamps and quality numbers never jitter. */
-        .watch-art-mount .art-video-player {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter,
-            'Helvetica Neue', Arial, sans-serif;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-          text-rendering: optimizeLegibility;
-          font-variant-numeric: tabular-nums;
-        }
-        /* Compact control bar: tighter height + icon box than ArtPlayer's
-           roomy defaults so nothing feels oversized. */
-        .watch-art-mount .art-video-player {
-          --art-control-height: 42px;
-          --art-control-icon-size: 28px;
-        }
-        /* Banner poster (our port only — the reference build has none): sits
-           above the art root at z 2 as a PlayerViewport sibling, so its
-           bottom edge is cut clear of the whole ArtPlayer bottom cluster
-           (controls 42px + progress + safe-area). The strip is therefore
-           hittable before first play; the hide triggers in Player.tsx
-           (video:play / video:playing / mousemove / setting) clear the
-           poster on first interaction. Keeps click → /info. */
-        .watch-art-poster {
-          position: absolute;
-          inset: 0 0 calc(60px + env(safe-area-inset-bottom, 0px)) 0;
-          z-index: 2;
-        }
-        /* Quality selector: make the current mode obvious and give every
-           option a compact resolution badge instead of a raw source label. */
-        .watch-art-mount .art-controls-quality {
-          min-width: 66px;
-        }
-        .watch-art-mount .art-controls-quality .art-selector-value,
-        .watch-art-mount .art-controls-quality .art-selector-item {
-          font-variant-numeric: tabular-nums;
-        }
-        .watch-art-mount .watch-quality-option {
-          display: inline-flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          width: 100%;
-          min-width: 92px;
-        }
-        .watch-art-mount .watch-quality-name {
-          font-weight: 700;
-          letter-spacing: 0.01em;
-        }
-        .watch-art-mount .watch-quality-badge {
-          color: rgba(226, 232, 240, 0.62);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-        }
-        .watch-art-mount .art-selector-list {
-          min-width: 158px;
-          padding: 5px;
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 9px;
-          background: rgba(10, 14, 24, 0.96);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.42);
-        }
-        .watch-art-mount .art-selector-item {
-          border-radius: 6px;
-          padding: 6px 9px;
-          transition: background 160ms ease, color 160ms ease;
-        }
-        .watch-art-mount .art-selector-item:hover,
-        .watch-art-mount .art-selector-item.art-current {
-          background: rgba(226,232,240,0.14);
-          color: #fff;
-        }
-        .watch-art-mount .art-selector-item.art-current .watch-quality-badge {
-          color: #cbd5e1;
-        }
-        /* ── Settings panel: compact + organized ────────────────────────
-           One shared grid for every menu and sub-menu: a fixed 16px icon
-           column, single-line labels, right-aligned gray values and a
-           uniform 31px row height with even 1px down-spacing. The panel
-           shrink-wraps its rows (no stretched half-empty box), stays
-           inside the player, and only scrolls when a menu truly needs it. */
-        .watch-art-mount .art-video-player {
-          --art-settings-max-height: min(64dvh, 336px);
-          --art-selector-max-height: min(58dvh, 300px);
-          --art-settings-icon-size: 16px;
-        }
-        .watch-art-mount .art-settings {
-          box-sizing: border-box;
-          width: min(232px, calc(100% - 16px)) !important;
-          max-width: calc(100% - 16px) !important;
-          /* Shrink-wrap: exactly as tall as the rows it shows — never a
-             fixed-height panel with dead space at the bottom. */
-          height: auto !important;
-          max-height: min(var(--art-settings-max-height), calc(100% - 52px)) !important;
-          min-height: 0 !important;
-          overflow: hidden !important;
-          overscroll-behavior: contain;
-          background: rgba(13, 14, 18, 0.97) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 10px !important;
-          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-          padding: 4px !important;
-          font-size: 12.5px;
-        }
-        .watch-art-mount .art-settings,
-        .watch-art-mount .art-settings * {
-          box-sizing: border-box;
-        }
-        .watch-art-mount .art-setting-panel,
-        .watch-art-mount .art-setting-panel .art-selector-list {
-          flex: 1 1 auto;
-          min-height: 0 !important;
-          min-width: 0 !important;
-          max-width: 100% !important;
-          max-height: none !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-          overscroll-behavior: contain;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.32) transparent;
-          padding: 0;
-        }
-        .watch-art-mount .art-setting-panel::-webkit-scrollbar,
-        .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar {
-          width: 5px;
-        }
-        .watch-art-mount .art-setting-panel::-webkit-scrollbar-thumb,
-        .watch-art-mount .art-setting-panel .art-selector-list::-webkit-scrollbar-thumb {
-          border-radius: 999px;
-          background: rgba(255,255,255,0.32);
-        }
-        .watch-art-mount .art-setting-item-left,
-        .watch-art-mount .art-setting-item-right {
-          overflow: hidden;
-        }
-        .watch-art-mount .art-selector-list {
-          width: 100%;
-          min-width: 0 !important;
-        }
-        /* One row grid for main options, sub-options, sliders and toggles:
-           identical height, padding, radius and down-space everywhere, so
-           nothing sits a little in front or a little behind. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item {
-          height: 31px !important;
-          min-height: 31px !important;
-          border-radius: 6px;
-          padding: 0 9px !important;
-          margin-block: 1px;
-          gap: 0;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item:hover {
-          background-color: rgba(255, 255, 255, 0.08);
-        }
-        /* Fixed icon column — every label starts on the same x-line.
-           !important matters here: ArtPlayer's runtime stylesheet ships the
-           same selectors with more specificity and would re-center or
-           resize the columns back to its defaults. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left {
-          flex: 1 1 auto !important;
-          min-width: 0;
-          justify-content: flex-start !important;
-          gap: 0 !important;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon {
-          flex: 0 0 16px !important;
-          width: 16px !important;
-          height: 16px !important;
-          margin-right: 8px !important;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-text {
-          font-size: 12.5px;
-          font-weight: 500;
-          letter-spacing: 0.01em;
-          line-height: 1.2;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        /* Value column: quiet gray, right-aligned, one consistent rhythm. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right {
-          flex: 0 0 auto !important;
-          min-width: 0;
-          justify-content: flex-end !important;
-          gap: 0 !important;
-          font-size: 11.5px !important;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-tooltip {
-          color: #8f97a3 !important;
-          font-size: 11.5px !important;
-          font-variant-numeric: tabular-nums;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 92px;
-          padding-left: 8px;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon {
-          min-width: 18px !important;
-          height: 20px !important;
-          padding-left: 4px;
-        }
-        /* Built-in arrows / checks sized to the compact grid. */
-        .watch-art-mount .art-settings .art-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0.92;
-        }
-        .watch-art-mount .art-settings .art-icon svg {
-          width: 100%;
-          height: 100%;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon .art-icon,
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon .art-icon {
-          width: 15px;
-          height: 15px;
-        }
-        /* Selector leaves keep a reserved check gutter; the current row's
-           check turns visible and the row takes the accent color. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-icon-check {
-          visibility: hidden;
-          width: 14px !important;
-          height: 14px !important;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-icon-check {
-          visibility: visible;
-          fill: var(--art-theme, #648FFC);
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-setting-item-left-text {
-          color: var(--art-theme, #648FFC);
-        }
-        /* Toggle switches: slimmer pill matched to the 31px row. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-icon svg.icon {
-          width: auto !important;
-          height: 13px !important;
-          max-width: 26px;
-        }
-        /* Back row: same grid, slightly taller, hairline separated. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item-back {
-          height: 34px !important;
-          min-height: 34px !important;
-          margin-block: 1px 3px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item-back .art-setting-item-left-text {
-          font-size: 12.5px;
-          font-weight: 600;
-        }
-        /* Range rows: slim track, round theme thumb; value stays readable
-           next to the slider without widening the row. Full selector chain
-           + !important outranks ArtPlayer's 80px default. */
-        .watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-range {
-          width: 68px !important;
-          height: 3px !important;
-          border-radius: 999px;
-          background-color: rgba(255, 255, 255, 0.22);
-          outline: none;
-          appearance: none;
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        .watch-art-mount .art-setting-range::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 11px;
-          height: 11px;
-          border-radius: 50%;
-          border: none;
-          background: var(--art-theme, #648FFC);
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
-        }
-        .watch-art-mount .art-setting-range::-moz-range-thumb {
-          width: 11px;
-          height: 11px;
-          border-radius: 50%;
-          border: none;
-          background: var(--art-theme, #648FFC);
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
-        }
-        .watch-art-mount .art-setting-item-right-icon svg {
-          fill: currentColor;
-        }
-        /* Text safety without breaking the row grid. */
-        .watch-art-mount .art-setting-item,
-        .watch-art-mount .art-selector-item {
-          min-width: 0 !important;
-          max-width: 100%;
-        }
-        .watch-art-mount .art-selector-item > * {
-          min-width: 0;
-          max-width: 100%;
-        }
-        .watch-art-mount .art-selector-value {
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        /* Control tooltips: smaller, sharper, faster to read. */
-        .watch-art-mount .art-video-player .art-tooltip {
-          font-size: 12px;
-          font-weight: 500;
-          letter-spacing: 0.01em;
-          padding: 5px 8px;
-          border-radius: 6px;
-          background: rgba(10, 12, 18, 0.95);
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-          white-space: nowrap;
-          pointer-events: none;
-        }
-        .watch-art-mount .art-control-seekBackward15,
-        .watch-art-mount .art-control-seekForward15,
-        .watch-art-mount .art-control-prevEpisode,
-        .watch-art-mount .art-control-nextEpisode,
-        .watch-art-mount .art-control-chromecast {
-          color: #e2e8f0;
-          opacity: 0.86;
-          border-radius: 7px;
-          transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
-        }
-        .watch-art-mount .art-control-seekBackward15:hover,
-        .watch-art-mount .art-control-seekForward15:hover,
-        .watch-art-mount .art-control-prevEpisode:hover,
-        .watch-art-mount .art-control-nextEpisode:hover,
-        .watch-art-mount .art-control-chromecast:hover {
-          opacity: 1;
-          background: rgba(255,255,255,0.1);
-        }
-        .watch-art-mount .art-control-seekBackward15:active,
-        .watch-art-mount .art-control-seekForward15:active,
-        .watch-art-mount .art-control-prevEpisode:active,
-        .watch-art-mount .art-control-nextEpisode:active,
-        .watch-art-mount .art-control-chromecast:active {
-          transform: scale(0.94);
-        }
-        .watch-art-mount .art-control-prevEpisode .watch-art-prev-icon,
-        .watch-art-mount .art-control-nextEpisode .watch-art-next-icon,
-        .watch-art-mount .art-control-chromecast .watch-art-cast-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .watch-art-seek-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          width: 32px;
-          height: 32px;
-          line-height: 1;
-          pointer-events: none;
-        }
-        .watch-art-seek-icon svg {
-          position: absolute;
-          inset: 1px;
-          width: 30px;
-          height: 30px;
-        }
-        .watch-art-seek-icon text {
-          pointer-events: none;
-          paint-order: stroke;
-          stroke: rgba(8, 12, 20, 0.24);
-          stroke-width: 0.35px;
-        }
-        /* Artplayer applies negative side margins on its mobile control groups.
-           The player itself clips overflow, so the rightmost settings/fullscreen
-           icon can disappear at the edge on narrow phones. */
-        .watch-art-mount .art-video-player .art-controls {
-          width: 100%;
-          min-width: 0;
-          box-sizing: border-box;
-          padding-inline: 4px;
-        }
-        .watch-art-mount .art-video-player .art-controls-left,
-        .watch-art-mount .art-video-player .art-controls-right {
-          min-width: 0;
-          margin-inline: 0;
-          /* Even breathing room between every control — the icon clusters
-             on both ends of the bar previously sat flush against each other. */
-          column-gap: 7px;
-        }
-        .watch-art-mount .art-video-player .art-controls .art-control {
-          min-width: 0;
-          flex: 0 0 auto;
-        }
-        .watch-art-mount .art-video-player .art-control-seekBackward15,
-        .watch-art-mount .art-video-player .art-control-seekForward15,
-        .watch-art-mount .art-video-player .art-control-prevEpisode,
-        .watch-art-mount .art-video-player .art-control-nextEpisode,
-        .watch-art-mount .art-video-player .art-control-chromecast {
-          width: 36px !important;
-          min-width: 36px !important;
-          margin-inline: 0 !important;
-          padding-inline: 0 !important;
-        }
-        .watch-art-mount .art-video-player .art-controls-quality {
-          min-width: 58px;
-        }
-        /* A YouTube-like downloaded-range cue that draws EVERY cached range —
-           forward and behind the playhead — because the cache itself has no
-           limit. It sits behind ArtPlayer's solid-accent played line and
-           thumb, never captures input. Deliberately DIM (white 0.28, no
-           bright ring) so buffered ranges can't be mistaken for the played
-           position — the played fill is the only bright element on the
-           track. */
-        .watch-art-mount .art-control-progress-inner {
-          overflow: hidden;
-        }
-        .watch-art-mount .watch-buffer-indicator {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          z-index: 2;
-        }
-        .watch-art-mount .watch-buffer-indicator-segment {
-          position: absolute;
-          top: 50%;
-          height: 3px;
-          transform: translateY(-50%);
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.28);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
-        }
-        .watch-art-mount .art-progress-loaded {
-          display: none !important;
-        }
-        .watch-art-mount .art-progress-played,
-        .watch-art-mount .art-progress-indicator {
-          z-index: 3;
-        }
-        /* Chapter segments (Intro │ Main episode │ Outro) — the layer is
-           appended AFTER .watch-buffer-indicator and the hover-marker layer
-           in .art-control-progress-inner. z-index 25 clears ArtPlayer's
-           native played fill (z20, which captures pointer events and would
-           otherwise shadow the strips) yet stays under the highlight (z30),
-           seek thumb (z40) and time tip (z50): the thumb stays grabbable
-           above us, and the played fill plus the buffer cue and
-           intro/outro/main bands stay visible through this transparent
-           layer. Decorative pieces never capture input — only the narrow
-           segment-start hit strips do, and they exist only when chapter
-           segments do (empty layer otherwise). Hover labels ride on the
-           body-level timeline tooltip (lib), because this inner track
-           clips any box we put inside it (overflow: hidden above). */
-        .watch-art-mount .watch-chapter-segments {
-          position: absolute;
-          inset: 0;
-          z-index: 25;
-          pointer-events: none;
-        }
-        .watch-art-mount .watch-chapter-segment__divider {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 1px;
-          transform: translateX(-50%);
-          background: rgba(255, 255, 255, 0.7);
-          box-shadow: 0 0 3px rgba(0, 0, 0, 0.55);
-          pointer-events: none;
-        }
-        .watch-art-mount .watch-chapter-segment__hit {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 14px;
-          cursor: pointer;
-          pointer-events: auto;
-        }
+/* ── Player tokens ────────────────────────────────────────────────────────
+   Brand tokens live on the mount (not just the player element) so sibling
+   overlays (skip buttons) can use them too. Primary follows the site
+   theme accent — Aniraku violet, deliberately NOT the reference embed's
+   blue — and the secondary amber highlights skip chapters on the bar. */
+.watch-art-mount {
+  --player-primary-color: var(--primary-accent, #b5a8ff);
+  --player-secondary-color: #facc15;
+}
+.watch-art-mount .art-video-player {
+  --art-control-height: 40px;
+  --art-control-icon-size: 24px;
+  --art-padding: 12px;
+  --art-bottom-gap: 14px;
+  --art-progress-height: 4px;
+  --art-indicator-size: 16px;
+  --art-state-size: 80px;
+  --art-transition-duration: 0.2s;
+  --art-tip-background: rgba(28, 28, 28, 0.95);
+  --art-widget-background: rgba(28, 28, 28, 0.96);
+  --art-settings-max-height: min(420px, calc(100% - var(--art-control-height) - 90px));
+  --art-selector-max-height: min(360px, calc(100% - var(--art-control-height) - 90px));
+}
 
-        /* Hover labels live in the lib tooltip (all three chapters) — no
-           chip element anymore. */
+.watch-art-mount video {
+  background: #000;
+}
 
-/* ArtPlayer mobile control sizing (<=768px) */
+/* ── Player typography ────────────────────────────────────────────────────
+   One crisp UI font stack for every layer (controls, tooltips, settings),
+   with subpixel smoothing and tabular values so timestamps never jitter. */
+.watch-art-mount .art-video-player {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Banner poster (our port only — the reference build has none): sits
+   above the art root at z 2 as a PlayerViewport sibling, so its bottom
+   edge is cut clear of the whole ArtPlayer bottom cluster (pills 40px +
+   progress + safe-area). The strip is therefore hittable before first
+   play; the hide triggers in Player.tsx clear the poster on first
+   interaction. Keeps click → /info. */
+.watch-art-poster {
+  position: absolute;
+  inset: 0 0 calc(60px + env(safe-area-inset-bottom, 0px)) 0;
+  z-index: 2;
+}
+
+/* ── Bottom chrome: gradient + fade with the controls ───────────────────── */
+.watch-art-mount .art-video-player .art-bottom {
+  background-image: linear-gradient(transparent, rgba(0, 0, 0, 0.55)) !important;
+  background-size: 100% 140px !important;
+  padding: 0 var(--art-padding) 10px !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.15s ease, visibility 0.15s ease !important;
+}
+.watch-art-mount .art-video-player.art-control-show .art-bottom,
+.watch-art-mount .art-video-player.art-hover .art-bottom {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.watch-art-mount .art-video-player .art-bottom .art-progress {
+  padding-bottom: 10px !important;
+}
+
+/* ── Control pills: the two floating groups ─────────────────────────────── */
+.watch-art-mount .art-video-player .art-controls {
+  height: var(--art-control-height);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.watch-art-mount .art-video-player .art-controls .art-controls-left,
+.watch-art-mount .art-video-player .art-controls .art-controls-right {
+  background-color: rgba(20, 20, 20, 0.78);
+  border-radius: 999px;
+  padding: 0 4px;
+  height: var(--art-control-height) !important;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  min-width: 0;
+}
+.watch-art-mount .art-video-player .art-controls .art-controls-left {
+  padding-left: 2px;
+  padding-right: 6px;
+}
+.watch-art-mount .art-video-player .art-controls .art-controls-right {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+.watch-art-mount .art-video-player .art-controls .art-controls-left:empty,
+.watch-art-mount .art-video-player .art-controls .art-controls-right:empty {
+  background-color: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+.watch-art-mount .art-video-player .art-controls .art-control {
+  min-height: var(--art-control-height) !important;
+  min-width: var(--art-control-height) !important;
+  border-radius: 999px;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+  color: #fff;
+  padding: 0;
+  flex: 0 0 auto;
+  margin-inline: 0 !important;
+}
+.watch-art-mount .art-video-player .art-controls .art-control .art-icon {
+  height: var(--art-control-icon-size);
+  width: var(--art-control-icon-size);
+  transform: scale(1) !important;
+}
+.watch-art-mount .art-video-player .art-controls .art-control .art-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.watch-art-mount .art-video-player .art-controls .art-control-playAndPause .art-icon {
+  width: 20px !important;
+  height: 20px !important;
+}
+.watch-art-mount .art-video-player .art-controls .art-control .art-icon:active {
+  transform: scale(0.9) !important;
+}
+/* Hover feedback only where a pointer can hover (touch keeps :active). */
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-video-player .art-controls .art-control:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    opacity: 1;
+  }
+}
+.watch-art-mount .art-video-player .art-controls .art-control:active {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+.watch-art-mount .art-video-player .art-controls .art-control-time {
+  padding: 0 12px !important;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+  min-width: auto !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-video-player .art-controls .art-control-time:hover {
+    background-color: transparent;
+  }
+}
+
+/* Our custom transport controls ride the same pill-button grid. */
+.watch-art-mount .art-video-player .art-controls .art-control-prevEpisode,
+.watch-art-mount .art-video-player .art-controls .art-control-nextEpisode,
+.watch-art-mount .art-video-player .art-controls .art-control-seekBackward15,
+.watch-art-mount .art-video-player .art-controls .art-control-seekForward15 {
+  width: var(--art-control-height) !important;
+}
+.watch-art-mount .art-video-player .art-controls .art-control-seekBackward15 .watch-art-seek-icon,
+.watch-art-mount .art-video-player .art-controls .art-control-seekForward15 .watch-art-seek-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+}
+.watch-art-mount .art-video-player .art-controls .art-control-seekBackward15 .watch-art-seek-icon svg,
+.watch-art-mount .art-video-player .art-controls .art-control-seekForward15 .watch-art-seek-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.watch-art-mount .art-video-player .art-controls .art-control-prevEpisode .watch-art-prev-icon,
+.watch-art-mount .art-video-player .art-controls .art-control-nextEpisode .watch-art-next-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Volume: collapsed to the mute button, expands a horizontal slider ──── */
+.watch-art-mount .art-video-player .art-control-volume .art-volume-panel {
+  position: static !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 0 !important;
+  height: var(--art-control-height) !important;
+  padding: 0 !important;
+  transform: none !important;
+  overflow: hidden;
+  flex: 0 0 auto;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.watch-art-mount .art-video-player .art-controls .art-control-volume {
+  width: var(--art-control-height);
+  overflow: hidden;
+  justify-content: flex-start;
+  padding-left: 8px !important;
+  box-sizing: border-box !important;
+  gap: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.15s ease !important;
+}
+.watch-art-mount .art-video-player .art-control-volume > svg {
+  flex: 0 0 var(--art-control-icon-size) !important;
+  width: var(--art-control-icon-size) !important;
+  height: var(--art-control-icon-size) !important;
+  min-width: var(--art-control-icon-size) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-video-player .art-controls .art-control-volume:hover {
+    width: 136px;
+    background-color: transparent !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control-volume:hover .art-volume-panel,
+  .watch-art-mount .art-video-player .art-controls .art-control-volume:focus-within .art-volume-panel {
+    width: 100px !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+.watch-art-mount .art-video-player .art-control-volume .art-volume-panel .art-volume-inner {
+  background-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 12px !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  height: var(--art-control-height) !important;
+  flex-direction: row !important;
+  gap: 0 !important;
+}
+.watch-art-mount
+  .art-video-player
+  .art-control-volume
+  .art-volume-panel
+  .art-volume-inner
+  .art-volume-val {
+  display: none !important;
+}
+.watch-art-mount
+  .art-video-player
+  .art-control-volume
+  .art-volume-panel
+  .art-volume-inner
+  .art-volume-slider {
+  width: 76px !important;
+  height: 100% !important;
+  flex: 0 0 76px !important;
+  align-items: center !important;
+}
+.watch-art-mount
+  .art-video-player
+  .art-control-volume
+  .art-volume-panel
+  .art-volume-inner
+  .art-volume-slider
+  .art-volume-handle {
+  width: 100% !important;
+  height: 3px !important;
+  border-radius: 3px !important;
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+.watch-art-mount
+  .art-video-player
+  .art-control-volume
+  .art-volume-panel
+  .art-volume-inner
+  .art-volume-slider
+  .art-volume-handle
+  .art-volume-loaded {
+  left: 0 !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 0;
+  height: 100%;
+  transform-origin: left center;
+}
+.watch-art-mount
+  .art-video-player
+  .art-control-volume
+  .art-volume-panel
+  .art-volume-inner
+  .art-volume-slider
+  .art-volume-indicator {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  top: 50% !important;
+  left: 0;
+  margin-top: calc(var(--art-volume-handle-size) / -2);
+  margin-left: calc(var(--art-volume-handle-size) / -2);
+}
+
+/* ── Seek bar: thin track, hover grow, theme fill + thumb ───────────────── */
+.watch-art-mount .art-bottom .art-progress .art-control-progress {
+  height: var(--art-progress-height) !important;
+  box-sizing: content-box !important;
+  padding: 9px 0 !important;
+  margin: -9px 0 !important;
+  transition: height 0.15s ease;
+}
+.watch-art-mount .art-bottom .art-progress .art-control-progress .art-control-progress-inner {
+  height: 100% !important;
+  border-radius: 3px;
+  overflow: visible;
+  background-color: rgba(255, 255, 255, 0.32) !important;
+}
+.watch-art-mount .art-bottom .art-progress .art-control-progress .art-control-progress-inner .art-progress-played {
+  background-color: var(--art-theme, var(--player-primary-color)) !important;
+}
+.watch-art-mount .art-bottom .art-progress .art-control-progress .art-control-progress-inner .art-progress-hover {
+  background-color: rgba(255, 255, 255, 0.45) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-bottom .art-progress .art-control-progress:hover {
+    height: 7px !important;
+  }
+}
+.watch-art-mount
+  .art-bottom
+  .art-progress
+  .art-control-progress
+  .art-control-progress-inner
+  .art-progress-indicator {
+  background-color: var(--art-theme, var(--player-primary-color)) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: scale(0) !important;
+  transition: transform 0.15s ease !important;
+  width: var(--art-indicator-size) !important;
+  height: var(--art-indicator-size) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount
+    .art-bottom
+    .art-progress
+    .art-control-progress:hover
+    .art-control-progress-inner
+    .art-progress-indicator,
+  .watch-art-mount
+    .art-bottom:hover
+    .art-progress
+    .art-control-progress
+    .art-control-progress-inner
+    .art-progress-indicator {
+    transform: scale(1) !important;
+  }
+  .watch-art-mount
+    .art-bottom
+    .art-progress
+    .art-control-progress
+    .art-control-progress-inner
+    .art-progress-indicator:hover {
+    transform: scale(1.3) !important;
+  }
+}
+
+/* A downloaded-range cue that draws EVERY cached range — forward and
+   behind the playhead. It sits behind ArtPlayer's solid-accent played
+   line and thumb, never captures input. Deliberately DIM (white 0.28) so
+   buffered ranges can't be mistaken for the played position. */
+.watch-art-mount .art-control-progress-inner {
+  /* overflow visible above — the thumb pops out of the track */
+}
+.watch-art-mount .watch-buffer-indicator {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.watch-art-mount .watch-buffer-indicator-segment {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.watch-art-mount .art-progress-loaded {
+  display: none !important;
+}
+.watch-art-mount .art-progress-played,
+.watch-art-mount .art-progress-indicator {
+  z-index: 3;
+}
+
+/* ── Hover frame preview (desktop pointers only — the JS layer is gated
+   behind (hover:hover)+(pointer:fine), so touch never builds the second
+   video). Live canvas sits above the time tip, centered on the cursor
+   (left is set by JS, clamped to the bar edges). ── */
+.watch-art-mount .watch-hover-preview {
+  position: absolute;
+  bottom: calc(100% + 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  width: 160px;
+  height: 90px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #000;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+.watch-art-mount .watch-hover-preview.is-visible {
+  opacity: 1;
+}
+.watch-art-mount .watch-hover-preview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.watch-art-mount .watch-hover-preview-video {
+  /* Offscreen but rendered — display:none can stop frame decode in some
+     engines, breaking the seeked → canvas pipeline. */
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 160px;
+  height: 90px;
+  pointer-events: none;
+}
+
+/* Chapter bands (Intro │ Main episode │ Outro) — reference look: base
+   #555 bands, intro/outro highlighted in the secondary yellow, played
+   fill rides on top. The white divider slivers are replaced by the
+   reference's clean band look, so they are hidden. */
+.watch-art-mount .watch-chapter-segments {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+.watch-art-mount .watch-chapter-segment__divider {
+  display: none;
+}
+.watch-art-mount .watch-chapter-segment__hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.watch-timeline-marker-intro,
+.watch-timeline-marker-outro {
+  background: var(--player-secondary-color, #facc15) !important;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.38);
+}
+.watch-timeline-marker-main {
+  background: #555 !important;
+  box-shadow: none;
+}
+/* Timeline hover tooltip (body-level, inline-styled by the lib) — pull it
+   onto the reference tooltip surface. */
+.watch-timeline-hover-tooltip {
+  background: rgba(28, 28, 28, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 6px !important;
+}
+
+/* ── Settings panel: dark glass sheet above the right pill ──────────────── */
+.watch-art-mount .art-video-player .art-settings {
+  background-color: rgba(28, 28, 28, 0.96) !important;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  bottom: calc(var(--art-control-height) + var(--art-progress-height) + var(--art-bottom-gap) + 18px) !important;
+  right: var(--art-padding) !important;
+  left: auto !important;
+  transform: none !important;
+  min-width: 280px !important;
+  max-width: 320px !important;
+  height: fit-content !important;
+  max-height: var(--art-settings-max-height) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  padding: 8px 0 !important;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+}
+/* With backdrop:true ArtPlayer adds .art-backdrop — match its glass. */
+.watch-art-mount .art-video-player.art-backdrop .art-settings,
+.watch-art-mount .art-video-player.art-backdrop .art-selector-list {
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+.watch-art-mount .art-video-player .art-settings,
+.watch-art-mount .art-video-player .art-settings *,
+.watch-art-mount .art-control-selector .art-selector-list,
+.watch-art-mount .art-control-selector .art-selector-list * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.watch-art-mount .art-video-player .art-settings::-webkit-scrollbar,
+.watch-art-mount .art-video-player .art-settings *::-webkit-scrollbar,
+.watch-art-mount .art-control-selector .art-selector-list::-webkit-scrollbar,
+.watch-art-mount .art-control-selector .art-selector-list *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+.watch-art-mount .art-video-player .art-settings:hover::-webkit-scrollbar-thumb,
+.watch-art-mount .art-control-selector .art-selector-list:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.32);
+}
+.watch-art-mount .art-video-player .art-settings::-webkit-scrollbar-thumb,
+.watch-art-mount .art-video-player .art-settings *::-webkit-scrollbar-thumb,
+.watch-art-mount .art-control-selector .art-selector-list::-webkit-scrollbar-thumb,
+.watch-art-mount .art-control-selector .art-selector-list *::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item {
+  padding: 12px 16px !important;
+  font-size: 14px;
+  border-radius: 0 !important;
+  gap: 12px;
+  min-height: 48px !important;
+  transition: background-color 0.12s ease;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-width: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+  }
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-left {
+  gap: 12px !important;
+  color: #fff;
+  flex: 1;
+  justify-content: flex-start !important;
+  font-weight: 400;
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0;
+  overflow: hidden;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon {
+  height: 22px !important;
+  width: 22px !important;
+  opacity: 0.9;
+  flex-shrink: 0;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right {
+  color: rgba(255, 255, 255, 0.75);
+  gap: 6px !important;
+  font-size: 13px;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right-tooltip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-item-right-icon {
+  min-width: 18px !important;
+  height: 18px !important;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-item-right-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item-back {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 500;
+  padding: 14px 18px !important;
+  min-height: 52px !important;
+}
+/* Drill-down rows (a panel with a back row): drop the icons, full-width
+   labels — matches the reference submenu treatment. */
+.watch-art-mount .art-video-player .art-settings .art-setting-panel:has(.art-setting-item-back) .art-setting-item:not(.art-setting-item-back) .art-setting-item-left-icon {
+  display: none !important;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel:has(.art-setting-item-back) .art-setting-item:not(.art-setting-item-back) .art-setting-item-left {
+  gap: 0 !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item.art-current {
+  color: var(--art-theme, var(--player-primary-color)) !important;
+  background-color: rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item.art-current::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background-color: var(--art-theme, var(--player-primary-color));
+  border-radius: 2px;
+}
+.watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-range {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgba(255, 255, 255, 0.18);
+  height: 4px;
+  border-radius: 2px;
+  width: 120px;
+  outline: none;
+  margin: 0;
+  cursor: pointer;
+}
+.watch-art-mount .art-setting-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--art-theme, var(--player-primary-color));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  border: none;
+  cursor: pointer;
+}
+.watch-art-mount .art-setting-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--art-theme, var(--player-primary-color));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  border: none;
+  cursor: pointer;
+}
+/* Selector leaves keep a reserved check gutter; the current row's check
+   turns visible in the accent color. */
+.watch-art-mount .art-settings .art-setting-panel .art-setting-item .art-icon-check {
+  visibility: hidden;
+}
+.watch-art-mount .art-settings .art-setting-panel .art-setting-item.art-current .art-icon-check {
+  visibility: visible;
+  fill: var(--art-theme, var(--player-primary-color));
+}
+
+/* ── Quality selector list (same glass sheet) ───────────────────────────── */
+.watch-art-mount .art-control-selector .art-selector-list {
+  background-color: rgba(28, 28, 28, 0.96) !important;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  bottom: calc(var(--art-control-height) + var(--art-progress-height) + var(--art-bottom-gap) + 18px) !important;
+  padding: 6px 0;
+  min-width: 200px !important;
+  max-height: var(--art-selector-max-height) !important;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  overflow: hidden auto !important;
+}
+.watch-art-mount .art-control-selector .art-selector-list .art-selector-item {
+  padding: 11px 20px !important;
+  font-size: 13.5px;
+  min-height: 42px;
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  transition: background-color 0.12s ease;
+  min-width: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-control-selector .art-selector-list .art-selector-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+}
+.watch-art-mount .art-control-selector .art-selector-list .art-selector-item.art-current {
+  color: var(--art-theme, var(--player-primary-color));
+  background-color: rgba(255, 255, 255, 0.05);
+  font-weight: 500;
+  position: relative;
+}
+.watch-art-mount .art-control-selector .art-selector-list .art-selector-item.art-current::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background-color: var(--art-theme, var(--player-primary-color));
+  border-radius: 2px;
+}
+/* Quality rows keep Aniraku's label + resolution badge inside the new grid. */
+.watch-art-mount .watch-quality-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.watch-art-mount .watch-quality-name {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.watch-art-mount .watch-quality-badge {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Center play state: dark glass disc ─────────────────────────────────── */
+.watch-art-mount .art-video-player .art-mask .art-state {
+  background-color: rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: transform var(--art-transition-duration) ease,
+    background-color 0.15s ease, opacity var(--art-transition-duration) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-art-mount .art-video-player .art-mask .art-state:hover {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+}
+.watch-art-mount .art-video-player .art-mask .art-state .art-icon,
+.watch-art-mount .art-video-player .art-mask .art-state svg {
+  width: 28px !important;
+  height: 28px !important;
+  fill: #fff;
+  color: #fff;
+  margin-left: 2px;
+}
+
+/* ── Aniraku brand mark (player layer) ────────────────────────────────────
+   Rides top-left and fades with the control chrome — visible while the
+   controls are, gone when they are (mini-bar, lock and idle states keep
+   the video clean). */
+.watch-art-mount .art-video-player .art-layer-brand {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 40;
+  display: flex;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.watch-art-mount .art-video-player.art-control-show .art-layer-brand,
+.watch-art-mount .art-video-player.art-hover .art-layer-brand {
+  opacity: 1;
+}
+.watch-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+.watch-brand-mark img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+  -webkit-user-drag: none;
+}
+.watch-brand-mark span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
 @media (max-width: 768px) {
-          .watch-art-mount .art-video-player {
-            --art-control-height: 40px;
-            --art-control-icon-size: 26px;
-            --art-padding: 8px;
-            --art-settings-max-height: min(76dvh, 400px);
-            --art-selector-max-height: min(66dvh, 320px);
-          }
-          .watch-art-poster {
-            inset: 0 0 calc(58px + env(safe-area-inset-bottom, 0px)) 0;
-          }
-          .watch-art-mount .art-video-player .art-controls {
-            padding-inline: 2px;
-          }
-          .watch-art-mount .art-video-player .art-controls-left,
-          .watch-art-mount .art-video-player .art-controls-right {
-            column-gap: 4px;
-          }
-          .watch-art-mount .art-settings {
-            width: min(232px, calc(100vw - 16px)) !important;
-            max-width: calc(100vw - 16px) !important;
-            /* Same shrink-wrap behavior as desktop: rows define the height. */
-            height: auto !important;
-            max-height: min(var(--art-settings-max-height), calc(100% - 48px)) !important;
-            right: 8px !important;
-            bottom: 44px !important;
-          }
-          .watch-art-mount .art-setting-panel,
-          .watch-art-mount .art-setting-panel .art-selector-list {
-            flex: 1 1 auto;
-            max-height: none !important;
-          }
-          .watch-art-mount .art-setting-panel .art-selector-list {
-            max-height: min(var(--art-selector-max-height), 320px) !important;
-          }
-          .watch-art-mount .art-video-player .art-controls .art-control {
-            width: 34px;
-            padding-inline: 2px;
-          }
-          .watch-art-mount .art-video-player .art-controls .art-control .art-icon {
-            width: 26px;
-            height: 26px;
-          }
-          .watch-art-mount .art-video-player .art-controls-quality {
-            width: 56px;
-            min-width: 56px;
-          }
-          .watch-art-mount .art-video-player .art-control-seekBackward15,
-          .watch-art-mount .art-video-player .art-control-seekForward15 {
-            width: 34px !important;
-            min-width: 34px !important;
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-          .watch-art-mount .art-video-player .art-controls-left .art-control-time {
-            display: none !important;
-          }
-          /* Narrow screens: the full desktop control set physically cannot
-             fit next to the progress bar — at 360px the left and right
-             groups overlapped by ~50px and icons stacked on top of each
-             other. Keep the essential transport plus settings and
-             fullscreen; phones adjust volume with hardware keys, and
-             PiP / Cast / web-fullscreen are unreliable or redundant on
-             touch devices. */
-          .watch-art-mount .art-video-player .art-control-volume,
-          .watch-art-mount .art-video-player .art-control-chromecast,
-          .watch-art-mount .art-video-player .art-control-pip,
-          .watch-art-mount .art-video-player .art-control-fullscreenWeb {
-            display: none !important;
-          }
+  .watch-art-mount .art-video-player .art-layer-brand {
+    top: 10px;
+    left: 10px;
+  }
+  .watch-brand-mark {
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 999px;
+  }
+  .watch-brand-mark img {
+    width: 14px;
+    height: 14px;
+  }
+  .watch-brand-mark span {
+    font-size: 10px;
+  }
 }
 
-/* Coarse tablets: taller touch controls */
-@media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
-          .watch-art-mount .art-controls { min-height: 42px; }
+/* ── Notice + tooltip chips ─────────────────────────────────────────────── */
+.watch-art-mount .art-video-player .art-notice .art-notice-inner {
+  background-color: rgba(28, 28, 28, 0.95);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.watch-art-mount .art-video-player .art-tooltip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--art-tip-background);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.watch-art-mount .art-bottom .art-progress .art-control-progress .art-progress-tip {
+  background-color: var(--art-tip-background);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  top: -32px;
+}
+/* Keyboard shortcut chips inside tooltips ("Play Space"). */
+.watch-art-mount .art-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 18px;
+  height: 18px;
+  text-transform: uppercase;
+  color: #eee;
+  vertical-align: middle;
 }
 
-/* Phones (<=480px): compact control rows */
+/* ── Fullscreen geometry ────────────────────────────────────────────────── */
+.watch-art-mount .art-fullscreen,
+.watch-art-mount .art-fullscreen-web {
+  --art-control-height: 48px !important;
+  --art-control-icon-size: 28px !important;
+  --art-progress-height: 4px;
+  --art-indicator-size: 16px;
+  --art-padding: 18px;
+  --art-bottom-gap: 18px;
+}
+.watch-art-mount .art-fullscreen .art-controls .art-control-time,
+.watch-art-mount .art-fullscreen-web .art-controls .art-control-time {
+  font-size: 14px;
+  padding: 0 14px !important;
+}
+
+/* ── Lock / mini-progress states drop the pill chrome ───────────────────── */
+.watch-art-mount .art-video-player.art-lock .art-controls .art-controls-left,
+.watch-art-mount .art-video-player.art-lock .art-controls .art-controls-right,
+.watch-art-mount .art-video-player.art-mini-progress-bar .art-controls .art-controls-left,
+.watch-art-mount .art-video-player.art-mini-progress-bar .art-controls .art-controls-right {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+/* ── Quality in the settings panel: rows inherit the new grid ───────────── */
+.watch-art-mount .art-settings .art-selector-value {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Skip Intro / Outro buttons (reference skip-button style) ───────────── */
+.watch-skip-overlay {
+  position: absolute;
+  z-index: 100;
+  pointer-events: none;
+}
+.watch-skip-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  padding: 0.6rem 1.2rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 500;
+  transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out,
+    border-color 0.2s ease-in-out;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  font-family: inherit;
+  pointer-events: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .watch-skip-btn:hover {
+    background-color: rgba(0, 0, 0, 0.85);
+    transform: scale(1.02);
+    /* Aniraku signature: violet edge on hover instead of the reference's
+       pure white. */
+    border-color: var(--player-primary-color, #b5a8ff);
+  }
+}
+.watch-skip-btn:active {
+  transform: scale(0.98);
+}
+
+/* Manual skip overlay placement (reference steps): Intro hugs the left,
+   Outro the right; both climb above the mobile control row. */
+@media (max-width: 768px) {
+  .watch-skip-btn {
+    font-size: 0.8rem;
+    padding: 0.5rem 1rem;
+  }
+  .watch-skip-overlay[aria-label='Skip intro'] {
+    left: 12px !important;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .watch-skip-overlay[aria-label='Skip outro'] {
+    right: 12px !important;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
 @media (max-width: 480px) {
-          .watch-art-mount .art-video-player .art-controls {
-            padding-inline: 0;
-          }
-          .watch-art-mount .art-video-player .art-controls-left,
-          .watch-art-mount .art-video-player .art-controls-right {
-            column-gap: 3px;
-          }
-          .watch-art-mount .art-video-player .art-controls .art-control {
-            width: 32px;
-            padding-inline: 1px;
-          }
-          .watch-art-mount .art-video-player .art-controls .art-control .art-icon {
-            width: 24px;
-            height: 24px;
-          }
-          .watch-art-mount .art-video-player .art-controls-quality {
-            width: 56px;
-            min-width: 56px;
-          }
-}
-
-/* Tiny screens (<=360px): drop the duplicate quality label */
-        @media (max-width: 360px) {
-          /* Quality remains available from settings; remove its duplicate
-             compact label only when the essential controls cannot all fit. */
-          .watch-art-mount .art-video-player .art-controls-quality {
-            display: none !important;
-          }
-        }
-
-/* Settings panel safety caps: never exceed the player */
-        /* Settings panel: never exceed the PLAYER. These are the final safety
-           caps — kept in sync with the compact 232px grid so the inner panel
-           can never be wider than the box that clips it.
-           The height caps are player-relative on purpose: a portrait phone's
-           inline player is only ~200px tall, and a viewport cap (76dvh ≈
-           400px) let the panel grow way past the video and get clipped at
-           the player's top edge. In fullscreen the player IS the viewport,
-           so calc(100% - …) stays correct there too. */
-        .watch-art-mount .art-settings,
-        .watch-art-mount .art-setting-panel {
-          box-sizing: border-box !important;
-          max-width: min(232px, calc(100vw - 16px), 100%) !important;
-        }
-        .watch-art-mount .art-settings {
-          max-height: min(400px, calc(100% - 52px)) !important;
-          overflow: hidden !important;
-        }
-        .watch-art-mount .art-setting-panel {
-          width: 100% !important;
-          max-height: min(400px, calc(100% - 52px)) !important;
-          overflow: hidden auto !important;
-          overscroll-behavior: contain;
-        }
-        .watch-art-mount .art-setting-panel .art-setting-item {
-          min-height: 31px !important;
-          width: 100% !important;
-          min-width: 0 !important;
-          overflow: hidden !important;
-        }
-        .watch-art-mount .art-setting-panel .art-setting-item-left,
-        .watch-art-mount .art-setting-panel .art-setting-item-left-text,
-        .watch-art-mount .art-setting-panel .art-setting-item-right,
-        .watch-art-mount .art-setting-panel .art-setting-item-right-tooltip,
-        .watch-art-mount .art-setting-panel .art-selector-item,
-        .watch-art-mount .art-setting-panel .art-selector-value {
-          min-width: 0 !important;
-          max-width: 100% !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
-          white-space: nowrap !important;
-        }
-        @media (max-width: 480px) {
-          .watch-art-mount .art-settings,
-          .watch-art-mount .art-setting-panel {
-            width: min(232px, calc(100vw - 12px), 100%) !important;
-            max-width: min(232px, calc(100vw - 12px), 100%) !important;
-          }
-          .watch-art-mount .art-setting-panel .art-setting-item {
-            padding-inline: 8px !important;
-          }
-        }
-        @media (max-height: 520px) {
-          .watch-art-mount .art-settings,
-          .watch-art-mount .art-setting-panel {
-            /* Player-relative for the same reason as above: landscape phones
-               keep the whole menu inside the video frame. */
-            max-height: min(300px, calc(100% - 48px)) !important;
-          }
-        }
-
-/* Intro/outro timeline markers (yellow) */
-/* Bands sit above the white buffer cue (equal z2 — the buffer div is
-           appended first, markers next, so later DOM order wins) and below
-           the played fill; the chapter layer (z25) sits above all of it. */
-        .watch-timeline-marker {
-          z-index: 2;
-        }
-        .watch-timeline-marker-intro,
-.watch-timeline-marker-outro { background: #facc15 !important; box-shadow: 0 0 8px rgba(250, 204, 21, 0.38); }
-        .watch-timeline-marker-main {
-          background: rgba(148, 163, 184, 0.22) !important;
-          box-shadow: none;
-        }
-
-/* Manual skip overlay placement (ported): phone / coarse tablet / landscape */
-@media (max-width: 768px) {
-  .watch-skip-overlay { right: 8px !important; max-width: calc(100% - 16px) !important; }
-  .watch-skip-btn { min-height: 44px !important; padding: 8px 10px !important; font-size: 12px !important; }
+  .watch-skip-btn {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+  }
+  .watch-skip-overlay[aria-label='Skip intro'] {
+    left: 8px !important;
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .watch-skip-overlay[aria-label='Skip outro'] {
+    right: 8px !important;
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 }
 @media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
   .watch-skip-overlay { bottom: calc(44px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 @media (orientation: landscape) and (max-height: 560px) {
   .watch-skip-overlay { bottom: calc(38px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* ── Mobile (≤768px): pills dissolve into scattered round buttons ───────── */
+@media (max-width: 768px) {
+  .watch-art-mount .art-video-player {
+    --art-control-height: 28px;
+    --art-control-icon-size: 16px;
+    --art-padding: 10px;
+    --art-bottom-gap: 4px;
+    --art-indicator-size: 10px;
+    --art-progress-height: 4px;
+  }
+  .watch-art-mount .art-video-player .art-bottom {
+    background-image: linear-gradient(
+      rgba(0, 0, 0, 0.35) 0%,
+      transparent 20%,
+      transparent 60%,
+      rgba(0, 0, 0, 0.55) 100%
+    ) !important;
+    background-size: 100% 100% !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .watch-art-mount .art-video-player:not(.art-control-show) .art-bottom,
+  .watch-art-mount .art-video-player:not(.art-control-show) .art-bottom * {
+    pointer-events: none !important;
+  }
+  .watch-art-mount .art-video-player .art-bottom .art-progress {
+    position: absolute !important;
+    bottom: 28px !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 10px 0 !important;
+    z-index: 10 !important;
+  }
+  .watch-art-mount .art-video-player .art-bottom .art-progress .art-control-progress {
+    height: 4px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .watch-art-mount
+    .art-video-player
+    .art-bottom
+    .art-progress
+    .art-control-progress
+    .art-control-progress-inner
+    .art-progress-indicator {
+    transform: scale(1) !important;
+  }
+  .watch-art-mount .art-video-player .art-controls {
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    display: block !important;
+    z-index: 20 !important;
+    background: none !important;
+    pointer-events: none !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-controls-left,
+  .watch-art-mount .art-video-player .art-controls .art-controls-right {
+    display: contents !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    padding: 0;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control {
+    display: none !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    pointer-events: auto !important;
+    position: absolute !important;
+    bottom: 2px !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control .art-icon,
+  .watch-art-mount .art-video-player .art-controls .art-control .art-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .watch-art-mount
+    .art-video-player
+    .art-controls
+    .art-control.art-control-playAndPause
+    .art-icon,
+  .watch-art-mount
+    .art-video-player
+    .art-controls
+    .art-control.art-control-playAndPause
+    .art-icon
+    svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  /* Bottom row: transport left, seek + fullscreen right. */
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-playAndPause {
+    display: flex !important;
+    left: 2px !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-volume {
+    display: flex !important;
+    left: 32px !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-time {
+    display: flex !important;
+    left: 64px !important;
+    font-size: 10px !important;
+    padding: 0 2px !important;
+    min-width: auto !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+    align-items: center;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-fullscreen {
+    display: flex !important;
+    right: 2px !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-seekForward15 {
+    display: flex !important;
+    right: 32px !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-seekBackward15 {
+    display: flex !important;
+    right: 62px !important;
+  }
+  /* Top row: settings as a floating 30px circle. Episode nav, PiP,
+     screenshot, cast and web-fullscreen move out of the way on phones
+     (episode nav lives in the bar under the player; the rest are
+     redundant on touch or unavailable). */
+  .watch-art-mount .art-video-player .art-controls .art-control.art-control-setting {
+    display: flex !important;
+    position: absolute !important;
+    background-color: rgba(0, 0, 0, 0.45) !important;
+    border-radius: 50% !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+    top: 10px !important;
+    bottom: auto !important;
+    pointer-events: auto !important;
+    justify-content: center !important;
+    align-items: center !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    backdrop-filter: blur(4px) !important;
+    box-shadow: none !important;
+    right: 10px !important;
+    left: auto !important;
+  }
+  .watch-art-mount .art-video-player .art-control-volume .art-volume-panel {
+    display: none !important;
+  }
+  /* Settings + selector drop from the top-right circles. */
+  .watch-art-mount .art-video-player .art-settings {
+    top: 41px !important;
+    bottom: auto !important;
+    right: var(--art-padding) !important;
+    left: auto !important;
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+    max-height: min(340px, calc(100% - 80px)) !important;
+    padding: 4px 0 !important;
+  }
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    min-height: 32px !important;
+    gap: 6px !important;
+  }
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-left-icon {
+    height: 16px !important;
+    width: 16px !important;
+  }
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right {
+    font-size: 10.5px !important;
+    gap: 4px !important;
+  }
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item .art-setting-item-right .art-setting-item-right-icon {
+    min-width: 12px !important;
+    height: 12px !important;
+  }
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item-back {
+    padding: 8px 12px !important;
+    min-height: 36px !important;
+  }
+  .watch-art-mount .art-video-player .art-control-selector .art-selector-list {
+    top: 48px !important;
+    bottom: auto !important;
+    right: 10px !important;
+    left: auto !important;
+    transform: none !important;
+    max-height: calc(100% - 100px) !important;
+  }
+  .watch-art-mount .art-video-player .art-notice .art-notice-inner {
+    font-size: 12px !important;
+  }
+  /* Center play disc shrinks to the reference's 64px touch target. */
+  .watch-art-mount .art-video-player .art-mask .art-state {
+    width: 64px !important;
+    height: 64px !important;
+    background-color: rgba(0, 0, 0, 0.45) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    backdrop-filter: blur(4px) !important;
+  }
+  .watch-art-mount .art-video-player .art-mask .art-state .art-icon,
+  .watch-art-mount .art-video-player .art-mask .art-state svg {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .watch-art-poster {
+    inset: 0 0 calc(46px + env(safe-area-inset-bottom, 0px)) 0;
+  }
+}
+
+/* Coarse tablets: taller touch controls */
+@media (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  .watch-art-mount .art-controls { min-height: 42px; }
+}
+
+/* Touch devices (no hover): keep active feedback, drop hover effects. */
+@media (hover: none), (pointer: coarse) {
+  .watch-art-mount .art-video-player .art-controls .art-control:hover,
+  .watch-art-mount .art-video-player .art-controls .art-control:focus,
+  .watch-art-mount .art-video-player .art-controls .art-control:focus-visible,
+  .watch-art-mount .art-video-player .art-controls .art-control:focus-within {
+    background-color: transparent;
+    outline: none !important;
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control:active {
+    background-color: rgba(255, 255, 255, 0.22);
+  }
+  .watch-art-mount .art-video-player .art-controls .art-control-volume:hover {
+    width: var(--art-control-height);
+  }
+  .watch-art-mount
+    .art-video-player
+    .art-controls
+    .art-control-volume:hover
+    .art-volume-panel,
+  .watch-art-mount
+    .art-video-player
+    .art-controls
+    .art-control-volume:focus-within
+    .art-volume-panel {
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  .watch-art-mount .art-bottom .art-progress .art-control-progress:hover {
+    height: var(--art-progress-height) !important;
+  }
+  .watch-art-mount
+    .art-bottom
+    .art-progress
+    .art-control-progress
+    .art-control-progress-inner
+    .art-progress-indicator:hover {
+    transform: scale(1) !important;
+  }
+  .watch-art-mount .art-video-player .art-settings .art-setting-panel .art-setting-item:hover {
+    background-color: transparent !important;
+  }
+  .watch-art-mount
+    .art-video-player
+    .art-settings
+    .art-setting-panel
+    .art-setting-item.art-current:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+  .watch-art-mount .art-control-selector .art-selector-list .art-selector-item:hover {
+    background-color: transparent;
+  }
+  .watch-art-mount
+    .art-control-selector
+    .art-selector-list
+    .art-selector-item.art-current:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  .watch-art-mount .art-video-player .art-mask .art-state:hover {
+    background-color: rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Reduced motion: keep the state changes, drop the travel. */
+@media (prefers-reduced-motion: reduce) {
+  .watch-art-mount .art-video-player .art-bottom,
+  .watch-art-mount .art-video-player .art-controls .art-control,
+  .watch-art-mount
+    .art-bottom
+    .art-progress
+    .art-control-progress
+    .art-control-progress-inner
+    .art-progress-indicator,
+  .watch-art-mount .art-video-player .art-mask .art-state,
+  .watch-art-mount .watch-hover-preview,
+  .watch-skip-btn {
+    transition: none !important;
+  }
+  .watch-art-mount
+    .art-bottom
+    .art-progress
+    .art-control-progress:hover {
+    height: var(--art-progress-height) !important;
+  }
+}
+
+/* ── Settings panel safety caps: never exceed the player ────────────────── */
+.watch-art-mount .art-settings {
+  max-width: min(320px, calc(100vw - 16px), 100%) !important;
 }
 
 /* Resume countdown dialog (Aniraku Watch.jsx:6069-6130 — Item 2): the

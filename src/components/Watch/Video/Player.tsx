@@ -47,6 +47,7 @@ import {
   proxiedMediaUrl,
 } from '../../../hooks/useApi';
 import { playbackUrl } from '../../../lib/apiBase';
+import anirakuLogo from '../../../assets/aniraku_logo.webp';
 import { detectSubtitleType } from '../../../lib/subtitleType';
 import { useSettings } from '../../../components/Profile/SettingsProvider';
 import { TbPlayerTrackPrev, TbPlayerTrackNext } from 'react-icons/tb';
@@ -674,11 +675,15 @@ export function escapeHtml(value: any): string {
 // reference build.
 export const SETTING_ICON_PLAY_SPEED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" shape-rendering="geometricPrecision"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.1 8.2v7.6l6.1-3.8z" fill="currentColor"/></svg>`;
 export const SETTING_ICON_ASPECT_RATIO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16.01H3V4.99h18v14.02z" fill="currentColor"/></svg>`;
-export const SETTING_ICON_CAPTIONS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1z" fill="currentColor"/></svg>`;
-export const SETTING_ICON_TUNE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z" fill="currentColor"/></svg>`;
+export const SETTING_ICON_CAPTIONS = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="width:100%;height:100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2" ry="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></svg>`;
+export const SETTING_ICON_TUNE = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="width:100%;height:100%" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19v-4"/><path d="M12 19v-9"/><path d="M19 19V5"/></svg>`;
 // Invisible spacer that keeps slider rows on the same label grid as every
 // other row, without drawing a decorative gear inside the sub-menu.
 export const SETTING_ICON_BLANK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%"></svg>`;
+
+// Material Design "photo_camera" glyph — shared by the icons config and the
+// custom screenshot control (see createScreenshotCapture below).
+export const SCREENSHOT_ICON = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" style="width:100%;height:100%" fill="currentColor"><path d="M480-260q75 0 127.5-52.5T660-440q0-75-52.5-127.5T480-620q-75 0-127.5 52.5T300-440q0 75 52.5 127.5T480-260Zm0-80q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM160-120q-33 0-56.5-23.5T80-200v-480q0-33 23.5-56.5T160-760h126l74-80h240l74 80h126q33 0 56.5 23.5T880-680v480q0 33-23.5 56.5T800-120H160Zm0-80h640v-480H638l-73-80H395l-73 80H160v480Zm320-240Z"/></svg>`;
 
 // Full-buffer cache indicator: paints every
 // video.buffered range into the progress bar as translucent segments. It reads
@@ -917,6 +922,233 @@ function createChapterSegmentsLayer(
   };
 }
 
+/**
+ * Hover frame preview: a hidden second <video> seeks to the hovered
+ * timestamp and paints the frame into a small canvas above the seek bar —
+ * the scrubbing filmstrip, without any backend sprite/VTT asset.
+ *
+ * Desktop pointers only ((hover:hover) + (pointer:fine) matchMedia gate):
+ * touch scrubbing never spins up the second stream, so mobile bandwidth
+ * and memory are untouched. The pipeline is built lazily on the first
+ * hover, seeks are throttled with a trailing apply (the preview always
+ * lands on the last hovered position), and the engine stays warm across
+ * hovers — idle cost is ~0 because the tiny buffer only loads a fragment
+ * when the hover position actually moves. Cleanup destroys the preview
+ * hls.js session and removes every node/listener (called from
+ * destroyPlayer alongside the other progress-bar layers).
+ */
+function createHoverFramePreview(options: {
+  video: HTMLVideoElement | null | undefined;
+  control: Element | null | undefined;
+  root: Element | null | undefined;
+  src: string;
+  isHls: boolean;
+  hlsLoader: Promise<unknown> | null;
+  buildUrl: (url: string) => string;
+}): () => void {
+  const { video, control, root, src, isHls, hlsLoader, buildUrl } = options;
+  if (!video || !control || !root || !src) return () => {};
+  const hoverable =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!hoverable) return () => {};
+
+  let engineBuilt = false;
+  let destroyed = false;
+  let previewVideo: HTMLVideoElement | null = null;
+  let wrap: HTMLDivElement | null = null;
+  let canvas: HTMLCanvasElement | null = null;
+  let hlsInstance: { destroy: () => void; startLoad: (t?: number) => void } | null =
+    null;
+  let hlsStarted = false;
+  let hideTimer: number | null = null;
+  let trailingTimer: number | null = null;
+  let lastAppliedAt = 0;
+  // True only while the pointer is on the seek bar. Guards drawFrame: the
+  // preview video's seeked event regularly lands after pointerleave (the
+  // last throttled seek resolves late), and without this flag the canvas
+  // would re-show itself and never hide.
+  let pointerOnBar = false;
+  const playerEl = control.closest('.art-video-player');
+
+  const hidePreview = () => {
+    if (hideTimer !== null) return;
+    hideTimer = window.setTimeout(() => {
+      hideTimer = null;
+      wrap?.classList.remove('is-visible');
+    }, 150);
+  };
+
+  const drawFrame = () => {
+    if (destroyed || !previewVideo || !canvas) return;
+    if (!pointerOnBar) return;
+    // The auto-hidden chrome (idle) hides with .art-bottom — never paint
+    // onto a faded-out player.
+    if (!playerEl?.classList.contains('art-control-show')) return;
+    if (previewVideo.readyState < 2 || !previewVideo.videoWidth) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    // Center-crop the frame to the canvas box (cover), like a thumbnail sprite.
+    const srcW = previewVideo.videoWidth;
+    const srcH = previewVideo.videoHeight;
+    const boxRatio = canvas.width / canvas.height;
+    const srcRatio = srcW / srcH;
+    let sx = 0;
+    let sy = 0;
+    let sw = srcW;
+    let sh = srcH;
+    if (srcRatio > boxRatio) {
+      sw = srcH * boxRatio;
+      sx = (srcW - sw) / 2;
+    } else {
+      sh = srcW / boxRatio;
+      sy = (srcH - sh) / 2;
+    }
+    ctx.drawImage(previewVideo, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    wrap?.classList.add('is-visible');
+  };
+
+  const buildEngine = () => {
+    if (destroyed || engineBuilt) return;
+    engineBuilt = true;
+    previewVideo = document.createElement('video');
+    previewVideo.className = 'watch-hover-preview-video';
+    previewVideo.muted = true;
+    previewVideo.playsInline = true;
+    previewVideo.preload = 'metadata';
+    previewVideo.setAttribute('aria-hidden', 'true');
+    previewVideo.setAttribute('disablepictureinpicture', 'true');
+    // No crossOrigin: the preview only DISPLAYS frames (drawImage taints
+    // the canvas but nothing reads it back), so a missing CORS header must
+    // not block the load the way it can for a fresh element request.
+    previewVideo.addEventListener('seeked', drawFrame);
+    previewVideo.addEventListener('loadeddata', drawFrame);
+    root.appendChild(previewVideo);
+
+    wrap = document.createElement('div');
+    wrap.className = 'watch-hover-preview';
+    wrap.setAttribute('aria-hidden', 'true');
+    canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 180;
+    wrap.appendChild(canvas);
+    control.appendChild(wrap);
+
+    if (isHls && hlsLoader) {
+      void hlsLoader.then((mod) => {
+        if (destroyed || !mod || !previewVideo) return;
+        const HlsCtor = (mod as { default?: unknown; isSupported?: () => boolean })
+          .default as
+          | (new (config: Record<string, unknown>) => {
+              destroy: () => void;
+              startLoad: (t?: number) => void;
+              loadSource: (u: string) => void;
+              attachMedia: (v: HTMLMediaElement) => void;
+            })
+          | null;
+        const HlsBase = mod as { isSupported?: () => boolean };
+        if (!HlsCtor || (HlsBase.isSupported && !HlsBase.isSupported())) return;
+        const hls = new HlsCtor({
+          autoStartLoad: false,
+          maxBufferLength: 8,
+          maxMaxBufferLength: 16,
+          backBufferLength: 8,
+        });
+        hls.loadSource(buildUrl(src));
+        hls.attachMedia(previewVideo);
+        hlsInstance = hls;
+      });
+    } else {
+      previewVideo.src = src;
+    }
+  };
+
+  const applySeek = (time: number) => {
+    if (destroyed || !previewVideo) return;
+    lastAppliedAt = Date.now();
+    try {
+      if (hlsInstance) {
+        if (!hlsStarted) {
+          hlsStarted = true;
+          hlsInstance.startLoad(time);
+        }
+        previewVideo.currentTime = time;
+      } else {
+        previewVideo.currentTime = time;
+      }
+    } catch {
+      // seeking before metadata is fine — the next move reapplies
+    }
+  };
+
+  const scheduleSeek = (time: number) => {
+    if (destroyed) return;
+    const elapsed = Date.now() - lastAppliedAt;
+    if (elapsed >= 120) {
+      applySeek(time);
+      return;
+    }
+    if (trailingTimer !== null) window.clearTimeout(trailingTimer);
+    trailingTimer = window.setTimeout(() => {
+      trailingTimer = null;
+      applySeek(time);
+    }, 140 - Math.max(0, elapsed));
+  };
+
+  const onPointerMove = (event: Event) => {
+    if (destroyed) return;
+    const duration = Number(video.duration);
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const rect = control.getBoundingClientRect();
+    if (!rect.width) return;
+    const offset = (event as PointerEvent).clientX - rect.left;
+    const ratio = Math.min(1, Math.max(0, offset / rect.width));
+    pointerOnBar = true;
+    if (hideTimer !== null) {
+      window.clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    buildEngine();
+    if (!wrap) return;
+    // Clamp inside the bar so the canvas never pokes past the player edge.
+    wrap.style.left = `${Math.min(rect.width - 84, Math.max(84, offset))}px`;
+    scheduleSeek(ratio * duration);
+  };
+
+  const onPointerLeave = () => {
+    // Clear immediately: a seeked event from the trailing throttled seek
+    // can land AFTER the hide timer and must not re-show the canvas.
+    pointerOnBar = false;
+    hidePreview();
+  };
+
+  control.addEventListener('pointermove', onPointerMove);
+  control.addEventListener('pointerleave', onPointerLeave);
+
+  return () => {
+    destroyed = true;
+    control.removeEventListener('pointermove', onPointerMove);
+    control.removeEventListener('pointerleave', onPointerLeave);
+    if (hideTimer !== null) window.clearTimeout(hideTimer);
+    if (trailingTimer !== null) window.clearTimeout(trailingTimer);
+    if (hlsInstance) {
+      try {
+        hlsInstance.destroy();
+      } catch {
+        // already torn down with the player
+      }
+      hlsInstance = null;
+    }
+    previewVideo?.removeEventListener('seeked', drawFrame);
+    previewVideo?.removeEventListener('loadeddata', drawFrame);
+    previewVideo?.remove();
+    previewVideo = null;
+    wrap?.remove();
+    wrap = null;
+    canvas = null;
+  };
+}
+
 export function findOptionLabel(
   options: readonly { value: any; label: string }[],
   value: any,
@@ -1072,12 +1304,6 @@ function nextEpisodeControlHtml(): string {
   // Exact Material Design "skip_next" glyph — the mirrored twin: bar on
   // the right, triangle pointing into it.
   return `<span class="watch-art-next-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M16 6h2v12h-2zM6 6v12l8.5-6z" fill="currentColor"/></svg></span>`;
-}
-
-function chromecastControlHtml(): string {
-  // Exact Material Design "cast" glyph: rounded screen with the signal
-  // waves emanating from the bottom-left corner.
-  return `<span class="watch-art-cast-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" width="22" height="22" shape-rendering="geometricPrecision"><path d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z" fill="currentColor"/></svg></span>`;
 }
 
 function getQualityPresentation(value: unknown) {
@@ -1445,6 +1671,7 @@ export function Player({
   const buildIdRef = useRef(0);
   const hlsPreloadPromiseRef = useRef<Promise<unknown> | null>(null);
   const bufferIndicatorCleanupRef = useRef<(() => void) | null>(null);
+  const hoverPreviewCleanupRef = useRef<(() => void) | null>(null);
   const timelineHoverCleanupRef = useRef<{
     refresh: () => void;
     cleanup: () => void;
@@ -1667,6 +1894,8 @@ export function Player({
     removePlayerKeydown();
     bufferIndicatorCleanupRef.current?.();
     bufferIndicatorCleanupRef.current = null;
+    hoverPreviewCleanupRef.current?.();
+    hoverPreviewCleanupRef.current = null;
     timelineHoverCleanupRef.current?.cleanup();
     timelineHoverCleanupRef.current = null;
     chapterLayerRef.current?.cleanup();
@@ -2932,6 +3161,54 @@ export function Player({
             }
           : null;
 
+      // Robust screenshot capture: draws the current frame to a canvas and
+      // downloads via a blob URL. Reported outcomes replace ArtPlayer's
+      // silent failures — a tainted canvas (Safari native-HLS ignores
+      // crossOrigin; protected sources) surfaced as a raw SecurityError
+      // notice with no download, and its data-URL download is dropped by
+      // some browsers.
+      const createScreenshotCapture = async () => {
+        const video = artInstanceRef.current?.video;
+        if (!video || !video.videoWidth) {
+          showToast('Play the video a moment before capturing a frame', {
+            type: 'warning',
+          });
+          return;
+        }
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('2d context unavailable');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, 'image/png'),
+          );
+          if (!blob) throw new Error('screenshot encode failed');
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = url;
+          const stamp = formatTime(video.currentTime || 0).replace(
+            /[^0-9a-zA-Z]+/g,
+            '-',
+          );
+          anchor.download = `Aniraku-E${episode}-${stamp}.png`;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+          showToast('Screenshot saved', { type: 'success' });
+          artInstanceRef.current?.emit('screenshot', url);
+        } catch {
+          // SecurityError = the source taints the canvas (protected stream
+          // or a cross-origin file without CORS headers).
+          showToast('Screenshot unavailable for this stream', {
+            type: 'warning',
+          });
+        }
+      };
+
       const playerConfig: any = {
         container,
         url: src,
@@ -2948,10 +3225,19 @@ export function Player({
         // scroll-locking); on desktop it is a nice touch.
         autoMini: !IS_MOBILE,
         fullscreen: true,
-        fullscreenWeb: true,
+        // Web fullscreen stays available programmatically but the reference
+        // embed ships no second fullscreen button; keep the bar identical.
+        fullscreenWeb: false,
         mutex: true,
         backdrop: true,
         playsInline: true,
+        // Thin progress line while the chrome is hidden (the reference's
+        // mini-bar state; the replica CSS fades the whole bottom out for a
+        // clean video).
+        miniProgressBar: true,
+        // Long-press 2× speed on touch, as in the reference embed
+        // (ArtPlayer.FAST_FORWARD_VALUE is set right after the import).
+        fastForward: true,
         autoPlayback: true,
         // TV remotes have no rotation sensor; keep the player orientation
         // locked so Android TV never flips it.
@@ -2960,22 +3246,36 @@ export function Player({
         // art.airplay() opens Safari's playback target picker and ArtPlayer
         // raises its own notice on browsers without one.
         airplay: false,
-        screenshot: !IS_TV,
+        // Built-in screenshot control replaced by the custom one below
+        // (robust capture + user feedback); TV keeps neither.
+        screenshot: false,
         setting: true,
-        // Top-level gear: exact Material Design "settings" filled glyph on
-        // the24×24 grid — the reference build's icon philosophy ("exact
-        // Material Design filled paths … renders identically crisp at any
-        // DPI"). Aniraku itself registers no override (its control bar at
-        // relies on ArtPlayer's built-in setting
-        // control, icons.setting); this pins that same built-in control's
-        // glyph to the official MD path instead of art's internal sketch.
+        // Icon set pinned to the reference embed's glyphs (Material Design
+        // / Material Symbols + Lucide — all open-license paths): volume,
+        // fullscreen variants, PiP, screenshot, gear and the dual-arc
+        // loading spinner. Play/pause/seek keep ArtPlayer's stock glyphs,
+        // as in the reference.
         icons: {
           setting:
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" shape-rendering="geometricPrecision" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" style="width:100%;height:100%" fill="currentColor"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></svg>',
+          volume:
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>',
+          volumeClose:
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" fill="currentColor"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>',
+          fullscreen:
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>',
+          fullscreenWeb:
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:100%;height:100%" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>',
+          pip: '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" style="width:100%;height:100%" fill="currentColor"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Zm0-80h640v-480H160v480Zm0 0v-480 480Zm280-40h320v-240H440v240Zm80-80v-80h160v80H520Z"/></svg>',
+          screenshot: SCREENSHOT_ICON,
+          loading:
+            '<div style="width: 60px; height: 60px; margin: auto; color: white;"><svg version="1.1" class="svg-loader" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 80 80" style="width:100%;height:100%"><path fill="currentColor" d="M10,40c0,0,0-0.4,0-1.1c0-0.3,0-0.8,0-1.3c0-0.3,0-0.5,0-0.8c0-0.3,0.1-0.6,0.1-0.9c0.1-0.6,0.1-1.4,0.2-2.1c0.2-0.8,0.3-1.6,0.5-2.5c0.2-0.9,0.6-1.8,0.8-2.8c0.3-1,0.8-1.9,1.2-3c0.5-1,1.1-2,1.7-3.1c0.7-1,1.4-2.1,2.2-3.1c1.6-2.1,3.7-3.9,6-5.6c2.3-1.7,5-3,7.9-4.1c0.7-0.2,1.5-0.4,2.2-0.7c0.7-0.3,1.5-0.3,2.3-0.5c0.8-0.2,1.5-0.3,2.3-0.4l1.2-0.1l0.6-0.1l0.3,0l0.1,0l0.1,0l0,0c0.1,0-0.1,0,0.1,0c1.5,0,2.9-0.1,4.5,0.2c0.8,0.1,1.6,0.1,2.4,0.3c0.8,0.2,1.5,0.3,2.3,0.5c3,0.8,5.9,2,8.5,3.6c2.6,1.6,4.9,3.4,6.8,5.4c1,1,1.8,2.1,2.7,3.1c0.8,1.1,1.5,2.1,2.1,3.2c0.6,1.1,1.2,2.1,1.6,3.1c0.4,1,0.9,2,1.2,3c0.3,1,0.6,1.9,0.8,2.7c0.2,0.9,0.3,1.6,0.5,2.4c0.1,0.4,0.1,0.7,0.2,1c0,0.3,0.1,0.6,0.1,0.9c0.1,0.6,0.1,1,0.1,1.4C74,39.6,74,40,74,40c0.2,2.2-1.5,4.1-3.7,4.3s-4.1-1.5-4.3-3.7c0-0.1,0-0.2,0-0.3l0-0.4c0,0,0-0.3,0-0.9c0-0.3,0-0.7,0-1.1c0-0.2,0-0.5,0-0.7c0-0.2-0.1-0.5-0.1-0.8c-0.1-0.6-0.1-1.2-0.2-1.9c-0.1-0.7-0.3-1.4-0.4-2.2c-0.2-0.8-0.5-1.6-0.7-2.4c-0.3-0.8-0.7-1.7-1.1-2.6c-0.5-0.9-0.9-1.8-1.5-2.7c-0.6-0.9-1.2-1.8-1.9-2.7c-1.4-1.8-3.2-3.4-5.2-4.9c-2-1.5-4.4-2.7-6.9-3.6c-0.6-0.2-1.3-0.4-1.9-0.6c-0.7-0.2-1.3-0.3-1.9-0.4c-1.2-0.3-2.8-0.4-4.2-0.5l-2,0c-0.7,0-1.4,0.1-2.1,0.1c-0.7,0.1-1.4,0.1-2,0.3c-0.7,0.1-1.3,0.3-2,0.4c-2.6,0.7-5.2,1.7-7.5,3.1c-2.2,1.4-4.3,2.9-6,4.7c-0.9,0.8-1.6,1.8-2.4,2.7c-0.7,0.9-1.3,1.9-1.9,2.8c-0.5,1-1,1.9-1.4,2.8c-0.4,0.9-0.8,1.8-1,2.6c-0.3,0.9-0.5,1.6-0.7,2.4c-0.2,0.7-0.3,1.4-0.4,2.1c-0.1,0.3-0.1,0.6-0.2,0.9c0,0.3-0.1,0.6-0.1,0.8c0,0.5-0.1,0.9-0.1,1.3C10,39.6,10,40,10,40z"><animateTransform attributeType="xml" attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="0.8s" repeatCount="indefinite"/></path><path fill="currentColor" d="M62,40.1c0,0,0,0.2-0.1,0.7c0,0.2,0,0.5-0.1,0.8c0,0.2,0,0.3,0,0.5c0,0.2-0.1,0.4-0.1,0.7c-0.1,0.5-0.2,1-0.3,1.6c-0.2,0.5-0.3,1.1-0.5,1.8c-0.2,0.6-0.5,1.3-0.7,1.9c-0.3,0.7-0.7,1.3-1,2.1c-0.4,0.7-0.9,1.4-1.4,2.1c-0.5,0.7-1.1,1.4-1.7,2c-1.2,1.3-2.7,2.5-4.4,3.6c-1.7,1-3.6,1.8-5.5,2.4c-2,0.5-4,0.7-6.2,0.7c-1.9-0.1-4.1-0.4-6-1.1c-1.9-0.7-3.7-1.5-5.2-2.6c-1.5-1.1-2.9-2.3-4-3.7c-0.6-0.6-1-1.4-1.5-2c-0.4-0.7-0.8-1.4-1.2-2c-0.3-0.7-0.6-1.3-0.8-2c-0.2-0.6-0.4-1.2-0.6-1.8c-0.1-0.6-0.3-1.1-0.4-1.6c-0.1-0.5-0.1-1-0.2-1.4c-0.1-0.9-0.1-1.5-0.1-2c0-0.5,0-0.7,0-0.7s0,0.2,0.1,0.7c0.1,0.5,0,1.1,0.2,2c0.1,0.4,0.2,0.9,0.3,1.4c0.1,0.5,0.3,1,0.5,1.6c0.2,0.6,0.4,1.1,0.7,1.8c0.3,0.6,0.6,1.2,0.9,1.9c0.4,0.6,0.8,1.3,1.2,1.9c0.5,0.6,1,1.3,1.6,1.8c1.1,1.2,2.5,2.3,4,3.2c1.5,0.9,3.2,1.6,5,2.1c1.8,0.5,3.6,0.6,5.6,0.6c1.8-0.1,3.7-0.4,5.4-1c1.7-0.6,3.3-1.4,4.7-2.4c1.4-1,2.6-2.1,3.6-3.3c0.5-0.6,0.9-1.2,1.3-1.8c0.4-0.6,0.7-1.2,1-1.8c0.3-0.6,0.6-1.2,0.8-1.8c0.2-0.6,0.4-1.1,0.5-1.7c0.1-0.5,0.2-1,0.3-1.5c0.1-0.4,0.1-0.8,0.1-1.2c0-0.2,0-0.4,0.1-0.5c0-0.2,0-0.4,0-0.5c0-0.3,0-0.6,0-0.8c0-0.5,0-0.7,0-0.7c0-1.1,0.9-2,2-2s2,0.9,2,2C62,40,62,40.1,62,40.1z"><animateTransform attributeType="xml" attributeName="transform" type="rotate" from="0 40 40" to="-360 40 40" dur="0.6s" repeatCount="indefinite"/></path></svg></div>',
         },
         hotkey: false,
-        // Theme resolved at runtime from the app accent (the reference build
-        // pinned a hardcoded brand violet); falls back to the soft accent.
+        // Player accent resolved from the app theme token — Aniraku violet
+        // (--player-secondary-color, amber) highlights skip chapters on the
+        // bar. Keeping it theme-driven is deliberate: the player follows
+        // whatever accent the site theme defines.
         theme:
           getComputedStyle(document.documentElement)
             .getPropertyValue('--primary-accent')
@@ -2986,6 +3286,15 @@ export function Player({
           (navigator.language || 'en').toLowerCase() === 'zh-cn'
             ? 'zh-cn'
             : 'en',
+        // Tooltip wording from the reference embed (plain text — ArtPlayer
+        // tooltips render through CSS attr(), not HTML).
+        i18n: {
+          en: {
+            'Show Setting': 'Settings',
+            'PIP Mode': 'Miniplayer',
+            Rate: 'Play Speed',
+          },
+        },
         moreVideoAttr: {
           crossOrigin: 'anonymous',
           preload: 'auto',
@@ -3024,9 +3333,11 @@ export function Player({
               ]
             : []),
           {
+            // Reference embed layout: seek controls lead the right pill,
+            // ahead of the tool buttons.
             name: 'seekBackward15',
-            position: 'left',
-            index: 17,
+            position: 'right',
+            index: 5,
             html: seekControlHtml(-1),
             tooltip: `Rewind ${SEEK_SECONDS}s`,
             style: { width: '36px', margin: '0' },
@@ -3042,8 +3353,8 @@ export function Player({
           },
           {
             name: 'seekForward15',
-            position: 'left',
-            index: 18,
+            position: 'right',
+            index: 6,
             html: seekControlHtml(1),
             tooltip: `Forward ${SEEK_SECONDS}s`,
             style: { width: '36px', margin: '0' },
@@ -3055,21 +3366,28 @@ export function Player({
             },
           },
           {
-            name: 'chromecast',
+            // Screenshot: custom control. ArtPlayer's built-in screenshot
+            // method is frozen via defineProperty (not overridable) and its
+            // download path fails silently on protected sources — the
+            // capture below reports every outcome instead.
+            name: 'screenshot',
             position: 'right',
-            index: 15,
-            html: chromecastControlHtml(),
-            tooltip: 'Chromecast',
-            style: { width: '36px', margin: '0' },
+            index: 20,
+            html: `<i class="art-icon">${SCREENSHOT_ICON}</i>`,
+            tooltip: 'Screenshot',
+            style: { width: '40px', margin: '0' },
             click: function () {
-              try {
-                artInstanceRef.current?.airplay();
-              } catch {
-                showToast('AirPlay is not available in this browser', {
-                  type: 'warning',
-                });
-              }
+              void createScreenshotCapture();
             },
+          },
+        ],
+        // Aniraku brand mark: top-left, fades in with the control chrome
+        // (visibility is driven by the .art-control-show class in CSS —
+        // no JS toggling). Points at the app's own logo asset.
+        layers: [
+          {
+            name: 'brand',
+            html: `<span class="watch-brand-mark"><img src="${anirakuLogo}" alt="" draggable="false" /><span>Aniraku</span></span>`,
           },
         ],
         settings: [
@@ -3887,6 +4205,8 @@ export function Player({
       }
       if (disposed || buildIdRef.current !== myBuildId) return;
       destroyPlayer();
+      // Long-press speed cap for touch (reference embed uses 2×).
+      Artplayer.FAST_FORWARD_VALUE = 2;
       const art = new Artplayer(playerConfig);
 
       const savedPlayerPreferences = playerPreferencesRef.current;
@@ -3968,6 +4288,20 @@ export function Player({
         art.video,
         progressInner,
       );
+      // Hover frame preview (desktop pointers only): hidden second video
+      // + canvas above the bar — needs the ORIGINAL source URL (the main
+      // video's src is a MediaSource blob once hls.js attaches, useless to
+      // a second element) plus the same proxy the main engine uses.
+      const artRoot = art.video?.closest('.art-video-player') ?? null;
+      hoverPreviewCleanupRef.current = createHoverFramePreview({
+        video: art.video,
+        control: artRoot?.querySelector('.art-control-progress') ?? null,
+        root: artRoot,
+        src,
+        isHls: srcType === 'hls',
+        hlsLoader: hlsPreloadPromiseRef.current,
+        buildUrl: proxied,
+      });
       timelineHoverCleanupRef.current = createTimelineHoverPreview(
         art.video,
         progressInner,
@@ -4888,83 +5222,48 @@ export function Player({
               </div>
             )}
             {noSourceOverlay}
-            {/* Manual skip prompt: above the bottom-right ArtPlayer controls */}
-            {(showSkipIntro || showSkipOutro) && (
+            {/* Manual skip prompts: reference layout — Intro bottom-left,
+                Outro bottom-right, above the control pills. */}
+            {showSkipIntro && (
               <div
                 className='watch-skip-overlay'
-                aria-label='Episode skip controls'
+                aria-label='Skip intro'
                 style={{
                   position: 'absolute',
-                  right: 'clamp(8px, 2.2vw, 18px)',
-                  bottom: 'calc(42px + env(safe-area-inset-bottom, 0px))',
+                  left: '20px',
+                  bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))',
                   zIndex: 100,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  flexWrap: 'wrap',
-                  maxWidth: 'calc(100% - 16px)',
-                  padding: 5,
-                  background: 'rgba(6,10,20,0.38)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 12,
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.28)',
-                  pointerEvents: 'auto',
+                  pointerEvents: 'none',
                 }}
               >
-                {showSkipIntro && (
-                  <button
-                    type='button'
-                    className='watch-skip-btn'
-                    onClick={() => handleSkipSegment('intro')}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.12)',
-                      color: '#f8fafc',
-                      border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: 9,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      minHeight: 40,
-                      boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
-                      backdropFilter: 'blur(4px)',
-                    }}
-                  >
-                    <FaStepForward />
-                    Skip Intro
-                  </button>
-                )}
-                {showSkipOutro && (
-                  <button
-                    type='button'
-                    className='watch-skip-btn'
-                    onClick={() => handleSkipSegment('outro')}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.12)',
-                      color: '#f8fafc',
-                      border: '1px solid rgba(255,255,255,0.18)',
-                      borderRadius: 9,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      minHeight: 40,
-                      boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
-                      backdropFilter: 'blur(4px)',
-                    }}
-                  >
-                    <FaStepForward />
-                    Skip Outro
-                  </button>
-                )}
+                <button
+                  type='button'
+                  className='watch-skip-btn'
+                  onClick={() => handleSkipSegment('intro')}
+                >
+                  <span className='watch-skip-btn-text'>Skip Intro</span>
+                </button>
+              </div>
+            )}
+            {showSkipOutro && (
+              <div
+                className='watch-skip-overlay'
+                aria-label='Skip outro'
+                style={{
+                  position: 'absolute',
+                  right: '20px',
+                  bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))',
+                  zIndex: 100,
+                  pointerEvents: 'none',
+                }}
+              >
+                <button
+                  type='button'
+                  className='watch-skip-btn'
+                  onClick={() => handleSkipSegment('outro')}
+                >
+                  <span className='watch-skip-btn-text'>Skip Outro</span>
+                </button>
               </div>
             )}
           </PlayerViewport>
