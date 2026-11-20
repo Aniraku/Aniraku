@@ -961,6 +961,7 @@ function createHoverFramePreview(options: {
   let hlsInstance: { destroy: () => void; startLoad: (t?: number) => void } | null =
     null;
   let hlsStarted = false;
+  let pendingSeekTime: number | null = null;
   let hideTimer: number | null = null;
   let trailingTimer: number | null = null;
   let lastAppliedAt = 0;
@@ -1037,8 +1038,12 @@ function createHoverFramePreview(options: {
     if (isHls && hlsLoader) {
       void hlsLoader.then((mod) => {
         if (destroyed || !mod || !previewVideo) return;
-        const HlsCtor = (mod as { default?: unknown; isSupported?: () => boolean })
-          .default as
+        // The prewarm promise resolves to the hls.js CLASS itself
+        // (import('hls.js').then(m => m.default ?? null)) — but cover the
+        // raw-module shape too, or the constructor lookup stays undefined
+        // and the preview engine never exists on HLS sources.
+        const HlsModule = mod as { default?: unknown; isSupported?: () => boolean };
+        const HlsCtor = ((HlsModule.default ?? mod) ?? null) as
           | (new (config: Record<string, unknown>) => {
               destroy: () => void;
               startLoad: (t?: number) => void;
@@ -1050,6 +1055,9 @@ function createHoverFramePreview(options: {
         if (!HlsCtor || (HlsBase.isSupported && !HlsBase.isSupported())) return;
         const hls = new HlsCtor({
           autoStartLoad: false,
+          // Prefetch the init segment while the manifest parses — shaves the
+          // first-paint wait when the first hover lands.
+          startFragPrefetch: true,
           maxBufferLength: 8,
           maxMaxBufferLength: 16,
           backBufferLength: 8,
@@ -1057,6 +1065,21 @@ function createHoverFramePreview(options: {
         hls.loadSource(buildUrl(src));
         hls.attachMedia(previewVideo);
         hlsInstance = hls;
+        // A seek requested before the engine existed (first hover racing
+        // the module load) is replayed here so a single hover still paints.
+        if (pendingSeekTime !== null) {
+          const time = pendingSeekTime;
+          pendingSeekTime = null;
+          if (!hlsStarted) {
+            hlsStarted = true;
+            hls.startLoad(time);
+          }
+          try {
+            previewVideo.currentTime = time;
+          } catch {
+            // metadata not ready yet — the next move reapplies
+          }
+        }
       });
     } else {
       previewVideo.src = src;
@@ -1073,6 +1096,10 @@ function createHoverFramePreview(options: {
           hlsInstance.startLoad(time);
         }
         previewVideo.currentTime = time;
+      } else if (isHls) {
+        // Engine still loading (module import / manifest) — remember the
+        // position; it is applied the moment the hls instance is ready.
+        pendingSeekTime = time;
       } else {
         previewVideo.currentTime = time;
       }
