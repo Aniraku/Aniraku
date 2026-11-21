@@ -698,12 +698,20 @@
   box-shadow: none;
 }
 /* Timeline hover tooltip (body-level, inline-styled by the lib) — pull it
-   onto the reference tooltip surface. */
+   onto the reference tooltip surface; flex+gap separates the timestamp
+   from the chapter label (the lib appends the spans adjacent). The
+   :not([hidden]) guard keeps the lib's own show/hide attribute working —
+   display:flex!important would otherwise pin it open forever. */
 .watch-timeline-hover-tooltip {
+  gap: 6px;
+  align-items: baseline;
   background: rgba(28, 28, 28, 0.95) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
   border-radius: 6px !important;
+}
+.watch-timeline-hover-tooltip:not([hidden]) {
+  display: flex !important;
 }
 
 /* ── Settings panel: dark glass sheet above the right pill ──────────────── */
@@ -1100,6 +1108,13 @@
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+/* The body-level timeline tooltip already shows the hovered time plus the
+   chapter label — ArtPlayer's native progress tip next to it reads as a
+   second timeline ("08:35" chip over "8:35 Main episode · …"). One tooltip:
+   the native tip stays hidden. */
+.watch-art-mount .art-video-player .art-progress-tip {
+  display: none !important;
 }
 .watch-art-mount .art-video-player .art-tooltip {
   font-size: 12px;

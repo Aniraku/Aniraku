@@ -1016,7 +1016,9 @@ function createHoverFramePreview(options: {
     previewVideo.className = 'watch-hover-preview-video';
     previewVideo.muted = true;
     previewVideo.playsInline = true;
-    previewVideo.preload = 'metadata';
+    // auto: some data is buffered up front so the FIRST hover paints fast
+    // instead of waiting a full fragment round-trip.
+    previewVideo.preload = 'auto';
     previewVideo.setAttribute('aria-hidden', 'true');
     previewVideo.setAttribute('disablepictureinpicture', 'true');
     // No crossOrigin: the preview only DISPLAYS frames (drawImage taints
@@ -1058,10 +1060,17 @@ function createHoverFramePreview(options: {
           // Prefetch the init segment while the manifest parses — shaves the
           // first-paint wait when the first hover lands.
           startFragPrefetch: true,
-          maxBufferLength: 8,
+          // Lowest rendition: a 160×90 canvas needs ~nothing, and small
+          // fragments are the difference between a snappy and a sluggish
+          // first paint on far-from-buffered positions.
+          startLevel: 0,
+          maxBufferLength: 12,
           maxMaxBufferLength: 16,
           backBufferLength: 8,
         });
+        // ABR would climb back to HD after the start level — cap it: the
+        // preview never benefits from renditions above ~360p.
+        (hls as unknown as { autoLevelCapping: number }).autoLevelCapping = 0;
         hls.loadSource(buildUrl(src));
         hls.attachMedia(previewVideo);
         hlsInstance = hls;
@@ -1076,6 +1085,19 @@ function createHoverFramePreview(options: {
           }
           try {
             previewVideo.currentTime = time;
+          } catch {
+            // metadata not ready yet — the next move reapplies
+          }
+        } else {
+          // Warm the buffer around the CURRENT playhead: the position the
+          // user is most likely to hover first already has a frame waiting.
+          const seedTime = Number.isFinite(video.currentTime)
+            ? Math.max(0, video.currentTime)
+            : 0;
+          hlsStarted = true;
+          hls.startLoad(seedTime);
+          try {
+            previewVideo.currentTime = seedTime;
           } catch {
             // metadata not ready yet — the next move reapplies
           }
@@ -1151,6 +1173,10 @@ function createHoverFramePreview(options: {
 
   control.addEventListener('pointermove', onPointerMove);
   control.addEventListener('pointerleave', onPointerLeave);
+  // Build at startup (still desktop-pointers-only): module import, manifest
+  // and init segment load happen invisibly BEFORE the first hover, so the
+  // first hover paints from a warm buffer instead of a cold round-trip.
+  buildEngine();
 
   return () => {
     destroyed = true;
