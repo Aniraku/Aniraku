@@ -4262,6 +4262,25 @@ export function Player({
       Artplayer.FAST_FORWARD_VALUE = 2;
       const art = new Artplayer(playerConfig);
 
+      // Horizontal volume adapter: stock ArtPlayer drives its volume slider
+      // in vertical terms (inline height on the fill, inline top on the
+      // thumb), while the replica design lays the track horizontally inside
+      // the pill. Map every volumechange onto the horizontal fill width and
+      // thumb position; the CSS !important top pins the thumb vertically.
+      const syncVolumeUI = () => {
+        const playerEl = art.template?.$player as HTMLElement | undefined;
+        const raw = art.muted ? 0 : art.volume;
+        const vol = Math.min(1, Math.max(0, Number(raw) || 0));
+        const fill = playerEl?.querySelector<HTMLElement>('.art-volume-loaded');
+        if (fill) fill.style.width = `${vol * 100}%`;
+        const thumb = playerEl?.querySelector<HTMLElement>(
+          '.art-volume-indicator',
+        );
+        if (thumb) thumb.style.left = `${vol * 100}%`;
+      };
+      art.on('video:volumechange', syncVolumeUI);
+      syncVolumeUI();
+
       const savedPlayerPreferences = playerPreferencesRef.current;
       art.volume = savedPlayerPreferences.volume;
       art.muted = savedPlayerPreferences.muted;

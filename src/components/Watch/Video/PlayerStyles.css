@@ -513,11 +513,12 @@
   .art-volume-handle
   .art-volume-loaded {
   left: 0 !important;
-  top: auto !important;
+  top: 0 !important;
   right: auto !important;
-  bottom: auto !important;
-  width: 0;
-  height: 100%;
+  bottom: 0 !important;
+  /* width is written inline by the volumechange adapter (stock ArtPlayer
+     writes vertical height/top for its vertical slider) */
+  height: 100% !important;
   transform-origin: left center;
 }
 .watch-art-mount
@@ -720,6 +721,10 @@
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   bottom: calc(var(--art-control-height) + var(--art-progress-height) + var(--art-bottom-gap) + 18px) !important;
+  /* top must lose: ArtPlayer's stock CSS sets top:50% on the panel, and
+     with top + bottom + height set, CSS ignores bottom — the panel floats
+     mid-video instead of anchoring above the pills. */
+  top: auto !important;
   right: var(--art-padding) !important;
   left: auto !important;
   transform: none !important;
